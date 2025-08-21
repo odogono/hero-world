@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { test, expect } from 'bun:test';
 
 import { createWorld } from '@/world';
 import { createEntity, getEComponents } from '@entity';
@@ -14,40 +14,38 @@ import { executeJournies } from '@entity/journey';
 import { createJourney } from '@entity/journey';
 
 
-describe('Entity', () => {
-  it('should be defined', () => {
-    const world = createWorld();
-    const hero = createEntity(world);
+test('Entity should be defined', () => {
+  const world = createWorld();
+  const hero = createEntity(world);
 
-    setEntityStats(world, hero, {strength: 10, dexterity: 10, intelligence: 10, wisdom: 10, constitution: 10, charisma: 10});
-    setEntityHitPoints(world, hero, {current: 10, max: 10});
+  setEntityStats(world, hero, {strength: 10, dexterity: 10, intelligence: 10, wisdom: 10, constitution: 10, charisma: 10});
+  setEntityHitPoints(world, hero, {current: 10, max: 10});
 
-    
+  
 
-    createLocation(world, {name: 'home', region: 'city'});
-    createLocation(world, {name: 'warehouse', region: 'city'});
+  createLocation(world, {name: 'home', region: 'city'});
+  createLocation(world, {name: 'warehouse', region: 'city'});
 
-    const home = getLocationE(world, {name: 'home'});
-    expect(home).not.toBeNull();
+  const home = getLocationE(world, {name: 'home'});
+  expect(home).not.toBeNull();
 
-    setEntityLocation(world, hero, {name: 'home'});
-    expect(getLocationByE(world, hero)!.name).toBe('home');
+  setEntityLocation(world, hero, {name: 'home'});
+  expect(getLocationByE(world, hero)!.name).toBe('home');
 
-    const [error, transit] = createJourney(world, hero, { name: 'warehouse'});
-    expect(error).toBeNull();
+  const [error, transit] = createJourney(world, hero, { name: 'warehouse'});
+  expect(error).toBeNull();
 
-    expect(getLocation(world,transit!.from)!.name).toBe('home');
-    expect(getLocation(world,transit!.to)!.name).toBe('warehouse');
-    expect( transit!.state ).toBe('pending');
+  expect(getLocation(world,transit!.from)!.name).toBe('home');
+  expect(getLocation(world,transit!.to)!.name).toBe('warehouse');
+  expect( transit!.state ).toBe('pending');
 
-    executeJournies(world);
+  executeJournies(world);
 
-    expect(getLocationByE(world, hero)!.name).toBe('warehouse');
+  expect(getLocationByE(world, hero)!.name).toBe('warehouse');
 
-    const components = getEComponents(world, hero);
-    console.log(components);
-    
-  });
+  const components = getEComponents(world, hero);
+  // console.log(components);
+  
 });
 
 

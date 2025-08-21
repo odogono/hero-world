@@ -36,6 +36,9 @@
       "@entity/*": [
         "./src/entity/*"
       ],
+      "@helpers/*": [
+        "./src/helpers/*"
+      ],
       "@types": [
         "./src/types"
       ]
