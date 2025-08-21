@@ -3,10 +3,11 @@ import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteTable } from '../schema-to-sql';
 import { createEntity, createWorld, saveWorld } from '../world';
-import { createLocation } from '../location';
+import { createLocation, getLocationE } from '../location';
+import { createLog } from '@helpers/log';
 
 
-
+const log = createLog('test-main');
 
 
 
@@ -30,6 +31,14 @@ test('SQLite should be able to create a database', async () => {
 
   createLocation(world, {name: 'home', region: 'city'});
   createLocation(world, {name: 'warehouse', region: 'city'});
+
+  const home = getLocationE(world, {name: 'home'});
+  expect(home).not.toBeNull();
+
+  log.info('home', home);
+
+  const office = getLocationE(world, {name: 'office'});
+  expect(office).toBeNull();
 
   // backup
   saveWorld(world, './world.db');

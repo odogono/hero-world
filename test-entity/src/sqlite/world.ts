@@ -3,7 +3,7 @@ import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable } from './schema-to-sql';
 import { createLog } from '@helpers/log';
-import { fromUrl } from '../helpers/string';
+import { fromUrl, toCamelCase } from '../helpers/string';
 
 export type World = {
   db: Database;
@@ -23,6 +23,12 @@ const entitySchema = z.object({
 }).meta({ name: 'tbl_entities' });
 
 
+
+export const isEntity = (val: unknown): val is Entity => {
+  if (typeof val !== 'object' || val === null) return false;
+  const entity = val as Partial<Entity>;
+  return typeof entity.id === 'number';
+}
 
 export const createWorld = () => {
 
@@ -49,7 +55,12 @@ export const saveWorld = async (world: World, path: string) => {
   world.db.exec(`VACUUM main INTO '${path}'`);
 }
 
-export const registerComponentDef = (world: World, componentDef: z.ZodObject<any>): World => {
+
+interface ComponentStatements {
+  [key: string]: string;
+}
+
+export const registerComponentDef = (world: World, componentDef: z.ZodObject<any>, statements: ComponentStatements): World => {
 
   const meta = componentDef.meta();
 
@@ -63,7 +74,7 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
   world.db.exec(result.sql);
 
   const sqlInsert = zodSchemaToSqliteInsert(componentDef);
-  world.db.prepare(sqlInsert);
+  // world.db.prepare(sqlInsert);
 
   log.info('registered component def', {
     
@@ -71,14 +82,27 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
     sqlInsert
   });
 
-  const insertKey = `insert${name}`;
+  const insertKey = `${toCamelCase(name)}Insert`;
+  const stmts = {
+    ...world.stmts,
+    [insertKey]: world.db.prepare(sqlInsert)
+  }
+
+
+  for (const [key, sql] of Object.entries(statements)) {
+    const stmt = world.db.prepare(sql);
+    stmts[key] = stmt;
+    log.info('registered component stmt', {
+      key,
+      sql
+    });
+  }
+
+  world.stmts = stmts;
 
   return {
     ...world,
-    stmts: {
-      ...world.stmts,
-      [insertKey]: world.db.prepare(sqlInsert)
-    }
+    stmts
   }
 }
 

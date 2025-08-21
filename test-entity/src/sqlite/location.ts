@@ -1,5 +1,5 @@
 import { zodSchemaToSqliteInsert } from "./schema-to-sql";
-import { createEntity, registerComponentDef, type World } from "./world";
+import { createEntity, isEntity, registerComponentDef, type Entity, type World } from "./world";
 import * as z from "zod";
 import { createLog } from "@helpers/log";
 
@@ -16,11 +16,35 @@ const locationSchema = z.object({
 
 
 export const createLocation = (world: World, location: Location) => {
-  world = registerComponentDef(world, locationSchema);
+  world = registerComponentDef(world, locationSchema, {
+    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
+  });
 
   const eid = createEntity(world);
 
-  world.stmts.insertLocation!.run(eid, location.name, location.region);
+  world.stmts.locationInsert!.run(eid, location.name, location.region);
 
   return eid;
+}
+
+
+export const getLocationE = (world: World, location: Entity | Partial<Location>): Entity | null => {
+
+  if (isEntity(location)) {
+    return location;
+  }
+
+  const stmt = world.stmts.locationSelectByName;
+
+  if (!stmt) {
+    throw new Error('locationSelectByName not found');
+  }
+
+  const result = stmt.get(location.name);
+
+  if (!result) {
+    return null;
+  }
+
+  return result as Entity;
 }
