@@ -29,6 +29,15 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@entity": [
+        "./src/entity"
+      ],
+      "@entity/*": [
+        "./src/entity/*"
+      ],
+      "@types": [
+        "./src/types"
       ]
     }
   }
