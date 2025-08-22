@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import * as z from "zod";
-import { zodSchemaToSqliteTable, zodSchemaToSqliteInsert, zodSchemaToSqliteSelect } from '../schema-to-sql';
+import { zodSchemaToSqliteTable, zodSchemaToSqliteInsert, zodSchemaToSqliteSelect, zodSchemaToSqliteSelectWhere } from '../schema-to-sql';
 import { Database } from 'bun:sqlite';
 
 
@@ -47,6 +47,32 @@ describe('inserting data', () => {
       email: 'john.doe@example.com',
       age: null
     });
+  });
+
+});
+
+
+describe('querying data', () => {
+
+  test('should query data from a table', () => {
+
+    const schema = z.object({
+      id: z.number().optional().meta({ primaryKey: true, autoIncrement: true }),
+      name: z.string(),
+      email: z.string(),
+      age: z.number().optional(),
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteTable(schema);
+
+
+    const sql = zodSchemaToSqliteSelectWhere(result, 'id', 'name');
+
+    expect(sql).toEqual('SELECT id FROM tbl_users WHERE name = ?1');
+
+    const sqlAnd = zodSchemaToSqliteSelectWhere(result, 'name', ['email', 'age']);
+
+    expect(sqlAnd).toEqual('SELECT name FROM tbl_users WHERE email = ?1 AND age = ?2');
   });
 
 })
@@ -308,6 +334,69 @@ describe('zodSchemaToSqliteTable', () => {
     expect(result.sql).toContain('is_active INTEGER NOT NULL DEFAULT 1');
     expect(result.sql).toContain('created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
     expect(result.sql).toContain('updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+  });
+
+
+  test('should handle unique constraints', () => {
+    const schema = z.object({
+      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      name: z.string().meta({ unique: true }),
+    }).meta({ name: 'tbl_user' });
+    
+    const result = zodSchemaToSqliteTable(schema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_user');
+    expect(result.sql).toContain('name TEXT NOT NULL UNIQUE');
+    expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
+  });
+
+
+  test('should handle foreign key constraints', () => {
+    const schema = z.object({
+      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      userId: z.number().meta({ foreignKey: 'tbl_user', cascade: true }),
+    }).meta({ name: 'tbl_user_role' });
+    
+    const result = zodSchemaToSqliteTable(schema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_user_role');
+    expect(result.sql).toContain('user_id INTEGER NOT NULL');
+    expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
+    expect(result.sql).toContain('FOREIGN KEY (user_id) REFERENCES tbl_user (id) ON DELETE CASCADE');
+  });
+
+  test('should handle foreign key constraints without cascade', () => {
+    const schema = z.object({
+      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      categoryId: z.number().meta({ foreignKey: 'tbl_categories' }),
+    }).meta({ name: 'tbl_products' });
+    
+    const result = zodSchemaToSqliteTable(schema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_products');
+    expect(result.sql).toContain('category_id INTEGER NOT NULL');
+    expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
+    expect(result.sql).toContain('FOREIGN KEY (category_id) REFERENCES tbl_categories (id)');
+    expect(result.sql).not.toContain('ON DELETE CASCADE');
+  });
+
+  test('should handle multiple foreign key constraints', () => {
+    const schema = z.object({
+      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      userId: z.number().meta({ foreignKey: 'tbl_users', cascade: true }),
+      categoryId: z.number().meta({ foreignKey: 'tbl_categories' }),
+      authorId: z.number().meta({ foreignKey: 'tbl_authors', cascade: true }),
+    }).meta({ name: 'tbl_posts' });
+    
+    const result = zodSchemaToSqliteTable(schema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_posts');
+    expect(result.sql).toContain('user_id INTEGER NOT NULL');
+    expect(result.sql).toContain('category_id INTEGER NOT NULL');
+    expect(result.sql).toContain('author_id INTEGER NOT NULL');
+    expect(result.sql).toContain('FOREIGN KEY (user_id) REFERENCES tbl_users (id) ON DELETE CASCADE');
+    expect(result.sql).toContain('FOREIGN KEY (category_id) REFERENCES tbl_categories (id)');
+    expect(result.sql).toContain('FOREIGN KEY (author_id) REFERENCES tbl_authors (id) ON DELETE CASCADE');
   });
 
 });

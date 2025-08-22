@@ -39,6 +39,7 @@ export function zodSchemaToSqliteTable(
   const shape = schema.shape;
   const columnDefs: string[] = [];
   const columnInfos: ColumnInfo[] = [];
+  const foreignKeyConstraints: string[] = [];
   
   // Get table name from metadata or options
   const tableName = options?.tableName || (schema.meta()?.name as string);
@@ -50,12 +51,19 @@ export function zodSchemaToSqliteTable(
   
   for (const [key, value] of Object.entries(shape)) {
     const snakeCaseKey = toSnakeCase(key) || key;
-    const { columnDef, columnInfo } = zodTypeToSqliteColumnWithInfo(snakeCaseKey, value as z.ZodTypeAny);
+    const { columnDef, columnInfo, foreignKeyConstraint } = zodTypeToSqliteColumnWithInfo(snakeCaseKey, value as z.ZodTypeAny);
     columnDefs.push(columnDef);
     columnInfos.push(columnInfo);
+    
+    // Collect foreign key constraints
+    if (foreignKeyConstraint) {
+      foreignKeyConstraints.push(foreignKeyConstraint);
+    }
   }
   
-  const sql = `CREATE TABLE${ifNotExists ? ' IF NOT EXISTS ' : ' '}${tableName} (\n  ${columnDefs.join(',\n  ')}\n);`;
+  // Combine column definitions with foreign key constraints
+  const allConstraints = [...columnDefs, ...foreignKeyConstraints];
+  const sql = `CREATE TABLE${ifNotExists ? ' IF NOT EXISTS ' : ' '}${tableName} (\n  ${allConstraints.join(',\n  ')}\n);`;
   
   return {
     sql,
@@ -71,7 +79,7 @@ export function zodSchemaToSqliteTable(
  * @param isOptional - Whether the field is optional (internal use)
  * @returns Object containing SQL column definition and column information
  */
-function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny, isOptional = false): { columnDef: string; columnInfo: ColumnInfo } {
+function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny, isOptional = false): { columnDef: string; columnInfo: ColumnInfo; foreignKeyConstraint?: string } {
   let sqliteType = 'TEXT'; // default
   let constraints: string[] = [];
   
@@ -185,6 +193,11 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
     isOptional = false;
   }
   
+  // Check for unique constraint in metadata
+  if (metadata?.unique) {
+    constraints.push('UNIQUE');
+  }
+  
   // Check for default value in metadata
   if (metadata?.default) {
     constraints.push(`DEFAULT ${metadata.default}`);
@@ -195,7 +208,18 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
     constraints.push('NOT NULL');
   }
   
-  // Order constraints properly: NOT NULL first, then PRIMARY KEY, then AUTOINCREMENT, then DEFAULT
+  // Handle foreign key constraint
+  let foreignKeyConstraint: string | undefined;
+  if (metadata?.foreignKey) {
+    const referencedTable = metadata.foreignKey;
+    const cascade = metadata.cascade ? ' ON DELETE CASCADE' : '';
+    foreignKeyConstraint = `FOREIGN KEY (${columnName}) REFERENCES ${referencedTable} (id)${cascade}`;
+    
+    // Foreign key columns should be INTEGER type
+    sqliteType = 'INTEGER';
+  }
+  
+  // Order constraints properly: NOT NULL first, then PRIMARY KEY, then AUTOINCREMENT, then UNIQUE, then DEFAULT
   const orderedConstraints = [];
   if (constraints.includes('NOT NULL')) {
     orderedConstraints.push('NOT NULL');
@@ -205,6 +229,9 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
   }
   if (constraints.includes('AUTOINCREMENT')) {
     orderedConstraints.push('AUTOINCREMENT');
+  }
+  if (constraints.includes('UNIQUE')) {
+    orderedConstraints.push('UNIQUE');
   }
   // Find and add DEFAULT constraint
   const defaultConstraint = constraints.find(c => c.startsWith('DEFAULT'));
@@ -224,7 +251,8 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
       name: columnName,
       type: sqliteType,
       constraints: [...orderedConstraints]
-    }
+    },
+    foreignKeyConstraint
   };
 }
 
@@ -307,6 +335,28 @@ export function zodSchemaToSqliteSelect(
   }
   
   return `SELECT ${columns.join(', ')} FROM ${tableName}`;
+}
+
+/**
+ * Converts a Zod schema to a SQLite SELECT statement with WHERE clause
+ * @param tableResult - The result from zodSchemaToSqliteTable
+ * @param selectColumn - The column to select (in snake_case)
+ * @param whereColumn - The column(s) to filter by (in snake_case)
+ * @returns SQLite SELECT statement with WHERE clause as a string
+ */
+export function zodSchemaToSqliteSelectWhere(
+  tableResult: TableGenerationResult,
+  selectColumn: string,
+  whereColumn: string | string[]
+): string {
+  const tableName = tableResult.tableName;
+  const whereColumns = Array.isArray(whereColumn) ? whereColumn : [whereColumn];
+  
+  // Build WHERE clause with AND conditions
+  const whereConditions = whereColumns.map((col, index) => `${col} = ?${index + 1}`);
+  const whereClause = whereConditions.join(' AND ');
+  
+  return `SELECT ${selectColumn} FROM ${tableName} WHERE ${whereClause}`;
 }
 
 /**
