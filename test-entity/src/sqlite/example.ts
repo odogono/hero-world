@@ -55,3 +55,30 @@ console.log(zodSchemaToSqliteTable(orderSchema));
 // Example 4: Using options to override table name
 console.log('\n=== Custom Table Name ===');
 console.log(zodSchemaToSqliteTable(userSchema, { tableName: 'custom_users' }));
+
+// Example: User and Post schemas with foreign key relationship
+const userSchemaFK = z.object({
+  id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+  name: z.string(),
+  email: z.string().meta({ unique: true }),
+  createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP' }),
+}).meta({ name: 'tbl_users' });
+
+const postSchemaFK = z.object({
+  id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+  title: z.string(),
+  content: z.string(),
+  userId: z.number().meta({ foreignKey: 'tbl_users', cascade: true }),
+  categoryId: z.number().meta({ foreignKey: 'tbl_categories' }),
+  createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP' }),
+  updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP' }),
+}).meta({ name: 'tbl_posts' });
+
+console.log('\n=== Foreign Key Example ===');
+console.log('\nUser Table:');
+const userTable = zodSchemaToSqliteTable(userSchemaFK);
+console.log(userTable.sql);
+
+console.log('\nPost Table (with foreign keys):');
+const postTable = zodSchemaToSqliteTable(postSchemaFK);
+console.log(postTable.sql);

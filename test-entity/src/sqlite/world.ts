@@ -20,8 +20,13 @@ const entitySchema = z.object({
   id: z.number().meta({ primaryKey: true, autoIncrement: true }),
   createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
   updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
-}).meta({ name: 'tbl_entities' });
+}).meta({ name: 'tbl_entity' });
 
+export type ComponentDef = z.infer<typeof componentDefSchema>;
+const componentDefSchema = z.object({
+  id: z.string().meta({ primaryKey: true, autoIncrement: true }),
+  url: z.string().meta({ unique: true }),
+}).meta({ name: 'tbl_component_def' });
 
 
 export const isEntity = (val: unknown): val is Entity => {
@@ -34,17 +39,34 @@ export const createWorld = () => {
 
   const db = new Database(':memory:');
 
+  db.exec("PRAGMA journal_mode = WAL;");
+  db.exec("PRAGMA foreign_keys = ON");
+
   const {sql} = zodSchemaToSqliteTable(entitySchema, {ifNotExists: true});
   db.exec(sql);
 
-  const insertEntity = db.prepare('INSERT INTO tbl_entities DEFAULT VALUES;');
+  const {sql: componentDefSql} = zodSchemaToSqliteTable(componentDefSchema, {ifNotExists: true});
+  db.exec(componentDefSql);
 
+  const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
+  const insertComponentDef = db.prepare('INSERT INTO tbl_component_def (url) VALUES (?1) ON CONFLICT DO NOTHING;');
+  const selectComponentDefByUrl = db.prepare('SELECT id FROM tbl_component_def WHERE url = ?1;');
   return {
     db,
     stmts: {
-      insertEntity
+      insertEntity,
+      insertComponentDef,
+      selectComponentDefByUrl
     }
   }
+}
+
+export const getComponentDef = (world: World, url: string) => {
+  const stmt = world.stmts.selectComponentDefByUrl;
+  if (!stmt) {
+    throw new Error('selectComponentDefByUrl not found');
+  }
+  return stmt.get(url);
 }
 
 
@@ -68,13 +90,20 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
     throw new Error('componentDef must have an id');
   }
 
+  const existing = getComponentDef(world, meta.id);
+  if (existing) {
+    return world;
+  }
+
   const name = fromUrl(meta.id);
+
+  const cid = insertComponentDef(world, meta.id);
   
   const result = zodSchemaToSqliteTable(componentDef, {ifNotExists: true});
   world.db.exec(result.sql);
 
   const sqlInsert = zodSchemaToSqliteInsert(componentDef);
-  // world.db.prepare(sqlInsert);
+  
 
   log.info('registered component def', {
     
@@ -107,11 +136,13 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
 }
 
 
-export const createEntity = (world: World) => {
-  if (!world.db || !world.stmts.insertEntity) {
+export const createEntity = (world: World) => 
+  world.stmts.insertEntity!.run().lastInsertRowid as number;
+
+export const insertComponentDef = (world: World, url: string) => {
+  if (!world.db || !world.stmts.insertComponentDef) {
     throw new Error('world not initialized');
   }
-  
-  const { lastInsertRowid } = world.stmts.insertEntity!.run();
+  const { lastInsertRowid } = world.stmts.insertComponentDef!.run(url);
   return lastInsertRowid as number;
 }
