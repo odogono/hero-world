@@ -1,12 +1,11 @@
 import { Database, Statement } from 'bun:sqlite';
-import { test, expect } from 'bun:test';
 import * as z from "zod";
-import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate, type ColumnInfo } from './schema-to-sql';
+import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate } from './schema-to-sql';
 import { createLog } from '@helpers/log';
-import { fromUrl, toCamelCase, toSnakeCase } from '../helpers/string';
-import type { Components, Entity, World, EntityCache, ComponentDef } from './types';
+import { fromUrl, toSnakeCase } from '../helpers/string';
+import type { Components, Entity, World, EntityCache, ComponentDef, WorldBuilder } from './types';
 import { entitySchema } from './types';
-import type { ComponentDefinition } from './component-registry';
+import type { ComponentDefinition } from './types';
 import { makeTrackedComponent } from './component';
 
 
@@ -26,7 +25,7 @@ const convertKeysToSnakeCase = (obj: Record<string, any>): Record<string, any> =
 
 
 
-export const createWorld = <T extends Components>(): World<T> => {
+const createWorldInternal = <T extends Components>(): World<T> => {
 
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entityCache: EntityCache = new Map();
@@ -39,13 +38,12 @@ export const createWorld = <T extends Components>(): World<T> => {
   const {sql} = zodSchemaToSqliteTable(entitySchema, {ifNotExists: true});
   db.exec(sql);
 
-  // const {sql: componentDefSql} = zodSchemaToSqliteTable(componentDefSchema, {ifNotExists: true});
-  // db.exec(componentDefSql);
-
+  
   const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?1;');
   const selectEntityById = db.prepare('SELECT id FROM tbl_entity WHERE id = ?1;');
-  // const selectComponentDefByUrl = db.prepare('SELECT id FROM tbl_component_def WHERE url = ?1;');
+  
+
   return {
     db,
     defs: new Map(),
@@ -55,9 +53,43 @@ export const createWorld = <T extends Components>(): World<T> => {
       insertEntity,
       deleteEntity,
       selectEntityById,
-      // selectComponentDefByUrl
+  
     }
   }
+}
+
+
+// Cleaner component registration using ComponentDefinition
+// export const registerComponent = <
+//   Name extends string,
+//   Schema extends z.ZodObject<any>
+// >(
+//   world: World<T & { [K in Name]: z.infer<Schema> }>, 
+//   definition: ComponentDefinition<Name, Schema>
+// ): World<T & { [K in Name]: z.infer<Schema> }> => {
+//   return registerComponentDef(world, definition.schema, definition.statements || {});
+// }
+
+export const createWorld = <T extends Components>(): WorldBuilder<T> => {
+  const world = createWorldInternal<T>();
+
+  const build = () => world;
+
+  const registerComponent = <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>): WorldBuilder<T> => {
+    registerComponentDef(world, def.schema, def.statements || {});
+    return {
+      ...world,
+      registerComponent,
+      build
+    } as WorldBuilder<T & { [K in Name]: z.infer<Schema> }>;
+  }
+
+
+  return {
+    ...world,
+    registerComponent,
+    build
+  };
 }
 
 // export const getComponentDef = <T extends Components>(world: World<T>, url: string) => {
@@ -81,7 +113,7 @@ interface ComponentStatements {
   [key: string]: string;
 }
 
-export const registerComponentDef = <T extends Components>(world: World<T>, componentDef: z.ZodObject<any>, statements: ComponentStatements = {}): World<T> => {
+const registerComponentDef = <T extends Components>(world: World<T>, componentDef: z.ZodObject<any>, statements: ComponentStatements = {}): World<T> => {
 
   const meta = componentDef.meta();
 
@@ -135,16 +167,6 @@ export const registerComponentDef = <T extends Components>(world: World<T>, comp
   return world;
 }
 
-// Cleaner component registration using ComponentDefinition
-export const registerComponent = <
-  Name extends string,
-  Schema extends z.ZodObject<any>
->(
-  world: World<T & { [K in Name]: z.infer<Schema> }>, 
-  definition: ComponentDefinition<Name, Schema>
-): World<T & { [K in Name]: z.infer<Schema> }> => {
-  return registerComponentDef(world, definition.schema, definition.statements || {});
-}
 
 // export const insertComponentDef = <T extends Components>(world: World<T>, url: string): number => {
 //   if (!world.db || !world.stmts.insertComponentDef) {
@@ -154,7 +176,7 @@ export const registerComponent = <
 //   return lastInsertRowid as number;
 // }
 
-export const deleteEntity = <T extends Components>(entity: Entity<T>) => {
+export const deleteEntity = <T extends Components>(entity: Entity<any>) => {
   const { id, world } = entity;
 
   // log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
@@ -179,16 +201,15 @@ export const getEntity = <T extends Components>(world: World<T>, id: number) => 
 }
 
 
-export const queryEntities = <T extends Components>(world: World<T>, components: (keyof T)[], entity?: Entity<T>) => {
+export const queryEntities = <T extends Components>(world: World<T>, components: (keyof T)[], entity?: Entity<any>) => {
 
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
   const fields: string[] = [];
-
   components.forEach(c => {
-    const def = world.defs.get(c);
+    const def = world.defs.get(c as string);
     if (!def) {
-      throw new Error(`Component def not found for ${c}`);
+      throw new Error(`Component def not found for ${String(c)}`);
     }
     const alias = def.name;
     const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
@@ -211,12 +232,12 @@ export const queryEntities = <T extends Components>(world: World<T>, components:
     const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
     
     components.forEach(c => {
-      const def = world.defs.get(c)!;
+      const def = world.defs.get(c as string)!;
       const data: any = {};
       def.columns.forEach(column => {
         data[column.name] = row[`${def.name}_${column.name}`];
       })
-      entity[c] = makeTrackedComponent(entity, c, data);
+      entity[c] = makeTrackedComponent(entity, c as string, data);
     });
 
     return entity;
@@ -232,11 +253,11 @@ export const flush = <T extends Components>(world: World<T>) => {
       const cache = entityCache.get(eid);
 
       for (const c of components) {
-        const entry = cache![c]!;
-        const def = defs.get(c);
+        const entry = cache![c as string]!;
+        const def = defs.get(c as string);
         if (!def) {
           log.debug('[flush] defs', Object.keys(defs));
-          throw new Error(`Component def not found for ${c}`);
+          throw new Error(`Component def not found for ${c as string}`);
         }
         if (entry.exists) {
           // update

@@ -1,10 +1,24 @@
-import type { Entity, Components } from "./types";
+import type { Entity, Components, ComponentDefinition } from "./types";
 import * as z from "zod";
 
 export const componentSchema = z.object({
   id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
   eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
 });
+
+
+
+/**
+ * Creates a component definition
+ */
+export const defineComponent = <
+  Name extends string,
+  Schema extends z.ZodTypeAny
+>(definition: ComponentDefinition<Name, Schema>) => {
+  return definition;
+};
+
+
 
 export const makeTrackedComponent = <T extends keyof Components>(
   entity: Entity,

@@ -2,10 +2,10 @@ import { Database } from 'bun:sqlite';
 import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteTable } from '../schema-to-sql';
-import { createEntity, createWorld, deleteEntity, flush, getEntity, queryEntities, registerComponentDef, saveWorld } from '../world';
-import { createLocation, getLocationE, locationSchema, type Location } from '../location';
+import { createWorld, deleteEntity, flush, getEntity, queryEntities, saveWorld } from '../world';
+import { createLocation, getLocationE, locationComponent, locationSchema, type Location } from '../components/location';
 import { createLog } from '@helpers/log';
-import { addComponent } from '../component';
+import { createEntity } from '../entity';
 
 
 const log = createLog('test-main');
@@ -25,15 +25,14 @@ test('SQLite should be able to create a database', async () => {
   //   INSERT INTO users VALUES (1, 'Alice'), (2, 'Bob');
   // `);
 
-  const world = createWorld();
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .build();
 
   // const e = createEntity(world);
   // console.log(e.id);
 
-  registerComponentDef(world, locationSchema, {
-    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
-  });
-
+  
   const e = createEntity(world, {location: {name: 'home', region: 'city'}});
 
   // addComponent(e, 'location', {name: 'home', region: 'city'});

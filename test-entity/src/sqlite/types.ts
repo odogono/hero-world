@@ -1,5 +1,5 @@
 import * as z from "zod";
-import type { Location } from "./location";
+import type { Location } from "./components/location";
 // import type { ComponentRegistry } from "./component-registry";
 import { Database, Statement } from 'bun:sqlite';
 import type { ColumnInfo } from "./schema-to-sql";
@@ -29,6 +29,17 @@ export type ComponentDef = {
 }
 
 
+/**
+ * Component definition
+ */
+export interface ComponentDefinition<
+  Name extends string,
+  Schema extends z.ZodTypeAny
+> {
+  name: Name;
+  schema: Schema;
+  statements?: Record<string, string>;
+}
 
 export type Components = Record<string, any>;
 
@@ -41,7 +52,11 @@ export type World<TComponents extends Components> = {
   entityCache: EntityCache;
   defs: Map<string, ComponentDef>;
   stmts: Record<string, Statement>;
-  // _componentTypes: TComponents;
+}
+
+export type WorldBuilder<TComponents extends Components> = World<TComponents> & {
+  registerComponent: <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
+  build: () => World<TComponents>;
 }
 
 // export type World = {

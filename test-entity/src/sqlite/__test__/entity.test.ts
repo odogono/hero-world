@@ -1,10 +1,10 @@
 import { test, expect, describe } from 'bun:test';
-import { createWorld, flush, registerComponentDef } from '../world';
-import { locationSchema, type Location } from '../location';
+import { createWorld, flush } from '../world';
+import { locationSchema } from '../components/location';
 import { createLog } from '@helpers/log';
 import * as z from 'zod';
 import { componentSchema } from '../component';
-import { defineComponent, createWorld as createWorldBuilder } from '../component-registry';
+import { defineComponent } from '../component';
 import { createEntity } from '../entity';
 
 const log = createLog('test-entity');
@@ -75,11 +75,7 @@ test('createEntity should create multiple entities with unique IDs', () => {
 });
 
 test('createEntity should create entity with location component', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, locationSchema, {
-    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
-  });
+  const world = createWorld().registerComponent(locationComponent).build();
   
   const entity = createEntity(world, { 
     location: { name: 'Forest', region: 'North' } 
@@ -93,11 +89,7 @@ test('createEntity should create entity with location component', () => {
 });
 
 test('createEntity should create entity with stats component', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, statsSchema, {
-    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?1'
-  });
+  const world = createWorld().registerComponent(statsComponent).build();
   
   const entity = createEntity(world, { 
     stats: { health: 100, mana: 50, level: 5 } 
@@ -111,9 +103,7 @@ test('createEntity should create entity with stats component', () => {
 });
 
 test('createEntity should create entity with inventory component', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, inventorySchema);
+  const world = createWorld().registerComponent(inventoryComponent).build();
   
   const items = JSON.stringify(['sword', 'potion', 'key']);
   const entity = createEntity(world, { 
@@ -127,15 +117,10 @@ test('createEntity should create entity with inventory component', () => {
 });
 
 test('createEntity should create entity with multiple components', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, locationSchema, {
-    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
-  });
-  
-  registerComponentDef(world, statsSchema, {
-    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?1'
-  });
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .build();
   
   const entity = createEntity(world, { 
     location: { name: 'City', region: 'Central' },
@@ -153,11 +138,9 @@ test('createEntity should create entity with multiple components', () => {
 });
 
 test('createEntity should track component changes', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, locationSchema, {
-    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
-  });
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .build();
   
   const entity = createEntity(world, { 
     location: { name: 'Forest', region: 'North' } 
@@ -180,11 +163,10 @@ test('createEntity should track component changes', () => {
 });
 
 test('createEntity should track changes across multiple components', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, locationSchema);
-  
-  registerComponentDef(world, statsSchema);
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .build();
   
   const entity = createEntity(world, { 
     location: { name: 'Village', region: 'East' },
@@ -209,9 +191,9 @@ test('createEntity should track changes across multiple components', () => {
 });
 
 test('createEntity should cache components in entityCache', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, statsSchema);
+  const world = createWorld()
+    .registerComponent(statsComponent)
+    .build();
   
   const entity = createEntity(world, { 
     stats: { health: 75, mana: 25, level: 4 } 
@@ -230,9 +212,7 @@ test('createEntity should cache components in entityCache', () => {
 });
 
 test('createEntity should persist components after flush', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, inventorySchema);
+  const world = createWorld().registerComponent(inventoryComponent).build();
   
   const entity = createEntity(world, { 
     inventory: { capacity: 5, items: '["apple", "bread"]' } 
@@ -252,9 +232,7 @@ test('createEntity should persist components after flush', () => {
 });
 
 test('createEntity should work with component modifications through proxy', () => {
-  const world = createWorld();
-  
-  registerComponentDef(world, statsSchema);
+  const world = createWorld().registerComponent(statsComponent).build();
   
   const entity = createEntity(world, { 
     stats: { health: 100, mana: 100, level: 10 } 
@@ -277,18 +255,20 @@ test('createEntity should work with component modifications through proxy', () =
 });
 
 test('createEntity should handle different component data types', () => {
-  const world = createWorld();
   
   // Test with string component
-  const nameSchema = z.object({
-    id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
-    eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
+  const nameSchema = componentSchema.extend({
     firstName: z.string(),
     lastName: z.string(),
     title: z.string().optional(),
   }).meta({ name: 'tbl_names', id: '/name' });
+
+  const nameComponent = defineComponent({
+    name: 'name' as const,
+    schema: nameSchema
+  });
   
-  registerComponentDef(world, nameSchema);
+  const world = createWorld().registerComponent(nameComponent).build();
   
   const entity = createEntity(world, { 
     name: { firstName: 'John', lastName: 'Doe', title: 'Sir' } 
@@ -311,8 +291,8 @@ test('createEntity should handle different component data types', () => {
 describe('WorldBuilder and TypedEntity System', () => {
 
 test('should create world with builder pattern and single component', () => {
-  const world = createWorldBuilder()
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(statsComponent)
     .build();
   
   expect(world).toBeDefined();
@@ -320,10 +300,10 @@ test('should create world with builder pattern and single component', () => {
 });
 
 test('should create world with multiple components using builder pattern', () => {
-  const world = createWorldBuilder()
-    .withComponent(locationComponent)
-    .withComponent(statsComponent)
-    .withComponent(inventoryComponent)
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .registerComponent(inventoryComponent)
     .build();
   
   expect(world.defs.has('location')).toBe(true);
@@ -332,8 +312,8 @@ test('should create world with multiple components using builder pattern', () =>
 });
 
 test('should create typed entity with single component', () => {
-  const world = createWorldBuilder()
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(statsComponent)
     .build();
   
   const entity = createEntity(world, {
@@ -349,9 +329,9 @@ test('should create typed entity with single component', () => {
 });
 
 test('should create typed entity with multiple components', () => {
-  const world = createWorldBuilder()
-    .withComponent(locationComponent)
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
     .build();
   
   const entity = createEntity(world, {
@@ -367,20 +347,20 @@ test('should create typed entity with multiple components', () => {
 });
 
 test('should create typed entity without initial components', () => {
-  const world = createWorldBuilder()
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(statsComponent)
     .build();
   
   const entity = createEntity(world);
   
   expect(entity).toBeDefined();
   expect(entity.id).toBeTypeOf('number');
-  expect(entity.world).toBe(world);
+  expect(entity.world).toBe(world as any);
 });
 
 test('should track component changes in typed entities', () => {
-  const world = createWorldBuilder()
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(statsComponent)
     .build();
   
   const entity = createEntity(world, {
@@ -402,8 +382,8 @@ test('should track component changes in typed entities', () => {
 });
 
 test('should persist typed entity components after flush', () => {
-  const world = createWorldBuilder()
-    .withComponent(inventoryComponent)
+  const world = createWorld()
+    .registerComponent(inventoryComponent)
     .build();
   
   const entity = createEntity(world, {
@@ -423,8 +403,8 @@ test('should persist typed entity components after flush', () => {
 });
 
 test('should work with custom component statements', () => {
-  const world = createWorldBuilder()
-    .withComponent(statsComponent)
+  const world = createWorld()
+    .registerComponent(statsComponent)
     .build();
   
   const entity = createEntity(world, {
@@ -439,16 +419,16 @@ test('should work with custom component statements', () => {
   expect(def!.statsByLevel).toBeDefined();
   
   // Execute custom statement
-  const results = def!.statsByLevel.all(5);
+  const results = def!.statsByLevel!.all(5);
   expect(results).toBeDefined();
   expect(Array.isArray(results)).toBe(true);
 });
 
 test('should handle complex multi-component scenarios', () => {
-  const world = createWorldBuilder()
-    .withComponent(locationComponent)
-    .withComponent(statsComponent)
-    .withComponent(inventoryComponent)
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .registerComponent(inventoryComponent)
     .build();
   
   // Create multiple entities

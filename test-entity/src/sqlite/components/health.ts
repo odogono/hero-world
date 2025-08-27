@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { componentSchema } from "../component";
-import { defineComponent } from "../component-registry";
+import { defineComponent } from "../component";
 
 // Define the component schema extending the base componentSchema
 const healthSchema = componentSchema.extend({

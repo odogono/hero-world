@@ -1,22 +1,19 @@
 import { makeTrackedComponent } from "./component";
-import type { EntityWithComponents } from "./component-registry";
 import type { Components, Entity, World } from "./types";
 
-/**
- * Create entity function for typed worlds
- */
-// export const createEntity2 = <
-//   TComponents extends Record<string, any>,
-//   C extends Partial<TComponents>
-// >(
-//   world: WorldWithComponents<TComponents>,
-//   initialComponents?: C
-// ): EntityWithComponents<TComponents, keyof C> => {
-//   // Import here to avoid circular dependency
-  
-//   return createEntity(world as any, initialComponents);
-// }
 
+/**
+ * Entity type for a world with specific components
+ */
+export type EntityWithComponents<
+  TComponents extends Record<string, any>,
+  C extends keyof TComponents = never
+> = {
+  id: number;
+  world: World<TComponents>;
+} & {
+  [K in C]-?: NonNullable<TComponents[K]>;
+}
 
 
 // Overloads for type inference

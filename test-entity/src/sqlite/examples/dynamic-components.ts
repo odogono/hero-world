@@ -6,8 +6,9 @@
  */
 
 import { healthComponent } from '../components/health';
-import { componentSchema } from '../component';
-import { defineComponent, createWorld, createEntity } from '../component-registry';
+import { componentSchema, defineComponent } from '../component';
+import { createWorld } from '../world';
+import { createEntity } from '../entity';
 import * as z from 'zod';
 
 // Example: Create a new component - no declare module needed!
@@ -32,8 +33,8 @@ export const manaComponent = defineComponent({
 export const exampleUsage = () => {
   // Create world with components using builder pattern
   const world = createWorld()
-    .withComponent(healthComponent)
-    .withComponent(manaComponent)
+    .registerComponent(healthComponent)
+    .registerComponent(manaComponent)
     .build();
   
   // Create entity with components - TypeScript knows about 'health' and 'mana'!
