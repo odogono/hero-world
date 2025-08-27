@@ -7,11 +7,13 @@ import { Database } from 'bun:sqlite';
 describe('inserting data', () => {
 
   test('should insert data into a table', () => {
-    const schema = z.object({
-      id: z.number().optional().meta({ primaryKey: true, autoIncrement: true }),
-      name: z.string(),
-      email: z.string(),
+    const schema = z.object(
+      // @ts-ignore
+      {
+      id: z.number().optional().meta({ autoIncrement: true, primaryKey: true }),
       age: z.number().optional(),
+      email: z.string(),
+      name: z.string(),
     }).meta({ name: 'tbl_users' });
 
     type User = z.infer<typeof schema>;
@@ -23,29 +25,29 @@ describe('inserting data', () => {
 
 
     const user: User = {
-      name: 'John Doe',
-      email: 'john.doe@example.com'
+      email: 'john.doe@example.com',
+      name: 'John Doe'
     };
 
     const sql = zodSchemaToSqliteInsert(schema);
 
-    expect(sql).toBe('INSERT INTO tbl_users (name, email, age) VALUES (?1, ?2, ?3)');
+    expect(sql).toBe('INSERT INTO tbl_users (age, email, name) VALUES (?1, ?2, ?3)');
 
 
     const query = db.query(sql);
-    query.run(user.name, user.email, null);
+    query.run(null, user.email, user.name);
 
     const selectSql = zodSchemaToSqliteSelect(schema);
-    expect(selectSql).toBe('SELECT id, name, email, age FROM tbl_users');
+    expect(selectSql).toBe('SELECT id, age, email, name FROM tbl_users');
 
     const selectQuery = db.query(selectSql);
     const userResult = selectQuery.get();
 
     expect(userResult).toEqual({
-      id: 1,
-      name: 'John Doe',
+      age: null,
       email: 'john.doe@example.com',
-      age: null
+      id: 1,
+      name: 'John Doe'
     });
   });
 
@@ -57,10 +59,10 @@ describe('querying data', () => {
   test('should query data from a table', () => {
 
     const schema = z.object({
-      id: z.number().optional().meta({ primaryKey: true, autoIncrement: true }),
-      name: z.string(),
-      email: z.string(),
       age: z.number().optional(),
+      email: z.string(),
+      id: z.number().optional().meta({ autoIncrement: true, primaryKey: true }),
+      name: z.string(),
     }).meta({ name: 'tbl_users' });
 
     const result = zodSchemaToSqliteTable(schema);
@@ -82,7 +84,7 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should create a table with a primary key', () => {
     const schema = z.object({
-      entityId: z.number().optional().meta({ primaryKey: true, autoIncrement: true }),
+      entityId: z.number().optional().meta({ autoIncrement: true, primaryKey: true }),
       name: z.string(),
     }).meta({ name: 'tbl_users' });
 
@@ -90,14 +92,14 @@ describe('zodSchemaToSqliteTable', () => {
 
 
     expect(result).toEqual({
+      columns: [
+        { constraints: ['PRIMARY KEY', 'AUTOINCREMENT', 'NOT NULL'], name: 'entity_id', type: 'INTEGER' },
+        { constraints: ['NOT NULL'], name: 'name', type: 'TEXT' },
+      ],
       sql: `CREATE TABLE tbl_users (
   entity_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   name TEXT NOT NULL
 );`,
-      columns: [
-        { name: 'entity_id', type: 'INTEGER', constraints: ['PRIMARY KEY', 'AUTOINCREMENT', 'NOT NULL'] },
-        { name: 'name', type: 'TEXT', constraints: ['NOT NULL'] },
-      ],
       tableName: 'tbl_users'
     });
 
@@ -108,10 +110,10 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should convert basic schema to SQLite table', () => {
     const userSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      name: z.string(),
-      email: z.string(),
       age: z.number().optional(),
+      email: z.string(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      name: z.string(),
     }).meta({ name: 'users' });
 
     const result = zodSchemaToSqliteTable(userSchema);
@@ -125,8 +127,8 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should use metadata to generate table name', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
       createdAt: z.iso.datetime(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
     }).meta({
       name: 'tbl_entities'
@@ -142,15 +144,15 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle different Zod types correctly', () => {
     const testSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      text: z.string(),
-      number: z.number(),
       boolean: z.boolean(),
       date: z.date(),
-      optional: z.string().optional(),
-      nullable: z.number().nullable(),
       enum: z.enum(['A', 'B', 'C']),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       literal: z.literal('test'),
+      nullable: z.number().nullable(),
+      number: z.number(),
+      optional: z.string().optional(),
+      text: z.string(),
       union: z.union([z.string(), z.number()]),
     }).meta({ name: 'test_table' });
 
@@ -170,10 +172,10 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle integer types correctly', () => {
     const intSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      bigInt: z.bigint(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       smallInt: z.int(),
       thirtyTwo: z.int32(),
-      bigInt: z.bigint(),
     }).meta({ name: 'integers' });
 
     const result = zodSchemaToSqliteTable(intSchema);
@@ -186,10 +188,10 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle datetime fields specially', () => {
     const timeSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
       createdAt: z.date(),
-      updatedAt: z.date(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       someOtherDate: z.date(),
+      updatedAt: z.date(),
     }).meta({ name: 'timestamps' });
 
     const result = zodSchemaToSqliteTable(timeSchema);
@@ -202,9 +204,9 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle default values', () => {
     const defaultSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      name: z.string().default('John'),
       active: z.boolean().default(true),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      name: z.string().default('John'),
     }).meta({ name: 'defaults' });
 
     const result = zodSchemaToSqliteTable(defaultSchema);
@@ -216,25 +218,25 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should generate valid SQL syntax', () => {
     const complexSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      firstName: z.string(),
-      lastName: z.string(),
-      email: z.string().email(),
       age: z.number().min(0).max(150).optional(),
-      isActive: z.boolean().default(true),
       createdAt: z.date(),
+      email: z.string().email(),
+      firstName: z.string(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      isActive: z.boolean().default(true),
+      lastName: z.string(),
       updatedAt: z.date(),
     }).meta({ name: 'users' });
 
     const result = zodSchemaToSqliteTable(complexSchema);
     
     // Should be valid SQL
-    expect(result.sql).toMatch(/^CREATE TABLE users \([\s\S]*\);$/);
+    expect(result.sql).toMatch(/^CREATE TABLE users \([\S\s]*\);$/);
     
     // Should have proper comma separation
     const lines = result.sql.split('\n').filter((line: string) => line.trim());
     expect(lines[0]).toBe('CREATE TABLE users (');
-    expect(lines[lines.length - 1]).toBe(');');
+    expect(lines.at(-1)).toBe(');');
     
     // All lines except first and last should end with comma (except the last column)
     for (let i = 1; i < lines.length - 2; i++) {
@@ -254,7 +256,7 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should work with the existing entity schema from main.test.ts', () => {
     const entitySchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       createdAt: z.date(),
       updatedAt: z.date(),
     }).meta({ name: 'entities' });
@@ -270,7 +272,7 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should throw error when no table name is provided', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       name: z.string(),
     });
 
@@ -281,7 +283,7 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should use options tableName to override metadata', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       name: z.string(),
     }).meta({ name: 'users' });
 
@@ -294,15 +296,15 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should convert camelCase column names to snake_case', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      firstName: z.string(),
-      lastName: z.string(),
-      emailAddress: z.string(),
-      phoneNumber: z.string(),
       createdAt: z.date(),
-      updatedAt: z.date(),
-      isActive: z.boolean(),
+      emailAddress: z.string(),
+      firstName: z.string(),
       hasPermission: z.boolean(),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      isActive: z.boolean(),
+      lastName: z.string(),
+      phoneNumber: z.string(),
+      updatedAt: z.date(),
     }).meta({ name: 'users' });
 
     const result = zodSchemaToSqliteTable(schema);
@@ -319,11 +321,11 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle default values from metadata', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      name: z.string().meta({ default: "'John Doe'" }),
       age: z.number().meta({ default: '18' }),
-      isActive: z.boolean().meta({ default: '1' }),
       createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP' }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      isActive: z.boolean().meta({ default: '1' }),
+      name: z.string().meta({ default: "'John Doe'" }),
       updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP' }),
     }).meta({ name: 'users' });
 
@@ -339,7 +341,7 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle unique constraints', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
       name: z.string().meta({ unique: true }),
     }).meta({ name: 'tbl_user' });
     
@@ -353,8 +355,8 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle foreign key constraints', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      userId: z.number().meta({ foreignKey: 'tbl_user', cascade: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      userId: z.number().meta({ cascade: true, foreignKey: 'tbl_user' }),
     }).meta({ name: 'tbl_user_role' });
     
     const result = zodSchemaToSqliteTable(schema);
@@ -367,8 +369,8 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle foreign key constraints without cascade', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
       categoryId: z.number().meta({ foreignKey: 'tbl_categories' }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
     }).meta({ name: 'tbl_products' });
     
     const result = zodSchemaToSqliteTable(schema);
@@ -382,10 +384,10 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle multiple foreign key constraints', () => {
     const schema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      userId: z.number().meta({ foreignKey: 'tbl_users', cascade: true }),
+      authorId: z.number().meta({ cascade: true, foreignKey: 'tbl_authors' }),
       categoryId: z.number().meta({ foreignKey: 'tbl_categories' }),
-      authorId: z.number().meta({ foreignKey: 'tbl_authors', cascade: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      userId: z.number().meta({ cascade: true, foreignKey: 'tbl_users' }),
     }).meta({ name: 'tbl_posts' });
     
     const result = zodSchemaToSqliteTable(schema);
@@ -402,8 +404,8 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('foreign key constraints from inherited schema', () => {
     const baseSchema = z.object({
-      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-      userId: z.number().meta({ foreignKey: 'tbl_users', cascade: true }),
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      userId: z.number().meta({ cascade: true, foreignKey: 'tbl_users' }),
     });
     const schema = baseSchema.extend({
       name: z.string(),

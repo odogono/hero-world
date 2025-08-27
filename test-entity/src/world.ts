@@ -7,26 +7,24 @@ import type { HitPoints } from '@entity/stats';
 
 
 export type World = {
-  entities: Entity[];
   components: Component[];
-  journies: Journey[];
-  locations: Map<Entity, Location>;
+  entities: Entity[];
+  entityHitPoints: Map<Entity, HitPoints>;
   entityLocations: Map<Entity, EntityLocation>;
   entityStats: Map<Entity, Stats>;
-  entityHitPoints: Map<Entity, HitPoints>;
+  journies: Journey[];
+  locations: Map<Entity, Location>;
 }
 
 
 
-export const createWorld = (): World => {
-  return {
-    entities: [],
+export const createWorld = (): World => ({
     components: [],
-    journies: [],
-    locations: new Map<Entity, Location>(),
+    entities: [],
+    entityHitPoints: new Map<Entity, HitPoints>(),
     entityLocations: new Map<Entity, EntityLocation>(),
     entityStats: new Map<Entity, Stats>(),
-    entityHitPoints: new Map<Entity, HitPoints>(),
-  };
-}
+    journies: [],
+    locations: new Map<Entity, Location>(),
+  })
 

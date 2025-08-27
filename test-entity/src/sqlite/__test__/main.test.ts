@@ -1,9 +1,6 @@
-import { Database } from 'bun:sqlite';
-import { test, expect } from 'bun:test';
-import * as z from "zod";
-import { zodSchemaToSqliteTable } from '../schema-to-sql';
-import { createWorld, deleteEntity, flush, getEntity, queryEntities, saveWorld } from '../world';
-import { createLocation, getLocationE, locationComponent, locationSchema, type Location } from '../components/location';
+import { test } from 'bun:test';
+import { createWorld, flush, queryEntities, saveWorld } from '../world';
+import { locationComponent } from '../components/location';
 import { createLog } from '@helpers/log';
 import { createEntity } from '../entity';
 

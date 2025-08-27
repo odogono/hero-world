@@ -4,7 +4,7 @@ export const slugify = (str: string) => slug(str);
 
 export const fromUrl = (url: string): string => {
   // Remove protocol and domain if present
-  const path = url.replace(/^https?:\/\/[^\/]+/, '');
+  const path = url.replace(/^https?:\/\/[^/]+/, '');
   
   // Split by '/' and filter out empty segments
   const segments = path.split('/').filter(segment => segment.length > 0);
@@ -26,7 +26,7 @@ export const fromUrl = (url: string): string => {
 export const toPascalCase = (str: string, joinChar: string = '') =>
   str
     .match(/[A-Z]?[a-z]+/g)
-    ?.map((word) => toCapitalized(word))
+    ?.map(word => toCapitalized(word))
     .join(joinChar);
 
 
@@ -41,7 +41,7 @@ export const toPascalCase = (str: string, joinChar: string = '') =>
 export const toKebabCase = (str: string, joinChar: string = '-') =>
   str
     .match(/[A-Z]?[a-z]+/g)
-    ?.map((word) => word.toLowerCase())
+    ?.map(word => word.toLowerCase())
     .join(joinChar);
 
 
@@ -61,7 +61,7 @@ export const toSnakeCase = (str: string) => toKebabCase(str, '_');
  * @returns The capitalized string
  */
 export const toCapitalized = (s: string) =>
-  s.replace(/\b\w/g, (c) => c.toUpperCase());
+  s.replaceAll(/\b\w/g, c => c.toUpperCase());
 
 /**
  * Convert a string to camelCase
@@ -72,5 +72,5 @@ export const toCapitalized = (s: string) =>
  */
 export const toCamelCase = (str: string, joinChar: string = '') => {
   const result = toPascalCase(str, joinChar);
-  return result ? result.charAt(0).toLowerCase() + result.substring(1) : '';
+  return result ? result.charAt(0).toLowerCase() + result.slice(1) : '';
 };

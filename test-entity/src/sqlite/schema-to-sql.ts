@@ -4,25 +4,25 @@ import { toSnakeCase } from '@helpers/string';
 /**
  * Column information for SQLite table generation
  */
-export interface ColumnInfo {
+export type ColumnInfo = {
+  constraints: string[];
   name: string;
   type: string;
-  constraints: string[];
 }
 
 /**
  * Result of converting a Zod schema to SQLite table
  */
-export interface TableGenerationResult {
-  sql: string;
+export type TableGenerationResult = {
   columns: ColumnInfo[];
+  sql: string;
   tableName: string;
 }
 
 
-export interface ZodSchemaToSqliteTableOptions {
-  tableName?: string;
+export type ZodSchemaToSqliteTableOptions = {
   ifNotExists?: boolean;
+  tableName?: string;
 }
 
 /**
@@ -66,8 +66,8 @@ export function zodSchemaToSqliteTable(
   const sql = `CREATE TABLE${ifNotExists ? ' IF NOT EXISTS ' : ' '}${tableName} (\n  ${allConstraints.join(',\n  ')}\n);`;
   
   return {
-    sql,
     columns: columnInfos,
+    sql,
     tableName
   };
 }
@@ -81,7 +81,7 @@ export function zodSchemaToSqliteTable(
  */
 function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny, isOptional = false): { columnDef: string; columnInfo: ColumnInfo; foreignKeyConstraint?: string } {
   let sqliteType = 'TEXT'; // default
-  let constraints: string[] = [];
+  const constraints: string[] = [];
   
   // Handle different Zod types
   if (zodType instanceof z.ZodNumber) {
@@ -106,11 +106,7 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
   } else if (zodType.constructor.name === 'ZodNumberFormat') {
     // Handle z.int() and z.int32() types
     const format = (zodType._def as any)?.format;
-    if (format === 'safeint' || format === 'int32') {
-      sqliteType = 'INTEGER';
-    } else {
-      sqliteType = 'REAL';
-    }
+    sqliteType = format === 'safeint' || format === 'int32' ? 'INTEGER' : 'REAL';
   } else if (zodType instanceof z.ZodString) {
     sqliteType = 'TEXT';
   } else if (zodType instanceof z.ZodBoolean) {
@@ -141,8 +137,8 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
     
     // If this optional field has primary key metadata, we need to handle it specially
     if (metadata?.primaryKey) {
-      let sqliteType = 'INTEGER';
-      let constraints: string[] = ['PRIMARY KEY'];
+      const sqliteType = 'INTEGER';
+      const constraints: string[] = ['PRIMARY KEY'];
       
       if (metadata?.autoIncrement) {
         constraints.push('AUTOINCREMENT');
@@ -155,9 +151,9 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
       return {
         columnDef,
         columnInfo: {
+          constraints: [...constraints],
           name: columnName,
-          type: sqliteType,
-          constraints: [...constraints]
+          type: sqliteType
         }
       };
     }
@@ -248,9 +244,9 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
   return {
     columnDef,
     columnInfo: {
+      constraints: [...orderedConstraints],
       name: columnName,
-      type: sqliteType,
-      constraints: [...orderedConstraints]
+      type: sqliteType
     },
     foreignKeyConstraint
   };
@@ -269,9 +265,9 @@ function zodTypeToSqliteColumn(columnName: string, zodType: z.ZodTypeAny, isOpti
 }
 
 
-interface StatementOptions {
-  tableName?: string;
+type StatementOptions = {
   namedParams?: boolean;
+  tableName?: string;
 }
 
 /**

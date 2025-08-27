@@ -2,8 +2,8 @@ import type { Entity, Components, ComponentDefinition } from "./types";
 import * as z from "zod";
 
 export const componentSchema = z.object({
-  id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
-  eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
+  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),
+  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
 });
 
 
@@ -14,9 +14,7 @@ export const componentSchema = z.object({
 export const defineComponent = <
   Name extends string,
   Schema extends z.ZodTypeAny
->(definition: ComponentDefinition<Name, Schema>) => {
-  return definition;
-};
+>(definition: ComponentDefinition<Name, Schema>) => definition;
 
 
 
@@ -27,7 +25,7 @@ export const makeTrackedComponent = <T extends keyof Components>(
   exists = true
 ): Components[T] => {
   const { id, world } = entity;
-  if (!world.entityCache.has(id)) world.entityCache.set(id, {});
+  if (!world.entityCache.has(id)) {world.entityCache.set(id, {});}
   (world.entityCache.get(id) as any)[componentName] = {
     data,
     exists,

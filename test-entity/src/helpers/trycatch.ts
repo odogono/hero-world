@@ -16,8 +16,8 @@ export function trycatch<T, E = Error>(
 
         if (isPromise(result)) {
             return Promise.resolve(result)
-                .then((data) => onSuccess(data))
-                .catch((error) => onFailure(error));
+                .then(data => onSuccess(data))
+                .catch(error => onFailure(error));
         }
 
         return onSuccess(result);
@@ -26,19 +26,15 @@ export function trycatch<T, E = Error>(
     }
 }
 
-const onSuccess = <T>(value: T): OperationSuccess<T> => {
-    return [value, null];
-};
+const onSuccess = <T>(value: T): OperationSuccess<T> => [value, null];
 
 const onFailure = <E>(error: unknown): OperationFailure<E> => {
     const errorParsed = error instanceof Error ? error : new Error(String(error));
     return [null, errorParsed as E];
 };
 
-const isPromise = <T = any>(value: unknown): value is Promise<T> => {
-    return (
+const isPromise = <T = any>(value: unknown): value is Promise<T> => (
         !!value &&
         (typeof value === 'object' || typeof value === 'function') &&
         typeof (value as any).then === 'function'
     );
-};

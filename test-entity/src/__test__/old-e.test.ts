@@ -18,7 +18,7 @@ test('Entity should be defined', () => {
   const world = createWorld();
   const hero = createEntity(world);
 
-  setEntityStats(world, hero, {strength: 10, dexterity: 10, intelligence: 10, wisdom: 10, constitution: 10, charisma: 10});
+  setEntityStats(world, hero, {charisma: 10, constitution: 10, dexterity: 10, intelligence: 10, strength: 10, wisdom: 10});
   setEntityHitPoints(world, hero, {current: 10, max: 10});
 
   

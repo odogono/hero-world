@@ -71,8 +71,8 @@ export const setEntityLocation = (world: World, entity: Entity, location: Entity
   }
 
   const entityLocation: EntityLocation = {
-    id: 0,
     entity,
+    id: 0,
     location: locationId,
   };
 

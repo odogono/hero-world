@@ -1,5 +1,4 @@
 import * as z from "zod";
-import type { Location } from "./components/location";
 // import type { ComponentRegistry } from "./component-registry";
 import { Database, Statement } from 'bun:sqlite';
 import type { ColumnInfo } from "./schema-to-sql";
@@ -18,12 +17,12 @@ export type EntityCache = Map<number, Partial<{
 
 
 export type ComponentDef = {
-  url: string;
-  name: string;
-  tableName: string;
   columns: ColumnInfo[];
+  name: string;
   stmtInsert: Statement;
   stmtUpdate: Statement;
+  tableName: string;
+  url: string;
 } & {
   [key: string]: Statement;
 }
@@ -32,10 +31,10 @@ export type ComponentDef = {
 /**
  * Component definition
  */
-export interface ComponentDefinition<
+export type ComponentDefinition<
   Name extends string,
   Schema extends z.ZodTypeAny
-> {
+> = {
   name: Name;
   schema: Schema;
   statements?: Record<string, string>;
@@ -48,15 +47,15 @@ export type Components = Record<string, any>;
  */
 export type World<TComponents extends Components> = {
   db: Database;
+  defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
   entityCache: EntityCache;
-  defs: Map<string, ComponentDef>;
   stmts: Record<string, Statement>;
 }
 
 export type WorldBuilder<TComponents extends Components> = World<TComponents> & {
-  registerComponent: <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
   build: () => World<TComponents>;
+  registerComponent: <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
 }
 
 // export type World = {
@@ -77,7 +76,7 @@ export type Entity<C extends keyof Components = never> = EntitySchema & {
 
 export type EntitySchema = z.infer<typeof entitySchema>;
 export const entitySchema = z.object({
-  id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+  id: z.number().meta({ autoIncrement: true, primaryKey: true }),
   // createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
   // updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
 }).meta({ name: 'tbl_entity' });
@@ -90,7 +89,7 @@ export const entitySchema = z.object({
 
 
 export const isEntity = (val: unknown): val is Entity => {
-  if (typeof val !== 'object' || val === null) return false;
+  if (typeof val !== 'object' || val === null) {return false;}
   const entity = val as Partial<Entity>;
   return typeof entity.id === 'number';
 }

@@ -2,7 +2,7 @@ import { test, expect, describe } from 'bun:test';
 import { createWorld, flush } from '../world';
 import { locationSchema } from '../components/location';
 import { createLog } from '@helpers/log';
-import * as z from 'zod';
+import { number, string } from 'zod';
 import { componentSchema } from '../component';
 import { defineComponent } from '../component';
 import { createEntity } from '../entity';
@@ -11,15 +11,15 @@ const log = createLog('test-entity');
 
 // Define additional component schemas for testing using new system
 const statsSchema = componentSchema.extend({
-  health: z.number(),
-  mana: z.number(),
-  level: z.number(),
-}).meta({ name: 'tbl_stats', id: '/stats' });
+  health: number(),
+  level: number(),
+  mana: number(),
+}).meta({ id: '/stats', name: 'tbl_stats' });
 
 const inventorySchema = componentSchema.extend({
-  capacity: z.number(),
-  items: z.string(), // JSON string for simplicity
-}).meta({ name: 'tbl_inventory', id: '/inventory' });
+  capacity: number(),
+  items: string(), // JSON string for simplicity
+}).meta({ id: '/inventory', name: 'tbl_inventory' });
 
 // Component definitions using new system
 const statsComponent = defineComponent({
@@ -92,7 +92,7 @@ test('createEntity should create entity with stats component', () => {
   const world = createWorld().registerComponent(statsComponent).build();
   
   const entity = createEntity(world, { 
-    stats: { health: 100, mana: 50, level: 5 } 
+    stats: { health: 100, level: 5, mana: 50 } 
   });
   
   expect(entity).toBeDefined();
@@ -124,7 +124,7 @@ test('createEntity should create entity with multiple components', () => {
   
   const entity = createEntity(world, { 
     location: { name: 'City', region: 'Central' },
-    stats: { health: 80, mana: 30, level: 3 }
+    stats: { health: 80, level: 3, mana: 30 }
   });
   
   expect(entity.location).toBeDefined();
@@ -170,7 +170,7 @@ test('createEntity should track changes across multiple components', () => {
   
   const entity = createEntity(world, { 
     location: { name: 'Village', region: 'East' },
-    stats: { health: 100, mana: 50, level: 1 }
+    stats: { health: 100, level: 1, mana: 50 }
   });
   
   // Clear dirty state
@@ -196,7 +196,7 @@ test('createEntity should cache components in entityCache', () => {
     .build();
   
   const entity = createEntity(world, { 
-    stats: { health: 75, mana: 25, level: 4 } 
+    stats: { health: 75, level: 4, mana: 25 } 
   });
   
   expect(world.entityCache.has(entity.id)).toBe(true);
@@ -235,7 +235,7 @@ test('createEntity should work with component modifications through proxy', () =
   const world = createWorld().registerComponent(statsComponent).build();
   
   const entity = createEntity(world, { 
-    stats: { health: 100, mana: 100, level: 10 } 
+    stats: { health: 100, level: 10, mana: 100 } 
   });
   
   // Clear dirty state
@@ -258,10 +258,10 @@ test('createEntity should handle different component data types', () => {
   
   // Test with string component
   const nameSchema = componentSchema.extend({
-    firstName: z.string(),
-    lastName: z.string(),
-    title: z.string().optional(),
-  }).meta({ name: 'tbl_names', id: '/name' });
+    firstName: string(),
+    lastName: string(),
+    title: string().optional(),
+  }).meta({ id: '/name', name: 'tbl_names' });
 
   const nameComponent = defineComponent({
     name: 'name' as const,
@@ -317,7 +317,7 @@ test('should create typed entity with single component', () => {
     .build();
   
   const entity = createEntity(world, {
-    stats: { health: 100, mana: 50, level: 1 }
+    stats: { health: 100, level: 1, mana: 50 }
   });
   
   expect(entity).toBeDefined();
@@ -336,7 +336,7 @@ test('should create typed entity with multiple components', () => {
   
   const entity = createEntity(world, {
     location: { name: 'Forest', region: 'North' },
-    stats: { health: 80, mana: 30, level: 3 }
+    stats: { health: 80, level: 3, mana: 30 }
   });
   
   expect(entity.location.name).toBe('Forest');
@@ -364,7 +364,7 @@ test('should track component changes in typed entities', () => {
     .build();
   
   const entity = createEntity(world, {
-    stats: { health: 100, mana: 50, level: 1 }
+    stats: { health: 100, level: 1, mana: 50 }
   });
   
   // Clear initial dirty state
@@ -408,7 +408,7 @@ test('should work with custom component statements', () => {
     .build();
   
   const entity = createEntity(world, {
-    stats: { health: 75, mana: 25, level: 5 }
+    stats: { health: 75, level: 5, mana: 25 }
   });
   
   flush(world);
@@ -433,15 +433,15 @@ test('should handle complex multi-component scenarios', () => {
   
   // Create multiple entities
   const warrior = createEntity(world, {
+    inventory: { capacity: 15, items: '["sword", "armor", "potion"]' },
     location: { name: 'Battlefield', region: 'War Zone' },
-    stats: { health: 120, mana: 10, level: 8 },
-    inventory: { capacity: 15, items: '["sword", "armor", "potion"]' }
+    stats: { health: 120, level: 8, mana: 10 }
   });
   
   const mage = createEntity(world, {
+    inventory: { capacity: 8, items: '["staff", "spellbook", "robe"]' },
     location: { name: 'Tower', region: 'Magic District' },
-    stats: { health: 60, mana: 200, level: 10 },
-    inventory: { capacity: 8, items: '["staff", "spellbook", "robe"]' }
+    stats: { health: 60, level: 10, mana: 200 }
   });
   
   flush(world);

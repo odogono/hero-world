@@ -8,9 +8,7 @@ export const createEntity = (world: World) => {
 };
 
 
-export const isEntity = (val: unknown): val is Entity => {
-  return typeof val === 'number';
-}
+export const isEntity = (val: unknown): val is Entity => typeof val === 'number'
 
 
 export const getEComponents = (world: World, entity: Entity): Component[] => {

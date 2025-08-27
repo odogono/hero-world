@@ -17,7 +17,7 @@ export type EntityWithComponents<
 
 
 // Overloads for type inference
-interface CreateEntityOverloads {
+type CreateEntityOverloads = {
   <T extends Partial<Components>>(world: World<T>, initialComponents: T): Entity<keyof T & string>;
   <T extends Partial<Components>>(world: World<T>): Entity<never>;
 }

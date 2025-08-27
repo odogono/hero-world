@@ -1,4 +1,3 @@
-import { zodSchemaToSqliteInsert } from "../schema-to-sql";
 import type { World } from "../types";
 import * as z from "zod";
 import { createLog } from "@helpers/log";
@@ -14,7 +13,7 @@ export type Location = z.infer<typeof locationSchema>;
 export const locationSchema = componentSchema.extend({
   name: z.string(),
   region: z.string(),
-}).meta({ name: 'tbl_locations', id: '/location' });
+}).meta({ id: '/location', name: 'tbl_locations' });
 
 
 export const locationComponent = defineComponent({
@@ -26,7 +25,7 @@ export const locationComponent = defineComponent({
 export const createLocation = (world: World<any>, location: Location) => {
   
   const e = createEntity(world, {
-    location: location
+    location
   });
 
   // world.stmts.locationInsert!.run(e.id, location.name, location.region);

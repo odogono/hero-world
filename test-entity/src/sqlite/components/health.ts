@@ -7,8 +7,8 @@ const healthSchema = componentSchema.extend({
   current: z.number(),
   max: z.number(),
 }).meta({ 
-  name: 'tbl_health', 
-  id: 'health'
+  id: 'health', 
+  name: 'tbl_health'
 });
 
 export type Health = z.infer<typeof healthSchema>;

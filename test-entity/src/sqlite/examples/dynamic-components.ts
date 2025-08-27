@@ -9,16 +9,16 @@ import { healthComponent } from '../components/health';
 import { componentSchema, defineComponent } from '../component';
 import { createWorld } from '../world';
 import { createEntity } from '../entity';
-import * as z from 'zod';
+import { number } from 'zod';
 
 // Example: Create a new component - no declare module needed!
 const manaSchema = componentSchema.extend({
-  current: z.number(),
-  max: z.number(),
-  regen: z.number(),
+  current: number(),
+  max: number(),
+  regen: number(),
 }).meta({ 
-  name: 'tbl_mana', 
-  id: 'mana' 
+  id: 'mana', 
+  name: 'tbl_mana' 
 });
 
 export const manaComponent = defineComponent({
@@ -47,5 +47,5 @@ export const exampleUsage = () => {
   console.log(`Health: ${entity.health.current}/${entity.health.max}`);
   console.log(`Mana: ${entity.mana.current}/${entity.mana.max} (regen: ${entity.mana.regen})`);
   
-  return { world, entity };
+  return { entity, world };
 };

@@ -50,8 +50,8 @@ const createWorldInternal = <T extends Components>(): World<T> => {
     dirtyEntities,
     entityCache,
     stmts: {
-      insertEntity,
       deleteEntity,
+      insertEntity,
       selectEntityById,
   
     }
@@ -79,16 +79,16 @@ export const createWorld = <T extends Components>(): WorldBuilder<T> => {
     registerComponentDef(world, def.schema, def.statements || {});
     return {
       ...world,
-      registerComponent,
-      build
+      build,
+      registerComponent
     } as WorldBuilder<T & { [K in Name]: z.infer<Schema> }>;
   }
 
 
   return {
     ...world,
-    registerComponent,
-    build
+    build,
+    registerComponent
   };
 }
 
@@ -109,7 +109,7 @@ export const saveWorld = async <T extends Components>(world: World<T>, path: str
 }
 
 
-interface ComponentStatements {
+type ComponentStatements = {
   [key: string]: string;
 }
 
@@ -148,12 +148,12 @@ const registerComponentDef = <T extends Components>(world: World<T>, componentDe
   }, {} as Record<string, Statement>);
 
   const def = {
-    url: meta.id!,
-    name,
-    tableName: result.tableName,
     columns: result.columns,
+    name,
     stmtInsert: world.db.prepare(sqlInsert),
     stmtUpdate: world.db.prepare(sqlUpdate),
+    tableName: result.tableName,
+    url: meta.id!,
     ...additionalStmts
   } as ComponentDef;
 

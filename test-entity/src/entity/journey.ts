@@ -4,8 +4,8 @@ import { setEntityLocation, getEntityLocation, type Location, getLocationE } fro
 
 export type Journey = {
   entity: Entity;
-  state: 'pending' | 'completed' | 'failed';
   from: Entity;
+  state: 'pending' | 'completed' | 'failed';
   to: Entity;
 }
 
@@ -37,10 +37,10 @@ export const createJourney = (world: World, entity: Entity, to: Partial<Location
   }
 
   const journey: Journey = {
-    from: fromId,
-    to: toId,
     entity,
+    from: fromId,
     state: 'pending',
+    to: toId,
   };
 
   world.journies.push(journey);
