@@ -60,6 +60,7 @@ export type World<TComponents extends Components> = {
   defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
   entityCache: EntityCache;
+  flush: (world: World<TComponents>) => void;
   stmts: Record<string, Statement>;
 }
 

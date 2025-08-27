@@ -49,6 +49,7 @@ const createWorldInternal = <T extends Components>(): World<T> => {
     defs: new Map(),
     dirtyEntities,
     entityCache,
+    flush: () => void 0,
     stmts: {
       deleteEntity,
       insertEntity,
@@ -73,7 +74,7 @@ const createWorldInternal = <T extends Components>(): World<T> => {
 export const createWorld = <T extends Components>(): WorldBuilder<T> => {
   const world = createWorldInternal<T>();
 
-  const build = () => world;
+  const build = () => ({...world, flush: () => flush(world)});
 
   const registerComponent = <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>): WorldBuilder<T> => {
     registerComponentDef(world, def.schema, def.statements || {});
