@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteTable } from '../schema-to-sql';
-import { createEntity, createWorld, flush, registerComponentDef, saveWorld } from '../world';
+import { createEntity, createWorld, deleteEntity, flush, getEntity, queryEntities, registerComponentDef, saveWorld } from '../world';
 import { createLocation, getLocationE, locationSchema, type Location } from '../location';
 import { createLog } from '@helpers/log';
 import { addComponent } from '../component';
@@ -27,18 +27,30 @@ test('SQLite should be able to create a database', async () => {
 
   const world = createWorld();
 
-  const e = createEntity(world);
-  console.log(e.id);
+  // const e = createEntity(world);
+  // console.log(e.id);
 
   registerComponentDef(world, locationSchema, {
     locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
   });
 
-  addComponent(e, 'location', {name: 'home', region: 'city'});
+  const e = createEntity(world, {location: {name: 'home', region: 'city'}});
 
+  // addComponent(e, 'location', {name: 'home', region: 'city'});
+
+  e.location.name = 'work';
+
+  // log.debug('entity', e);
   // log.debug('world', world);
 
   flush(world);
+
+
+  const entities = queryEntities(world, ['location']);
+  log.debug('entities', entities);
+
+  // deleteEntity(e);
+  // expect(getEntity(world, e.id)).toBeNull();
 
   // log.debug('e', e);
 
@@ -54,12 +66,8 @@ test('SQLite should be able to create a database', async () => {
   // expect(office).toBeNull();
 
   // // backup
-  // saveWorld(world, './world.db');
+  saveWorld(world, './world.db');
 
-  // const fileDb = new Database('mydatabase.sqlite');
-
-  // const contents = db.serialize();
-  // Database.deserialize(contents);
 });
 
 

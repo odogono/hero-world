@@ -4,14 +4,14 @@ import type { World } from "./world";
 
 
 export const makeTrackedComponent = <T extends keyof Components>(
-  world: World,
-  eid: number,
+  entity: Entity,
   componentName: T,
   data: Components[T],
   exists = true
 ): Components[T] => {
-  if (!world.entityCache.has(eid)) world.entityCache.set(eid, {});
-  (world.entityCache.get(eid) as any)[componentName] = {
+  const { id, world } = entity;
+  if (!world.entityCache.has(id)) world.entityCache.set(id, {});
+  (world.entityCache.get(id) as any)[componentName] = {
     data,
     exists,
   };
@@ -19,10 +19,10 @@ export const makeTrackedComponent = <T extends keyof Components>(
   return new Proxy(data as any, {
     set(target, prop, value) {
       (target as any)[prop] = value;
-      if (!world.dirtyEntities.has(eid)) {
-        world.dirtyEntities.set(eid, new Set());
+      if (!world.dirtyEntities.has(id)) {
+        world.dirtyEntities.set(id, new Set());
       }
-      world.dirtyEntities.get(eid)!.add(componentName);
+      world.dirtyEntities.get(id)!.add(componentName);
       return true;
     },
   });
@@ -36,8 +36,7 @@ export const addComponent = <T extends keyof Components>(
 ) => {
   const { id, world } = entity;
   entity[componentName] = makeTrackedComponent(
-    world,
-    id,
+    entity,
     componentName,
     data,
     false // mark as new
@@ -47,4 +46,34 @@ export const addComponent = <T extends keyof Components>(
     world.dirtyEntities.set(id, new Set());
   }
   world.dirtyEntities.get(id)!.add(componentName);
+}
+
+
+export const removeComponent = <T extends keyof Components>(
+  entity: Entity<any>,
+  componentName: T
+) => {
+  const { id, world } = entity;
+  const def = world.defs.get(componentName);
+  if (!def) {
+    throw new Error(`Component def not found for ${componentName}`);
+  }
+
+  // delete from db
+  world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
+  
+  const cache = entity.world.entityCache.get(id);
+  if (cache) {
+    delete (cache as any)[componentName];
+  }
+
+  delete (entity as any)[componentName];
+
+  const dirty = entity.world.dirtyEntities.get(id);
+  if (dirty) {
+    dirty.delete(componentName);
+    if (dirty.size === 0) {
+      world.dirtyEntities.delete(id);
+    }
+  }
 }

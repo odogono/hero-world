@@ -8,7 +8,7 @@ const log = createLog('location');
 
 export const componentSchema = z.object({
   id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
-  eid: z.int().optional(),
+  eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
 })
 
 export type Location = z.infer<typeof locationSchema>;
