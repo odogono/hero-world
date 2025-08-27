@@ -2,7 +2,7 @@ import { test, expect, describe } from 'bun:test';
 import { defineComponent } from '../component';
 import z from 'zod';
 import { createWorld, flush, saveWorld } from '../world';
-import { createEntity, queryEntities } from '../entity';
+import { createEntity, queryEntities, queryEntitiesIterator } from '../entity';
 
 const statusComponent = defineComponent({
   name: 'status' as const,
@@ -114,5 +114,47 @@ describe('query', () => {
     expect(entities).toHaveLength(2);
     expect(entities[0]?.status.status).toBe('walking');
     expect(entities[1]?.status.status).toBe('fighting');
+  });
+
+
+
+  test('should return an iterator over the entities', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    world.flush();
+
+    const query = queryEntitiesIterator(world, ['status']);
+
+    let result: string[] = [];
+    for (const entity of query) {
+      result.push(entity.status.status);
+    }
+
+    expect(result).toEqual(['idle', 'walking', 'fighting', 'dead']);
+  });
+
+  test('should return an iterator with filtering options', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    world.flush();
+
+    const query = queryEntitiesIterator(world, ['status'], { where: 'status IN ("walking", "fighting")' });
+
+    let result: string[] = [];
+    for (const entity of query) {
+      result.push(entity.status.status);
+    }
+
+    expect(result).toEqual(['walking', 'fighting']);
   });
 });

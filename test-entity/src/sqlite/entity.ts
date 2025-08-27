@@ -144,3 +144,72 @@ export const queryEntities = <T extends Components>(
     return entity;
   });
 }
+
+export const queryEntitiesIterator = <T extends Components>(
+  world: World<T>, 
+  components: (keyof T)[], 
+  options?: { where?: string; entity?: Entity<any>; limit?: number; offset?: number }
+) => {
+  const base = `SELECT e.id AS eid`;
+  const joins: string[] = [];
+  const fields: string[] = [];
+  components.forEach(c => {
+    const def = world.defs.get(c as string);
+    if (!def) {
+      throw new Error(`Component def not found for ${String(c)}`);
+    }
+    const alias = def.name;
+    const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
+    joins.push(join);
+    def.columns.forEach(column => {
+      const name = column.name;
+      const field = `${alias}.${name} AS ${alias}_${name}`;
+      fields.push(field);
+    });
+  });
+
+  let whereClause = '';
+  if (options?.entity) {
+    whereClause = `WHERE e.id = ${options.entity.id}`;
+  } else if (options?.where) {
+    whereClause = `WHERE ${options.where}`;
+  }
+
+  // Build LIMIT and OFFSET clauses
+  let limitOffsetClause = '';
+  if (options?.limit !== undefined) {
+    limitOffsetClause += ` LIMIT ${options.limit}`;
+    if (options?.offset !== undefined) {
+      limitOffsetClause += ` OFFSET ${options.offset}`;
+    }
+  } else if (options?.offset !== undefined) {
+    // In SQLite, OFFSET requires LIMIT, so we use a very large limit
+    limitOffsetClause += ` LIMIT -1 OFFSET ${options.offset}`;
+  }
+
+  // TODO cache sql against components
+  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
+  const stmt = world.db.query(sql);
+  
+  // Use Bun's iterate capability for incremental results
+  const iterator = stmt.iterate();
+  
+  return {
+    [Symbol.iterator]: function* () {
+      for (const row of iterator) {
+        const entity: Entity<any> = { id: (row as any).eid, world } as Entity<any>;
+        
+        components.forEach(c => {
+          const def = world.defs.get(c as string)!;
+          const data: any = {};
+          def.columns.forEach(column => {
+            data[column.name] = (row as any)[`${def.name}_${column.name}`];
+          })
+          entity[c] = makeTrackedComponent(entity, c as string, data);
+        });
+
+        yield entity;
+      }
+    }
+  };
+}

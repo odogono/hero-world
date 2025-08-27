@@ -49,7 +49,7 @@ const createWorldInternal = <T extends Components>(): World<T> => {
     defs: new Map(),
     dirtyEntities,
     entityCache,
-    flush: () => void 0,
+    flush: () => ({} as unknown as World<T>),
     stmts: {
       deleteEntity,
       insertEntity,
