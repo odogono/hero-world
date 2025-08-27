@@ -85,14 +85,24 @@ interface QueryOptions {
   entity?: Entity<any>;
   limit?: number;
   offset?: number;
+  with?: (keyof any)[];
+  without?: (keyof any)[];
 }
 
 
-const buildQuery = (world: World<any>, components: (keyof any)[], options?: QueryOptions) => {
+const buildQuery = (world: World<any>, options?: QueryOptions) => {
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
   const fields: string[] = [];
-  components.forEach(c => {
+  const withoutConditions: string[] = [];
+  
+  // Determine which components to include in the query
+  const componentsToInclude = options?.with ?? world.defs.keys();
+  
+  
+
+  // Handle components that entities must have
+  componentsToInclude.forEach(c => {
     const def = world.defs.get(c as string);
     if (!def) {
       throw new Error(`Component def not found for ${String(c)}`);
@@ -107,11 +117,36 @@ const buildQuery = (world: World<any>, components: (keyof any)[], options?: Quer
     });
   });
 
+  // Handle components that entities must NOT have
+  if (options?.without) {
+    options.without.forEach(c => {
+      const def = world.defs.get(c as string);
+      if (!def) {
+        throw new Error(`Component def not found for ${String(c)}`);
+      }
+      const alias = `${def.name}_not`;
+      const join = `LEFT JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
+      joins.push(join);
+      withoutConditions.push(`${alias}.eid IS NULL`);
+    });
+  }
+
   let whereClause = '';
+  const conditions: string[] = [];
+  
   if (options?.entity) {
-    whereClause = `WHERE e.id = ${options.entity.id}`;
+    conditions.push(`e.id = ${options.entity.id}`);
   } else if (options?.where) {
-    whereClause = `WHERE ${options.where}`;
+    conditions.push(options.where);
+  }
+  
+  // Add WITHOUT conditions
+  if (withoutConditions.length > 0) {
+    conditions.push(...withoutConditions);
+  }
+  
+  if (conditions.length > 0) {
+    whereClause = `WHERE ${conditions.join(' AND ')}`;
   }
 
   // Build LIMIT and OFFSET clauses
@@ -129,16 +164,18 @@ const buildQuery = (world: World<any>, components: (keyof any)[], options?: Quer
   // TODO cache sql against components
   const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
 
-  return sql;
+  return {
+    sql,
+    componentsToInclude
+  }
 }
 
 
 export const queryEntities = <T extends Components>(
   world: World<T>, 
-  components: (keyof T)[], 
   options?: QueryOptions
 ) => {
-  const sql = buildQuery(world, components, options);
+  const { sql, componentsToInclude } = buildQuery(world, options);
   
   const stmt = world.db.query(sql);
   const rows = stmt.all();
@@ -146,14 +183,14 @@ export const queryEntities = <T extends Components>(
   return rows.map((row: any) => {
     const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
     
-    components.forEach(c => {
+    for (const c of componentsToInclude) {
       const def = world.defs.get(c as string)!;
       const data: any = {};
-      def.columns.forEach(column => {
+      for (const column of def.columns) {
         data[column.name] = row[`${def.name}_${column.name}`];
-      })
-      entity[c] = makeTrackedComponent(entity, c as string, data);
-    });
+      }
+      (entity as any)[c] = makeTrackedComponent(entity, c as string, data);
+    }
 
     return entity;
   });
@@ -161,28 +198,28 @@ export const queryEntities = <T extends Components>(
 
 export const queryEntitiesIterator = <T extends Components>(
   world: World<T>, 
-  components: (keyof T)[], 
   options?: QueryOptions
 ) => {
-  const sql = buildQuery(world, components, options);
+  const { sql, componentsToInclude } = buildQuery(world, options);
   const stmt = world.db.query(sql);
   
   // Use Bun's iterate capability for incremental results
   const iterator = stmt.iterate();
+  
   
   return {
     [Symbol.iterator]: function* () {
       for (const row of iterator) {
         const entity: Entity<any> = { id: (row as any).eid, world } as Entity<any>;
         
-        components.forEach(c => {
+        for (const c of componentsToInclude) {
           const def = world.defs.get(c as string)!;
           const data: any = {};
-          def.columns.forEach(column => {
+          for (const column of def.columns) {
             data[column.name] = (row as any)[`${def.name}_${column.name}`];
-          })
-          entity[c] = makeTrackedComponent(entity, c as string, data);
-        });
+          }
+          (entity as any)[c] = makeTrackedComponent(entity, c as string, data);
+        }
 
         yield entity;
       }
