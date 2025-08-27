@@ -86,32 +86,101 @@ export const addComponent = <
   return entity as E & { [K in T]: Components[T] };
 }
 
+export const addComponents = <
+  E extends Entity<any> | EntityWithComponents<any, any>,
+  T extends Record<string, any>
+>(
+  entity: E,
+  components: T
+): E & { [K in keyof T]: T[K] } => {
+  const { id, world } = entity;
+  
+  for (const [componentName, data] of Object.entries(components)) {
+    (entity as any)[componentName] = makeTrackedComponent(
+      entity,
+      componentName,
+      data,
+      false // mark as new
+    );
 
-export const removeComponent = <T extends keyof Components>(
+    if (!world.dirtyEntities.has(id)) {
+      world.dirtyEntities.set(id, new Set());
+    }
+    world.dirtyEntities.get(id)!.add(componentName);
+  }
+  
+  return entity as E & { [K in keyof T]: T[K] };
+}
+
+
+// Overloaded function signatures for removeComponent
+export function removeComponent(
+  entity: Entity<any> | EntityWithComponents<any, any>
+): void;
+
+export function removeComponent<T extends keyof Components>(
   entity: Entity<any> | EntityWithComponents<any, any>,
   componentName: T
-) => {
+): void;
+
+export function removeComponent<T extends keyof Components>(
+  entity: Entity<any> | EntityWithComponents<any, any>,
+  ...componentNames: T[]
+): void;
+
+export function removeComponent<T extends keyof Components>(
+  entity: Entity<any> | EntityWithComponents<any, any>,
+  ...componentNames: T[]
+): void {
   const { id, world } = entity;
-  const def = world.defs.get(componentName);
-  if (!def) {
-    throw new Error(`Component def not found for ${componentName}`);
-  }
-
-  // delete from db
-  world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
   
-  const cache = entity.world.entityCache.get(id);
-  if (cache) {
-    delete (cache as any)[componentName];
+  // If no component names provided, remove all components from the entity
+  if (componentNames.length === 0) {
+    const cache = entity.world.entityCache.get(id);
+    if (cache) {
+      // Get all component names from the cache
+      const allComponentNames = Object.keys(cache);
+      
+      for (const componentName of allComponentNames) {
+        const def = world.defs.get(componentName);
+        if (def) {
+          // delete from db
+          world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
+        }
+        
+        delete (cache as any)[componentName];
+        delete (entity as any)[componentName];
+      }
+    }
+    
+    // Clean up dirty tracking
+    world.dirtyEntities.delete(id);
+    return;
   }
+  
+  // Remove specific components
+  for (const componentName of componentNames) {
+    const def = world.defs.get(componentName);
+    if (!def) {
+      throw new Error(`Component def not found for ${componentName}`);
+    }
 
-  delete (entity as any)[componentName];
+    // delete from db
+    world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
+    
+    const cache = entity.world.entityCache.get(id);
+    if (cache) {
+      delete (cache as any)[componentName];
+    }
 
-  const dirty = entity.world.dirtyEntities.get(id);
-  if (dirty) {
-    dirty.delete(componentName);
-    if (dirty.size === 0) {
-      world.dirtyEntities.delete(id);
+    delete (entity as any)[componentName];
+
+    const dirty = entity.world.dirtyEntities.get(id);
+    if (dirty) {
+      dirty.delete(componentName);
+      if (dirty.size === 0) {
+        world.dirtyEntities.delete(id);
+      }
     }
   }
 }

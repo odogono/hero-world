@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'bun:test';
 import { createWorld, flush } from '../world';
 import { defineComponent } from '../component';
-import { addComponent, removeComponent } from '../component';
+import { addComponent, addComponents, removeComponent } from '../component';
 import { createEntity } from '../entity';
 import { z } from 'zod';
 
@@ -183,6 +183,25 @@ describe('component', () => {
       expect(entity.location_test.name).toBe('Forest');
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('location_test')).toBe(true);
+    });
+
+
+    test('should add multiple components to same entity with different names', () => {
+      const world = createWorld()
+        .registerComponent(statsComponent)
+        .registerComponent(locationComponent)
+        .build();
+      const entity = createEntity(world);
+
+      const entityWithComponents = addComponents(entity, {
+        stats_test: { health: 100, level: 1, mana: 50 },
+        location_test: { name: 'Forest', region: 'North' }
+      });
+
+      expect(entityWithComponents.stats_test).toBeDefined();
+      expect(entityWithComponents.location_test).toBeDefined();
+      expect(entityWithComponents.stats_test.health).toBe(100);
+      expect(entityWithComponents.location_test.name).toBe('Forest');
     });
   });
 
@@ -410,6 +429,51 @@ describe('component', () => {
       
       expect(entity.stats_test.health).toBe(100);
       expect(entity.inventory_test.capacity).toBe(10);
+    });
+
+
+    test('should handle removing several named components at once', () => {
+      const world = createWorld()
+        .registerComponent(statsComponent)
+        .registerComponent(locationComponent)
+        .registerComponent(inventoryComponent)
+        .build();
+
+      const entity = createEntity(world, {
+        stats_test: { health: 100, level: 1, mana: 50 },
+        location_test: { name: 'Forest', region: 'North' },
+        inventory_test: { capacity: 10, items: '["sword"]' }
+      });
+      flush(world);
+      
+      // Remove middle component
+      removeComponent(entity, 'location_test', 'stats_test', 'inventory_test');
+
+      expect(entity.stats_test).toBeUndefined();
+      expect(entity.location_test).toBeUndefined();
+      expect(entity.inventory_test).toBeUndefined();
+    });
+
+    test('should handle removing all components at once', () => {
+      const world = createWorld()
+        .registerComponent(statsComponent)
+        .registerComponent(locationComponent)
+        .registerComponent(inventoryComponent)
+        .build();
+
+      const entity = createEntity(world, {
+        stats_test: { health: 100, level: 1, mana: 50 },
+        location_test: { name: 'Forest', region: 'North' },
+        inventory_test: { capacity: 10, items: '["sword"]' }
+      });
+      flush(world);
+      
+      // Remove middle component
+      removeComponent(entity);
+
+      expect(entity.stats_test).toBeUndefined();
+      expect(entity.location_test).toBeUndefined();
+      expect(entity.inventory_test).toBeUndefined();
     });
   });
 });
