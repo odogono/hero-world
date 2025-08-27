@@ -3,49 +3,30 @@ import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate, type ColumnInfo } from './schema-to-sql';
 import { createLog } from '@helpers/log';
-import { fromUrl, toCamelCase } from '../helpers/string';
-import type { Location } from './location';
-import { componentDefSchema, entitySchema, type Components, type Entity } from './types';
+import { fromUrl, toCamelCase, toSnakeCase } from '../helpers/string';
+import type { Components, Entity, World, EntityCache, ComponentDef } from './types';
+import { entitySchema } from './types';
+import type { ComponentDefinition } from './component-registry';
 import { makeTrackedComponent } from './component';
 
 
-type ComponentCacheEntry<T> = {
-  data: T;
-  exists: boolean;
-}
 
-
-type EntityCache = Map<number, Partial<{
-  [K in keyof Components]: ComponentCacheEntry<Components[K]>
-}>>;
-
-
-type ComponentDef = {
-  url: string;
-  name: string;
-  tableName: string;
-  columns: ColumnInfo[];
-  stmtInsert: Statement;
-  stmtUpdate: Statement;
-} & {
-  [key: string]: Statement;
-}
-
-export type World = {
-  db: Database;
-  dirtyEntities: Map<number, Set<keyof Components>>;
-  entityCache: EntityCache;
-  defs: Map<string, ComponentDef>;
-  stmts: {
-    [key: string]: Statement;
-  }
-}
 
 const log = createLog('world');
 
+// Helper function to convert object keys from camelCase to snake_case
+const convertKeysToSnakeCase = (obj: Record<string, any>): Record<string, any> => {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const snakeKey = toSnakeCase(key) || key;
+    result[snakeKey] = value;
+  }
+  return result;
+};
 
 
-export const createWorld = (): World => {
+
+export const createWorld = <T extends Components>(): World<T> => {
 
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entityCache: EntityCache = new Map();
@@ -58,14 +39,13 @@ export const createWorld = (): World => {
   const {sql} = zodSchemaToSqliteTable(entitySchema, {ifNotExists: true});
   db.exec(sql);
 
-  const {sql: componentDefSql} = zodSchemaToSqliteTable(componentDefSchema, {ifNotExists: true});
-  db.exec(componentDefSql);
+  // const {sql: componentDefSql} = zodSchemaToSqliteTable(componentDefSchema, {ifNotExists: true});
+  // db.exec(componentDefSql);
 
   const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?1;');
   const selectEntityById = db.prepare('SELECT id FROM tbl_entity WHERE id = ?1;');
-  const insertComponentDef = db.prepare('INSERT INTO tbl_component_def (url) VALUES (?1) ON CONFLICT DO NOTHING;');
-  const selectComponentDefByUrl = db.prepare('SELECT id FROM tbl_component_def WHERE url = ?1;');
+  // const selectComponentDefByUrl = db.prepare('SELECT id FROM tbl_component_def WHERE url = ?1;');
   return {
     db,
     defs: new Map(),
@@ -75,22 +55,21 @@ export const createWorld = (): World => {
       insertEntity,
       deleteEntity,
       selectEntityById,
-      insertComponentDef,
-      selectComponentDefByUrl
+      // selectComponentDefByUrl
     }
   }
 }
 
-export const getComponentDef = (world: World, url: string) => {
-  const stmt = world.stmts.selectComponentDefByUrl;
-  if (!stmt) {
-    throw new Error('selectComponentDefByUrl not found');
-  }
-  return stmt.get(url);
-}
+// export const getComponentDef = <T extends Components>(world: World<T>, url: string) => {
+//   const stmt = world.stmts.selectComponentDefByUrl;
+//   if (!stmt) {
+//     throw new Error('selectComponentDefByUrl not found');
+//   }
+//   return stmt.get(url);
+// }
 
 
-export const saveWorld = async (world: World, path: string) => {
+export const saveWorld = async <T extends Components>(world: World<T>, path: string) => {
   if (await Bun.file(path).exists()) {
     await Bun.file(path).delete();
   }
@@ -102,34 +81,34 @@ interface ComponentStatements {
   [key: string]: string;
 }
 
-export const registerComponentDef = (world: World, componentDef: z.ZodObject<any>, statements: ComponentStatements): World => {
+export const registerComponentDef = <T extends Components>(world: World<T>, componentDef: z.ZodObject<any>, statements: ComponentStatements = {}): World<T> => {
 
   const meta = componentDef.meta();
 
   if (!meta?.id) {
     throw new Error('componentDef must have an id');
   }
+  const name = fromUrl(meta.id);
 
-  const existing = getComponentDef(world, meta.id);
+  const existing = world.defs.get(name);
   if (existing) {
     return world;
   }
 
-  const name = fromUrl(meta.id);
 
-  log.debug('[registerComponentDef] name', name, meta.id);
+  // log.debug('[registerComponentDef] name', name, meta.id);
 
-  const cid = insertComponentDef(world, meta.id);
+  // const cid = insertComponentDef(world, meta.id);
   
   const result = zodSchemaToSqliteTable(componentDef, {ifNotExists: true});
-  log.debug('[registerComponentDef] result', result);
+  // log.debug('[registerComponentDef] result', result);
   world.db.exec(result.sql);
 
   const sqlInsert = zodSchemaToSqliteInsert(componentDef, {namedParams: true});
   const sqlUpdate = zodSchemaToSqliteUpdate(componentDef, {namedParams: true});
 
-  log.debug('[registerComponentDef] sqlInsert', name, sqlInsert);
-  log.debug('[registerComponentDef] sqlUpdate', name, sqlUpdate);
+  // log.debug('[registerComponentDef] sqlInsert', name, sqlInsert);
+  // log.debug('[registerComponentDef] sqlUpdate', name, sqlUpdate);
   
   const additionalStmts = Object.entries(statements).reduce((acc, [key, sql]) => {
     acc[key] = world.db.prepare(sql);
@@ -156,41 +135,29 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
   return world;
 }
 
-
-export const createEntity = <C extends keyof Components>(world: World, initialComponents?: Partial<Pick<Components, C>>): Entity<C> => {
-  const eid = world.stmts.insertEntity!.run().lastInsertRowid as number;
-  
-  const entity: any = { id: eid, world };
-  
-  world.entityCache.set(eid, {});
-  if (initialComponents) {
-    for (const [c, data] of Object.entries(initialComponents)) {
-      const name = c as keyof Components;
-      if (data ) {
-        entity[name] = makeTrackedComponent(entity, name, {...data} as any, false);
-
-        if (!world.dirtyEntities.has(eid)) {
-          world.dirtyEntities.set(eid, new Set());
-        }
-        world.dirtyEntities.get(eid)!.add(name);
-      }
-    }
-  }
-  return entity as Entity<C>;
+// Cleaner component registration using ComponentDefinition
+export const registerComponent = <
+  Name extends string,
+  Schema extends z.ZodObject<any>
+>(
+  world: World<T & { [K in Name]: z.infer<Schema> }>, 
+  definition: ComponentDefinition<Name, Schema>
+): World<T & { [K in Name]: z.infer<Schema> }> => {
+  return registerComponentDef(world, definition.schema, definition.statements || {});
 }
 
-export const insertComponentDef = (world: World, url: string) => {
-  if (!world.db || !world.stmts.insertComponentDef) {
-    throw new Error('world not initialized');
-  }
-  const { lastInsertRowid } = world.stmts.insertComponentDef!.run(url);
-  return lastInsertRowid as number;
-}
+// export const insertComponentDef = <T extends Components>(world: World<T>, url: string): number => {
+//   if (!world.db || !world.stmts.insertComponentDef) {
+//     throw new Error('world not initialized');
+//   }
+//   const { lastInsertRowid } = world.stmts.insertComponentDef!.run(url);
+//   return lastInsertRowid as number;
+// }
 
-export const deleteEntity = (entity: Entity) => {
+export const deleteEntity = <T extends Components>(entity: Entity<T>) => {
   const { id, world } = entity;
 
-  log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
+  // log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
   
   world.stmts.deleteEntity!.run(id);
 
@@ -201,7 +168,7 @@ export const deleteEntity = (entity: Entity) => {
   return null;
 }
 
-export const getEntity = (world: World, id: number) => {
+export const getEntity = <T extends Components>(world: World<T>, id: number) => {
   const stmt = world.stmts.selectEntityById;
   if (!stmt) {
     throw new Error('selectEntityById not found');
@@ -212,7 +179,7 @@ export const getEntity = (world: World, id: number) => {
 }
 
 
-export const queryEntities = (world: World, components: (keyof Components)[], entity?: Entity) => {
+export const queryEntities = <T extends Components>(world: World<T>, components: (keyof T)[], entity?: Entity<T>) => {
 
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
@@ -233,7 +200,7 @@ export const queryEntities = (world: World, components: (keyof Components)[], en
     });
   });
 
-  const where = entity ? `WHERE e.id = ${entity.id}` : '';
+  const where = entity ? `WHERE e.id = ${entity.id} LIMIT 1` : '';
 
   // TODO cache sql against components
   const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${where}`;
@@ -241,7 +208,7 @@ export const queryEntities = (world: World, components: (keyof Components)[], en
   const rows = stmt.all();
 
   return rows.map((row: any) => {
-    const entity: Entity<any> = { id: row.eid, world };
+    const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
     
     components.forEach(c => {
       const def = world.defs.get(c)!;
@@ -257,7 +224,7 @@ export const queryEntities = (world: World, components: (keyof Components)[], en
 }
 
 
-export const flush = (world: World) => {
+export const flush = <T extends Components>(world: World<T>) => {
   const { db, defs, dirtyEntities, entityCache, stmts } = world;
   db.transaction(() => {
     
@@ -273,14 +240,14 @@ export const flush = (world: World) => {
         }
         if (entry.exists) {
           // update
-          log.debug('[flush] update', entry.data, eid);
-          def!.stmtUpdate.run(entry.data);
-          // stmts[c]!.run(eid, entry.data);
+          const updateData = convertKeysToSnakeCase({...entry.data, eid});
+          // log.debug('[flush] update', updateData, eid);
+          def!.stmtUpdate.run(updateData);
         } else {
           // insert
-          const data = {...entry.data, eid};
-          log.debug('[flush] insert', data, def.url);
-          def!.stmtInsert.run(data);
+          const insertData = convertKeysToSnakeCase({...entry.data, eid});
+          // log.debug('[flush] insert', insertData, def.url);
+          def!.stmtInsert.run(insertData);
           entry.exists = true;
         }
       }

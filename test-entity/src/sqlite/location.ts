@@ -1,15 +1,14 @@
 import { zodSchemaToSqliteInsert } from "./schema-to-sql";
-import { createEntity, registerComponentDef, type World } from "./world";
+import { registerComponentDef, type World } from "./world";
 import * as z from "zod";
 import { createLog } from "@helpers/log";
 import { isEntity, type Entity } from "./types";
+import { componentSchema } from "./component";
+import { createEntity } from "./entity";
 
 const log = createLog('location');
 
-export const componentSchema = z.object({
-  id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
-  eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
-})
+
 
 export type Location = z.infer<typeof locationSchema>;
 export const locationSchema = componentSchema.extend({

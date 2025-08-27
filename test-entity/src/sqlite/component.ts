@@ -1,7 +1,10 @@
 import type { Entity, Components } from "./types";
-import type { World } from "./world";
+import * as z from "zod";
 
-
+export const componentSchema = z.object({
+  id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
+  eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
+});
 
 export const makeTrackedComponent = <T extends keyof Components>(
   entity: Entity,
