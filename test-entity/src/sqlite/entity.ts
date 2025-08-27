@@ -84,7 +84,7 @@ export const getEntity = <T extends Components>(world: World<T>, id: number) => 
 export const queryEntities = <T extends Components>(
   world: World<T>, 
   components: (keyof T)[], 
-  options?: { where?: string; entity?: Entity<any> }
+  options?: { where?: string; entity?: Entity<any>; limit?: number; offset?: number }
 ) => {
 
   const base = `SELECT e.id AS eid`;
@@ -107,13 +107,25 @@ export const queryEntities = <T extends Components>(
 
   let whereClause = '';
   if (options?.entity) {
-    whereClause = `WHERE e.id = ${options.entity.id} LIMIT 1`;
+    whereClause = `WHERE e.id = ${options.entity.id}`;
   } else if (options?.where) {
     whereClause = `WHERE ${options.where}`;
   }
 
+  // Build LIMIT and OFFSET clauses
+  let limitOffsetClause = '';
+  if (options?.limit !== undefined) {
+    limitOffsetClause += ` LIMIT ${options.limit}`;
+    if (options?.offset !== undefined) {
+      limitOffsetClause += ` OFFSET ${options.offset}`;
+    }
+  } else if (options?.offset !== undefined) {
+    // In SQLite, OFFSET requires LIMIT, so we use a very large limit
+    limitOffsetClause += ` LIMIT -1 OFFSET ${options.offset}`;
+  }
+
   // TODO cache sql against components
-  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}`;
+  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
   const stmt = world.db.query(sql);
   const rows = stmt.all();
 

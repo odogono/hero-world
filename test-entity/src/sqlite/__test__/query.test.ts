@@ -64,4 +64,55 @@ describe('query', () => {
     expect(result[0]?.id).toBe(entity1.id);
     expect(result[0]?.status.status).toBe('idle');
   });
+
+
+
+  test('should set a limit on the number of entities returned', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    flush(world);
+
+    const entities = queryEntities(world, ['status'], { limit: 2 });
+    expect(entities).toHaveLength(2);
+    expect(entities[0]?.status.status).toBe('idle');
+    expect(entities[1]?.status.status).toBe('walking');
+  });
+
+  test('should set an offset on the number of entities returned', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    flush(world);
+
+    const entities = queryEntities(world, ['status'], { offset: 2 });
+    expect(entities).toHaveLength(2);
+    expect(entities[0]?.status.status).toBe('fighting');
+    expect(entities[1]?.status.status).toBe('dead');
+  });
+
+  test('should combine limit and offset options', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+    createEntity(world, { status: { status: 'idle' } });
+
+    flush(world);
+
+    const entities = queryEntities(world, ['status'], { limit: 2, offset: 1 });
+    expect(entities).toHaveLength(2);
+    expect(entities[0]?.status.status).toBe('walking');
+    expect(entities[1]?.status.status).toBe('fighting');
+  });
 });
