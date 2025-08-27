@@ -1,12 +1,37 @@
 import { Database, Statement } from 'bun:sqlite';
 import { test, expect } from 'bun:test';
 import * as z from "zod";
-import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable } from './schema-to-sql';
+import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate } from './schema-to-sql';
 import { createLog } from '@helpers/log';
 import { fromUrl, toCamelCase } from '../helpers/string';
+import type { Location } from './location';
+import { componentDefSchema, entitySchema, type Components, type Entity } from './types';
+
+
+type ComponentCacheEntry<T> = {
+  data: T;
+  exists: boolean;
+}
+
+
+type EntityCache = Map<number, Partial<{
+  [K in keyof Components]: ComponentCacheEntry<Components[K]>
+}>>;
+
+
+type ComponentDef = {
+  url: string;
+  stmtInsert: Statement;
+  stmtUpdate: Statement;
+} & {
+  [key: string]: Statement;
+}
 
 export type World = {
   db: Database;
+  dirtyEntities: Map<number, Set<keyof Components>>;
+  entityCache: EntityCache;
+  defs: Map<string, ComponentDef>;
   stmts: {
     [key: string]: Statement;
   }
@@ -15,27 +40,11 @@ export type World = {
 const log = createLog('world');
 
 
-export type Entity = z.infer<typeof entitySchema>;
-const entitySchema = z.object({
-  id: z.number().meta({ primaryKey: true, autoIncrement: true }),
-  createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
-  updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
-}).meta({ name: 'tbl_entity' });
 
-export type ComponentDef = z.infer<typeof componentDefSchema>;
-const componentDefSchema = z.object({
-  id: z.string().meta({ primaryKey: true, autoIncrement: true }),
-  url: z.string().meta({ unique: true }),
-}).meta({ name: 'tbl_component_def' });
+export const createWorld = (): World => {
 
-
-export const isEntity = (val: unknown): val is Entity => {
-  if (typeof val !== 'object' || val === null) return false;
-  const entity = val as Partial<Entity>;
-  return typeof entity.id === 'number';
-}
-
-export const createWorld = () => {
+  const dirtyEntities = new Map<number, Set<keyof Components>>();
+  const entityCache: EntityCache = new Map();
 
   const db = new Database(':memory:');
 
@@ -49,12 +58,17 @@ export const createWorld = () => {
   db.exec(componentDefSql);
 
   const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
+  const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?1;');
   const insertComponentDef = db.prepare('INSERT INTO tbl_component_def (url) VALUES (?1) ON CONFLICT DO NOTHING;');
   const selectComponentDefByUrl = db.prepare('SELECT id FROM tbl_component_def WHERE url = ?1;');
   return {
     db,
+    defs: new Map(),
+    dirtyEntities,
+    entityCache,
     stmts: {
       insertEntity,
+      deleteEntity,
       insertComponentDef,
       selectComponentDefByUrl
     }
@@ -97,47 +111,47 @@ export const registerComponentDef = (world: World, componentDef: z.ZodObject<any
 
   const name = fromUrl(meta.id);
 
+  log.debug('[registerComponentDef] name', name, meta.id);
+
   const cid = insertComponentDef(world, meta.id);
   
   const result = zodSchemaToSqliteTable(componentDef, {ifNotExists: true});
   world.db.exec(result.sql);
 
-  const sqlInsert = zodSchemaToSqliteInsert(componentDef);
+  const sqlInsert = zodSchemaToSqliteInsert(componentDef, {namedParams: true});
+  const sqlUpdate = zodSchemaToSqliteUpdate(componentDef, {namedParams: true});
+
+  log.debug('[registerComponentDef] sqlInsert', name, sqlInsert);
+  log.debug('[registerComponentDef] sqlUpdate', name, sqlUpdate);
   
+  const additionalStmts = Object.entries(statements).reduce((acc, [key, sql]) => {
+    acc[key] = world.db.prepare(sql);
+    return acc;
+  }, {} as Record<string, Statement>);
 
-  log.info('registered component def', {
-    
-    componentDef: {...componentDef.meta(), name},
-    sqlInsert
-  });
+  const def = {
+    url: meta.id!,
+    stmtInsert: world.db.prepare(sqlInsert),
+    stmtUpdate: world.db.prepare(sqlUpdate),
+    ...additionalStmts
+  } as ComponentDef;
 
-  const insertKey = `${toCamelCase(name)}Insert`;
-  const stmts = {
-    ...world.stmts,
-    [insertKey]: world.db.prepare(sqlInsert)
-  }
+  // log.info('registered component def', {
+  //   componentDef: {...componentDef.meta(), name},
+  //   def
+  // });
 
-
-  for (const [key, sql] of Object.entries(statements)) {
-    const stmt = world.db.prepare(sql);
-    stmts[key] = stmt;
-    log.info('registered component stmt', {
-      key,
-      sql
-    });
-  }
-
-  world.stmts = stmts;
-
-  return {
-    ...world,
-    stmts
-  }
+  world.defs.set(name, def);
+  
+  return world;
 }
 
 
-export const createEntity = (world: World) => 
-  world.stmts.insertEntity!.run().lastInsertRowid as number;
+export const createEntity = (world: World): Entity => {
+  const eid = world.stmts.insertEntity!.run().lastInsertRowid as number;
+  world.entityCache.set(eid, {});
+  return { id: eid, world } as Entity<any>;
+}
 
 export const insertComponentDef = (world: World, url: string) => {
   if (!world.db || !world.stmts.insertComponentDef) {
@@ -145,4 +159,56 @@ export const insertComponentDef = (world: World, url: string) => {
   }
   const { lastInsertRowid } = world.stmts.insertComponentDef!.run(url);
   return lastInsertRowid as number;
+}
+
+export const deleteEntity = (entity: Entity) => {
+  const { id, world } = entity;
+
+  world.db.transaction(() => {
+
+    // for (const c of Object.keys())
+    
+    world.stmts.deleteEntity!.run(id);
+
+    // Clean up caches
+    world.entityCache.delete(id);
+    world.dirtyEntities.delete(id);
+  });
+}
+
+
+
+export const flush = (world: World) => {
+  const { db, defs, dirtyEntities, entityCache, stmts } = world;
+  db.transaction(() => {
+    
+    for (const [eid, components] of dirtyEntities.entries()) {
+      const cache = entityCache.get(eid);
+
+      for (const c of components) {
+        const entry = cache![c]!;
+        const def = defs.get(c);
+        if (!def) {
+          log.debug('[flush] defs', Object.keys(defs));
+          throw new Error(`Component def not found for ${c}`);
+        }
+        if (entry.exists) {
+          // update
+          log.debug('[flush] update', entry.data, eid);
+          def!.stmtUpdate.run(entry.data);
+          // stmts[c]!.run(eid, entry.data);
+        } else {
+          // insert
+          const data = {...entry.data, eid};
+          log.debug('[flush] insert', data, def.url);
+          def!.stmtInsert.run(data);
+          entry.exists = true;
+        }
+      }
+    }
+
+
+  })();
+
+  dirtyEntities.clear();
 }

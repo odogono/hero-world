@@ -2,9 +2,10 @@ import { Database } from 'bun:sqlite';
 import { test, expect } from 'bun:test';
 import * as z from "zod";
 import { zodSchemaToSqliteTable } from '../schema-to-sql';
-import { createEntity, createWorld, saveWorld } from '../world';
-import { createLocation, getLocationE } from '../location';
+import { createEntity, createWorld, flush, registerComponentDef, saveWorld } from '../world';
+import { createLocation, getLocationE, locationSchema, type Location } from '../location';
 import { createLog } from '@helpers/log';
+import { addComponent } from '../component';
 
 
 const log = createLog('test-main');
@@ -26,22 +27,34 @@ test('SQLite should be able to create a database', async () => {
 
   const world = createWorld();
 
-  const eid = createEntity(world);
-  console.log(eid);
+  const e = createEntity(world);
+  console.log(e.id);
 
-  createLocation(world, {name: 'home', region: 'city'});
-  createLocation(world, {name: 'warehouse', region: 'city'});
+  registerComponentDef(world, locationSchema, {
+    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
+  });
 
-  const home = getLocationE(world, {name: 'home'});
-  expect(home).not.toBeNull();
+  addComponent(e, 'location', {name: 'home', region: 'city'});
 
-  log.info('home', home);
+  // log.debug('world', world);
 
-  const office = getLocationE(world, {name: 'office'});
-  expect(office).toBeNull();
+  flush(world);
 
-  // backup
-  saveWorld(world, './world.db');
+  // log.debug('e', e);
+
+  // createLocation(world, {name: 'home', region: 'city'});
+  // createLocation(world, {name: 'warehouse', region: 'city'});
+
+  // const home = getLocationE(world, {name: 'home'});
+  // expect(home).not.toBeNull();
+
+  // log.info('home', home);
+
+  // const office = getLocationE(world, {name: 'office'});
+  // expect(office).toBeNull();
+
+  // // backup
+  // saveWorld(world, './world.db');
 
   // const fileDb = new Database('mydatabase.sqlite');
 

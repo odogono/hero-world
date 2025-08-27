@@ -11,28 +11,65 @@ export const fromUrl = (url: string): string => {
   
   // Convert each segment to PascalCase and join
   return segments
-    .map(segment => toPascalCase(segment))
+    .map(segment => toCamelCase(segment))
     .filter(Boolean)
     .join('');
 };
 
+/**
+ * Convert a string to PascalCase
+ * 
+ * @param str - The string to convert
+ * @param joinChar - The character to join the words with
+ * @returns The PascalCase string
+ */
 export const toPascalCase = (str: string, joinChar: string = '') =>
   str
     .match(/[A-Z]?[a-z]+/g)
     ?.map((word) => toCapitalized(word))
     .join(joinChar);
 
+
+
+/**
+ * Convert a string to kebab-case
+ * 
+ * @param str - The string to convert
+ * @param joinChar - The character to join the words with
+ * @returns The kebab-case string
+ */
 export const toKebabCase = (str: string, joinChar: string = '-') =>
   str
     .match(/[A-Z]?[a-z]+/g)
     ?.map((word) => word.toLowerCase())
     .join(joinChar);
 
+
+/**
+ * Convert a string to snake_case
+ * 
+ * @param str - The string to convert
+ * @param joinChar - The character to join the words with
+ * @returns The snake_case string
+ */
 export const toSnakeCase = (str: string) => toKebabCase(str, '_');
 
+/**
+ * Convert a string to Capitalized
+ * 
+ * @param s - The string to convert
+ * @returns The capitalized string
+ */
 export const toCapitalized = (s: string) =>
   s.replace(/\b\w/g, (c) => c.toUpperCase());
 
+/**
+ * Convert a string to camelCase
+ * 
+ * @param str - The string to convert
+ * @param joinChar - The character to join the words with
+ * @returns The camelCase string
+ */
 export const toCamelCase = (str: string, joinChar: string = '') => {
   const result = toPascalCase(str, joinChar);
   return result ? result.charAt(0).toLowerCase() + result.substring(1) : '';

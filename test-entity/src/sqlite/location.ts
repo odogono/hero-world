@@ -1,14 +1,18 @@
 import { zodSchemaToSqliteInsert } from "./schema-to-sql";
-import { createEntity, isEntity, registerComponentDef, type Entity, type World } from "./world";
+import { createEntity, registerComponentDef, type World } from "./world";
 import * as z from "zod";
 import { createLog } from "@helpers/log";
+import { isEntity, type Entity } from "./types";
 
 const log = createLog('location');
 
-export type Location = z.infer<typeof locationSchema>;
-const locationSchema = z.object({
+export const componentSchema = z.object({
   id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
   eid: z.int().optional(),
+})
+
+export type Location = z.infer<typeof locationSchema>;
+export const locationSchema = componentSchema.extend({
   name: z.string(),
   region: z.string(),
 }).meta({ name: 'tbl_locations', id: '/location' });
@@ -20,11 +24,11 @@ export const createLocation = (world: World, location: Location) => {
     locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
   });
 
-  const eid = createEntity(world);
+  const e = createEntity(world);
 
-  world.stmts.locationInsert!.run(eid, location.name, location.region);
+  world.stmts.locationInsert!.run(e.id, location.name, location.region);
 
-  return eid;
+  return e;
 }
 
 
