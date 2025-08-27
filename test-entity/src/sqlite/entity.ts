@@ -52,11 +52,9 @@ export const createEntity: CreateEntityOverloads =
 
 
 
-export const deleteEntity = <T extends Components>(entity: Entity<T> | EntityWithComponents<T, any>) => {
+export const deleteEntity = (entity: Entity<any> | EntityWithComponents<any, any>) => {
   const { id, world } = entity;
 
-  // log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
-  
   world.stmts.deleteEntity!.run(id);
 
   // Clean up caches
@@ -80,7 +78,7 @@ export const getEntity = <T extends Components>(world: World<T>, id: number) => 
 }
 
 
-interface QueryOptions {
+export interface QueryOptions {
   where?: string;
   entity?: Entity<any>;
   limit?: number;

@@ -1,6 +1,5 @@
 import { test, expect, describe } from 'bun:test';
 import { createWorld, flush } from '../world';
-import { locationSchema } from '../components/location';
 import { createLog } from '@helpers/log';
 import { number, string } from 'zod';
 import { defineComponent } from '../component';
