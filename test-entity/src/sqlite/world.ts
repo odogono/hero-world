@@ -46,7 +46,7 @@ export const createWorld = (): World => {
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entityCache: EntityCache = new Map();
 
-  const db = new Database(':memory:');
+  const db = new Database(':memory:', { strict: true});
 
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON");
