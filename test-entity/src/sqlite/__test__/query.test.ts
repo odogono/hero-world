@@ -11,6 +11,22 @@ const statusComponent = defineComponent({
   }
 });
 
+const positionComponent = defineComponent({
+  name: 'position' as const,
+  schema: {
+    x: z.number(),
+    y: z.number(),
+  }
+});
+
+const velocityComponent = defineComponent({
+  name: 'velocity' as const,
+  schema: {
+    x: z.number(),
+    y: z.number(),
+  }
+});
+
 describe('query', () => {
 
   test('should query all entities with status component', () => {
@@ -157,4 +173,30 @@ describe('query', () => {
 
     expect(result).toEqual(['walking', 'fighting']);
   });
+
+
+
+  test('query returns entities with both components', () => {
+    const world = createWorld()
+          .registerComponent(positionComponent)
+          .registerComponent(velocityComponent)
+          .build();
+
+    createEntity(world, { position: { x: 0, y: 0 } });
+    createEntity(world, { position: { x: 1, y: 1 } });
+    createEntity(world, { position: { x: 2, y: 2 }, velocity: { x: 3, y: 3 } });
+
+    flush(world);
+
+
+    const stationary = queryEntities(world, ['position']);
+    expect(stationary).toHaveLength(3);
+
+    const moving = queryEntities(world, ['position', 'velocity']);
+    expect(moving).toHaveLength(1);
+
+
+    // saveWorld(world, './world.db');
+  })
+
 });

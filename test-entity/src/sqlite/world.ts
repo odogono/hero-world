@@ -211,4 +211,6 @@ export const flush = <T extends Components>(world: World<T>) => {
   })();
 
   dirtyEntities.clear();
+
+  return world;
 }

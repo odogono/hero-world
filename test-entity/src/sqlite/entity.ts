@@ -18,8 +18,8 @@ export type EntityWithComponents<
 
 // Overloads for type inference
 type CreateEntityOverloads = {
-  <T extends Partial<Components>>(world: World<T>, initialComponents: T): Entity<keyof T & string>;
-  <T extends Partial<Components>>(world: World<T>): Entity<never>;
+  <TComponents extends Components, C extends Partial<TComponents>>(world: World<TComponents>, initialComponents: C): EntityWithComponents<TComponents, keyof C & keyof TComponents>;
+  <TComponents extends Components>(world: World<TComponents>): EntityWithComponents<TComponents, never>;
 }
 
 export const createEntity: CreateEntityOverloads = 
@@ -80,13 +80,15 @@ export const getEntity = <T extends Components>(world: World<T>, id: number) => 
 }
 
 
+interface QueryOptions {
+  where?: string;
+  entity?: Entity<any>;
+  limit?: number;
+  offset?: number;
+}
 
-export const queryEntities = <T extends Components>(
-  world: World<T>, 
-  components: (keyof T)[], 
-  options?: { where?: string; entity?: Entity<any>; limit?: number; offset?: number }
-) => {
 
+const buildQuery = (world: World<any>, components: (keyof any)[], options?: QueryOptions) => {
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
   const fields: string[] = [];
@@ -126,6 +128,18 @@ export const queryEntities = <T extends Components>(
 
   // TODO cache sql against components
   const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
+
+  return sql;
+}
+
+
+export const queryEntities = <T extends Components>(
+  world: World<T>, 
+  components: (keyof T)[], 
+  options?: QueryOptions
+) => {
+  const sql = buildQuery(world, components, options);
+  
   const stmt = world.db.query(sql);
   const rows = stmt.all();
 
@@ -148,47 +162,9 @@ export const queryEntities = <T extends Components>(
 export const queryEntitiesIterator = <T extends Components>(
   world: World<T>, 
   components: (keyof T)[], 
-  options?: { where?: string; entity?: Entity<any>; limit?: number; offset?: number }
+  options?: QueryOptions
 ) => {
-  const base = `SELECT e.id AS eid`;
-  const joins: string[] = [];
-  const fields: string[] = [];
-  components.forEach(c => {
-    const def = world.defs.get(c as string);
-    if (!def) {
-      throw new Error(`Component def not found for ${String(c)}`);
-    }
-    const alias = def.name;
-    const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
-    joins.push(join);
-    def.columns.forEach(column => {
-      const name = column.name;
-      const field = `${alias}.${name} AS ${alias}_${name}`;
-      fields.push(field);
-    });
-  });
-
-  let whereClause = '';
-  if (options?.entity) {
-    whereClause = `WHERE e.id = ${options.entity.id}`;
-  } else if (options?.where) {
-    whereClause = `WHERE ${options.where}`;
-  }
-
-  // Build LIMIT and OFFSET clauses
-  let limitOffsetClause = '';
-  if (options?.limit !== undefined) {
-    limitOffsetClause += ` LIMIT ${options.limit}`;
-    if (options?.offset !== undefined) {
-      limitOffsetClause += ` OFFSET ${options.offset}`;
-    }
-  } else if (options?.offset !== undefined) {
-    // In SQLite, OFFSET requires LIMIT, so we use a very large limit
-    limitOffsetClause += ` LIMIT -1 OFFSET ${options.offset}`;
-  }
-
-  // TODO cache sql against components
-  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
+  const sql = buildQuery(world, components, options);
   const stmt = world.db.query(sql);
   
   // Use Bun's iterate capability for incremental results

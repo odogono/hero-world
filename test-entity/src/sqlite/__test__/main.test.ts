@@ -1,8 +1,9 @@
 import { test } from 'bun:test';
 import { createWorld, flush, saveWorld } from '../world';
-import { locationComponent } from '../components/location';
+import * as z from 'zod';
 import { createLog } from '@helpers/log';
 import { createEntity, queryEntities } from '../entity';
+import { defineComponent } from '../component';
 
 
 const log = createLog('test-main');
@@ -10,17 +11,13 @@ const log = createLog('test-main');
 
 
 test('SQLite should be able to create a database', async () => {
-  // const db = new Database(':memory:');
-  // expect(db).toBeDefined();
-
-  // const query = db.query("select 'Hello world' as message;");
-  // const result = query.get();
-  // expect(result).toEqual({ message: "Hello world" });
-
-  // db.exec(`
-  //   CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-  //   INSERT INTO users VALUES (1, 'Alice'), (2, 'Bob');
-  // `);
+  const locationComponent = defineComponent({
+    name: 'locationScene' as const,
+    schema: {
+      name: z.string(),
+      region: z.string(),
+    },
+  });
 
   const world = createWorld()
     .registerComponent(locationComponent)
@@ -30,11 +27,11 @@ test('SQLite should be able to create a database', async () => {
   // console.log(e.id);
 
   
-  const e = createEntity(world, {location: {name: 'home', region: 'city'}});
+  const e = createEntity(world, {locationScene: {name: 'home', region: 'city'}});
 
   // addComponent(e, 'location', {name: 'home', region: 'city'});
 
-  e.location.name = 'work';
+  e.locationScene.name = 'work';
 
   // log.debug('entity', e);
   // log.debug('world', world);
@@ -42,7 +39,7 @@ test('SQLite should be able to create a database', async () => {
   flush(world);
 
 
-  const entities = queryEntities(world, ['location']);
+  const entities = queryEntities(world, ['locationScene']);
   log.debug('entities', entities);
 
   // deleteEntity(e);
