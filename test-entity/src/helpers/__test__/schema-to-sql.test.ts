@@ -484,7 +484,7 @@ describe('zodSchemaToSqliteTable', () => {
   test('actual codebase componentSchema now works correctly', () => {
     // This test verifies that the actual componentSchema from the codebase now works correctly
     
-    // This replicates the exact schema from src/sqlite/component.ts
+    // This replicates the exact schema from src/component.ts
     const componentSchema = z.object({
       id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
       eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),

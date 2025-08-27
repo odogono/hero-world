@@ -4,11 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Entity Component System (ECS) library built with TypeScript and Bun, featuring dual implementations:
-1. **In-memory ECS** (`src/entity/`, `src/world.ts`) - Simple Maps-based approach  
-2. **SQLite-backed ECS** (`src/sqlite/`) - Database-persistent with schema generation
-
-The SQLite implementation uses Zod schemas to automatically generate database tables and provides type-safe components with change tracking.
+This is an Entity Component System (ECS) library built with TypeScript and Bun. The SQLite implementation uses Zod schemas to automatically generate database tables and provides type-safe components with change tracking.
 
 ## Common Commands
 
@@ -16,7 +12,7 @@ The SQLite implementation uses Zod schemas to automatically generate database ta
 - `bun install` - Install dependencies
 - `bun run index.ts` - Run main file  
 - `bun test` - Run all tests
-- `bun test --coverage` - Run tests with coverage
+- `bun run test:coverage` - Run tests with coverage
 - `bun test src/path/to/specific.test.ts` - Run specific test file
 
 ### Code Quality  
@@ -33,20 +29,21 @@ The SQLite implementation uses Zod schemas to automatically generate database ta
 - **Component**: Data containers (Location, Stats, HitPoints, etc.)  
 - **World**: Container managing entities, components, and their relationships
 
-### Dual Implementations
+### SQLite ECS Implementation
 
-#### In-Memory ECS (`src/entity/`, `src/world.ts`)
-```ts
-const world = createWorld();
-const entity = createEntity(world);
-const location = createLocation(world, { name: "Forest", region: "North" });
-setEntityLocation(world, entity, location);
-```
+The core implementation provides a SQLite-backed ECS with type-safe components:
 
-#### SQLite ECS (`src/sqlite/`)
 ```ts
-const world = createWorld(); // Creates in-memory SQLite DB
-const entity = createEntity(world, { location: { name: "Forest", region: "North" } });
+const world = createWorld()
+  .registerComponent(locationComponent)
+  .registerComponent(statsComponent)
+  .build();
+
+const entity = createEntity(world, { 
+  location: { name: "Forest", region: "North" },
+  stats: { health: 100, level: 1, mana: 50 }
+});
+
 flush(world); // Persist changes to database
 saveWorld(world, "game.db"); // Save to file
 ```
@@ -64,9 +61,9 @@ saveWorld(world, "game.db"); // Save to file
 - `flush()` persists all pending changes in a transaction
 
 #### Component Management
-- `addComponent(entity, componentName, data)` - Add component to entity
-- `removeComponent(entity, componentName)` - Remove component from entity  
-- `queryEntities(world, components, entity?)` - Query entities with specific components
+- `createEntity(world, initialComponents?)` - Create entity with optional initial components
+- `deleteEntity(entity)` - Remove entity and cascade delete components  
+- `queryEntities(world, options?)` - Query entities with specific components
 
 ### Path Aliases (tsconfig.json)
 - `@/*` → `./src/*`
@@ -78,15 +75,17 @@ saveWorld(world, "game.db"); // Save to file
 ## Key Files
 
 ### Core ECS Files
-- `src/sqlite/world.ts` - Main SQLite ECS implementation
-- `src/sqlite/types.ts` - Entity and Component type definitions
-- `src/sqlite/component.ts` - Component proxy tracking system
-- `src/sqlite/schema-to-sql.ts` - Zod schema to SQLite conversion
+- `src/world.ts` - Main SQLite ECS implementation and world creation
+- `src/types.ts` - Entity and Component type definitions
+- `src/component.ts` - Component proxy tracking system and definitions
+- `src/entity.ts` - Entity creation, deletion, and querying functions
+- `src/system.ts` - System execution and management
 
 ### Utility Files  
 - `src/helpers/string.ts` - String utilities (camelCase, snake_case conversion)
 - `src/helpers/trycatch.ts` - Error handling utilities
 - `src/helpers/log.ts` - Logging utilities
+- `src/helpers/schema-to-sql.ts` - Zod schema to SQLite conversion
 
 ## Development Guidelines
 
@@ -97,26 +96,30 @@ saveWorld(world, "game.db"); // Save to file
 
 ### Component Creation Pattern
 ```ts
-// Define Zod schema with metadata
-export const componentSchema = z.object({
-  id: z.int().optional().meta({ primaryKey: true, autoIncrement: true }),
-  eid: z.int().optional().meta({ foreignKey: 'tbl_entity', cascade: true }),
-  name: z.string(),
-  // ... other fields
-}).meta({ name: 'tbl_component_name', id: '/component-url' });
-
-// Register component definition  
-world = registerComponentDef(world, componentSchema, {
-  // Custom SQL statements
-  selectByName: 'SELECT * FROM tbl_component_name WHERE name = ?1'
+// Define component using defineComponent helper
+const statsComponent = defineComponent({
+  name: 'stats' as const,
+  schema: {
+    health: z.number(),
+    level: z.number(),
+    mana: z.number(),
+  },
+  statements: {
+    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?1'
+  }
 });
+
+// Register component with world using builder pattern
+const world = createWorld()
+  .registerComponent(statsComponent)
+  .build();
 ```
 
 ### Testing Structure
 - Test files in `src/**/__test__/*.test.ts`
-- Use `import { test, expect } from "bun:test"`
-- Entity and component tests in `src/__test__/entity.test.ts` and `src/sqlite/__test__/entity.test.ts`
-- SQLite functionality tests in `src/sqlite/__test__/`
+- Use `import { test, expect, describe } from "bun:test"`
+- Main tests in `src/__test__/`: `entity.test.ts`, `component.test.ts`, `query.test.ts`, `system.test.ts`
+- Helper tests in `src/helpers/__test__/`: `schema-to-sql.test.ts`, `string.test.ts`, `trycatch.test.ts`
 
 ## Key Implementation Details
 
@@ -126,6 +129,7 @@ world = registerComponentDef(world, componentSchema, {
 - The system automatically converts between formats during database operations
 
 ### Type Safety
-- `Components` type in `src/sqlite/types.ts` must include all component types for proper TypeScript inference
+- `Components` type in `src/types.ts` must include all component types for proper TypeScript inference
 - `Entity<C>` uses `-?: NonNullable<Components[K]>` to ensure required components are not undefined
 - `createEntity` function overloads enable automatic type inference from `initialComponents`
+- `WorldBuilder` provides type-safe component registration with automatic type accumulation

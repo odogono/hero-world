@@ -1,7 +1,6 @@
 import { test, expect, describe } from 'bun:test';
 import { createWorld, flush } from '../world';
-import { defineComponent } from '../component';
-import { addComponent, addComponents, removeComponent } from '../component';
+import { addComponent, addComponents, defineComponent, removeComponent } from '../component';
 import { createEntity } from '../entity';
 import { z } from 'zod';
 

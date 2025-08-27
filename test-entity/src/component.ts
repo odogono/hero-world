@@ -1,8 +1,8 @@
-import type { Entity, Components, ComponentDefinition } from "./types";
-import type { EntityWithComponents } from "./entity";
+import type { Entity, Components, ComponentDefinition } from './types';
+import type { EntityWithComponents } from './entity';
 import * as z from "zod";
-import { componentSchema } from "./types";
-import { toSnakeCase } from "../helpers/string";
+import { componentSchema } from './types';
+import { toSnakeCase } from "./helpers/string";
 
 
 

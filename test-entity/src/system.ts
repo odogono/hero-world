@@ -1,6 +1,6 @@
 import type { EntityWithComponents, QueryOptions } from "./entity";
-import type { Entity, Components, World } from "./types";
-import { flush } from "./world";
+import type { Entity, World } from './types';
+import { flush } from './world';
 import { queryEntitiesIterator } from "./entity";
 
 export const createSystem = <

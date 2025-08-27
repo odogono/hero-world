@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { createSystem } from '../system';
+import { createSystem } from '../system'
 import { createWorld } from '../world';
 import { createEntity, queryEntitiesIterator } from '../entity';
 import { healthComponent } from '../components/health';

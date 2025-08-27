@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { toSnakeCase } from '@helpers/string';
-import type { SchemaType } from './types';
+import type { SchemaType } from '../types';
 
 /**
  * Column information for SQLite table generation
