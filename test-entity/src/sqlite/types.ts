@@ -5,6 +5,8 @@ import type { ColumnInfo } from "./schema-to-sql";
 
 
 
+export type SchemaType = z.ZodObject<any>;
+
 type ComponentCacheEntry<T> = {
   data: T;
   exists: boolean;
@@ -28,10 +30,6 @@ export type ComponentDef = {
 }
 
 
-
-export type ComponentSchema = z.infer<typeof componentSchema>;
-
-export type ComponentSchemaType = typeof componentSchema;
 export const componentSchema = z.object({
   id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
   eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
@@ -43,7 +41,7 @@ export const componentSchema = z.object({
  */
 export type ComponentDefinition<
   Name extends string,
-  Schema extends z.ZodObject<any>
+  Schema extends SchemaType
 > = {
   name: Name;
   schema: Schema;
@@ -66,7 +64,7 @@ export type World<TComponents extends Components> = {
 
 export type WorldBuilder<TComponents extends Components> = World<TComponents> & {
   build: () => World<TComponents>;
-  registerComponent: <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
+  registerComponent: <Name extends string, Schema extends SchemaType>(def: ComponentDefinition<Name, Schema>) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
 }
 
 // export type World = {

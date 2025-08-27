@@ -2,8 +2,8 @@ import { Database, Statement } from 'bun:sqlite';
 import * as z from "zod";
 import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate } from './schema-to-sql';
 import { createLog } from '@helpers/log';
-import { fromUrl, toSnakeCase } from '../helpers/string';
-import type { Components, World, EntityCache, ComponentDef, WorldBuilder, ComponentSchema, ComponentSchemaType } from './types';
+import { toSnakeCase } from '../helpers/string';
+import type { Components, World, EntityCache, ComponentDef, WorldBuilder, SchemaType } from './types';
 import { entitySchema } from './types';
 import type { ComponentDefinition } from './types';
 
@@ -60,23 +60,12 @@ const createWorldInternal = <T extends Components>(): World<T> => {
 }
 
 
-// Cleaner component registration using ComponentDefinition
-// export const registerComponent = <
-//   Name extends string,
-//   Schema extends z.ZodObject<any>
-// >(
-//   world: World<T & { [K in Name]: z.infer<Schema> }>, 
-//   definition: ComponentDefinition<Name, Schema>
-// ): World<T & { [K in Name]: z.infer<Schema> }> => {
-//   return registerComponentDef(world, definition.schema, definition.statements || {});
-// }
-
 export const createWorld = <T extends Components>(): WorldBuilder<T> => {
   const world = createWorldInternal<T>();
 
   const build = () => ({...world, flush: () => flush(world)});
 
-  const registerComponent = <Name extends string, Schema extends z.ZodObject<any>>(def: ComponentDefinition<Name, Schema>): WorldBuilder<T> => {
+  const registerComponent = <Name extends string, Schema extends SchemaType>(def: ComponentDefinition<Name, Schema>): WorldBuilder<T> => {
     registerComponentDef(world, def.schema, def.statements || {});
     return {
       ...world,
@@ -114,7 +103,7 @@ type ComponentStatements = {
   [key: string]: string;
 }
 
-const registerComponentDef = <T extends Components>(world: World<T>, componentDef: z.ZodObject<any>, statements: ComponentStatements = {}): World<T> => {
+const registerComponentDef = <T extends Components>(world: World<T>, componentDef: SchemaType, statements: ComponentStatements = {}): World<T> => {
 
   const meta = componentDef.meta();
 

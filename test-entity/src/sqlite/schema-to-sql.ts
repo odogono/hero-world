@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { toSnakeCase } from '@helpers/string';
+import type { SchemaType } from './types';
 
 /**
  * Column information for SQLite table generation
@@ -33,7 +34,7 @@ export type ZodSchemaToSqliteTableOptions = {
  * @returns Object containing SQL statement, column details, and table name
  */
 export function zodSchemaToSqliteTable(
-  schema: z.ZodObject<any>, 
+  schema: SchemaType, 
   options?: ZodSchemaToSqliteTableOptions
 ): TableGenerationResult {
   const shape = schema.shape;
@@ -287,7 +288,7 @@ type StatementOptions = {
  * @returns SQLite INSERT statement as a string
  */
 export const zodSchemaToSqliteInsert = (
-  schema: z.ZodObject<any>,
+  schema: SchemaType,
   options?: StatementOptions
 ): string => {
   const shape = schema.shape;
@@ -320,7 +321,7 @@ export const zodSchemaToSqliteInsert = (
 }
 
 
-export const zodSchemaToSqliteUpdate = (schema: z.ZodObject<any>, options?: StatementOptions): string => {
+export const zodSchemaToSqliteUpdate = (schema: SchemaType, options?: StatementOptions): string => {
   const shape = schema.shape;
   const columns: string[] = [];
   const placeholders: string[] = [];
@@ -364,7 +365,7 @@ export const zodSchemaToSqliteUpdate = (schema: z.ZodObject<any>, options?: Stat
  * @returns SQLite SELECT statement as a string
  */
 export const zodSchemaToSqliteSelect = (
-  schema: z.ZodObject<any>,
+  schema: SchemaType,
   options?: { tableName?: string }
 ): string => {
   const shape = schema.shape;
@@ -410,11 +411,11 @@ export const zodSchemaToSqliteSelectWhere = (
 /**
  * Type helper for extracting the inferred type from a Zod schema
  */
-export type InferTableSchema<T extends z.ZodObject<any>> = z.infer<T>;
+export type InferTableSchema<T extends SchemaType> = z.infer<T>;
 
 // Re-export the old function for backward compatibility
 export const zodSchemaToSqliteTableString = (
-  schema: z.ZodObject<any>, 
+  schema: SchemaType, 
   options?: { tableName?: string }
 ): string => {
   const result = zodSchemaToSqliteTable(schema, options);

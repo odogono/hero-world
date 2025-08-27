@@ -1,24 +1,8 @@
-import type { Entity, Components, ComponentDefinition, ComponentSchemaType, ComponentSchema } from "./types";
+import type { Entity, Components, ComponentDefinition } from "./types";
+import type { EntityWithComponents } from "./entity";
 import * as z from "zod";
 import { componentSchema } from "./types";
 import { toSnakeCase } from "../helpers/string";
-
-// type ComponentSchema = z.infer<typeof componentSchema>;
-
-// export const componentSchema = z.object({
-//   id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
-//   eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
-// });
-
-
-
-// /**
-//  * Creates a component definition
-//  */
-// export const defineComponent = <
-//   Name extends string,
-//   Schema extends ComponentSchemaType
-// >(definition: ComponentDefinition<Name, Schema>) => definition;
 
 
 
@@ -78,13 +62,16 @@ export const makeTrackedComponent = <T extends keyof Components>(
 }
 
 
-export const addComponent = <T extends keyof Components>(
-  entity: Entity<any>,
+export const addComponent = <
+  E extends Entity<any> | EntityWithComponents<any, any>,
+  T extends keyof Components
+>(
+  entity: E,
   componentName: T,
   data: Components[T]
-) => {
+): E & { [K in T]: Components[T] } => {
   const { id, world } = entity;
-  entity[componentName] = makeTrackedComponent(
+  (entity as any)[componentName] = makeTrackedComponent(
     entity,
     componentName,
     data,
@@ -95,11 +82,13 @@ export const addComponent = <T extends keyof Components>(
     world.dirtyEntities.set(id, new Set());
   }
   world.dirtyEntities.get(id)!.add(componentName);
+  
+  return entity as E & { [K in T]: Components[T] };
 }
 
 
 export const removeComponent = <T extends keyof Components>(
-  entity: Entity<any>,
+  entity: Entity<any> | EntityWithComponents<any, any>,
   componentName: T
 ) => {
   const { id, world } = entity;

@@ -36,19 +36,19 @@ describe('component', () => {
   describe('addComponent', () => {
     test('should add a component to an entity', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
-      addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
+      const entityWithStats = addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       
-      expect(entity.stats_test).toBeDefined();
-      expect(entity.stats_test.health).toBe(100);
-      expect(entity.stats_test.level).toBe(1);
-      expect(entity.stats_test.mana).toBe(50);
+      expect(entityWithStats.stats_test).toBeDefined();
+      expect(entityWithStats.stats_test.health).toBe(100);
+      expect(entityWithStats.stats_test.level).toBe(1);
+      expect(entityWithStats.stats_test.mana).toBe(50);
     });
 
     test('should mark entity as dirty when adding component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       
@@ -58,7 +58,7 @@ describe('component', () => {
 
     test('should cache component data in entityCache', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       
@@ -73,7 +73,7 @@ describe('component', () => {
 
     test('should create tracked component with proxy', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       
@@ -82,9 +82,9 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
       
       // Modify component - should mark as dirty again
-      entity.stats_test.health = 90;
+      (entity as any).stats_test.health = 90;
       
-      expect(entity.stats_test.health).toBe(90);
+      expect((entity as any).stats_test.health).toBe(90);
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
     });
@@ -94,15 +94,15 @@ describe('component', () => {
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
-      addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
-      addComponent(entity, 'location_test', { name: 'Forest', region: 'North' });
+      const entityWithStats = addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
+      const entityWithBoth = addComponent(entityWithStats, 'location_test', { name: 'Forest', region: 'North' });
       
-      expect(entity.stats_test).toBeDefined();
-      expect(entity.location_test).toBeDefined();
-      expect(entity.stats_test.health).toBe(100);
-      expect(entity.location_test.name).toBe('Forest');
+      expect(entityWithBoth.stats_test).toBeDefined();
+      expect(entityWithBoth.location_test).toBeDefined();
+      expect(entityWithBoth.stats_test.health).toBe(100);
+      expect(entityWithBoth.location_test.name).toBe('Forest');
       
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
@@ -111,7 +111,7 @@ describe('component', () => {
 
     test('should persist component after flush', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       
@@ -134,33 +134,33 @@ describe('component', () => {
         .registerComponent(locationComponent)
         .registerComponent(inventoryComponent)
         .build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
-      addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
-      addComponent(entity, 'location_test', { name: 'City', region: 'Central' });
-      addComponent(entity, 'inventory_test', { capacity: 10, items: '["sword", "potion"]' });
+      const entityWithStats = addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
+      const entityWithLocation = addComponent(entityWithStats, 'location_test', { name: 'City', region: 'Central' });
+      const entityWithInventory = addComponent(entityWithLocation, 'inventory_test', { capacity: 10, items: '["sword", "potion"]' });
       
-      expect(entity.stats_test.health).toBe(100);
-      expect(entity.location_test.name).toBe('City');
-      expect(entity.inventory_test.capacity).toBe(10);
-      expect(entity.inventory_test.items).toBe('["sword", "potion"]');
+      expect(entityWithStats.stats_test.health).toBe(100);
+      expect(entityWithLocation.location_test.name).toBe('City');
+      expect(entityWithInventory.inventory_test.capacity).toBe(10);
+      expect(entityWithInventory.inventory_test.items).toBe('["sword", "potion"]');
     });
 
     test('should handle component modifications after adding', () => {
       const world = createWorld().registerComponent(statsComponent).build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
-      addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
+      const entityWithStats = addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
       flush(world);
       
       // Modify component
-      entity.stats_test.health = 90;
-      entity.stats_test.level = 2;
-      entity.stats_test.mana = 40;
+      entityWithStats.stats_test.health = 90;
+      entityWithStats.stats_test.level = 2;
+      entityWithStats.stats_test.mana = 40;
       
-      expect(entity.stats_test.health).toBe(90);
-      expect(entity.stats_test.level).toBe(2);
-      expect(entity.stats_test.mana).toBe(40);
+      expect(entityWithStats.stats_test.health).toBe(90);
+      expect(entityWithStats.stats_test.level).toBe(2);
+      expect(entityWithStats.stats_test.mana).toBe(40);
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
     });
@@ -191,7 +191,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       removeComponent(entity, 'stats_test');
@@ -203,7 +203,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       // Verify component exists in database
@@ -220,7 +220,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       // Verify component is in cache
@@ -236,7 +236,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       // Modify component to mark as dirty
@@ -254,7 +254,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       // Modify component to mark as dirty
@@ -276,7 +276,7 @@ describe('component', () => {
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 },
         location_test: { name: 'Forest', region: 'North' }
-      }) as any;
+      });
       flush(world);
       
       // Modify both components
@@ -295,7 +295,7 @@ describe('component', () => {
 
     test('should throw error for non-existent component definition', () => {
       const world = createWorld().build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
       
       expect(() => {
         removeComponent(entity, 'nonexistent' as any);
@@ -323,10 +323,10 @@ describe('component', () => {
       
       const entity1 = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       const entity2 = createEntity(world, {
         stats_test: { health: 80, level: 2, mana: 40 }
-      }) as any;
+      });
       flush(world);
       
       // Remove component from one entity
@@ -344,7 +344,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(statsComponent).build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
       
       // Modify component (creates pending changes)
@@ -362,7 +362,7 @@ describe('component', () => {
       const world = createWorld().registerComponent(inventoryComponent).build();
       const entity = createEntity(world, {
         inventory_test: { capacity: 20, items: '["sword", "shield", "potion", "key"]' }
-      }) as any;
+      });
       flush(world);
       
       // Verify component exists
@@ -397,7 +397,7 @@ describe('component', () => {
         stats_test: { health: 100, level: 1, mana: 50 },
         location_test: { name: 'Forest', region: 'North' },
         inventory_test: { capacity: 10, items: '["sword"]' }
-      }) as any;
+      });
       flush(world);
       
       // Remove middle component

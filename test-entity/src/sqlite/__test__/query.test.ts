@@ -75,8 +75,7 @@ describe('query', () => {
     const world = createWorld().registerComponent(statusComponent).build();
 
     const entity1 = createEntity(world, { status: { status: 'idle' } });
-    const entity2 = createEntity(world, { status: { status: 'walking' } });
-
+    
     flush(world);
     
     const result = queryEntities(world, { with: ['status'], entity: entity1 as any });

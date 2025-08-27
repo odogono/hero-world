@@ -52,7 +52,7 @@ export const createEntity: CreateEntityOverloads =
 
 
 
-export const deleteEntity = <T extends Components>(entity: Entity<any>) => {
+export const deleteEntity = <T extends Components>(entity: Entity<T> | EntityWithComponents<T, any>) => {
   const { id, world } = entity;
 
   // log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
