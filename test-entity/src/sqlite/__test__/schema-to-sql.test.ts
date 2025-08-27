@@ -399,4 +399,23 @@ describe('zodSchemaToSqliteTable', () => {
     expect(result.sql).toContain('FOREIGN KEY (author_id) REFERENCES tbl_authors (id) ON DELETE CASCADE');
   });
 
+
+  test('foreign key constraints from inherited schema', () => {
+    const baseSchema = z.object({
+      id: z.number().meta({ primaryKey: true, autoIncrement: true }),
+      userId: z.number().meta({ foreignKey: 'tbl_users', cascade: true }),
+    });
+    const schema = baseSchema.extend({
+      name: z.string(),
+    }).meta({ name: 'tbl_user_role' });
+
+    const result = zodSchemaToSqliteTable(schema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_user_role');
+    expect(result.sql).toContain('user_id INTEGER NOT NULL');
+    expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
+    expect(result.sql).toContain('FOREIGN KEY (user_id) REFERENCES tbl_users (id) ON DELETE CASCADE');
+    expect(result.sql).toContain('name TEXT NOT NULL');
+  });
+
 });

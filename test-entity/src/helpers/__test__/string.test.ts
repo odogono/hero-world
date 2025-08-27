@@ -13,12 +13,12 @@ describe('String utility functions', () => {
 
   describe('fromUrl', () => {
     it.each([
-      ['/hello-world', 'HelloWorld'],
-      ['/my-variable-name', 'MyVariableName'],
-      ['/my-variable-name/hello-world', 'MyVariableNameHelloWorld'],
-      ['https://example.com/my-variable-name/hello-world', 'MyVariableNameHelloWorld'],
+      ['/hello-world', 'helloWorld'],
+      ['/my-variable-name', 'myVariableName'],
+      ['/my-variable-name/hello-world', 'myVariableNameHelloWorld'],
+      ['https://example.com/my-variable-name/hello-world', 'myVariableNameHelloWorld'],
     ])(
-      'should convert URL to PascalCase: %s -> %s',
+      'should convert URL to camelCase: %s -> %s',
       (input, expected) => {
         expect(fromUrl(input)).toBe(expected);
       }

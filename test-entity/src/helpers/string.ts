@@ -11,7 +11,7 @@ export const fromUrl = (url: string): string => {
   
   // Convert each segment to PascalCase and join
   return segments
-    .map(segment => toCamelCase(segment))
+    .map((segment, index) => index === 0 ? toCamelCase(segment) : toPascalCase(segment))
     .filter(Boolean)
     .join('');
 };
