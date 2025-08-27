@@ -28,12 +28,22 @@ export type ComponentDef = {
 }
 
 
+
+export type ComponentSchema = z.infer<typeof componentSchema>;
+
+export type ComponentSchemaType = typeof componentSchema;
+export const componentSchema = z.object({
+  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
+});
+
+
 /**
  * Component definition
  */
 export type ComponentDefinition<
   Name extends string,
-  Schema extends z.ZodTypeAny
+  Schema extends z.ZodObject<any>
 > = {
   name: Name;
   schema: Schema;

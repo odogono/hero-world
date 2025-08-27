@@ -3,28 +3,20 @@ import { createWorld, flush } from '../world';
 import { locationSchema } from '../components/location';
 import { createLog } from '@helpers/log';
 import { number, string } from 'zod';
-import { componentSchema } from '../component';
 import { defineComponent } from '../component';
 import { createEntity, deleteEntity, getEntity } from '../entity';
-
+import z from 'zod';
 const log = createLog('test-entity');
 
-// Define additional component schemas for testing using new system
-const statsSchema = componentSchema.extend({
-  health: number(),
-  level: number(),
-  mana: number(),
-}).meta({ id: '/stats', name: 'tbl_stats' });
-
-const inventorySchema = componentSchema.extend({
-  capacity: number(),
-  items: string(), // JSON string for simplicity
-}).meta({ id: '/inventory', name: 'tbl_inventory' });
 
 // Component definitions using new system
 const statsComponent = defineComponent({
   name: 'stats' as const,
-  schema: statsSchema,
+  schema: {
+    health: z.number(),
+    level: z.number(),
+    mana: z.number(),
+  },
   statements: {
     statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?1'
   }
@@ -32,14 +24,24 @@ const statsComponent = defineComponent({
 
 const inventoryComponent = defineComponent({
   name: 'inventory' as const,
-  schema: inventorySchema
+  schema: {
+    capacity: z.number(),
+    items: z.string(), // JSON string for simplicity
+  },
+  statements: {
+    inventoryByCapacity: 'SELECT * FROM tbl_inventory WHERE capacity = ?1'
+  }
 });
 
 const locationComponent = defineComponent({
   name: 'location' as const,
-  schema: locationSchema,
+  tableName: 'tbl_location',
+  schema: {
+    name: z.string(),
+    region: z.string(),
+  },
   statements: {
-    locationSelectByName: 'SELECT eid as id FROM tbl_locations WHERE name = ?1'
+    locationSelectByName: 'SELECT eid as id FROM tbl_location WHERE name = ?1'
   }
 });
 
@@ -257,15 +259,19 @@ test('createEntity should work with component modifications through proxy', () =
 test('createEntity should handle different component data types', () => {
   
   // Test with string component
-  const nameSchema = componentSchema.extend({
-    firstName: string(),
-    lastName: string(),
-    title: string().optional(),
-  }).meta({ id: '/name', name: 'tbl_names' });
+  // const nameSchema = componentSchema.extend({
+  //   firstName: string(),
+  //   lastName: string(),
+  //   title: string().optional(),
+  // }).meta({ id: '/name', name: 'tbl_names' });
 
   const nameComponent = defineComponent({
     name: 'name' as const,
-    schema: nameSchema
+    schema: {
+      firstName: z.string(),
+      lastName: z.string(),
+      title: z.string().optional(),
+    }
   });
   
   const world = createWorld().registerComponent(nameComponent).build();
@@ -545,7 +551,7 @@ test('deleteEntity should cascade delete components from database', () => {
   flush(world);
   
   // Verify components exist in database
-  const locationStmt = world.db.query('SELECT * FROM tbl_locations WHERE eid = ?');
+  const locationStmt = world.db.query('SELECT * FROM tbl_location WHERE eid = ?');
   const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
   
   expect(locationStmt.get(entity.id)).toBeDefined();
@@ -676,7 +682,7 @@ test('deleteEntity should handle entity with all component types and cascade del
   expect(world.dirtyEntities.has(entity.id)).toBe(false);
   
   // Verify database cascade delete worked
-  const locationStmt = world.db.query('SELECT * FROM tbl_locations WHERE eid = ?');
+  const locationStmt = world.db.query('SELECT * FROM tbl_location WHERE eid = ?');
   const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
   const inventoryStmt = world.db.query('SELECT * FROM tbl_inventory WHERE eid = ?');
   
@@ -696,7 +702,7 @@ test('foreign key constraints are properly created for component tables', () => 
   expect(foreignKeysEnabled).toEqual({ foreign_keys: 1 });
   
   // Check that foreign key constraints exist for location table
-  const locationForeignKeys = world.db.query('PRAGMA foreign_key_list(tbl_locations)').all();
+  const locationForeignKeys = world.db.query('PRAGMA foreign_key_list(tbl_location)').all();
   expect(locationForeignKeys).toHaveLength(1);
   expect(locationForeignKeys[0]).toMatchObject({
     from: 'eid',

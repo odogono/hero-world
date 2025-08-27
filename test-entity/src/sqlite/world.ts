@@ -3,7 +3,7 @@ import * as z from "zod";
 import { zodSchemaToSqliteInsert, zodSchemaToSqliteTable, zodSchemaToSqliteUpdate } from './schema-to-sql';
 import { createLog } from '@helpers/log';
 import { fromUrl, toSnakeCase } from '../helpers/string';
-import type { Components, World, EntityCache, ComponentDef, WorldBuilder } from './types';
+import type { Components, World, EntityCache, ComponentDef, WorldBuilder, ComponentSchema, ComponentSchemaType } from './types';
 import { entitySchema } from './types';
 import type { ComponentDefinition } from './types';
 

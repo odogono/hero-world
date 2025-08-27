@@ -2,7 +2,8 @@ import type { World } from "../types";
 import * as z from "zod";
 import { createLog } from "@helpers/log";
 import { isEntity, type Entity } from "../types";
-import { componentSchema, defineComponent } from "../component";
+import { defineComponent } from "../component";
+import { componentSchema } from "../types";
 import { createEntity } from "../entity";
 
 const log = createLog('location');
