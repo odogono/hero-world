@@ -420,4 +420,97 @@ describe('zodSchemaToSqliteTable', () => {
     expect(result.sql).toContain('name TEXT NOT NULL');
   });
 
+  test('foreign key constraints are now generated for optional fields', () => {
+    // This test verifies that foreign key constraints are now properly generated for optional fields
+    
+    const componentSchema = z.object({
+      eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),
+      id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+    }).meta({ name: 'tbl_component_test' });
+
+    const result = zodSchemaToSqliteTable(componentSchema);
+
+    // Basic table structure is correct
+    expect(result.sql).toContain('CREATE TABLE tbl_component_test');
+    expect(result.sql).toContain('eid INTEGER NULL');
+    expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL');
+    
+    // Foreign key constraint should now be generated for optional fields
+    expect(result.sql).toContain('FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE');
+  });
+
+  test('foreign key constraints work for non-optional fields', () => {
+    // This test verifies that foreign key constraints work when the field is not optional
+    
+    const nonOptionalSchema = z.object({
+      eid: z.int().meta({ cascade: true, foreignKey: 'tbl_entity' }),
+      id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+    }).meta({ name: 'tbl_component_required' });
+
+    const result = zodSchemaToSqliteTable(nonOptionalSchema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_component_required');
+    expect(result.sql).toContain('eid INTEGER NOT NULL');
+    expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL');
+    
+    // This should pass - foreign key constraint should be generated for non-optional fields
+    expect(result.sql).toContain('FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE');
+  });
+
+  test('componentSchema extension now includes foreign key constraints', () => {
+    // This test verifies that when extending componentSchema, foreign key constraints are properly included
+    
+    const componentSchema = z.object({
+      eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),
+      id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+    });
+
+    const locationSchema = componentSchema.extend({
+      name: z.string(),
+      region: z.string(),
+    }).meta({ id: '/location/extension', name: 'tbl_locations' });
+
+    const result = zodSchemaToSqliteTable(locationSchema);
+
+    expect(result.sql).toContain('CREATE TABLE tbl_locations');
+    expect(result.sql).toContain('eid INTEGER NULL');
+    expect(result.sql).toContain('name TEXT NOT NULL');
+    expect(result.sql).toContain('region TEXT NOT NULL');
+    
+    // Foreign key constraint should now be included in extended schemas
+    expect(result.sql).toContain('FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE');
+  });
+
+  test('actual codebase componentSchema now works correctly', () => {
+    // This test verifies that the actual componentSchema from the codebase now works correctly
+    
+    // This replicates the exact schema from src/sqlite/component.ts
+    const componentSchema = z.object({
+      id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+      eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),
+    });
+
+    // This replicates how location schema extends it
+    const locationSchema = componentSchema.extend({
+      name: z.string(),
+      region: z.string(),
+    }).meta({ id: '/location/actual', name: 'tbl_locations' });
+
+    const result = zodSchemaToSqliteTable(locationSchema);
+
+    // Verify the expected structure is there
+    expect(result.sql).toBe(`CREATE TABLE tbl_locations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  eid INTEGER NULL,
+  name TEXT NOT NULL,
+  region TEXT NOT NULL,
+  FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE
+);`);
+
+    // Verify the foreign key constraint is included
+    expect(result.sql).toContain('FOREIGN KEY');
+    expect(result.sql).toContain('REFERENCES tbl_entity');
+    expect(result.sql).toContain('ON DELETE CASCADE');
+  });
+
 });

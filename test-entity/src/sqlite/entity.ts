@@ -49,3 +49,77 @@ export const createEntity: CreateEntityOverloads =
   }
   return entity as EntityWithComponents<TComponents, keyof C & keyof TComponents>;
 }
+
+
+
+export const deleteEntity = <T extends Components>(entity: Entity<any>) => {
+  const { id, world } = entity;
+
+  // log.debug('[deleteEntity] foreign_keys', world.db.query('PRAGMA foreign_keys').get());
+  
+  world.stmts.deleteEntity!.run(id);
+
+  // Clean up caches
+  world.entityCache.delete(id);
+  world.dirtyEntities.delete(id);
+
+  return null;
+}
+
+
+
+
+export const getEntity = <T extends Components>(world: World<T>, id: number) => {
+  const stmt = world.stmts.selectEntityById;
+  if (!stmt) {
+    throw new Error('selectEntityById not found');
+  }
+  const eid = stmt.get(id);
+
+  return eid ? { id: eid, world } as Entity<any> : null;
+}
+
+
+
+export const queryEntities = <T extends Components>(world: World<T>, components: (keyof T)[], entity?: Entity<any>) => {
+
+  const base = `SELECT e.id AS eid`;
+  const joins: string[] = [];
+  const fields: string[] = [];
+  components.forEach(c => {
+    const def = world.defs.get(c as string);
+    if (!def) {
+      throw new Error(`Component def not found for ${String(c)}`);
+    }
+    const alias = def.name;
+    const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
+    joins.push(join);
+    def.columns.forEach(column => {
+      const name = column.name;
+      const field = `${alias}.${name} AS ${alias}_${name}`;
+      fields.push(field);
+    });
+  });
+
+  const where = entity ? `WHERE e.id = ${entity.id} LIMIT 1` : '';
+
+  // TODO cache sql against components
+  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${where}`;
+  const stmt = world.db.query(sql);
+  const rows = stmt.all();
+
+  return rows.map((row: any) => {
+    const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
+    
+    components.forEach(c => {
+      const def = world.defs.get(c as string)!;
+      const data: any = {};
+      def.columns.forEach(column => {
+        data[column.name] = row[`${def.name}_${column.name}`];
+      })
+      entity[c] = makeTrackedComponent(entity, c as string, data);
+    });
+
+    return entity;
+  });
+}

@@ -5,7 +5,7 @@ import { createLog } from '@helpers/log';
 import { number, string } from 'zod';
 import { componentSchema } from '../component';
 import { defineComponent } from '../component';
-import { createEntity } from '../entity';
+import { createEntity, deleteEntity, getEntity } from '../entity';
 
 const log = createLog('test-entity');
 
@@ -286,9 +286,6 @@ test('createEntity should handle different component data types', () => {
   expect(world.dirtyEntities.has(entity.id)).toBe(true);
 });
 
-});
-
-describe('WorldBuilder and TypedEntity System', () => {
 
 test('should create world with builder pattern and single component', () => {
   const world = createWorld()
@@ -461,6 +458,262 @@ test('should handle complex multi-component scenarios', () => {
   
   expect(world.dirtyEntities.has(warrior.id)).toBe(true);
   expect(world.dirtyEntities.has(mage.id)).toBe(true);
+});
+
+});
+
+describe('deleteEntity', () => {
+
+test('deleteEntity should remove entity from database', () => {
+  const world = createWorld();
+  
+  const entity = createEntity(world);
+  
+  // Verify entity exists
+  expect(getEntity(world, entity.id)).toBeDefined();
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity is removed
+  expect(getEntity(world, entity.id)).toBeNull();
+});
+
+test('deleteEntity should remove entity with components', () => {
+  const world = createWorld().registerComponent(locationComponent).build();
+  
+  const entity = createEntity(world, { 
+    location: { name: 'Forest', region: 'North' } 
+  });
+  flush(world);
+  
+  // Verify entity and component exist
+  expect(getEntity(world, entity.id)).toBeDefined();
+  expect(entity.location.name).toBe('Forest');
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity is removed
+  expect(getEntity(world, entity.id)).toBeNull();
+});
+
+test('deleteEntity should clean up entity cache', () => {
+  const world = createWorld().registerComponent(statsComponent).build();
+  
+  const entity = createEntity(world, { 
+    stats: { health: 100, level: 1, mana: 50 } 
+  });
+  
+  // Verify entity is in cache
+  expect(world.entityCache.has(entity.id)).toBe(true);
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity is removed from cache
+  expect(world.entityCache.has(entity.id)).toBe(false);
+});
+
+test('deleteEntity should clean up dirty entities tracking', () => {
+  const world = createWorld().registerComponent(statsComponent).build();
+  
+  const entity = createEntity(world, { 
+    stats: { health: 100, level: 1, mana: 50 } 
+  });
+  
+  // Verify entity is marked as dirty
+  expect(world.dirtyEntities.has(entity.id)).toBe(true);
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity is removed from dirty tracking
+  expect(world.dirtyEntities.has(entity.id)).toBe(false);
+});
+
+test('deleteEntity should cascade delete components from database', () => {
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .build();
+  
+  const entity = createEntity(world, { 
+    location: { name: 'Village', region: 'East' },
+    stats: { health: 80, level: 3, mana: 30 }
+  });
+  flush(world);
+  
+  // Verify components exist in database
+  const locationStmt = world.db.query('SELECT * FROM tbl_locations WHERE eid = ?');
+  const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
+  
+  expect(locationStmt.get(entity.id)).toBeDefined();
+  expect(statsStmt.get(entity.id)).toBeDefined();
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity is removed
+  expect(getEntity(world, entity.id)).toBeNull();
+  
+  // Verify components are cascade deleted from database due to foreign key constraints
+  expect(locationStmt.get(entity.id)).toBeNull();
+  expect(statsStmt.get(entity.id)).toBeNull();
+});
+
+test('deleteEntity should handle multiple entities independently', () => {
+  const world = createWorld().registerComponent(statsComponent).build();
+  
+  const entity1 = createEntity(world, { 
+    stats: { health: 100, level: 1, mana: 50 } 
+  });
+  const entity2 = createEntity(world, { 
+    stats: { health: 80, level: 2, mana: 40 } 
+  });
+  const entity3 = createEntity(world, { 
+    stats: { health: 120, level: 3, mana: 60 } 
+  });
+  
+  flush(world);
+  
+  // Verify all entities exist
+  expect(getEntity(world, entity1.id)).toBeDefined();
+  expect(getEntity(world, entity2.id)).toBeDefined();
+  expect(getEntity(world, entity3.id)).toBeDefined();
+  
+  // Delete middle entity
+  deleteEntity(entity2);
+  
+  // Verify only middle entity is removed
+  expect(getEntity(world, entity1.id)).toBeDefined();
+  expect(getEntity(world, entity2.id)).toBeNull();
+  expect(getEntity(world, entity3.id)).toBeDefined();
+  
+  // Verify other entities still work
+  expect(entity1.stats.health).toBe(100);
+  expect(entity3.stats.health).toBe(120);
+});
+
+test('deleteEntity should return null', () => {
+  const world = createWorld();
+  
+  const entity = createEntity(world);
+  
+  const result = deleteEntity(entity);
+  
+  expect(result).toBeNull();
+});
+
+test('deleteEntity should work with unflushed entities', () => {
+  const world = createWorld().registerComponent(inventoryComponent).build();
+  
+  const entity = createEntity(world, { 
+    inventory: { capacity: 10, items: '["sword", "potion"]' } 
+  });
+  
+  // Don't flush - entity exists in cache but not in database yet
+  expect(world.dirtyEntities.has(entity.id)).toBe(true);
+  expect(world.entityCache.has(entity.id)).toBe(true);
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify cleanup
+  expect(world.entityCache.has(entity.id)).toBe(false);
+  expect(world.dirtyEntities.has(entity.id)).toBe(false);
+  expect(getEntity(world, entity.id)).toBeNull();
+});
+
+test('deleteEntity should work after component modifications', () => {
+  const world = createWorld().registerComponent(statsComponent).build();
+  
+  const entity = createEntity(world, { 
+    stats: { health: 100, level: 1, mana: 50 } 
+  });
+  flush(world);
+  
+  // Modify component
+  entity.stats.health = 90;
+  entity.stats.level = 2;
+  
+  expect(world.dirtyEntities.has(entity.id)).toBe(true);
+  
+  // Delete entity with pending changes
+  deleteEntity(entity);
+  
+  // Verify complete cleanup
+  expect(world.entityCache.has(entity.id)).toBe(false);
+  expect(world.dirtyEntities.has(entity.id)).toBe(false);
+  expect(getEntity(world, entity.id)).toBeNull();
+});
+
+test('deleteEntity should handle entity with all component types and cascade delete', () => {
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .registerComponent(inventoryComponent)
+    .build();
+  
+  const entity = createEntity(world, {
+    inventory: { capacity: 20, items: '["crown", "scepter", "gold"]' },
+    location: { name: 'Castle', region: 'Kingdom' },
+    stats: { health: 150, level: 5, mana: 75 }
+  });
+  flush(world);
+  
+  // Verify all components exist
+  expect(entity.location.name).toBe('Castle');
+  expect(entity.stats.health).toBe(150);
+  expect(entity.inventory.capacity).toBe(20);
+  
+  // Delete entity
+  deleteEntity(entity);
+  
+  // Verify entity and cache cleanup
+  expect(getEntity(world, entity.id)).toBeNull();
+  expect(world.entityCache.has(entity.id)).toBe(false);
+  expect(world.dirtyEntities.has(entity.id)).toBe(false);
+  
+  // Verify database cascade delete worked
+  const locationStmt = world.db.query('SELECT * FROM tbl_locations WHERE eid = ?');
+  const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
+  const inventoryStmt = world.db.query('SELECT * FROM tbl_inventory WHERE eid = ?');
+  
+  expect(locationStmt.get(entity.id)).toBeNull();
+  expect(statsStmt.get(entity.id)).toBeNull();
+  expect(inventoryStmt.get(entity.id)).toBeNull();
+});
+
+test('foreign key constraints are properly created for component tables', () => {
+  const world = createWorld()
+    .registerComponent(locationComponent)
+    .registerComponent(statsComponent)
+    .build();
+  
+  // Check that foreign keys are enabled
+  const foreignKeysEnabled = world.db.query('PRAGMA foreign_keys').get();
+  expect(foreignKeysEnabled).toEqual({ foreign_keys: 1 });
+  
+  // Check that foreign key constraints exist for location table
+  const locationForeignKeys = world.db.query('PRAGMA foreign_key_list(tbl_locations)').all();
+  expect(locationForeignKeys).toHaveLength(1);
+  expect(locationForeignKeys[0]).toMatchObject({
+    from: 'eid',
+    table: 'tbl_entity',
+    to: 'id',
+    on_delete: 'CASCADE'
+  });
+  
+  // Check that foreign key constraints exist for stats table  
+  const statsForeignKeys = world.db.query('PRAGMA foreign_key_list(tbl_stats)').all();
+  expect(statsForeignKeys).toHaveLength(1);
+  expect(statsForeignKeys[0]).toMatchObject({
+    from: 'eid',
+    table: 'tbl_entity',
+    to: 'id',
+    on_delete: 'CASCADE'
+  });
 });
 
 });

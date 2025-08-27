@@ -158,6 +158,15 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
       };
     }
     
+    // For optional fields with other metadata (like foreignKey), we need to preserve the metadata
+    // by merging it with the unwrapped type's metadata
+    if (metadata && Object.keys(metadata).length > 0) {
+      const unwrappedMetadata = unwrappedType.meta() || {};
+      const mergedMetadata = { ...unwrappedMetadata, ...metadata };
+      const typeWithMetadata = unwrappedType.meta(mergedMetadata);
+      return zodTypeToSqliteColumnWithInfo(columnName, typeWithMetadata, true);
+    }
+    
     // Optional fields are nullable by default
     return zodTypeToSqliteColumnWithInfo(columnName, unwrappedType, true);
   } else if (zodType instanceof z.ZodNullable) {

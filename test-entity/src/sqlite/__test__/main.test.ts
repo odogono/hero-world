@@ -1,8 +1,8 @@
 import { test } from 'bun:test';
-import { createWorld, flush, queryEntities, saveWorld } from '../world';
+import { createWorld, flush, saveWorld } from '../world';
 import { locationComponent } from '../components/location';
 import { createLog } from '@helpers/log';
-import { createEntity } from '../entity';
+import { createEntity, queryEntities } from '../entity';
 
 
 const log = createLog('test-main');
