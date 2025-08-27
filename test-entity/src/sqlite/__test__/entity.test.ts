@@ -80,7 +80,7 @@ test('createEntity should create entity with location component', () => {
   const world = createWorld().registerComponent(locationComponent).build();
   
   const entity = createEntity(world, { 
-    location: { name: 'Forest', region: 'North' } 
+    locationTest: { name: 'Forest', region: 'North' } 
   });
   
   expect(entity).toBeDefined();
@@ -125,7 +125,7 @@ test('createEntity should create entity with multiple components', () => {
     .build();
   
   const entity = createEntity(world, { 
-    location: { name: 'City', region: 'Central' },
+    locationTest: { name: 'City', region: 'Central' },
     stats: { health: 80, level: 3, mana: 30 }
   });
   
@@ -145,7 +145,7 @@ test('createEntity should track component changes', () => {
     .build();
   
   const entity = createEntity(world, { 
-    location: { name: 'Forest', region: 'North' } 
+    locationTest: { name: 'Forest', region: 'North' } 
   });
   
   // Initial state - entity should be marked as dirty

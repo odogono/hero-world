@@ -19,7 +19,10 @@ export const locationSchema = componentSchema.extend({
 
 export const locationComponent = defineComponent({
   name: 'location' as const,
-  schema: locationSchema,
+  schema: {
+    name: z.string(),
+    region: z.string(),
+  },
 });
 
 

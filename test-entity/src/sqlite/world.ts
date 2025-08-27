@@ -121,7 +121,7 @@ const registerComponentDef = <T extends Components>(world: World<T>, componentDe
   if (!meta?.id) {
     throw new Error('componentDef must have an id');
   }
-  const name = fromUrl(meta.id);
+  const name = meta.id;
 
   const existing = world.defs.get(name);
   if (existing) {

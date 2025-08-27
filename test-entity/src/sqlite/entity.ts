@@ -81,7 +81,11 @@ export const getEntity = <T extends Components>(world: World<T>, id: number) => 
 
 
 
-export const queryEntities = <T extends Components>(world: World<T>, components: (keyof T)[], entity?: Entity<any>) => {
+export const queryEntities = <T extends Components>(
+  world: World<T>, 
+  components: (keyof T)[], 
+  options?: { where?: string; entity?: Entity<any> }
+) => {
 
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
@@ -101,10 +105,15 @@ export const queryEntities = <T extends Components>(world: World<T>, components:
     });
   });
 
-  const where = entity ? `WHERE e.id = ${entity.id} LIMIT 1` : '';
+  let whereClause = '';
+  if (options?.entity) {
+    whereClause = `WHERE e.id = ${options.entity.id} LIMIT 1`;
+  } else if (options?.where) {
+    whereClause = `WHERE ${options.where}`;
+  }
 
   // TODO cache sql against components
-  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${where}`;
+  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}`;
   const stmt = world.db.query(sql);
   const rows = stmt.all();
 
