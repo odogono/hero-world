@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import type { EntityWithComponents } from '@entity';
 import { toSnakeCase } from '@helpers/string';
 import {
   componentSchema,
   type ComponentDefinition,
   type Components,
-  type Entity
+  type Entity,
+  type EntityWithComponents
 } from '@types';
 
 type DefineComponentExOptions<Name extends string> = {

@@ -1,6 +1,7 @@
 import { Database, Statement } from 'bun:sqlite';
 import { z } from 'zod';
 
+import { pkWithAutoIncrement } from './schema';
 import type { ColumnInfo, SchemaType } from './schema/types';
 
 type ComponentCacheEntry<T> = {
@@ -27,8 +28,9 @@ export type ComponentDef = {
 };
 
 export const componentSchema = z.object({
-  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' }),
-  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true })
+  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+  // eslint-disable-next-line perfectionist/sort-objects
+  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
 });
 
 /**
@@ -65,36 +67,31 @@ export type WorldBuilder<TComponents extends Components> =
     ) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
   };
 
-// export type World = {
-//   db: Database;
-//   dirtyEntities: Map<number, Set<keyof Components>>;
-//   entityCache: EntityCache;
-//   defs: Map<string, ComponentDef>;
-//   stmts: {
-//     [key: string]: Statement;
-//   }
-// }
-
 export type Entity<C extends keyof Components = never> = EntitySchema & {
   world: World<Components>;
 } & {
   [K in C]-?: NonNullable<Components[K]>;
 };
 
+/**
+ * Entity type for a world with specific components
+ */
+export type EntityWithComponents<
+  TComponents extends Record<string, any>,
+  C extends keyof TComponents = never
+> = {
+  id: number;
+  world: World<TComponents>;
+} & {
+  [K in C]-?: NonNullable<TComponents[K]>;
+};
+
 export type EntitySchema = z.infer<typeof entitySchema>;
 export const entitySchema = z
   .object({
-    id: z.number().meta({ autoIncrement: true, primaryKey: true })
-    // createdAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
-    // updatedAt: z.iso.datetime().meta({ default: 'CURRENT_TIMESTAMP'}),
+    id: pkWithAutoIncrement()
   })
   .meta({ name: 'tbl_entity' });
-
-// export type ComponentDef = z.infer<typeof componentDefSchema>;
-// export const componentDefSchema = z.object({
-//   id: z.string().meta({ primaryKey: true, autoIncrement: true }),
-//   url: z.string().meta({ unique: true }),
-// }).meta({ name: 'tbl_component_def' });
 
 export const isEntity = (val: unknown): val is Entity => {
   if (typeof val !== 'object' || val === null) {

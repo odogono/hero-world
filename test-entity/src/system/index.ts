@@ -1,10 +1,9 @@
 import {
   queryEntities,
   queryEntitiesIterator,
-  type EntityWithComponents,
   type QueryOptions
 } from '@entity';
-import type { Components, Entity, World } from '@types';
+import type { Components, Entity, EntityWithComponents, World } from '@types';
 import { flush } from '@world';
 
 import type { SystemFunction } from './types';

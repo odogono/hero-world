@@ -79,6 +79,22 @@ describe('query', () => {
     expect(activeEntities).toHaveLength(2);
   });
 
+  test('where clause should support args', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    flush(world);
+
+    const entities = queryEntities(world, {
+      args: ['fighting'],
+      where: 'status = ?1'
+    });
+    expect(entities).toHaveLength(1);
+  });
+
   test('should query single entity by ID', () => {
     const world = createWorld().registerComponent(statusComponent).build();
 
@@ -189,6 +205,29 @@ describe('query', () => {
     }
 
     expect(result).toEqual(['walking', 'fighting']);
+  });
+
+  test('iterator should support args in where clause', () => {
+    const world = createWorld().registerComponent(statusComponent).build();
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+    createEntity(world, { status: { status: 'dead' } });
+
+    flush(world);
+
+    const query = queryEntitiesIterator(world, {
+      args: ['fighting'],
+      where: 'status = ?1',
+      with: ['status']
+    });
+
+    const result: string[] = [];
+    for (const entity of query) {
+      result.push(entity.status.status);
+    }
+
+    expect(result).toEqual(['fighting']);
   });
 
   test('query returns entities with both components', () => {

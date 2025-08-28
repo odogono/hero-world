@@ -1,18 +1,7 @@
-import { makeTrackedComponent } from '@component';
-import type { Components, Entity, World } from '@types';
+import type { SQLQueryBindings } from 'bun:sqlite';
 
-/**
- * Entity type for a world with specific components
- */
-export type EntityWithComponents<
-  TComponents extends Record<string, any>,
-  C extends keyof TComponents = never
-> = {
-  id: number;
-  world: World<TComponents>;
-} & {
-  [K in C]-?: NonNullable<TComponents[K]>;
-};
+import { makeTrackedComponent } from '@component';
+import type { Components, Entity, EntityWithComponents, World } from '@types';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
@@ -26,7 +15,7 @@ type CreateEntityOverloads = {
 };
 
 export const createEntity: CreateEntityOverloads = <
-  TComponents extends Record<string, any>,
+  TComponents extends Components,
   C extends Partial<TComponents>
 >(
   world: World<TComponents>,
@@ -88,12 +77,13 @@ export const getEntity = <T extends Components>(
 };
 
 export type QueryOptions = {
+  args?: SQLQueryBindings[];
   entity?: Entity<any>;
   limit?: number;
   offset?: number;
   where?: string;
-  with?: (keyof any)[];
-  without?: (keyof any)[];
+  with?: (keyof Components)[];
+  without?: (keyof Components)[];
 };
 
 const buildQuery = (world: World<any>, options?: QueryOptions) => {
@@ -169,6 +159,7 @@ const buildQuery = (world: World<any>, options?: QueryOptions) => {
   const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
 
   return {
+    args: options?.args,
     componentsToInclude,
     sql
   };
@@ -178,10 +169,10 @@ export const queryEntities = <T extends Components>(
   world: World<T>,
   options?: QueryOptions
 ) => {
-  const { componentsToInclude, sql } = buildQuery(world, options);
+  const { args, componentsToInclude, sql } = buildQuery(world, options);
 
   const stmt = world.db.query(sql);
-  const rows = stmt.all();
+  const rows = args && args.length > 0 ? stmt.all(...args) : stmt.all();
 
   return rows.map((row: any) => {
     const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
@@ -203,11 +194,12 @@ export const queryEntitiesIterator = <T extends Components>(
   world: World<T>,
   options?: QueryOptions
 ) => {
-  const { componentsToInclude, sql } = buildQuery(world, options);
+  const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.query(sql);
 
   // Use Bun's iterate capability for incremental results
-  const iterator = stmt.iterate();
+  const iterator =
+    args && args.length > 0 ? stmt.iterate(...args) : stmt.iterate();
 
   return {
     *[Symbol.iterator]() {

@@ -74,10 +74,16 @@ saveWorld(world, 'game.db'); // Save to file
 ### Path Aliases (tsconfig.json)
 
 - `@/*` → `./src/*`
+- `@component` → `./src/component`
 - `@entity` → `./src/entity`
-- `@entity/*` → `./src/entity/*`
+- `@events/*` → `./src/events/*`
 - `@helpers/*` → `./src/helpers/*`
+- `@schema` → `./src/schema`
+- `@schema/*` → `./src/schema/*`
+- `@system` → `./src/system/index.ts`
+- `@system/*` → `./src/system/*`
 - `@types` → `./src/types`
+- `@world` → `./src/world`
 
 ## Key Files
 
@@ -87,20 +93,22 @@ saveWorld(world, 'game.db'); // Save to file
 - `src/types.ts` - Entity and Component type definitions
 - `src/component.ts` - Component proxy tracking system and definitions
 - `src/entity.ts` - Entity creation, deletion, and querying functions
-- `src/system.ts` - System execution and management
+- `src/system/index.ts` - System execution and management
 
 ### Game Engine Files
 
-- `src/event-system.ts` - Type-safe event publishing/subscribing with queuing
-- `src/game-loop.ts` - Game loop with priority-based system execution and performance tracking
-- `src/persistent-events.ts` - Database-backed event persistence with scheduling and replay capabilities
+- `src/events/event-system.ts` - Type-safe event publishing/subscribing with queuing
+- `src/events/persistent.ts` - Database-backed event persistence with scheduling and replay capabilities
+- `src/events/event-game-loop.ts` - Event-aware game loop integration
+- `src/system/game-loop.ts` - Game loop with priority-based system execution and performance tracking
 
 ### Utility Files
 
 - `src/helpers/string.ts` - String utilities (camelCase, snake_case conversion)
 - `src/helpers/trycatch.ts` - Error handling utilities
 - `src/helpers/log.ts` - Logging utilities
-- `src/helpers/schema-to-sql.ts` - Zod schema to SQLite conversion
+- `src/schema/schema-to-sql.ts` - Zod schema to SQLite conversion
+- `src/schema/types.ts` - Schema and table generation type definitions
 
 ## Development Guidelines
 
