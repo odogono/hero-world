@@ -1,5 +1,5 @@
-import { makeTrackedComponent } from './component';
-import type { Components, Entity, World } from './types';
+import { makeTrackedComponent } from '@component';
+import type { Components, Entity, World } from '@types';
 
 /**
  * Entity type for a world with specific components

@@ -1,13 +1,13 @@
-import * as z from 'zod';
+import { z } from 'zod';
 
-import type { EntityWithComponents } from './entity';
-import { toSnakeCase } from './helpers/string';
+import type { EntityWithComponents } from '@entity';
+import { toSnakeCase } from '@helpers/string';
 import {
   componentSchema,
   type ComponentDefinition,
   type Components,
   type Entity
-} from './types';
+} from '@types';
 
 type DefineComponentExOptions<Name extends string> = {
   meta?: Record<string, any>;
@@ -15,7 +15,7 @@ type DefineComponentExOptions<Name extends string> = {
   schema: Record<string, z.ZodTypeAny>;
   statements?: Record<string, string>;
   tableName?: string;
-}
+};
 
 export const defineComponent = <Name extends string>(
   options: DefineComponentExOptions<Name>

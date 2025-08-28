@@ -1,6 +1,6 @@
 import { createLog } from '@helpers/log';
+import type { Components, World } from '@types';
 
-import type { Components, World } from '../types';
 import type {
   GameLoop,
   SystemFunction,

@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -25,11 +27,39 @@
     // Paths
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@entity": ["./src/entity"],
-      "@entity/*": ["./src/entity/*"],
-      "@helpers/*": ["./src/helpers/*"],
-      "@types": ["./src/types"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@component": [
+        "./src/component"
+      ],
+      "@entity": [
+        "./src/entity"
+      ],
+      "@events/*": [
+        "./src/events/*"
+      ],
+      "@helpers/*": [
+        "./src/helpers/*"
+      ],
+      "@schema": [
+        "./src/schema"
+      ],
+      "@schema/*": [
+        "./src/schema/*"
+      ],
+      "@system": [
+        "./src/system/index.ts"
+      ],
+      "@system/*": [
+        "./src/system/*"
+      ],
+      "@types": [
+        "./src/types"
+      ],
+      "@world": [
+        "./src/world"
+      ]
     }
   }
 }

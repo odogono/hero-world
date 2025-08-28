@@ -3,9 +3,10 @@ import {
   queryEntitiesIterator,
   type EntityWithComponents,
   type QueryOptions
-} from '../entity';
-import type { Components, Entity, World } from '../types';
-import { flush } from '../world';
+} from '@entity';
+import type { Components, Entity, World } from '@types';
+import { flush } from '@world';
+
 import type { SystemFunction } from './types';
 
 // Legacy system creation (for backward compatibility)

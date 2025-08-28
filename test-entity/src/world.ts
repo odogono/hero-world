@@ -1,24 +1,23 @@
 import { Database, Statement } from 'bun:sqlite';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { createLog } from '@helpers/log';
-
-import { toSnakeCase } from './helpers/string';
+import { toSnakeCase } from '@helpers/string';
 import {
   zodSchemaToSqliteInsert,
   zodSchemaToSqliteTable,
   zodSchemaToSqliteUpdate
-} from './schema/schema-to-sql';
+} from '@schema/schema-to-sql';
+import type { SchemaType } from '@schema/types';
 import {
   entitySchema,
   type ComponentDef,
   type ComponentDefinition,
   type Components,
   type EntityCache,
-  type SchemaType,
   type World,
   type WorldBuilder
-} from './types';
+} from '@types';
 
 const log = createLog('world');
 
