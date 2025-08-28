@@ -10,7 +10,7 @@ import {
   withIndex,
   withUnique,
   withUniqueIndex
-} from '../../schema';
+} from '@schema';
 import {
   zodSchemaToSqliteIndexes,
   zodSchemaToSqliteInsert,
@@ -18,7 +18,7 @@ import {
   zodSchemaToSqliteSelect,
   zodSchemaToSqliteSelectWhere,
   zodSchemaToSqliteTable
-} from '../../schema/schema-to-sql';
+} from '@schema/schema-to-sql';
 
 describe('inserting data', () => {
   test('should insert data into a table', () => {
