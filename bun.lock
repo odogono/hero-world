@@ -23,6 +23,7 @@
     "packages/ecs": {
       "name": "odgn-ecs",
       "dependencies": {
+        "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
         "mitt": "^3.0.1",
         "odgn-helpers": "workspace:*",
         "zod": "^4.1.4",
