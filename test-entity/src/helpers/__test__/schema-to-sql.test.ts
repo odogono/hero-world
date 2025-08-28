@@ -204,16 +204,17 @@ describe('zodSchemaToSqliteTable', () => {
 
   test('should handle default values', () => {
     const defaultSchema = z.object({
-      active: z.boolean().default(true),
       id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      active: z.boolean().default(true),
       name: z.string().default('John'),
     }).meta({ name: 'defaults' });
 
     const result = zodSchemaToSqliteTable(defaultSchema);
     
+    console.debug(result.sql);
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
-    expect(result.sql).toContain('name TEXT NOT NULL');
-    expect(result.sql).toContain('active INTEGER NOT NULL');
+    expect(result.sql).toContain('name TEXT NOT NULL DEFAULT \'John\'');
+    expect(result.sql).toContain('active INTEGER NOT NULL DEFAULT 1');
   });
 
   test('should generate valid SQL syntax', () => {

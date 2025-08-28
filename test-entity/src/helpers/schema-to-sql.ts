@@ -173,8 +173,37 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
   } else if (zodType instanceof z.ZodNullable) {
     return zodTypeToSqliteColumnWithInfo(columnName, zodType.unwrap() as z.ZodTypeAny, true);
   } else if (zodType instanceof z.ZodDefault) {
-    // Default values will be handled by the application layer
-    return zodTypeToSqliteColumnWithInfo(columnName, zodType.removeDefault() as z.ZodTypeAny, isOptional);
+    // Extract the default value and the underlying type
+    const defaultValue = (zodType._def as any).defaultValue;
+    const innerType = zodType.removeDefault() as z.ZodTypeAny;
+    
+    // Process the inner type first
+    const result = zodTypeToSqliteColumnWithInfo(columnName, innerType, isOptional);
+    
+    // Add the default value constraint
+    let defaultConstraint: string;
+    if (typeof defaultValue === 'string') {
+      defaultConstraint = `DEFAULT '${defaultValue}'`;
+    } else if (typeof defaultValue === 'boolean') {
+      defaultConstraint = `DEFAULT ${defaultValue ? '1' : '0'}`;
+    } else if (typeof defaultValue === 'number') {
+      defaultConstraint = `DEFAULT ${defaultValue}`;
+    } else {
+      // For other types, convert to string representation
+      defaultConstraint = `DEFAULT '${String(defaultValue)}'`;
+    }
+    
+    // Add the default constraint to the column definition
+    const columnDef = result.columnDef + ' ' + defaultConstraint;
+    
+    return {
+      columnDef,
+      columnInfo: {
+        ...result.columnInfo,
+        constraints: [...result.columnInfo.constraints, defaultConstraint]
+      },
+      foreignKeyConstraint: result.foreignKeyConstraint
+    };
   }
   
   // Handle special cases for common field names
