@@ -1,7 +1,13 @@
 import type { SQLQueryBindings } from 'bun:sqlite';
 
 import { makeTrackedComponent } from '@component';
-import type { Components, Entity, EntityWithComponents, World } from '@types';
+import type {
+  Components,
+  Entity,
+  EntityWithComponents,
+  GenericEntity,
+  World
+} from '@types';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
@@ -49,8 +55,8 @@ export const createEntity: CreateEntityOverloads = <
   >;
 };
 
-export const deleteEntity = (
-  entity: Entity<any> | EntityWithComponents<any, any>
+export const deleteEntity = <T extends Components>(
+  entity: GenericEntity<T>
 ) => {
   const { id, world } = entity;
 
@@ -73,12 +79,12 @@ export const getEntity = <T extends Components>(
   }
   const eid = stmt.get(id);
 
-  return eid ? ({ id: eid, world } as Entity<any>) : null;
+  return eid ? ({ id: eid, world } as GenericEntity<T>) : null;
 };
 
-export type QueryOptions = {
+export type QueryOptions<T extends Components> = {
   args?: SQLQueryBindings[];
-  entity?: Entity<any>;
+  entity?: GenericEntity<T>;
   limit?: number;
   offset?: number;
   where?: string;
@@ -86,7 +92,10 @@ export type QueryOptions = {
   without?: (keyof Components)[];
 };
 
-const buildQuery = (world: World<any>, options?: QueryOptions) => {
+const buildQuery = <T extends Components>(
+  world: World<T>,
+  options?: QueryOptions<T>
+) => {
   const base = `SELECT e.id AS eid`;
   const joins: string[] = [];
   const fields: string[] = [];

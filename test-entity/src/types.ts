@@ -67,6 +67,11 @@ export type WorldBuilder<TComponents extends Components> =
     ) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
   };
 
+export type GenericEntity<T extends Components> = {
+  id: number;
+  world: World<T>;
+};
+
 export type Entity<C extends keyof Components = never> = EntitySchema & {
   world: World<Components>;
 } & {

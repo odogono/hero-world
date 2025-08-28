@@ -103,7 +103,7 @@ describe('query', () => {
     flush(world);
 
     const result = queryEntities(world, {
-      entity: entity1 as any,
+      entity: entity1,
       with: ['status']
     });
     expect(result).toHaveLength(1);
