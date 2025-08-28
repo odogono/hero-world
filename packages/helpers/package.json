@@ -1,0 +1,15 @@
+{
+  "name": "odgn-helpers",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "github-slugger": "^2.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
