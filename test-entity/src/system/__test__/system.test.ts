@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
-import { defineComponent } from '../component';
-import { healthComponent } from '../components/health';
-import { createEntity, queryEntitiesIterator } from '../entity';
-import { createSystem } from '../system';
-import { createWorld, flush } from '../world';
+import { healthComponent } from '@/components/health';
+import { defineComponent } from '@component';
+import { createEntity, queryEntitiesIterator } from '@entity';
+import { eventComponent } from '@events';
+import { createEntitySystem, createSystem, createWorldSystem } from '@system';
+import { createWorld, flush } from '@world';
 
 describe('Systems', () => {
   const locationComponent = defineComponent({
@@ -392,5 +393,65 @@ describe('Systems', () => {
     // Verify only the matching entity was processed
     expect(processedEntities).toHaveLength(1);
     expect(processedEntities).toContain(entity3.id);
+  });
+
+  test('should create event-aware entity system', () => {
+    const world = createWorld()
+      .registerComponent(healthComponent)
+      .registerComponent(eventComponent)
+      .build();
+
+    // Create entities
+    createEntity(world, { health: { current: 100, max: 100 } });
+    createEntity(world, { health: { current: 75, max: 100 } });
+    flush(world);
+
+    let processedEntities: any[] = [];
+    let receivedEvents: any[] = [];
+
+    // Create system that processes entities and events
+    const system = createEntitySystem(
+      { with: ['health'] },
+      (entities, _world, _deltaTime, events) => {
+        processedEntities = [...entities];
+        receivedEvents = [...events];
+      }
+    );
+
+    // Run system with events
+    const mockEvents = [
+      { entity: {} as any, payload: { test: 'data' }, type: 'test-event' }
+    ];
+
+    system(world, 16, mockEvents);
+
+    expect(processedEntities).toHaveLength(2);
+    expect(receivedEvents).toHaveLength(1);
+    expect(receivedEvents[0].payload.test).toBe('data');
+  });
+
+  test('should create event-aware world system', () => {
+    const world = createWorld().registerComponent(eventComponent).build();
+
+    let receivedWorld: any = null;
+    let receivedDeltaTime: number = 0;
+    let receivedEvents: any[] = [];
+
+    const system = createWorldSystem((w, dt, events) => {
+      receivedWorld = w;
+      receivedDeltaTime = dt;
+      receivedEvents = [...events];
+    });
+
+    const mockEvents = [
+      { entity: {} as any, payload: { action: 'jump' }, type: 'player-action' }
+    ];
+
+    system(world, 33, mockEvents);
+
+    expect(receivedWorld).toBe(world);
+    expect(receivedDeltaTime).toBe(33);
+    expect(receivedEvents).toHaveLength(1);
+    expect(receivedEvents[0].payload.action).toBe('jump');
   });
 });

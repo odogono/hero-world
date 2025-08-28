@@ -1,3 +1,4 @@
+import type { EventSystem } from '@events';
 import { createLog } from '@helpers/log';
 import type { Components, World } from '@types';
 
@@ -135,7 +136,8 @@ export const createGameLoop = <TComponents extends Components>(
       const startTime = Date.now();
 
       try {
-        system.fn(world, deltaTime);
+        // Call system without events (legacy compatibility)
+        system.fn(world, deltaTime, []);
 
         // Update performance metrics
         const executionTime = Date.now() - startTime;
@@ -184,7 +186,7 @@ export const createGameLoop = <TComponents extends Components>(
  * Helper function to create a system that queries entities
  */
 export const createSystem = <TComponents extends Components>(
-  queryFn: (world: World<TComponents>, deltaTime: number) => void
+  queryFn: (world: World<TComponents>, deltaTime: number, events: any[]) => void
 ): SystemFunction<TComponents> => queryFn;
 
 /**
@@ -196,14 +198,15 @@ export const createEntitySystem =
     processFn: (
       entities: TEntity[],
       world: World<TComponents>,
-      deltaTime: number
+      deltaTime: number,
+      events: any[]
     ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number) => {
+  (world: World<TComponents>, deltaTime: number, events) => {
     // This will need to be implemented once we integrate with the query system
     // For now, it's a placeholder that shows the intended interface
     const entities: TEntity[] = []; // TODO: query entities using queryOptions
-    processFn(entities, world, deltaTime);
+    processFn(entities, world, deltaTime, events);
   };
 
 /**
@@ -227,4 +230,150 @@ export const logSystemPerformance = (
 
   const totalTime = perf.reduce((sum, p) => sum + p.lastExecutionTime, 0);
   log.debug(`Total system execution time: ${totalTime.toFixed(2)}ms`);
+};
+
+/**
+ * Creates an event-aware game loop that collects events for each system before execution
+ */
+export const createEventAwareGameLoop = <TComponents extends Components>(
+  world: World<TComponents>,
+  eventSystem: EventSystem
+): GameLoop<TComponents> => {
+  const systems = new Map<string, SystemRegistration<TComponents>>();
+  const performance = new Map<string, SystemPerformance>();
+  let frameCount = 0;
+
+  const addSystem = (
+    id: string,
+    fn: SystemFunction<TComponents>,
+    options: SystemOptions = {}
+  ): GameLoop<TComponents> => {
+    if (systems.has(id)) {
+      log.warn(`System '${id}' already exists, replacing`);
+    }
+
+    const systemRegistration: SystemRegistration<TComponents> = {
+      enabled: options.enabled ?? true,
+      fn,
+      frameCount: 0,
+      id,
+      options: {
+        enabled: options.enabled ?? true,
+        frequency: options.frequency ?? 1,
+        priority: options.priority ?? 50
+      }
+    };
+
+    systems.set(id, systemRegistration);
+
+    performance.set(id, {
+      averageExecutionTime: 0,
+      executionCount: 0,
+      id,
+      lastExecutionTime: 0,
+      totalExecutionTime: 0
+    });
+
+    log.debug(
+      `Added event-aware system '${id}' with priority ${systemRegistration.options.priority}`
+    );
+    return gameLoop;
+  };
+
+  const removeSystem = (id: string): GameLoop<TComponents> => {
+    if (!systems.has(id)) {
+      log.warn(`System '${id}' does not exist`);
+      return gameLoop;
+    }
+
+    systems.delete(id);
+    performance.delete(id);
+    log.debug(`Removed system '${id}'`);
+    return gameLoop;
+  };
+
+  const enableSystem = (id: string): GameLoop<TComponents> => {
+    const system = systems.get(id);
+    if (!system) {
+      log.warn(`System '${id}' does not exist`);
+      return gameLoop;
+    }
+
+    system.enabled = true;
+    log.debug(`Enabled system '${id}'`);
+    return gameLoop;
+  };
+
+  const disableSystem = (id: string): GameLoop<TComponents> => {
+    const system = systems.get(id);
+    if (!system) {
+      log.warn(`System '${id}' does not exist`);
+      return gameLoop;
+    }
+
+    system.enabled = false;
+    log.debug(`Disabled system '${id}'`);
+    return gameLoop;
+  };
+
+  const getSortedSystems = (): SystemRegistration<TComponents>[] =>
+    Array.from(systems.values()).sort(
+      (a, b) => b.options.priority - a.options.priority
+    );
+
+  const update = (deltaTime: number): void => {
+    frameCount++;
+    const sortedSystems = getSortedSystems();
+
+    for (const system of sortedSystems) {
+      if (!system.enabled) {
+        continue;
+      }
+
+      if (frameCount % system.options.frequency !== 0) {
+        continue;
+      }
+
+      const startTime = Date.now();
+
+      try {
+        // Collect events for this system
+        const events = eventSystem.collectEventsForSystem(system.id);
+
+        // Execute system with events
+        system.fn(world, deltaTime, events);
+
+        const executionTime = Date.now() - startTime;
+        const perf = performance.get(system.id)!;
+
+        perf.lastExecutionTime = executionTime;
+        perf.totalExecutionTime += executionTime;
+        perf.executionCount++;
+        perf.averageExecutionTime =
+          perf.totalExecutionTime / perf.executionCount;
+      } catch (error) {
+        log.error(`System '${system.id}' threw an error:`, error);
+      }
+    }
+  };
+
+  const getPerformance = (): SystemPerformance[] =>
+    Array.from(performance.values()).sort(
+      (a, b) => b.lastExecutionTime - a.lastExecutionTime
+    );
+
+  const getSystems = (): SystemRegistration<TComponents>[] =>
+    getSortedSystems();
+
+  const gameLoop: GameLoop<TComponents> = {
+    addSystem,
+    disableSystem,
+    enableSystem,
+    getPerformance,
+    getSystems,
+    removeSystem,
+    update
+  };
+
+  return gameLoop;
 };

@@ -1,9 +1,10 @@
-import type { Components, World } from '../types';
+import type { Components, World, Entity } from '../types';
 
 // System Loop Types
 export type SystemFunction<TComponents extends Components> = (
   world: World<TComponents>,
-  deltaTime: number
+  deltaTime: number,
+  events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
 ) => void;
 
 export type SystemOptions = {

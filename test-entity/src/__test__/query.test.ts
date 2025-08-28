@@ -28,6 +28,13 @@ const velocityComponent = defineComponent({
   }
 });
 
+const nameComponent = defineComponent({
+  name: 'name' as const,
+  schema: {
+    fullName: z.string()
+  }
+});
+
 describe('query', () => {
   test('should query all entities with status component', () => {
     const world = createWorld().registerComponent(statusComponent).build();
@@ -46,6 +53,15 @@ describe('query', () => {
 
     const allEntities = queryEntities(world);
     expect(allEntities).toHaveLength(6);
+  });
+
+  test('should return component properties with camelCase', () => {
+    const world = createWorld().registerComponent(nameComponent).build();
+    createEntity(world, { name: { fullName: 'John Doe' } });
+    flush(world);
+    const entities = queryEntities(world, { with: ['name'] });
+
+    expect(entities[0]!.name!.fullName).toBe('John Doe');
   });
 
   test('should filter entities with where clause', () => {

@@ -8,6 +8,10 @@ import { flush } from '@world';
 
 import type { SystemFunction } from './types';
 
+// Export event-aware system functionality
+// Re-export the event-aware game loop as the main game loop
+export { createEventAwareGameLoop as createGameLoop, type GameLoop } from './game-loop';
+
 // Legacy system creation (for backward compatibility)
 export const createSystem =
   <E extends Entity<any> | EntityWithComponents<any, any>>(
@@ -15,7 +19,7 @@ export const createSystem =
     fn: (entity: E) => void,
     options?: QueryOptions
   ) =>
-  () => {
+  (_world: any, _deltaTime: number, _events: any[]) => {
     const entities = queryEntitiesIterator(world, options);
     for (const e of entities) {
       fn(e as E);
@@ -39,12 +43,13 @@ export const createEntitySystem =
     processFn: (
       entities: TEntity[],
       world: World<TComponents>,
-      deltaTime: number
+      deltaTime: number,
+      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
     ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number) => {
+  (world: World<TComponents>, deltaTime: number, events) => {
     const entities = queryEntities(world, queryOptions) as TEntity[];
-    processFn(entities, world, deltaTime);
+    processFn(entities, world, deltaTime, events);
     flush(world);
   };
 
@@ -54,10 +59,14 @@ export const createEntitySystem =
  */
 export const createWorldSystem =
   <TComponents extends Components>(
-    systemFn: (world: World<TComponents>, deltaTime: number) => void
+    systemFn: (
+      world: World<TComponents>, 
+      deltaTime: number,
+      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+    ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number) => {
-    systemFn(world, deltaTime);
+  (world: World<TComponents>, deltaTime: number, events) => {
+    systemFn(world, deltaTime, events);
     flush(world);
   };
 
@@ -77,13 +86,46 @@ export const createIteratorSystem =
     processFn: (
       entity: TEntity,
       world: World<TComponents>,
-      deltaTime: number
+      deltaTime: number,
+      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
     ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number) => {
+  (world: World<TComponents>, deltaTime: number, events) => {
     const entities = queryEntitiesIterator(world, queryOptions);
     for (const entity of entities) {
-      processFn(entity as TEntity, world, deltaTime);
+      processFn(entity as TEntity, world, deltaTime, events);
     }
     flush(world);
+  };
+
+/**
+ * Wrapper that converts a system function without events to one that ignores events
+ */
+export const ignoreEvents = <TComponents extends Components>(
+  systemFn: (world: World<TComponents>, deltaTime: number) => void
+): SystemFunction<TComponents> =>
+  (world: World<TComponents>, deltaTime: number, _events) => {
+    systemFn(world, deltaTime);
+  };
+
+/**
+ * Helper to create event-driven system that only processes when specific events are received
+ */
+export const createEventDrivenSystem = <TComponents extends Components>(
+  eventTypes: string[],
+  systemFn: (
+    world: World<TComponents>,
+    deltaTime: number,
+    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+  ) => void
+): SystemFunction<TComponents> =>
+  (world: World<TComponents>, deltaTime: number, events) => {
+    // Only run if we have events of the specified types
+    const relevantEvents = events.filter(event =>
+      eventTypes.includes(event.type)
+    );
+    if (relevantEvents.length > 0) {
+      systemFn(world, deltaTime, relevantEvents);
+      flush(world);
+    }
   };

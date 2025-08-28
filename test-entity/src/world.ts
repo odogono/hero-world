@@ -1,5 +1,5 @@
 import { Database, Statement } from 'bun:sqlite';
-import { z } from 'zod';
+import z from 'zod';
 
 import { createLog } from '@helpers/log';
 import { toSnakeCase } from '@helpers/string';
@@ -39,11 +39,13 @@ const createWorldInternal = <T extends Components>(): World<T> => {
 
   const db = new Database(':memory:', { strict: true });
 
-  db.exec('PRAGMA journal_mode = WAL;');
-  db.exec('PRAGMA foreign_keys = ON');
+  db.run('PRAGMA journal_mode = WAL;');
+  db.run('PRAGMA foreign_keys = ON');
 
-  const { sql } = zodSchemaToSqliteTable(entitySchema, { ifNotExists: true });
-  db.exec(sql);
+  const { sql } = zodSchemaToSqliteTable(entitySchema, {
+    ifNotExists: true
+  });
+  db.run(sql);
 
   const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?1;');

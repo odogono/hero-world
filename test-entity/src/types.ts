@@ -98,6 +98,13 @@ export const entitySchema = z
   })
   .meta({ name: 'tbl_entity' });
 
+export const getEntitySchema = () =>
+  z
+    .object({
+      id: pkWithAutoIncrement()
+    })
+    .meta({ name: 'tbl_entity' });
+
 export const isEntity = (val: unknown): val is Entity => {
   if (typeof val !== 'object' || val === null) {
     return false;

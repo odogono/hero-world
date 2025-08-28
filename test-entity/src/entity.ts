@@ -9,6 +9,8 @@ import type {
   World
 } from '@types';
 
+import { toCamelCase } from './helpers/string';
+
 // Overloads for type inference
 type CreateEntityOverloads = {
   <TComponents extends Components, C extends Partial<TComponents>>(
@@ -102,7 +104,8 @@ const buildQuery = <T extends Components>(
   const withoutConditions: string[] = [];
 
   // Determine which components to include in the query
-  const componentsToInclude = options?.with ?? world.defs.keys();
+  const componentsToInclude =
+    options?.with ?? (Array.from(world.defs.keys()) as (keyof T)[]);
 
   // Handle components that entities must have
   componentsToInclude.forEach(c => {
@@ -174,34 +177,45 @@ const buildQuery = <T extends Components>(
   };
 };
 
+const mapRowToEntity = <T extends Components>(
+  world: World<T>,
+  componentsToInclude: (keyof T)[],
+  row: unknown
+) => {
+  const entity: Entity<keyof Components> = { id: row.eid, world } as Entity<
+    keyof Components
+  >;
+
+  for (const c of componentsToInclude) {
+    const def = world.defs.get(c as string)!;
+    const data: Record<string, unknown> = {};
+    for (const column of def.columns) {
+      const key = toCamelCase(column.name);
+      data[key] = row[`${def.name}_${column.name}`];
+    }
+    entity[c] = makeTrackedComponent(entity, c as string, data);
+  }
+
+  return entity;
+};
+
 export const queryEntities = <T extends Components>(
   world: World<T>,
-  options?: QueryOptions
+  options?: QueryOptions<T>
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
 
   const stmt = world.db.query(sql);
   const rows = args && args.length > 0 ? stmt.all(...args) : stmt.all();
 
-  return rows.map((row: any) => {
-    const entity: Entity<any> = { id: row.eid, world } as Entity<any>;
-
-    for (const c of componentsToInclude) {
-      const def = world.defs.get(c as string)!;
-      const data: any = {};
-      for (const column of def.columns) {
-        data[column.name] = row[`${def.name}_${column.name}`];
-      }
-      (entity as any)[c] = makeTrackedComponent(entity, c as string, data);
-    }
-
-    return entity;
-  });
+  return rows.map((row: any) =>
+    mapRowToEntity(world, componentsToInclude, row)
+  );
 };
 
 export const queryEntitiesIterator = <T extends Components>(
   world: World<T>,
-  options?: QueryOptions
+  options?: QueryOptions<T>
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.query(sql);
@@ -213,20 +227,7 @@ export const queryEntitiesIterator = <T extends Components>(
   return {
     *[Symbol.iterator]() {
       for (const row of iterator) {
-        const entity: Entity<any> = {
-          id: (row as any).eid,
-          world
-        } as Entity<any>;
-
-        for (const c of componentsToInclude) {
-          const def = world.defs.get(c as string)!;
-          const data: any = {};
-          for (const column of def.columns) {
-            data[column.name] = (row as any)[`${def.name}_${column.name}`];
-          }
-          (entity as any)[c] = makeTrackedComponent(entity, c as string, data);
-        }
-
+        const entity = mapRowToEntity(world, componentsToInclude, row);
         yield entity;
       }
     }

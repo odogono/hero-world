@@ -9,6 +9,9 @@ import { createWorld, flush } from '../world';
 
 const log = createLog('test-entity');
 
+// NOTE currently breaks earlier registration of entity schema
+// z.globalRegistry.clear();
+
 // Component definitions using new system
 const statsComponent = defineComponent({
   name: 'stats' as const,
@@ -257,7 +260,7 @@ describe('createEntity', () => {
     // }).meta({ id: '/name', name: 'tbl_names' });
 
     const nameComponent = defineComponent({
-      name: 'name' as const,
+      name: 'test_name' as const,
       schema: {
         firstName: z.string(),
         lastName: z.string(),
@@ -268,18 +271,18 @@ describe('createEntity', () => {
     const world = createWorld().registerComponent(nameComponent).build();
 
     const entity = createEntity(world, {
-      name: { firstName: 'John', lastName: 'Doe', title: 'Sir' }
+      test_name: { firstName: 'John', lastName: 'Doe', title: 'Sir' }
     });
 
-    expect(entity.name).toBeDefined();
-    expect(entity.name.firstName).toBe('John');
-    expect(entity.name.lastName).toBe('Doe');
-    expect(entity.name.title).toBe('Sir');
+    expect(entity.test_name).toBeDefined();
+    expect(entity.test_name.firstName).toBe('John');
+    expect(entity.test_name.lastName).toBe('Doe');
+    expect(entity.test_name.title).toBe('Sir');
 
     // Test modifications
     flush(world);
-    entity.name.title = 'Lord';
-    expect(entity.name.title).toBe('Lord');
+    entity.test_name.title = 'Lord';
+    expect(entity.test_name.title).toBe('Lord');
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
   });
 

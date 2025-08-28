@@ -36,6 +36,9 @@
       "@entity": [
         "./src/entity"
       ],
+      "@events": [
+        "./src/events"
+      ],
       "@events/*": [
         "./src/events/*"
       ],
