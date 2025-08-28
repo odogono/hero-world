@@ -1,6 +1,7 @@
 import { createLog } from 'odgn-helpers';
 
 import { ThemeTogglePortal } from '@components/theme/toggle-portal';
+import { SQLiteDemo } from '@components/SQLiteDemo';
 
 const log = createLog('Main');
 
@@ -11,9 +12,10 @@ const Main = () => {
 
   return (
     <>
-      <div className="bg-background h-screen w-screen">
-        <div className="flex h-full w-full items-center justify-center gap-4">
+      <div className="bg-background min-h-screen w-screen">
+        <div className="flex flex-col items-center justify-center gap-8 py-8">
           <h1 className="text-text text-4xl">{message}</h1>
+          <SQLiteDemo />
         </div>
       </div>
       <ThemeTogglePortal />

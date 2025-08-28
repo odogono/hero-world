@@ -140,3 +140,33 @@ const world = createWorld()
 - Helper tests in `packages/helpers/src/**/__test__/*.test.ts`
 - Use `import { test, expect, describe } from "bun:test"` for ECS/helpers
 - Use `vitest` APIs for tank-world React components
+
+### Browser Testing with Playwright
+
+Playwright is installed in the tank-world package for debugging browser issues:
+
+```bash
+# Install Playwright (already configured)
+bun add -D playwright @playwright/test
+bunx playwright install
+
+# Use Playwright for debugging browser errors
+node test-app.js  # Custom script for capturing browser errors
+```
+
+Key benefits of Playwright for development:
+- **Runtime error capture**: See exact browser console errors and stack traces
+- **Network monitoring**: Track failed imports and 404/500 errors
+- **Visual verification**: Take screenshots to verify UI rendering
+- **Real browser testing**: Test actual browser behavior vs. build-time errors
+
+The `test-app.js` script demonstrates:
+- Listening for console messages, page errors, and request failures
+- Navigating to the dev server and capturing real-time issues
+- Verifying React root mounting and page functionality
+- Taking screenshots for visual debugging
+
+This approach was crucial for identifying and fixing:
+- TypeScript import issues with `import type` syntax
+- Vite path alias configuration problems
+- Runtime vs. build-time error differentiation

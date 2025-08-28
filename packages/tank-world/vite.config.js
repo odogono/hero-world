@@ -14,5 +14,15 @@ export default defineConfig({
       '@screens': resolve('src/screens'),
       '@types': resolve('src/types')
     }
-  }
+  },
+  server: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin'
+    }
+  },
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm']
+  },
+  assetsInclude: ['**/*.wasm']
 });
