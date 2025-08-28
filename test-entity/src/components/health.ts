@@ -1,5 +1,6 @@
-import * as z from "zod";
-import { defineComponent } from "../component";
+import * as z from 'zod';
+
+import { defineComponent } from '../component';
 
 export type Health = z.infer<typeof healthSchema>;
 
@@ -8,7 +9,7 @@ export const healthComponent = defineComponent({
   name: 'health' as const,
   schema: {
     current: z.number(),
-    max: z.number(),
+    max: z.number()
   },
   statements: {
     // Optional: custom SQL statements

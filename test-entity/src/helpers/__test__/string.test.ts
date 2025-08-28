@@ -6,25 +6,23 @@ import {
   toCapitalized,
   toKebabCase,
   toPascalCase,
-  toSnakeCase,
+  toSnakeCase
 } from '../string';
 
 describe('String utility functions', () => {
-
   describe('fromUrl', () => {
     it.each([
       ['/hello-world', 'helloWorld'],
       ['/my-variable-name', 'myVariableName'],
       ['/my-variable-name/hello-world', 'myVariableNameHelloWorld'],
-      ['https://example.com/my-variable-name/hello-world', 'myVariableNameHelloWorld'],
-    ])(
-      'should convert URL to camelCase: %s -> %s',
-      (input, expected) => {
-        expect(fromUrl(input)).toBe(expected);
-      }
-    );
-  })
-
+      [
+        'https://example.com/my-variable-name/hello-world',
+        'myVariableNameHelloWorld'
+      ]
+    ])('should convert URL to camelCase: %s -> %s', (input, expected) => {
+      expect(fromUrl(input)).toBe(expected);
+    });
+  });
 
   describe('toPascalCase', () => {
     it.each([

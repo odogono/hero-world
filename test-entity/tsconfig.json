@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": [
-      "ESNext"
-    ],
+    "lib": ["ESNext"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -27,21 +25,11 @@
     // Paths
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@entity": [
-        "./src/entity"
-      ],
-      "@entity/*": [
-        "./src/entity/*"
-      ],
-      "@helpers/*": [
-        "./src/helpers/*"
-      ],
-      "@types": [
-        "./src/types"
-      ]
+      "@/*": ["./src/*"],
+      "@entity": ["./src/entity"],
+      "@entity/*": ["./src/entity/*"],
+      "@helpers/*": ["./src/helpers/*"],
+      "@types": ["./src/types"]
     }
   }
 }

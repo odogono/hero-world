@@ -1,9 +1,10 @@
-import type { World } from "../types";
-import * as z from "zod";
-import { createLog } from "@helpers/log";
-import { isEntity, type Entity } from "../types";
-import { defineComponent } from "../component";
-import { createEntity } from "../entity";
+import * as z from 'zod';
+
+import { createLog } from '@helpers/log';
+
+import { defineComponent } from '../component';
+import { createEntity } from '../entity';
+import { isEntity, type Entity, type World } from '../types';
 
 const log = createLog('location');
 
@@ -11,16 +12,14 @@ export const locationComponent = defineComponent({
   name: 'location' as const,
   schema: {
     name: z.string(),
-    region: z.string(),
-  },
+    region: z.string()
+  }
 });
 
 export type Location = z.infer<typeof locationSchema>;
 const locationSchema = locationComponent.schema;
 
-
 export const createLocation = (world: World<any>, location: Location) => {
-  
   const e = createEntity(world, {
     location
   });
@@ -28,11 +27,12 @@ export const createLocation = (world: World<any>, location: Location) => {
   // world.stmts.locationInsert!.run(e.id, location.name, location.region);
 
   return e;
-}
+};
 
-
-export const getLocationE = (world: World<any>, location: Entity | Partial<Location>): Entity | null => {
-
+export const getLocationE = (
+  world: World<any>,
+  location: Entity | Partial<Location>
+): Entity | null => {
   if (isEntity(location)) {
     return location;
   }
@@ -50,4 +50,4 @@ export const getLocationE = (world: World<any>, location: Entity | Partial<Locat
   }
 
   return result as Entity;
-}
+};
