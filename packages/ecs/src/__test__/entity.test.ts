@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { createLog } from 'odgn-helpers';
 import z from 'zod';
-
-import { createLog } from '@helpers/log';
 
 import { defineComponent } from '../component';
 import { createEntity, deleteEntity, getEntity } from '../entity';

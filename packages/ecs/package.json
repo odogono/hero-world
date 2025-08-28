@@ -1,5 +1,5 @@
 {
-  "name": "test-entity",
+  "name": "odgn-ecs",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -9,7 +9,8 @@
     "eslint": "^9.34.0",
     "knip": "^5.63.0",
     "prettier": "^3.6.2",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "odgn-helpers": "workspace:*"
   },
   "peerDependencies": {
     "typescript": "^5.9.2"
@@ -25,7 +26,7 @@
     "unused": "knip"
   },
   "dependencies": {
-    "github-slugger": "^2.0.0",
+    "odgn-helpers": "workspace:*",
     "mitt": "^3.0.1",
     "zod": "^4.1.4"
   }

@@ -1,6 +1,6 @@
+import { toSnakeCase } from 'odgn-helpers';
 import { z } from 'zod';
 
-import { toSnakeCase } from '@helpers/string';
 import {
   componentSchema,
   type ComponentDefinition,

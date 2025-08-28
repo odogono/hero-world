@@ -1,7 +1,6 @@
 /* eslint-disable @nkzw/no-instanceof */
+import { toSnakeCase } from 'odgn-helpers';
 import { z } from 'zod';
-
-import { toSnakeCase } from '@helpers/string';
 
 import type {
   ColumnInfo,

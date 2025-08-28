@@ -1,5 +1,5 @@
 import type { EventSystem } from '@events';
-import { createLog } from '@helpers/log';
+import { createLog } from 'odgn-helpers';
 import type { Components, World } from '@types';
 
 import type {

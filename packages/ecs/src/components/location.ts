@@ -1,6 +1,5 @@
+import { createLog } from 'odgn-helpers';
 import * as z from 'zod';
-
-import { createLog } from '@helpers/log';
 
 import { defineComponent } from '../component';
 import { createEntity } from '../entity';

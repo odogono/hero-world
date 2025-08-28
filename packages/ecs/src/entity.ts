@@ -1,4 +1,5 @@
 import type { SQLQueryBindings } from 'bun:sqlite';
+import { toCamelCase } from 'odgn-helpers';
 
 import { makeTrackedComponent } from '@component';
 import type {
@@ -8,8 +9,6 @@ import type {
   GenericEntity,
   World
 } from '@types';
-
-import { toCamelCase } from './helpers/string';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
