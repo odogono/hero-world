@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import * as z from "zod";
-import { zodSchemaToSqliteTable, zodSchemaToSqliteInsert, zodSchemaToSqliteSelect, zodSchemaToSqliteSelectWhere } from '../schema-to-sql';
+import { zodSchemaToSqliteTable, zodSchemaToSqliteInsert, zodSchemaToSqliteSelect, zodSchemaToSqliteSelectWhere, zodSchemaToSqliteIndexes, zodSchemaToSqliteSchema } from '../schema-to-sql';
 import { Database } from 'bun:sqlite';
 
 
@@ -96,14 +96,15 @@ describe('zodSchemaToSqliteTable', () => {
         { constraints: ['PRIMARY KEY', 'AUTOINCREMENT', 'NOT NULL'], name: 'entity_id', type: 'INTEGER' },
         { constraints: ['NOT NULL'], name: 'name', type: 'TEXT' },
       ],
-      sql: `CREATE TABLE tbl_users (
+      indexes: [],
+      sql: `CREATE TABLE IF NOT EXISTS tbl_users (
   entity_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   name TEXT NOT NULL
 );`,
       tableName: 'tbl_users'
     });
 
-    expect(result.sql).toContain('CREATE TABLE tbl_users');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_users');
     expect(result.sql).toContain('entity_id INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('name TEXT NOT NULL');
   });
@@ -118,7 +119,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(userSchema);
     
-    expect(result.sql).toContain('CREATE TABLE users');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS users');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('name TEXT NOT NULL');
     expect(result.sql).toContain('email TEXT NOT NULL');
@@ -136,7 +137,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_entities');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_entities');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('created_at DATETIME NOT NULL');
     expect(result.sql).toContain('updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
@@ -232,11 +233,11 @@ describe('zodSchemaToSqliteTable', () => {
     const result = zodSchemaToSqliteTable(complexSchema);
     
     // Should be valid SQL
-    expect(result.sql).toMatch(/^CREATE TABLE users \([\S\s]*\);$/);
+    expect(result.sql).toMatch(/^CREATE TABLE IF NOT EXISTS users \([\S\s]*\);$/);
     
     // Should have proper comma separation
     const lines = result.sql.split('\n').filter((line: string) => line.trim());
-    expect(lines[0]).toBe('CREATE TABLE users (');
+    expect(lines[0]).toBe('CREATE TABLE IF NOT EXISTS users (');
     expect(lines.at(-1)).toBe(');');
     
     // All lines except first and last should end with comma (except the last column)
@@ -264,7 +265,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(entitySchema);
     
-    expect(result.sql).toBe(`CREATE TABLE entities (
+    expect(result.sql).toBe(`CREATE TABLE IF NOT EXISTS entities (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -290,7 +291,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(schema, { tableName: 'custom_users' });
     
-    expect(result.sql).toContain('CREATE TABLE custom_users');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS custom_users');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('name TEXT NOT NULL');
   });
@@ -348,7 +349,7 @@ describe('zodSchemaToSqliteTable', () => {
     
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_user');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user');
     expect(result.sql).toContain('name TEXT NOT NULL UNIQUE');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
   });
@@ -362,7 +363,7 @@ describe('zodSchemaToSqliteTable', () => {
     
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_user_role');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user_role');
     expect(result.sql).toContain('user_id INTEGER NOT NULL');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('FOREIGN KEY (user_id) REFERENCES tbl_user (id) ON DELETE CASCADE');
@@ -376,7 +377,7 @@ describe('zodSchemaToSqliteTable', () => {
     
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_products');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_products');
     expect(result.sql).toContain('category_id INTEGER NOT NULL');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('FOREIGN KEY (category_id) REFERENCES tbl_categories (id)');
@@ -393,7 +394,7 @@ describe('zodSchemaToSqliteTable', () => {
     
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_posts');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_posts');
     expect(result.sql).toContain('user_id INTEGER NOT NULL');
     expect(result.sql).toContain('category_id INTEGER NOT NULL');
     expect(result.sql).toContain('author_id INTEGER NOT NULL');
@@ -414,7 +415,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(schema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_user_role');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user_role');
     expect(result.sql).toContain('user_id INTEGER NOT NULL');
     expect(result.sql).toContain('id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('FOREIGN KEY (user_id) REFERENCES tbl_users (id) ON DELETE CASCADE');
@@ -432,7 +433,7 @@ describe('zodSchemaToSqliteTable', () => {
     const result = zodSchemaToSqliteTable(componentSchema);
 
     // Basic table structure is correct
-    expect(result.sql).toContain('CREATE TABLE tbl_component_test');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_component_test');
     expect(result.sql).toContain('eid INTEGER NULL');
     expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL');
     
@@ -450,7 +451,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(nonOptionalSchema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_component_required');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_component_required');
     expect(result.sql).toContain('eid INTEGER NOT NULL');
     expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL');
     
@@ -473,7 +474,7 @@ describe('zodSchemaToSqliteTable', () => {
 
     const result = zodSchemaToSqliteTable(locationSchema);
 
-    expect(result.sql).toContain('CREATE TABLE tbl_locations');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_locations');
     expect(result.sql).toContain('eid INTEGER NULL');
     expect(result.sql).toContain('name TEXT NOT NULL');
     expect(result.sql).toContain('region TEXT NOT NULL');
@@ -500,7 +501,7 @@ describe('zodSchemaToSqliteTable', () => {
     const result = zodSchemaToSqliteTable(locationSchema);
 
     // Verify the expected structure is there
-    expect(result.sql).toBe(`CREATE TABLE tbl_locations (
+    expect(result.sql).toBe(`CREATE TABLE IF NOT EXISTS tbl_locations (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   eid INTEGER NULL,
   name TEXT NOT NULL,
@@ -514,4 +515,241 @@ describe('zodSchemaToSqliteTable', () => {
     expect(result.sql).toContain('ON DELETE CASCADE');
   });
 
+});
+
+describe('SQLite Index Generation', () => {
+  test('should generate single-column indexes from field metadata', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+      name: z.string().meta({ index: true, indexName: 'idx_users_name' }),
+      username: z.string().meta({ index: true, indexUnique: true }),
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteTable(schema);
+    
+    expect(result.indexes).toHaveLength(3);
+    expect(result.indexes).toEqual([
+      {
+        columns: ['email'],
+        name: 'idx_tbl_users_email',
+        tableName: 'tbl_users',
+        unique: false
+      },
+      {
+        columns: ['name'],
+        name: 'idx_users_name',
+        tableName: 'tbl_users',
+        unique: false
+      },
+      {
+        columns: ['username'],
+        name: 'idx_tbl_users_username',
+        tableName: 'tbl_users',
+        unique: true
+      }
+    ]);
+  });
+
+  test('should generate composite indexes from schema metadata', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      categoryId: z.number(),
+      status: z.string(),
+      userId: z.number(),
+    }).meta({ 
+      name: 'tbl_posts',
+      indexes: [
+        { columns: ['userId', 'status'] },
+        { columns: ['categoryId', 'status'], unique: true },
+        { columns: ['userId', 'categoryId'], name: 'idx_posts_user_category' }
+      ]
+    });
+
+    const result = zodSchemaToSqliteTable(schema);
+    
+    expect(result.indexes).toHaveLength(3);
+    expect(result.indexes).toEqual([
+      {
+        columns: ['user_id', 'status'],
+        name: 'idx_tbl_posts_user_id_status',
+        tableName: 'tbl_posts',
+        unique: false
+      },
+      {
+        columns: ['category_id', 'status'],
+        name: 'idx_tbl_posts_category_id_status',
+        tableName: 'tbl_posts',
+        unique: true
+      },
+      {
+        columns: ['user_id', 'category_id'],
+        name: 'idx_posts_user_category',
+        tableName: 'tbl_posts',
+        unique: false
+      }
+    ]);
+  });
+
+  test('should generate index SQL statements', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+      username: z.string().meta({ index: true, indexUnique: true }),
+    }).meta({ 
+      name: 'tbl_users',
+      indexes: [
+        { columns: ['email', 'username'] }
+      ]
+    });
+
+    const result = zodSchemaToSqliteIndexes(schema);
+    
+    expect(result.sql).toEqual([
+      'CREATE INDEX IF NOT EXISTS idx_tbl_users_email ON tbl_users (email);',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_tbl_users_username ON tbl_users (username);',
+      'CREATE INDEX IF NOT EXISTS idx_tbl_users_email_username ON tbl_users (email, username);'
+    ]);
+  });
+
+  test('should generate index SQL with IF NOT EXISTS by default', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteIndexes(schema);
+    
+    expect(result.sql).toEqual([
+      'CREATE INDEX IF NOT EXISTS idx_tbl_users_email ON tbl_users (email);'
+    ]);
+  });
+
+  test('should generate index SQL without IF NOT EXISTS when explicitly disabled', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteIndexes(schema, { ifNotExists: false });
+    
+    expect(result.sql).toEqual([
+      'CREATE INDEX idx_tbl_users_email ON tbl_users (email);'
+    ]);
+  });
+
+  test('should generate complete schema with table and indexes', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+      name: z.string(),
+    }).meta({ 
+      name: 'tbl_users',
+      indexes: [
+        { columns: ['name', 'email'] }
+      ]
+    });
+
+    const result = zodSchemaToSqliteSchema(schema);
+    
+    expect(result).toHaveLength(3); // 1 table + 2 indexes
+    expect(result[0]).toContain('CREATE TABLE IF NOT EXISTS tbl_users');
+    expect(result[1]).toContain('CREATE INDEX IF NOT EXISTS idx_tbl_users_email ON tbl_users (email);');
+    expect(result[2]).toContain('CREATE INDEX IF NOT EXISTS idx_tbl_users_name_email ON tbl_users (name, email);');
+  });
+
+  test('should work with actual database operations', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true, unique: true }),
+      name: z.string(),
+    }).meta({ 
+      name: 'tbl_users',
+      indexes: [
+        { columns: ['name'] }
+      ]
+    });
+
+    const db = new Database(':memory:');
+    
+    // Create table and indexes
+    const schemaSql = zodSchemaToSqliteSchema(schema);
+    for (const sql of schemaSql) {
+      db.exec(sql);
+    }
+
+    // Insert data
+    const insertSql = zodSchemaToSqliteInsert(schema);
+    const stmt = db.query(insertSql);
+    stmt.run('john@example.com', 'John Doe');
+
+    // Query using indexed column
+    const selectSql = zodSchemaToSqliteSelect(schema) + ' WHERE email = ?';
+    const selectStmt = db.query(selectSql);
+    const result = selectStmt.get('john@example.com');
+
+    expect(result).toEqual({
+      id: 1,
+      email: 'john@example.com',
+      name: 'John Doe'
+    });
+  });
+
+  test('should handle camelCase column names in composite indexes', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      firstName: z.string(),
+      lastName: z.string(),
+    }).meta({ 
+      name: 'tbl_users',
+      indexes: [
+        { columns: ['firstName', 'lastName'] }
+      ]
+    });
+
+    const result = zodSchemaToSqliteIndexes(schema);
+    
+    expect(result.sql).toEqual([
+      'CREATE INDEX IF NOT EXISTS idx_tbl_users_first_name_last_name ON tbl_users (first_name, last_name);'
+    ]);
+  });
+
+  test('should not generate indexes for fields without index metadata', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      email: z.string().meta({ index: true }),
+      name: z.string(), // No index metadata
+      age: z.number(), // No index metadata
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteTable(schema);
+    
+    expect(result.indexes).toHaveLength(1);
+    expect(result.indexes[0]?.columns).toEqual(['email']);
+  });
+
+  test('should handle empty indexes array gracefully', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      name: z.string(),
+    }).meta({ 
+      name: 'tbl_users',
+      indexes: []
+    });
+
+    const result = zodSchemaToSqliteTable(schema);
+    
+    expect(result.indexes).toHaveLength(0);
+  });
+
+  test('should handle schema without any index metadata', () => {
+    const schema = z.object({
+      id: z.number().meta({ autoIncrement: true, primaryKey: true }),
+      name: z.string(),
+    }).meta({ name: 'tbl_users' });
+
+    const result = zodSchemaToSqliteTable(schema);
+    
+    expect(result.indexes).toHaveLength(0);
+  });
 });

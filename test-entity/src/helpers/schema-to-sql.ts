@@ -12,14 +12,32 @@ export type ColumnInfo = {
 }
 
 /**
+ * Index information for SQLite index generation
+ */
+export type IndexInfo = {
+  columns: string[];
+  name: string;
+  unique: boolean;
+  tableName: string;
+}
+
+/**
  * Result of converting a Zod schema to SQLite table
  */
 export type TableGenerationResult = {
   columns: ColumnInfo[];
+  indexes: IndexInfo[];
   sql: string;
   tableName: string;
 }
 
+/**
+ * Result of converting a Zod schema to SQLite indexes
+ */
+export type IndexGenerationResult = {
+  indexes: IndexInfo[];
+  sql: string[];
+}
 
 export type ZodSchemaToSqliteTableOptions = {
   ifNotExists?: boolean;
@@ -41,10 +59,11 @@ export function zodSchemaToSqliteTable(
   const columnDefs: string[] = [];
   const columnInfos: ColumnInfo[] = [];
   const foreignKeyConstraints: string[] = [];
+  const indexInfos: IndexInfo[] = [];
   
   // Get table name from metadata or options
   const tableName = options?.tableName || (schema.meta()?.name as string);
-  const ifNotExists = options?.ifNotExists || false;
+  const ifNotExists = options?.ifNotExists ?? true; // Default to true
   
   if (!tableName) {
     throw new Error('Table name must be specified either in schema metadata (schema.meta({ name: "table_name" })) or in options parameter');
@@ -60,6 +79,33 @@ export function zodSchemaToSqliteTable(
     if (foreignKeyConstraint) {
       foreignKeyConstraints.push(foreignKeyConstraint);
     }
+    
+    // Collect single-column indexes from field metadata
+    const metadata = (value as z.ZodTypeAny).meta();
+    if (metadata && typeof metadata === 'object' && 'index' in metadata && metadata.index) {
+      const indexName = (metadata.indexName as string) || `idx_${tableName}_${snakeCaseKey}`;
+      indexInfos.push({
+        columns: [snakeCaseKey],
+        name: indexName,
+        tableName,
+        unique: (metadata.indexUnique as boolean) || false
+      });
+    }
+  }
+  
+  // Collect composite indexes from schema metadata
+  const schemaMetadata = schema.meta();
+  if (schemaMetadata && typeof schemaMetadata === 'object' && 'indexes' in schemaMetadata && Array.isArray(schemaMetadata.indexes)) {
+    for (const indexDef of schemaMetadata.indexes as Array<{name?: string; columns: string[]; unique?: boolean}>) {
+      const snakeCaseColumns = indexDef.columns.map((col: string) => toSnakeCase(col) || col);
+      const indexName = indexDef.name || `idx_${tableName}_${snakeCaseColumns.join('_')}`;
+      indexInfos.push({
+        columns: snakeCaseColumns,
+        name: indexName,
+        tableName,
+        unique: indexDef.unique || false
+      });
+    }
   }
   
   // Combine column definitions with foreign key constraints
@@ -68,9 +114,54 @@ export function zodSchemaToSqliteTable(
   
   return {
     columns: columnInfos,
+    indexes: indexInfos,
     sql,
     tableName
   };
+}
+
+/**
+ * Converts a Zod schema to SQLite CREATE INDEX statements
+ * @param schema - The Zod schema to convert
+ * @param options - Optional configuration
+ * @param options.tableName - Override table name from schema metadata
+ * @param options.ifNotExists - Add IF NOT EXISTS to index creation
+ * @returns Object containing index information and SQL statements
+ */
+export function zodSchemaToSqliteIndexes(
+  schema: SchemaType,
+  options?: ZodSchemaToSqliteTableOptions
+): IndexGenerationResult {
+  const tableResult = zodSchemaToSqliteTable(schema, options);
+  const indexSql: string[] = [];
+  
+  for (const indexInfo of tableResult.indexes) {
+    const uniqueClause = indexInfo.unique ? 'UNIQUE ' : '';
+    const ifNotExists = (options?.ifNotExists ?? true) ? 'IF NOT EXISTS ' : '';
+    const sql = `CREATE ${uniqueClause}INDEX ${ifNotExists}${indexInfo.name} ON ${indexInfo.tableName} (${indexInfo.columns.join(', ')});`;
+    indexSql.push(sql);
+  }
+  
+  return {
+    indexes: tableResult.indexes,
+    sql: indexSql
+  };
+}
+
+/**
+ * Converts a Zod schema to a complete SQLite schema (table + indexes)
+ * @param schema - The Zod schema to convert
+ * @param options - Optional configuration
+ * @returns Array of SQL statements for table and index creation
+ */
+export function zodSchemaToSqliteSchema(
+  schema: SchemaType,
+  options?: ZodSchemaToSqliteTableOptions
+): string[] {
+  const tableResult = zodSchemaToSqliteTable(schema, options);
+  const indexResult = zodSchemaToSqliteIndexes(schema, options);
+  
+  return [tableResult.sql, ...indexResult.sql];
 }
 
 /**
@@ -88,11 +179,11 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
   if (zodType instanceof z.ZodNumber) {
     sqliteType = 'REAL';
     // Check if it's specifically an integer
-    if (zodType._def.checks?.some((check: any) => check.kind === 'int')) {
+    if (zodType.def.checks?.some((check: any) => check.kind === 'int')) {
       sqliteType = 'INTEGER';
     }
     // Check for integer format in checks
-    if (zodType._def.checks?.some((check: any) => check._def?.format === 'safeint' || check._def?.isInt === true)) {
+    if (zodType.def.checks?.some((check: any) => check._def?.format === 'safeint' || check._def?.isInt === true)) {
       sqliteType = 'INTEGER';
     }
     // Also check for ZodInt specifically
@@ -100,13 +191,13 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
       sqliteType = 'INTEGER';
     }
     // Check for format property in _def for z.int() and z.int32()
-    const format = (zodType._def as any)?.format;
+    const format = (zodType.def as any)?.format;
     if (format === 'safeint' || format === 'int32') {
       sqliteType = 'INTEGER';
     }
   } else if (zodType.constructor.name === 'ZodNumberFormat') {
     // Handle z.int() and z.int32() types
-    const format = (zodType._def as any)?.format;
+    const format = (zodType.def as any)?.format;
     sqliteType = format === 'safeint' || format === 'int32' ? 'INTEGER' : 'REAL';
   } else if (zodType instanceof z.ZodString) {
     sqliteType = 'TEXT';
@@ -120,7 +211,7 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
     sqliteType = 'TEXT';
   } else if (zodType instanceof z.ZodLiteral) {
     // For literal values, we need to determine the type from the value
-    const literalValue = (zodType._def as any).value;
+    const literalValue = (zodType.def as any).value;
     if (typeof literalValue === 'number') {
       sqliteType = Number.isInteger(literalValue) ? 'INTEGER' : 'REAL';
     } else if (typeof literalValue === 'boolean') {
@@ -289,18 +380,6 @@ function zodTypeToSqliteColumnWithInfo(columnName: string, zodType: z.ZodTypeAny
     },
     foreignKeyConstraint
   };
-}
-
-/**
- * Converts a Zod type to a SQLite column definition (backward compatibility)
- * @param columnName - The name of the column
- * @param zodType - The Zod type to convert
- * @param isOptional - Whether the field is optional (internal use)
- * @returns SQLite column definition as a string
- */
-function zodTypeToSqliteColumn(columnName: string, zodType: z.ZodTypeAny, isOptional = false): string {
-  const result = zodTypeToSqliteColumnWithInfo(columnName, zodType, isOptional);
-  return result.columnDef;
 }
 
 
