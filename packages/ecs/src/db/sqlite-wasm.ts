@@ -5,7 +5,6 @@ import type {
 } from '@sqlite.org/sqlite-wasm';
 
 import { convertKeysToNamedParams, isObject, parseArgs } from './helpers';
-import { loadFromJSON as sharedLoadFromJSON, saveToJSON as sharedSaveToJSON } from './json-functions';
 import type {
   Database,
   LoadFromJSONOptions,
@@ -13,6 +12,10 @@ import type {
   Statement,
   StatementArgs
 } from './index';
+import {
+  loadFromJSON as sharedLoadFromJSON,
+  saveToJSON as sharedSaveToJSON
+} from './json-functions';
 
 // Wrapper for SQLite WASM database
 export class WasmDatabaseWrapper implements Database {
@@ -26,6 +29,11 @@ export class WasmDatabaseWrapper implements Database {
 
   close(): void {
     this.db.close();
+  }
+
+  addEntity(): number {
+    this.db.exec('INSERT INTO tbl_entity DEFAULT VALUES');
+    return this.lastInsertRowId();
   }
 
   exec(sql: string, input?: StatementArgs, ...rest: StatementArgs[]): void {

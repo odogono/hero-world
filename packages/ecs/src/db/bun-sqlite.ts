@@ -7,7 +7,6 @@ import type {
 } from 'bun:sqlite';
 
 import { parseArgs } from './helpers';
-import { loadFromJSON as sharedLoadFromJSON, saveToJSON as sharedSaveToJSON } from './json-functions';
 import type {
   Database,
   LoadFromJSONOptions,
@@ -16,6 +15,10 @@ import type {
   StatementArgs,
   StatementRunResult
 } from './index';
+import {
+  loadFromJSON as sharedLoadFromJSON,
+  saveToJSON as sharedSaveToJSON
+} from './json-functions';
 
 // Wrapper for Bun SQLite database
 export class BunDatabaseWrapper implements Database {
@@ -27,6 +30,11 @@ export class BunDatabaseWrapper implements Database {
 
   close(): void {
     this.db.close();
+  }
+
+  addEntity(): number {
+    const r = this.db.run('INSERT INTO tbl_entity DEFAULT VALUES');
+    return r.lastInsertRowid as number;
   }
 
   exec(

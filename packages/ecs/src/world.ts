@@ -46,7 +46,6 @@ const createWorldInternal = async <T extends Components>(
   });
   db.exec(sql);
 
-  const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?;');
   const selectEntityById = db.prepare(
     'SELECT id FROM tbl_entity WHERE id = ?;'
@@ -60,7 +59,6 @@ const createWorldInternal = async <T extends Components>(
     flush: () => ({}) as unknown as World<T>,
     stmts: {
       deleteEntity,
-      insertEntity,
       selectEntityById
     }
   };

@@ -14,38 +14,38 @@ const log = createLog('test-entity');
 
 // Component definitions using new system
 const statsComponent = defineComponent({
-  name: 'stats' as const,
+  name: 'te_stats' as const,
   schema: {
     health: z.number(),
     level: z.number(),
     mana: z.number()
   },
   statements: {
-    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?'
+    statsByLevel: 'SELECT * FROM tbl_te_stats WHERE level = ?'
   }
 });
 
 const inventoryComponent = defineComponent({
-  name: 'inventory' as const,
+  name: 'te_inventory' as const,
   schema: {
     capacity: z.number(),
     items: z.string() // JSON string for simplicity
   },
   statements: {
-    inventoryByCapacity: 'SELECT * FROM tbl_inventory WHERE capacity = ?'
+    inventoryByCapacity: 'SELECT * FROM tbl_te_inventory WHERE capacity = ?'
   }
 });
 
 const locationComponent = defineComponent({
-  name: 'location' as const,
+  name: 'te_location' as const,
   schema: {
     name: z.string(),
     region: z.string()
   },
   statements: {
-    locationSelectByName: 'SELECT eid as id FROM tbl_location WHERE name = ?'
+    locationSelectByName: 'SELECT eid as id FROM tbl_te_location WHERE name = ?'
   },
-  tableName: 'tbl_location'
+  tableName: 'tbl_te_location'
 });
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
@@ -87,14 +87,14 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Forest', region: 'North' }
+      te_location: { name: 'Forest', region: 'North' }
     });
 
     expect(entity).toBeDefined();
     expect(entity.id).toBeTypeOf('number');
-    expect(entity.location).toBeDefined();
-    expect(entity.location.name).toBe('Forest');
-    expect(entity.location.region).toBe('North');
+    expect(entity.te_location).toBeDefined();
+    expect(entity.te_location.name).toBe('Forest');
+    expect(entity.te_location.region).toBe('North');
   });
 
   test('createEntity should create entity with stats component', async () => {
@@ -103,14 +103,14 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 5, mana: 50 }
+      te_stats: { health: 100, level: 5, mana: 50 }
     });
 
     expect(entity).toBeDefined();
-    expect(entity.stats).toBeDefined();
-    expect(entity.stats.health).toBe(100);
-    expect(entity.stats.mana).toBe(50);
-    expect(entity.stats.level).toBe(5);
+    expect(entity.te_stats).toBeDefined();
+    expect(entity.te_stats.health).toBe(100);
+    expect(entity.te_stats.mana).toBe(50);
+    expect(entity.te_stats.level).toBe(5);
   });
 
   test('createEntity should create entity with inventory component', async () => {
@@ -120,13 +120,13 @@ describe('createEntity', () => {
 
     const items = JSON.stringify(['sword', 'potion', 'key']);
     const entity = createEntity(world, {
-      inventory: { capacity: 10, items }
+      te_inventory: { capacity: 10, items }
     });
 
     expect(entity).toBeDefined();
-    expect(entity.inventory).toBeDefined();
-    expect(entity.inventory.capacity).toBe(10);
-    expect(entity.inventory.items).toBe(items);
+    expect(entity.te_inventory).toBeDefined();
+    expect(entity.te_inventory.capacity).toBe(10);
+    expect(entity.te_inventory.items).toBe(items);
   });
 
   test('createEntity should create entity with multiple components', async () => {
@@ -136,18 +136,18 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'City', region: 'Central' },
-      stats: { health: 80, level: 3, mana: 30 }
+      te_location: { name: 'City', region: 'Central' },
+      te_stats: { health: 80, level: 3, mana: 30 }
     });
 
-    expect(entity.location).toBeDefined();
-    expect(entity.location.name).toBe('City');
-    expect(entity.location.region).toBe('Central');
+    expect(entity.te_location).toBeDefined();
+    expect(entity.te_location.name).toBe('City');
+    expect(entity.te_location.region).toBe('Central');
 
-    expect(entity.stats).toBeDefined();
-    expect(entity.stats.health).toBe(80);
-    expect(entity.stats.mana).toBe(30);
-    expect(entity.stats.level).toBe(3);
+    expect(entity.te_stats).toBeDefined();
+    expect(entity.te_stats.health).toBe(80);
+    expect(entity.te_stats.mana).toBe(30);
+    expect(entity.te_stats.level).toBe(3);
   });
 
   test('createEntity should track component changes', async () => {
@@ -156,23 +156,23 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Forest', region: 'North' }
+      te_location: { name: 'Forest', region: 'North' }
     });
 
     // Initial state - entity should be marked as dirty
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('location')).toBe(true);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_location')).toBe(true);
 
     // Clear dirty state by flushing
     flush(world);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify component - should mark as dirty again
-    entity.location.name = 'Mountain';
+    entity.te_location.name = 'Mountain';
 
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('location')).toBe(true);
-    expect(entity.location.name).toBe('Mountain');
+    expect(world.dirtyEntities.get(entity.id)?.has('te_location')).toBe(true);
+    expect(entity.te_location.name).toBe('Mountain');
   });
 
   test('createEntity should track changes across multiple components', async () => {
@@ -182,8 +182,8 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Village', region: 'East' },
-      stats: { health: 100, level: 1, mana: 50 }
+      te_location: { name: 'Village', region: 'East' },
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
 
     // Clear dirty state
@@ -191,15 +191,15 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify location component
-    entity.location.name = 'Town';
+    entity.te_location.name = 'Town';
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('location')).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(false);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_location')).toBe(true);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_stats')).toBe(false);
 
     // Modify stats component
-    entity.stats.level = 2;
-    expect(world.dirtyEntities.get(entity.id)?.has('location')).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(true);
+    entity.te_stats.level = 2;
+    expect(world.dirtyEntities.get(entity.id)?.has('te_location')).toBe(true);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_stats')).toBe(true);
     expect(world.dirtyEntities.get(entity.id)?.size).toBe(2);
   });
 
@@ -209,19 +209,19 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 75, level: 4, mana: 25 }
+      te_stats: { health: 75, level: 4, mana: 25 }
     });
 
     expect(world.entityCache.has(entity.id)).toBe(true);
 
     const cached = world.entityCache.get(entity.id);
     expect(cached).toBeDefined();
-    expect(cached!.stats).toBeDefined();
-    expect(cached!.stats!.data).toBeDefined();
-    expect(cached!.stats!.data!.health).toBe(75);
-    expect(cached!.stats!.data!.mana).toBe(25);
-    expect(cached!.stats!.data!.level).toBe(4);
-    expect(cached!.stats!.exists).toBe(false); // New component, not yet persisted
+    expect(cached!.te_stats).toBeDefined();
+    expect(cached!.te_stats!.data).toBeDefined();
+    expect(cached!.te_stats!.data!.health).toBe(75);
+    expect(cached!.te_stats!.data!.mana).toBe(25);
+    expect(cached!.te_stats!.data!.level).toBe(4);
+    expect(cached!.te_stats!.exists).toBe(false); // New component, not yet persisted
   });
 
   test('createEntity should persist components after flush', async () => {
@@ -230,11 +230,11 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      inventory: { capacity: 5, items: '["apple", "bread"]' }
+      te_inventory: { capacity: 5, items: '["apple", "bread"]' }
     });
 
     // Before flush - component exists but not persisted
-    const cacheBefore = world.entityCache.get(entity.id)!.inventory!;
+    const cacheBefore = world.entityCache.get(entity.id)!.te_inventory!;
     expect(cacheBefore.exists).toBe(false);
 
     // Flush to persist
@@ -243,7 +243,7 @@ describe('createEntity', () => {
     // await world.db.saveToPath('world.db');
 
     // After flush - should be marked as existing in database
-    const cacheAfter = world.entityCache.get(entity.id)!.inventory!;
+    const cacheAfter = world.entityCache.get(entity.id)!.te_inventory!;
     expect(cacheAfter.exists).toBe(true);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
@@ -254,7 +254,7 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 10, mana: 100 }
+      te_stats: { health: 100, level: 10, mana: 100 }
     });
 
     // Clear dirty state
@@ -262,15 +262,15 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify multiple properties
-    entity.stats.health = 90;
-    entity.stats.mana = 80;
-    entity.stats.level = 11;
+    entity.te_stats.health = 90;
+    entity.te_stats.mana = 80;
+    entity.te_stats.level = 11;
 
-    expect(entity.stats.health).toBe(90);
-    expect(entity.stats.mana).toBe(80);
-    expect(entity.stats.level).toBe(11);
+    expect(entity.te_stats.health).toBe(90);
+    expect(entity.te_stats.mana).toBe(80);
+    expect(entity.te_stats.level).toBe(11);
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(true);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_stats')).toBe(true);
   });
 
   test('createEntity should handle different component data types', async () => {
@@ -316,7 +316,7 @@ describe('createEntity', () => {
       .build();
 
     expect(world).toBeDefined();
-    expect(world.defs.has('stats')).toBe(true);
+    expect(world.defs.has('te_stats')).toBe(true);
   });
 
   test('should create world with multiple components using builder pattern', async () => {
@@ -326,9 +326,9 @@ describe('createEntity', () => {
       .registerComponent(inventoryComponent)
       .build();
 
-    expect(world.defs.has('location')).toBe(true);
-    expect(world.defs.has('stats')).toBe(true);
-    expect(world.defs.has('inventory')).toBe(true);
+    expect(world.defs.has('te_location')).toBe(true);
+    expect(world.defs.has('te_stats')).toBe(true);
+    expect(world.defs.has('te_inventory')).toBe(true);
   });
 
   test('should create typed entity with single component', async () => {
@@ -337,15 +337,15 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
 
     expect(entity).toBeDefined();
     expect(entity.id).toBeTypeOf('number');
-    expect(entity.stats).toBeDefined();
-    expect(entity.stats.health).toBe(100);
-    expect(entity.stats.mana).toBe(50);
-    expect(entity.stats.level).toBe(1);
+    expect(entity.te_stats).toBeDefined();
+    expect(entity.te_stats.health).toBe(100);
+    expect(entity.te_stats.mana).toBe(50);
+    expect(entity.te_stats.level).toBe(1);
   });
 
   test('should create typed entity with multiple components', async () => {
@@ -355,15 +355,15 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Forest', region: 'North' },
-      stats: { health: 80, level: 3, mana: 30 }
+      te_location: { name: 'Forest', region: 'North' },
+      te_stats: { health: 80, level: 3, mana: 30 }
     });
 
-    expect(entity.location.name).toBe('Forest');
-    expect(entity.location.region).toBe('North');
-    expect(entity.stats.health).toBe(80);
-    expect(entity.stats.mana).toBe(30);
-    expect(entity.stats.level).toBe(3);
+    expect(entity.te_location.name).toBe('Forest');
+    expect(entity.te_location.region).toBe('North');
+    expect(entity.te_stats.health).toBe(80);
+    expect(entity.te_stats.mana).toBe(30);
+    expect(entity.te_stats.level).toBe(3);
   });
 
   test('should create typed entity without initial components', async () => {
@@ -384,7 +384,7 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
 
     // Clear initial dirty state
@@ -392,13 +392,13 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify component
-    entity.stats.health = 90;
-    entity.stats.level = 2;
+    entity.te_stats.health = 90;
+    entity.te_stats.level = 2;
 
-    expect(entity.stats.health).toBe(90);
-    expect(entity.stats.level).toBe(2);
+    expect(entity.te_stats.health).toBe(90);
+    expect(entity.te_stats.level).toBe(2);
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
-    expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(true);
+    expect(world.dirtyEntities.get(entity.id)?.has('te_stats')).toBe(true);
   });
 
   test('should persist typed entity components after flush', async () => {
@@ -407,17 +407,17 @@ describe('createEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      inventory: { capacity: 10, items: '["sword", "shield"]' }
+      te_inventory: { capacity: 10, items: '["sword", "shield"]' }
     });
 
     // Before flush
-    const cacheBefore = world.entityCache.get(entity.id)!.inventory!;
+    const cacheBefore = world.entityCache.get(entity.id)!.te_inventory!;
     expect(cacheBefore.exists).toBe(false);
 
     // Flush and check
     flush(world);
 
-    const cacheAfter = world.entityCache.get(entity.id)!.inventory!;
+    const cacheAfter = world.entityCache.get(entity.id)!.te_inventory!;
     expect(cacheAfter.exists).toBe(true);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
@@ -428,13 +428,13 @@ describe('createEntity', () => {
       .build();
 
     createEntity(world, {
-      stats: { health: 75, level: 5, mana: 25 }
+      te_stats: { health: 75, level: 5, mana: 25 }
     });
 
     flush(world);
 
     // Test custom statement from component definition
-    const def = world.defs.get('stats');
+    const def = world.defs.get('te_stats');
     expect(def).toBeDefined();
     expect(def!.statsByLevel).toBeDefined();
 
@@ -456,31 +456,31 @@ describe('createEntity', () => {
 
     // Create multiple entities
     const warrior = createEntity(world, {
-      inventory: { capacity: 15, items: '["sword", "armor", "potion"]' },
-      location: { name: 'Battlefield', region: 'War Zone' },
-      stats: { health: 120, level: 8, mana: 10 }
+      te_inventory: { capacity: 15, items: '["sword", "armor", "potion"]' },
+      te_location: { name: 'Battlefield', region: 'War Zone' },
+      te_stats: { health: 120, level: 8, mana: 10 }
     });
 
     const mage = createEntity(world, {
-      inventory: { capacity: 8, items: '["staff", "spellbook", "robe"]' },
-      location: { name: 'Tower', region: 'Magic District' },
-      stats: { health: 60, level: 10, mana: 200 }
+      te_inventory: { capacity: 8, items: '["staff", "spellbook", "robe"]' },
+      te_location: { name: 'Tower', region: 'Magic District' },
+      te_stats: { health: 60, level: 10, mana: 200 }
     });
 
     flush(world);
 
     // Verify both entities exist and have correct data
-    expect(warrior.location.name).toBe('Battlefield');
-    expect(warrior.stats.health).toBe(120);
-    expect(warrior.inventory.capacity).toBe(15);
+    expect(warrior.te_location.name).toBe('Battlefield');
+    expect(warrior.te_stats.health).toBe(120);
+    expect(warrior.te_inventory.capacity).toBe(15);
 
-    expect(mage.location.name).toBe('Tower');
-    expect(mage.stats.mana).toBe(200);
-    expect(mage.inventory.capacity).toBe(8);
+    expect(mage.te_location.name).toBe('Tower');
+    expect(mage.te_stats.mana).toBe(200);
+    expect(mage.te_inventory.capacity).toBe(8);
 
     // Modify components
-    warrior.stats.health = 100;
-    mage.stats.mana = 180;
+    warrior.te_stats.health = 100;
+    mage.te_stats.mana = 180;
 
     expect(world.dirtyEntities.has(warrior.id)).toBe(true);
     expect(world.dirtyEntities.has(mage.id)).toBe(true);
@@ -511,13 +511,13 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Forest', region: 'North' }
+      te_location: { name: 'Forest', region: 'North' }
     });
     flush(world);
 
     // Verify entity and component exist
     expect(getEntity(world, entity.id)).toBeDefined();
-    expect(entity.location.name).toBe('Forest');
+    expect(entity.te_location.name).toBe('Forest');
 
     // Delete entity
     deleteEntity(entity);
@@ -532,7 +532,7 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
 
     // Verify entity is in cache
@@ -551,7 +551,7 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
 
     // Verify entity is marked as dirty
@@ -571,16 +571,18 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      location: { name: 'Village', region: 'East' },
-      stats: { health: 80, level: 3, mana: 30 }
+      te_location: { name: 'Village', region: 'East' },
+      te_stats: { health: 80, level: 3, mana: 30 }
     });
     flush(world);
 
     // Verify components exist in database
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_location WHERE eid = ?'
+      'SELECT * FROM tbl_te_location WHERE eid = ?'
     );
-    const statsStmt = world.db.prepare('SELECT * FROM tbl_stats WHERE eid = ?');
+    const statsStmt = world.db.prepare(
+      'SELECT * FROM tbl_te_stats WHERE eid = ?'
+    );
 
     expect(locationStmt.get(entity.id)).toBeDefined();
     expect(statsStmt.get(entity.id)).toBeDefined();
@@ -602,13 +604,13 @@ describe('deleteEntity', () => {
       .build();
 
     const entity1 = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
     const entity2 = createEntity(world, {
-      stats: { health: 80, level: 2, mana: 40 }
+      te_stats: { health: 80, level: 2, mana: 40 }
     });
     const entity3 = createEntity(world, {
-      stats: { health: 120, level: 3, mana: 60 }
+      te_stats: { health: 120, level: 3, mana: 60 }
     });
 
     flush(world);
@@ -627,8 +629,8 @@ describe('deleteEntity', () => {
     expect(getEntity(world, entity3.id)).toBeDefined();
 
     // Verify other entities still work
-    expect(entity1.stats.health).toBe(100);
-    expect(entity3.stats.health).toBe(120);
+    expect(entity1.te_stats.health).toBe(100);
+    expect(entity3.te_stats.health).toBe(120);
   });
 
   test('deleteEntity should return null', async () => {
@@ -647,7 +649,7 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      inventory: { capacity: 10, items: '["sword", "potion"]' }
+      te_inventory: { capacity: 10, items: '["sword", "potion"]' }
     });
 
     // Don't flush - entity exists in cache but not in database yet
@@ -669,13 +671,13 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      stats: { health: 100, level: 1, mana: 50 }
+      te_stats: { health: 100, level: 1, mana: 50 }
     });
     flush(world);
 
     // Modify component
-    entity.stats.health = 90;
-    entity.stats.level = 2;
+    entity.te_stats.health = 90;
+    entity.te_stats.level = 2;
 
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
 
@@ -696,16 +698,16 @@ describe('deleteEntity', () => {
       .build();
 
     const entity = createEntity(world, {
-      inventory: { capacity: 20, items: '["crown", "scepter", "gold"]' },
-      location: { name: 'Castle', region: 'Kingdom' },
-      stats: { health: 150, level: 5, mana: 75 }
+      te_inventory: { capacity: 20, items: '["crown", "scepter", "gold"]' },
+      te_location: { name: 'Castle', region: 'Kingdom' },
+      te_stats: { health: 150, level: 5, mana: 75 }
     });
     flush(world);
 
     // Verify all components exist
-    expect(entity.location.name).toBe('Castle');
-    expect(entity.stats.health).toBe(150);
-    expect(entity.inventory.capacity).toBe(20);
+    expect(entity.te_location.name).toBe('Castle');
+    expect(entity.te_stats.health).toBe(150);
+    expect(entity.te_inventory.capacity).toBe(20);
 
     // Delete entity
     deleteEntity(entity);
@@ -717,11 +719,13 @@ describe('deleteEntity', () => {
 
     // Verify database cascade delete worked
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_location WHERE eid = ?'
+      'SELECT * FROM tbl_te_location WHERE eid = ?'
     );
-    const statsStmt = world.db.prepare('SELECT * FROM tbl_stats WHERE eid = ?');
+    const statsStmt = world.db.prepare(
+      'SELECT * FROM tbl_te_stats WHERE eid = ?'
+    );
     const inventoryStmt = world.db.prepare(
-      'SELECT * FROM tbl_inventory WHERE eid = ?'
+      'SELECT * FROM tbl_te_inventory WHERE eid = ?'
     );
 
     expect(locationStmt.get(entity.id)).toBeNull();
@@ -741,7 +745,7 @@ describe('deleteEntity', () => {
 
     // Check that foreign key constraints exist for location table
     const locationForeignKeys = world.db
-      .prepare('PRAGMA foreign_key_list(tbl_location)')
+      .prepare('PRAGMA foreign_key_list(tbl_te_location)')
       .all();
     expect(locationForeignKeys).toHaveLength(1);
 
@@ -754,7 +758,7 @@ describe('deleteEntity', () => {
 
     // Check that foreign key constraints exist for stats table
     const statsForeignKeys = world.db
-      .prepare('PRAGMA foreign_key_list(tbl_stats)')
+      .prepare('PRAGMA foreign_key_list(tbl_te_stats)')
       .all();
     expect(statsForeignKeys).toHaveLength(1);
     // expect(statsForeignKeys[0]).toMatchObject({

@@ -8,6 +8,7 @@ export type SaveToJSONOptions = {
 
 // Unified database interface
 export type Database = {
+  addEntity: () => number;
   close: () => void;
   exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
   loadFromJSON: (json: unknown, options?: LoadFromJSONOptions) => void;
@@ -46,6 +47,7 @@ export type Statement = {
 
 // Database type enum
 export const DatabaseType = {
+  ALASQL: 'alasql',
   BUN: 'bun',
   WASM: 'wasm'
 } as const;
@@ -66,6 +68,11 @@ export const createDatabase = async (
   const { enableTracing = false, path = ':memory:', type } = options;
 
   switch (type) {
+    case DatabaseType.ALASQL: {
+      const { createAlasqlDatabaseInstance } = await import('./alasql');
+      return createAlasqlDatabaseInstance(path);
+    }
+
     case DatabaseType.BUN: {
       const { createBunDatabaseInstance } = await import('./bun-sqlite');
       return createBunDatabaseInstance(path);
@@ -82,6 +89,16 @@ export const createDatabase = async (
 };
 
 // Convenience functions for common use cases
+export const createAlasqlDatabase = async (
+  path?: string,
+  enableTracing?: boolean
+): Promise<Database> =>
+  createDatabase({
+    enableTracing,
+    path,
+    type: DatabaseType.ALASQL
+  });
+
 export const createBunDatabase = async (
   path?: string,
   enableTracing?: boolean

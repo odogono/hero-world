@@ -144,13 +144,14 @@ export const createGameLoop = <TComponents extends Components>(
         const executionTime = Date.now() - startTime;
         const perf = performance.get(system.id)!;
 
+        // console.log('perf', system.id, perf);
         perf.lastExecutionTime = executionTime;
         perf.totalExecutionTime += executionTime;
         perf.executionCount++;
         perf.averageExecutionTime =
           perf.totalExecutionTime / perf.executionCount;
-      } catch (error) {
-        log.error(`System '${system.id}' threw an error:`, error);
+      } catch {
+        // log.error(`System '${system.id}' threw an error:`, error);
         // Continue executing other systems even if one fails
       }
     }
@@ -325,8 +326,8 @@ export const createEventAwareGameLoop = <TComponents extends Components>(
         perf.executionCount++;
         perf.averageExecutionTime =
           perf.totalExecutionTime / perf.executionCount;
-      } catch (error) {
-        log.error(`System '${system.id}' threw an error:`, error);
+      } catch {
+        // log.error(`System '${system.id}' threw an error:`, error);
       }
     }
   };

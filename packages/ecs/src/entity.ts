@@ -27,7 +27,7 @@ export const createEntity: CreateEntityOverloads = <
   world: World<TComponents>,
   initialComponents?: C
 ): EntityWithComponents<TComponents, keyof C & keyof TComponents> => {
-  const eid = world.stmts.insertEntity!.run().lastInsertRowId;
+  const eid = world.db.addEntity();
 
   const entity: any = { id: eid, world };
   world.entityCache.set(eid, {});
