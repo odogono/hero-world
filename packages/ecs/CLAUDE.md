@@ -135,7 +135,7 @@ const statsComponent = defineComponent({
 });
 
 // Register component with world using builder pattern
-const world = createWorld().registerComponent(statsComponent).build();
+const world = (await createWorld()).registerComponent(statsComponent).build();
 ```
 
 ### Testing Structure

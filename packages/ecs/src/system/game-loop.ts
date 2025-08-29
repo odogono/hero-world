@@ -1,5 +1,6 @@
-import type { EventSystem } from '@events';
 import { createLog } from 'odgn-helpers';
+
+import type { EventSystem } from '@events';
 import type { Components, World } from '@types';
 
 import type {
@@ -181,33 +182,6 @@ export const createGameLoop = <TComponents extends Components>(
 
   return gameLoop;
 };
-
-/**
- * Helper function to create a system that queries entities
- */
-export const createSystem = <TComponents extends Components>(
-  queryFn: (world: World<TComponents>, deltaTime: number, events: any[]) => void
-): SystemFunction<TComponents> => queryFn;
-
-/**
- * Helper function to create a system that processes specific entities
- */
-export const createEntitySystem =
-  <TComponents extends Components, TEntity = any>(
-    queryOptions: any, // QueryOptions from entity.ts
-    processFn: (
-      entities: TEntity[],
-      world: World<TComponents>,
-      deltaTime: number,
-      events: any[]
-    ) => void
-  ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events) => {
-    // This will need to be implemented once we integrate with the query system
-    // For now, it's a placeholder that shows the intended interface
-    const entities: TEntity[] = []; // TODO: query entities using queryOptions
-    processFn(entities, world, deltaTime, events);
-  };
 
 /**
  * Utility function to log system performance

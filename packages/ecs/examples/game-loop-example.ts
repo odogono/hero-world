@@ -3,13 +3,14 @@ import z from 'zod';
 
 import { defineComponent } from '@component';
 import { createEntity } from '@entity';
-import {
-  createEntitySystem,
-  createIteratorSystem,
-  createWorldSystem
-} from '@system';
+import { createSystem, createWorldSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
 import { createWorld } from '@world';
+
+const createTestWorld = async () => {
+  const world = await createWorld();
+  return world;
+};
 
 // Define game components
 const positionComponent = defineComponent({
@@ -48,7 +49,7 @@ const playerComponent = defineComponent({
 });
 
 // Create world and register components
-const world = createWorld()
+const world = (await createTestWorld())
   .registerComponent(positionComponent)
   .registerComponent(velocityComponent)
   .registerComponent(healthComponent)
@@ -78,22 +79,19 @@ const enemy2 = createEntity(world, {
 // Create game systems
 
 // Movement system - updates position based on velocity
-const movementSystem = createEntitySystem(
-  { with: ['position', 'velocity'] },
-  (entities, world, deltaTime) => {
-    entities.forEach(entity => {
-      const deltaSeconds = deltaTime / 1000;
-      entity.position.x += entity.velocity.x * deltaSeconds;
-      entity.position.y += entity.velocity.y * deltaSeconds;
-      entity.position.z += entity.velocity.z * deltaSeconds;
-    });
-    console.log(`Movement system processed ${entities.length} entities`);
-  }
+const movementSystem = createSystem(
+  (entity, world, deltaTime) => {
+    const deltaSeconds = deltaTime / 1000;
+    entity.position.x += entity.velocity.x * deltaSeconds;
+    entity.position.y += entity.velocity.y * deltaSeconds;
+    entity.position.z += entity.velocity.z * deltaSeconds;
+
+    // console.log(`Movement system processed ${entities.length} entities`);
+  },
+  { with: ['position', 'velocity'] }
 );
 
-// Health regeneration system - regenerates health over time
-const healthSystem = createIteratorSystem(
-  { with: ['health'] },
+const healthSystem = createSystem(
   (entity, world, deltaTime) => {
     if (
       entity.health.regenerationRate > 0 &&
@@ -106,52 +104,47 @@ const healthSystem = createIteratorSystem(
         entity.health.current + regenAmount
       );
     }
-  }
+  },
+  { with: ['health'] }
 );
 
 // Input system - simple example that moves player
 const inputState = { down: false, left: false, right: false, up: false };
-const inputSystem = createEntitySystem(
-  { with: ['player', 'velocity'] },
-  (entities, world, deltaTime) => {
-    entities.forEach(player => {
-      const speed = 100; // pixels per second
+const inputSystem = createSystem(
+  (player, world, deltaTime) => {
+    const speed = 100; // pixels per second
 
-      player.velocity.x = 0;
-      player.velocity.y = 0;
+    player.velocity.x = 0;
+    player.velocity.y = 0;
 
-      if (inputState.left) {
-        player.velocity.x -= speed;
-      }
-      if (inputState.right) {
-        player.velocity.x += speed;
-      }
-      if (inputState.up) {
-        player.velocity.y -= speed;
-      }
-      if (inputState.down) {
-        player.velocity.y += speed;
-      }
-    });
-  }
+    if (inputState.left) {
+      player.velocity.x -= speed;
+    }
+    if (inputState.right) {
+      player.velocity.x += speed;
+    }
+    if (inputState.up) {
+      player.velocity.y -= speed;
+    }
+    if (inputState.down) {
+      player.velocity.y += speed;
+    }
+  },
+  { with: ['player', 'velocity'] }
 );
 
 // Cleanup system - removes entities that are too far from origin
-const cleanupSystem = createEntitySystem(
-  { with: ['position'] },
-  (entities, world, deltaTime) => {
-    entities.forEach(entity => {
-      const distance = Math.sqrt(
-        entity.position.x ** 2 + entity.position.y ** 2
+const cleanupSystem = createSystem(
+  (entity, world, deltaTime) => {
+    const distance = Math.sqrt(entity.position.x ** 2 + entity.position.y ** 2);
+    if (distance > 1000) {
+      console.log(
+        `Entity ${entity.id} is too far away (${distance}), should be cleaned up`
       );
-      if (distance > 1000) {
-        console.log(
-          `Entity ${entity.id} is too far away (${distance}), should be cleaned up`
-        );
-        // In a real game, you'd call deleteEntity(entity) here
-      }
-    });
-  }
+      // In a real game, you'd call deleteEntity(entity) here
+    }
+  },
+  { with: ['position'] }
 );
 
 // Debug system - logs game state periodically

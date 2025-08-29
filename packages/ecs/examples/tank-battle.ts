@@ -4,7 +4,7 @@ import z from 'zod';
 import { defineComponent } from '@component';
 import { createEntity, queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
-import { createEntitySystem, createGameLoop, createWorldSystem } from '@system';
+import { createGameLoop, createSystem, createWorldSystem } from '@system';
 import { createWorld } from '@world';
 
 // ============================================================================
@@ -97,7 +97,7 @@ type TankGameEvents = {
 // World Setup
 // ============================================================================
 
-const world = createWorld()
+const world = (await createWorld())
   .registerComponent(positionComponent)
   .registerComponent(velocityComponent)
   .registerComponent(tankComponent)
@@ -232,61 +232,59 @@ const handleWorldStateQuery = (requestId: string) => {
 // ============================================================================
 
 // Movement System - handles tank movement based on move orders
-const movementSystem = createEntitySystem(
-  { with: ['position', 'velocity', 'tank'] },
-  (entities, world, deltaTime, events) => {
+const movementSystem = createSystem(
+  (tank, world, deltaTime, events) => {
     const deltaSeconds = deltaTime / 1000;
 
-    entities.forEach(tank => {
-      // Check if this tank has a move order
-      const cache = world.entityCache.get(tank.id);
-      const moveOrder = cache?.move_order?.data;
+    // Check if this tank has a move order
+    const cache = world.entityCache.get(tank.id);
+    const moveOrder = cache?.move_order?.data;
 
-      if (!moveOrder || moveOrder.completed) {
-        // No active move order, stop the tank
-        tank.velocity.x = 0;
-        tank.velocity.y = 0;
-        return;
-      }
+    if (!moveOrder || moveOrder.completed) {
+      // No active move order, stop the tank
+      tank.velocity.x = 0;
+      tank.velocity.y = 0;
+      return;
+    }
 
-      // Calculate vector to target
-      const dx = moveOrder.xCoord - tank.position.x;
-      const dy = moveOrder.yCoord - tank.position.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+    // Calculate vector to target
+    const dx = moveOrder.xCoord - tank.position.x;
+    const dy = moveOrder.yCoord - tank.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // If close enough to target, complete the order
-      if (distance < 2) {
-        tank.position.x = moveOrder.xCoord;
-        tank.position.y = moveOrder.yCoord;
-        tank.velocity.x = 0;
-        tank.velocity.y = 0;
-        moveOrder.completed = true;
+    // If close enough to target, complete the order
+    if (distance < 2) {
+      tank.position.x = moveOrder.xCoord;
+      tank.position.y = moveOrder.yCoord;
+      tank.velocity.x = 0;
+      tank.velocity.y = 0;
+      moveOrder.completed = true;
 
-        // Emit completion event
-        eventSystem.scheduleEvent('notification', 'tank:movement_completed', {
-          tankId: tank.tank.id,
-          x: tank.position.x,
-          y: tank.position.y
-        });
+      // Emit completion event
+      eventSystem.scheduleEvent('notification', 'tank:movement_completed', {
+        tankId: tank.tank.id,
+        x: tank.position.x,
+        y: tank.position.y
+      });
 
-        console.log(
-          `Tank ${tank.tank.id} reached target (${tank.position.x.toFixed(1)}, ${tank.position.y.toFixed(1)})`
-        );
-        return;
-      }
+      console.log(
+        `Tank ${tank.tank.id} reached target (${tank.position.x.toFixed(1)}, ${tank.position.y.toFixed(1)})`
+      );
+      return;
+    }
 
-      // Calculate velocity vector
-      const normalizedDx = dx / distance;
-      const normalizedDy = dy / distance;
+    // Calculate velocity vector
+    const normalizedDx = dx / distance;
+    const normalizedDy = dy / distance;
 
-      tank.velocity.x = normalizedDx * tank.tank.speed;
-      tank.velocity.y = normalizedDy * tank.tank.speed;
+    tank.velocity.x = normalizedDx * tank.tank.speed;
+    tank.velocity.y = normalizedDy * tank.tank.speed;
 
-      // Update position
-      tank.position.x += tank.velocity.x * deltaSeconds;
-      tank.position.y += tank.velocity.y * deltaSeconds;
-    });
-  }
+    // Update position
+    tank.position.x += tank.velocity.x * deltaSeconds;
+    tank.position.y += tank.velocity.y * deltaSeconds;
+  },
+  { with: ['position', 'velocity', 'tank'] }
 );
 
 // Command System - processes incoming commands

@@ -6,7 +6,8 @@ import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntitiesIterator } from '@entity';
 import { eventComponent } from '@events';
-import { createEntitySystem, createSystem, createWorldSystem } from '@system';
+import { createSystem, createWorldSystem } from '@system';
+import type { Components, EntityWithComponents, World } from '@types';
 import { createWorld, flush } from '@world';
 
 const createTestWorld = async () =>
@@ -27,6 +28,8 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Create some entities
     const entity1 = createEntity(world, { health: { current: 100, max: 100 } });
     const entity2 = createEntity(world, { health: { current: 75, max: 100 } });
@@ -39,9 +42,11 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that tracks processed entities
-    const system = createSystem(world, entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
+        processedEntities.push(entity.id);
+      }
+    );
 
     // Run the system
     system(world, 16, []);
@@ -59,6 +64,10 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .registerComponent(locationComponent)
       .build();
+    type TestComponents = Components & {
+      health: Record<string, unknown>;
+      system_location: Record<string, unknown>;
+    };
 
     // Create entities with different component combinations
     const healthEntity = createEntity(world, {
@@ -79,16 +88,15 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with health component
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       { with: ['health'] }
     );
 
     // Run the system
-    system();
+    system(world, 16, []);
 
     // Verify only entities with health component were processed
     expect(processedEntities).toHaveLength(2);
@@ -102,6 +110,8 @@ describe('Systems', () => {
     const world = (await createTestWorld())
       .registerComponent(healthComponent)
       .build();
+
+    type TestComponents = Components & { health: Record<string, unknown> };
 
     // Create entities with different health values
     const healthyEntity = createEntity(world, {
@@ -121,9 +131,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with low health
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       {
@@ -148,6 +157,8 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Create multiple entities
     const entities = [];
     for (let i = 0; i < 5; i++) {
@@ -163,9 +174,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes only first 3 entities
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       {
@@ -187,6 +197,8 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Create multiple entities
     const entities = [];
     for (let i = 0; i < 5; i++) {
@@ -202,9 +214,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that skips first 2 entities
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       {
@@ -229,6 +240,11 @@ describe('Systems', () => {
       .registerComponent(locationComponent)
       .build();
 
+    type TestComponents = Components & {
+      health: Record<string, unknown>;
+      system_location: Record<string, unknown>;
+    };
+
     // Create entities with different component combinations
     const healthEntity = createEntity(world, {
       health: { current: 100, max: 100 }
@@ -248,9 +264,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes entities with location but without health component
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       {
@@ -275,6 +290,8 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Create an entity
     const entity = createEntity(world, { health: { current: 100, max: 100 } });
 
@@ -282,9 +299,8 @@ describe('Systems', () => {
     flush(world);
 
     // Create a system that heals entities
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         if (entity.health && entity.health.current < entity.health.max) {
           entity.health.current = Math.min(
             entity.health.current + 25,
@@ -318,18 +334,22 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Don't create any entities
 
     // Track processed entities
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem(world, entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
+        processedEntities.push(entity.id);
+      }
+    );
 
     // Run the system
-    system();
+    system(world, 16, []);
 
     // Verify no entities were processed
     expect(processedEntities).toHaveLength(0);
@@ -341,6 +361,8 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .build();
 
+    type TestComponents = Components & { health: Record<string, unknown> };
+
     // Create an entity
     const entity = createEntity(world, { health: { current: 100, max: 100 } });
 
@@ -351,9 +373,11 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem(world, entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
+        processedEntities.push(entity.id);
+      }
+    );
 
     // Run the system multiple times
     system(world, 16, []);
@@ -371,6 +395,11 @@ describe('Systems', () => {
       .registerComponent(healthComponent)
       .registerComponent(locationComponent)
       .build();
+
+    type TestComponents = Components & {
+      health: Record<string, unknown>;
+      system_location: Record<string, unknown>;
+    };
 
     // Create entities with different combinations
     const entity1 = createEntity(world, {
@@ -393,9 +422,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system with complex query options
-    const system = createSystem(
-      world,
-      entity => {
+    const system = createSystem<TestComponents>(
+      (entity: EntityWithComponents<TestComponents, any>) => {
         processedEntities.push(entity.id);
       },
       {
@@ -419,21 +447,33 @@ describe('Systems', () => {
       .registerComponent(eventComponent)
       .build();
 
+    type TestComponents = Components & {
+      event: Record<string, unknown>;
+      health: Record<string, unknown>;
+    };
+
     // Create entities
     createEntity(world, { health: { current: 100, max: 100 } });
     createEntity(world, { health: { current: 75, max: 100 } });
     flush(world);
 
-    let processedEntities: any[] = [];
+    world.db.saveToPath('world.db');
+
+    const processedEntities: any[] = [];
     let receivedEvents: any[] = [];
 
     // Create system that processes entities and events
-    const system = createEntitySystem(
-      { with: ['health'] },
-      (entities, _world, _deltaTime, events) => {
-        processedEntities = [...entities];
-        receivedEvents = [...events];
-      }
+    const system = createSystem<TestComponents>(
+      (
+        e: EntityWithComponents<TestComponents, any>,
+        _world: World<TestComponents>,
+        _deltaTime: number,
+        events: any[]
+      ) => {
+        processedEntities.push(e);
+        receivedEvents = events;
+      },
+      { with: ['health'] }
     );
 
     // Run system with events

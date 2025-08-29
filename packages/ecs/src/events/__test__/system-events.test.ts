@@ -5,9 +5,9 @@ import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity } from '@entity';
 import {
-  createEntitySystem,
   createEventDrivenSystem,
   createGameLoop,
+  createSystem,
   createWorldSystem,
   ignoreEvents
 } from '@system';
@@ -162,15 +162,15 @@ describe('System Events Integration', () => {
     createEntity(world, { test: { value: 20 } });
     flush(world);
 
-    let processedEntities: any[] = [];
+    const processedEntities: any[] = [];
     let receivedEvents: any[] = [];
 
-    const entitySystem = createEntitySystem(
-      { with: ['test'] },
-      (entities, _world, _deltaTime, events) => {
-        processedEntities = [...entities];
-        receivedEvents = [...events];
-      }
+    const entitySystem = createSystem(
+      (entity, _world, _deltaTime, events) => {
+        processedEntities.push(entity);
+        receivedEvents = events;
+      },
+      { with: ['test'] }
     );
 
     gameLoop.addSystem('entity-system', entitySystem);
