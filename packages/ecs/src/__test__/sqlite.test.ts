@@ -6,6 +6,7 @@ import {
   expect,
   it
 } from 'bun:test';
+import { toSnakeCase } from 'odgn-helpers';
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
@@ -567,5 +568,46 @@ describe('sqlite.wasm', () => {
 
       expect(result).toEqual([1, 'entity_1']);
     });
+
+    it('should handle prepared statements with parameters', () => {
+      db.exec(`
+        CREATE TABLE component (
+          id INTEGER PRIMARY KEY,
+          full_name TEXT,
+          data_type TEXT,
+          data TEXT
+        )
+      `);
+
+      const stmt = db.prepare(
+        'INSERT INTO component (full_name, data_type, data) VALUES (:full_name, :data_type, :data)'
+      );
+      stmt.bind(
+        convertKeysToNamedParams({
+          data: 'data_1',
+          dataType: 'type_1',
+          fullName: 'component_1'
+        })
+      );
+
+      // Execute
+      stmt.reset();
+      stmt.step();
+
+      const result = db.selectObjects('SELECT * FROM component');
+      console.log('Inserted row with id:', getLastInsertRowId(sqlite3, db));
+      console.log(result);
+    });
   });
 });
+
+const convertKeysToNamedParams = (
+  obj: Record<string, unknown>
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const namedParam = `:${toSnakeCase(key) || key}`;
+    result[namedParam] = value;
+  }
+  return result;
+};

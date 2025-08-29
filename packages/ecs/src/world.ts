@@ -205,13 +205,12 @@ export const flush = <T extends Components>(world: World<T>) => {
         } else {
           // insert
           const insertData = convertKeysToSnakeCase({ ...entry.data, eid });
-          // log.debug('[flush] insert', insertData, def.url);
           def!.stmtInsert.run(insertData);
           entry.exists = true;
         }
       }
     }
-  })();
+  });
 
   dirtyEntities.clear();
 

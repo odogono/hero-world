@@ -3,6 +3,7 @@ import { createLog } from 'odgn-helpers';
 import z from 'zod';
 
 import { defineComponent } from '../component';
+import { DatabaseType } from '../db';
 import { createEntity, deleteEntity, getEntity } from '../entity';
 import { createWorld, flush } from '../world';
 
@@ -20,7 +21,7 @@ const statsComponent = defineComponent({
     mana: z.number()
   },
   statements: {
-    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?1'
+    statsByLevel: 'SELECT * FROM tbl_stats WHERE level = ?'
   }
 });
 
@@ -31,7 +32,7 @@ const inventoryComponent = defineComponent({
     items: z.string() // JSON string for simplicity
   },
   statements: {
-    inventoryByCapacity: 'SELECT * FROM tbl_inventory WHERE capacity = ?1'
+    inventoryByCapacity: 'SELECT * FROM tbl_inventory WHERE capacity = ?'
   }
 });
 
@@ -42,14 +43,17 @@ const locationComponent = defineComponent({
     region: z.string()
   },
   statements: {
-    locationSelectByName: 'SELECT eid as id FROM tbl_location WHERE name = ?1'
+    locationSelectByName: 'SELECT eid as id FROM tbl_location WHERE name = ?'
   },
   tableName: 'tbl_location'
 });
 
+const createTestWorld = async () =>
+  await createWorld({ dbType: DatabaseType.WASM });
+
 describe('createEntity', () => {
-  test('createEntity should create entity without components', () => {
-    const world = createWorld();
+  test('createEntity should create entity without components', async () => {
+    const world = (await createTestWorld()).build();
 
     const entity = createEntity(world);
 
@@ -57,10 +61,12 @@ describe('createEntity', () => {
     expect(entity.id).toBeTypeOf('number');
     expect(entity.id).toBeGreaterThan(0);
     expect(entity.world).toBe(world);
+
+    await world.db.saveToPath('world.db');
   });
 
-  test('createEntity should create multiple entities with unique IDs', () => {
-    const world = createWorld();
+  test('createEntity should create multiple entities with unique IDs', async () => {
+    const world = (await createTestWorld()).build();
 
     const entity1 = createEntity(world);
     const entity2 = createEntity(world);
@@ -74,8 +80,10 @@ describe('createEntity', () => {
     expect(entity2.id).toBeLessThan(entity3.id);
   });
 
-  test('createEntity should create entity with location component', () => {
-    const world = createWorld().registerComponent(locationComponent).build();
+  test('createEntity should create entity with location component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(locationComponent)
+      .build();
 
     const entity = createEntity(world, {
       location: { name: 'Forest', region: 'North' }
@@ -88,8 +96,10 @@ describe('createEntity', () => {
     expect(entity.location.region).toBe('North');
   });
 
-  test('createEntity should create entity with stats component', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('createEntity should create entity with stats component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 5, mana: 50 }
@@ -102,8 +112,10 @@ describe('createEntity', () => {
     expect(entity.stats.level).toBe(5);
   });
 
-  test('createEntity should create entity with inventory component', () => {
-    const world = createWorld().registerComponent(inventoryComponent).build();
+  test('createEntity should create entity with inventory component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(inventoryComponent)
+      .build();
 
     const items = JSON.stringify(['sword', 'potion', 'key']);
     const entity = createEntity(world, {
@@ -116,8 +128,8 @@ describe('createEntity', () => {
     expect(entity.inventory.items).toBe(items);
   });
 
-  test('createEntity should create entity with multiple components', () => {
-    const world = createWorld()
+  test('createEntity should create entity with multiple components', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .build();
@@ -137,8 +149,10 @@ describe('createEntity', () => {
     expect(entity.stats.level).toBe(3);
   });
 
-  test('createEntity should track component changes', () => {
-    const world = createWorld().registerComponent(locationComponent).build();
+  test('createEntity should track component changes', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(locationComponent)
+      .build();
 
     const entity = createEntity(world, {
       location: { name: 'Forest', region: 'North' }
@@ -160,8 +174,8 @@ describe('createEntity', () => {
     expect(entity.location.name).toBe('Mountain');
   });
 
-  test('createEntity should track changes across multiple components', () => {
-    const world = createWorld()
+  test('createEntity should track changes across multiple components', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .build();
@@ -188,8 +202,10 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.get(entity.id)?.size).toBe(2);
   });
 
-  test('createEntity should cache components in entityCache', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('createEntity should cache components in entityCache', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 75, level: 4, mana: 25 }
@@ -207,8 +223,10 @@ describe('createEntity', () => {
     expect(cached!.stats!.exists).toBe(false); // New component, not yet persisted
   });
 
-  test('createEntity should persist components after flush', () => {
-    const world = createWorld().registerComponent(inventoryComponent).build();
+  test('createEntity should persist components after flush', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(inventoryComponent)
+      .build();
 
     const entity = createEntity(world, {
       inventory: { capacity: 5, items: '["apple", "bread"]' }
@@ -227,8 +245,10 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
 
-  test('createEntity should work with component modifications through proxy', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('createEntity should work with component modifications through proxy', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 10, mana: 100 }
@@ -250,7 +270,7 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(true);
   });
 
-  test('createEntity should handle different component data types', () => {
+  test('createEntity should handle different component data types', async () => {
     // Test with string component
     // const nameSchema = componentSchema.extend({
     //   firstName: string(),
@@ -267,7 +287,9 @@ describe('createEntity', () => {
       }
     });
 
-    const world = createWorld().registerComponent(nameComponent).build();
+    const world = (await createTestWorld())
+      .registerComponent(nameComponent)
+      .build();
 
     const entity = createEntity(world, {
       test_name: { firstName: 'John', lastName: 'Doe', title: 'Sir' }
@@ -285,15 +307,17 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
   });
 
-  test('should create world with builder pattern and single component', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('should create world with builder pattern and single component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     expect(world).toBeDefined();
     expect(world.defs.has('stats')).toBe(true);
   });
 
-  test('should create world with multiple components using builder pattern', () => {
-    const world = createWorld()
+  test('should create world with multiple components using builder pattern', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .registerComponent(inventoryComponent)
@@ -304,8 +328,10 @@ describe('createEntity', () => {
     expect(world.defs.has('inventory')).toBe(true);
   });
 
-  test('should create typed entity with single component', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('should create typed entity with single component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -319,8 +345,8 @@ describe('createEntity', () => {
     expect(entity.stats.level).toBe(1);
   });
 
-  test('should create typed entity with multiple components', () => {
-    const world = createWorld()
+  test('should create typed entity with multiple components', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .build();
@@ -337,18 +363,22 @@ describe('createEntity', () => {
     expect(entity.stats.level).toBe(3);
   });
 
-  test('should create typed entity without initial components', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('should create typed entity without initial components', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world);
 
     expect(entity).toBeDefined();
     expect(entity.id).toBeTypeOf('number');
-    expect(entity.world).toBe(world as any);
+    expect(entity.world).toBe(world);
   });
 
-  test('should track component changes in typed entities', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('should track component changes in typed entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -368,8 +398,10 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.get(entity.id)?.has('stats')).toBe(true);
   });
 
-  test('should persist typed entity components after flush', () => {
-    const world = createWorld().registerComponent(inventoryComponent).build();
+  test('should persist typed entity components after flush', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(inventoryComponent)
+      .build();
 
     const entity = createEntity(world, {
       inventory: { capacity: 10, items: '["sword", "shield"]' }
@@ -387,10 +419,12 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
 
-  test('should work with custom component statements', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test.only('should work with custom component statements', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
-    const entity = createEntity(world, {
+    createEntity(world, {
       stats: { health: 75, level: 5, mana: 25 }
     });
 
@@ -402,13 +436,14 @@ describe('createEntity', () => {
     expect(def!.statsByLevel).toBeDefined();
 
     // Execute custom statement
-    const results = def!.statsByLevel!.all(5);
+    const results = def!.statsByLevel!.all([5]);
+
     expect(results).toBeDefined();
     expect(Array.isArray(results)).toBe(true);
   });
 
-  test('should handle complex multi-component scenarios', () => {
-    const world = createWorld()
+  test('should handle complex multi-component scenarios', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .registerComponent(inventoryComponent)
@@ -448,23 +483,27 @@ describe('createEntity', () => {
 });
 
 describe('deleteEntity', () => {
-  test('deleteEntity should remove entity from database', () => {
-    const world = createWorld();
+  test('deleteEntity should remove entity from database', async () => {
+    const world = (await createTestWorld()).build();
 
     const entity = createEntity(world);
 
     // Verify entity exists
-    expect(getEntity(world, entity.id)).toBeDefined();
+    const e = getEntity(world, entity.id);
+    expect(e!.id).toEqual(entity.id);
 
     // Delete entity
     deleteEntity(entity);
 
     // Verify entity is removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    const e2 = getEntity(world, entity.id);
+    expect(e2).toBeNull();
   });
 
-  test('deleteEntity should remove entity with components', () => {
-    const world = createWorld().registerComponent(locationComponent).build();
+  test('deleteEntity should remove entity with components', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(locationComponent)
+      .build();
 
     const entity = createEntity(world, {
       location: { name: 'Forest', region: 'North' }
@@ -482,8 +521,10 @@ describe('deleteEntity', () => {
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
-  test('deleteEntity should clean up entity cache', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('deleteEntity should clean up entity cache', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -499,8 +540,10 @@ describe('deleteEntity', () => {
     expect(world.entityCache.has(entity.id)).toBe(false);
   });
 
-  test('deleteEntity should clean up dirty entities tracking', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('deleteEntity should clean up dirty entities tracking', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -516,8 +559,8 @@ describe('deleteEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
 
-  test('deleteEntity should cascade delete components from database', () => {
-    const world = createWorld()
+  test('deleteEntity should cascade delete components from database', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .build();
@@ -529,10 +572,10 @@ describe('deleteEntity', () => {
     flush(world);
 
     // Verify components exist in database
-    const locationStmt = world.db.query(
+    const locationStmt = world.db.prepare(
       'SELECT * FROM tbl_location WHERE eid = ?'
     );
-    const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
+    const statsStmt = world.db.prepare('SELECT * FROM tbl_stats WHERE eid = ?');
 
     expect(locationStmt.get(entity.id)).toBeDefined();
     expect(statsStmt.get(entity.id)).toBeDefined();
@@ -548,8 +591,10 @@ describe('deleteEntity', () => {
     expect(statsStmt.get(entity.id)).toBeNull();
   });
 
-  test('deleteEntity should handle multiple entities independently', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('deleteEntity should handle multiple entities independently', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity1 = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -581,8 +626,8 @@ describe('deleteEntity', () => {
     expect(entity3.stats.health).toBe(120);
   });
 
-  test('deleteEntity should return null', () => {
-    const world = createWorld();
+  test('deleteEntity should return null', async () => {
+    const world = (await createTestWorld()).build();
 
     const entity = createEntity(world);
 
@@ -591,8 +636,10 @@ describe('deleteEntity', () => {
     expect(result).toBeNull();
   });
 
-  test('deleteEntity should work with unflushed entities', () => {
-    const world = createWorld().registerComponent(inventoryComponent).build();
+  test('deleteEntity should work with unflushed entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(inventoryComponent)
+      .build();
 
     const entity = createEntity(world, {
       inventory: { capacity: 10, items: '["sword", "potion"]' }
@@ -611,8 +658,10 @@ describe('deleteEntity', () => {
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
-  test('deleteEntity should work after component modifications', () => {
-    const world = createWorld().registerComponent(statsComponent).build();
+  test('deleteEntity should work after component modifications', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statsComponent)
+      .build();
 
     const entity = createEntity(world, {
       stats: { health: 100, level: 1, mana: 50 }
@@ -634,8 +683,8 @@ describe('deleteEntity', () => {
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
-  test('deleteEntity should handle entity with all component types and cascade delete', () => {
-    const world = createWorld()
+  test('deleteEntity should handle entity with all component types and cascade delete', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .registerComponent(inventoryComponent)
@@ -662,11 +711,11 @@ describe('deleteEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Verify database cascade delete worked
-    const locationStmt = world.db.query(
+    const locationStmt = world.db.prepare(
       'SELECT * FROM tbl_location WHERE eid = ?'
     );
-    const statsStmt = world.db.query('SELECT * FROM tbl_stats WHERE eid = ?');
-    const inventoryStmt = world.db.query(
+    const statsStmt = world.db.prepare('SELECT * FROM tbl_stats WHERE eid = ?');
+    const inventoryStmt = world.db.prepare(
       'SELECT * FROM tbl_inventory WHERE eid = ?'
     );
 
@@ -675,19 +724,19 @@ describe('deleteEntity', () => {
     expect(inventoryStmt.get(entity.id)).toBeNull();
   });
 
-  test('foreign key constraints are properly created for component tables', () => {
-    const world = createWorld()
+  test('foreign key constraints are properly created for component tables', async () => {
+    const world = (await createTestWorld())
       .registerComponent(locationComponent)
       .registerComponent(statsComponent)
       .build();
 
     // Check that foreign keys are enabled
-    const foreignKeysEnabled = world.db.query('PRAGMA foreign_keys').get();
+    const foreignKeysEnabled = world.db.prepare('PRAGMA foreign_keys').get();
     expect(foreignKeysEnabled).toEqual({ foreign_keys: 1 });
 
     // Check that foreign key constraints exist for location table
     const locationForeignKeys = world.db
-      .query('PRAGMA foreign_key_list(tbl_location)')
+      .prepare('PRAGMA foreign_key_list(tbl_location)')
       .all();
     expect(locationForeignKeys).toHaveLength(1);
     expect(locationForeignKeys[0]).toMatchObject({
@@ -699,7 +748,7 @@ describe('deleteEntity', () => {
 
     // Check that foreign key constraints exist for stats table
     const statsForeignKeys = world.db
-      .query('PRAGMA foreign_key_list(tbl_stats)')
+      .prepare('PRAGMA foreign_key_list(tbl_stats)')
       .all();
     expect(statsForeignKeys).toHaveLength(1);
     expect(statsForeignKeys[0]).toMatchObject({

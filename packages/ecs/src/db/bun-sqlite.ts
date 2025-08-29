@@ -6,35 +6,13 @@ import type {
   SQLQueryBindings
 } from 'bun:sqlite';
 
+import { parseArgs } from './helpers';
 import type {
   Database,
   Statement,
   StatementArgs,
   StatementRunResult
 } from './index';
-
-const isArray = (args: unknown): args is unknown[] => Array.isArray(args);
-const isObject = (args: unknown): args is Record<string, unknown> =>
-  typeof args === 'object' && args !== null;
-
-const parseArgs = (
-  args: unknown[] | Record<string, unknown> | unknown,
-  ...rest: unknown[]
-) => {
-  if (!args && rest.length === 0) {
-    return null;
-  }
-
-  if (Array.isArray(args)) {
-    return args;
-  } else if (isObject(args) && rest.length === 0) {
-    return args;
-  } else if (rest.length > 0) {
-    return [args, ...rest];
-  } else {
-    return [args];
-  }
-};
 
 // Wrapper for Bun SQLite database
 export class BunDatabaseWrapper implements Database {
@@ -115,18 +93,17 @@ export class BunDatabaseWrapper implements Database {
     return 0;
   }
 
-  saveToPath(path: string): Promise<void> {
+  saveToPath(path: string) {
     // if the file exists, delete it
     if (existsSync(path)) {
       unlinkSync(path);
     }
 
     this.db.run(`VACUUM main INTO '${path}'`);
-    return Promise.resolve();
   }
 
-  transaction(fn: () => void): () => void {
-    return this.db.transaction(fn);
+  transaction<T>(fn: () => T): T {
+    return this.db.transaction(fn) as T;
   }
 }
 
