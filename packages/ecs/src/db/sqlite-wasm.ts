@@ -5,7 +5,14 @@ import type {
 } from '@sqlite.org/sqlite-wasm';
 
 import { convertKeysToNamedParams, isObject, parseArgs } from './helpers';
-import type { Database, Statement, StatementArgs } from './index';
+import { loadFromJSON as sharedLoadFromJSON, saveToJSON as sharedSaveToJSON } from './json-functions';
+import type {
+  Database,
+  LoadFromJSONOptions,
+  SaveToJSONOptions,
+  Statement,
+  StatementArgs
+} from './index';
 
 // Wrapper for SQLite WASM database
 export class WasmDatabaseWrapper implements Database {
@@ -141,6 +148,14 @@ export class WasmDatabaseWrapper implements Database {
 
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn);
+  }
+
+  saveToJSON(options: SaveToJSONOptions = {}): unknown {
+    return sharedSaveToJSON(this, options);
+  }
+
+  loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
+    sharedLoadFromJSON(this, json, options);
   }
 }
 

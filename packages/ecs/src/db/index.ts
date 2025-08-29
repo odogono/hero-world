@@ -1,7 +1,16 @@
+export type LoadFromJSONOptions = {
+  asComponents?: boolean;
+};
+
+export type SaveToJSONOptions = {
+  asComponents?: boolean;
+};
+
 // Unified database interface
 export type Database = {
   close: () => void;
   exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
+  loadFromJSON: (json: unknown, options?: LoadFromJSONOptions) => void;
   // lastInsertRowId: () => number;
   prepare: (sql: string) => Statement;
   query: (
@@ -9,11 +18,8 @@ export type Database = {
     args?: StatementArgs,
     ...rest: StatementArgs[]
   ) => unknown[];
+  saveToJSON: (options?: SaveToJSONOptions) => unknown;
   saveToPath: (path: string) => void;
-  // selectArray: (sql: string) => unknown[];
-  // selectArrays: (sql: string) => unknown[][];
-  // selectObjects: (sql: string) => unknown[];
-  // selectValue: (sql: string) => number;
   transaction: <T>(fn: () => T) => T;
 };
 

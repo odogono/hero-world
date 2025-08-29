@@ -457,8 +457,6 @@ describe('Systems', () => {
     createEntity(world, { health: { current: 75, max: 100 } });
     flush(world);
 
-    world.db.saveToPath('world.db');
-
     const processedEntities: any[] = [];
     let receivedEvents: any[] = [];
 

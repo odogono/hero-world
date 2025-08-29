@@ -7,8 +7,11 @@ import type {
 } from 'bun:sqlite';
 
 import { parseArgs } from './helpers';
+import { loadFromJSON as sharedLoadFromJSON, saveToJSON as sharedSaveToJSON } from './json-functions';
 import type {
   Database,
+  LoadFromJSONOptions,
+  SaveToJSONOptions,
   Statement,
   StatementArgs,
   StatementRunResult
@@ -120,6 +123,14 @@ export class BunDatabaseWrapper implements Database {
 
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn)() as T;
+  }
+
+  saveToJSON(options: SaveToJSONOptions = {}): unknown {
+    return sharedSaveToJSON(this, options);
+  }
+
+  loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
+    sharedLoadFromJSON(this, json, options);
   }
 }
 

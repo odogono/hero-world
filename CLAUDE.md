@@ -38,10 +38,19 @@ packages/
 - `bun run unused` - Find unused code with knip
 
 #### Tank World Package (`packages/tank-world/`)
-- `bunx --bun vite` or `bun run dev` - Start development server
-- `bunx --bun vite build` or `bun run build` - Build for production
-- `vitest` or `bun run test` - Run tests
+- `bun run dev` - Start development server (uses `bunx --bun vite`)
+- `bun run build` - Build for production (uses `bunx --bun vite build`)
+- `bun run test` - Run tests with Vitest
 - `bun run coverage` - Run tests with coverage
+- `bun run preview` - Preview production build
+- `bun run lint` - Check for linting errors
+- `bun run lint:fix` - Auto-fix linting errors
+- `bun run format` - Format code with Prettier
+- `bun run unused` - Find unused code with knip
+
+#### Helpers Package (`packages/helpers/`)
+- No specific scripts - uses shared utilities for string manipulation, error handling, and logging
+- Contains dependencies: `github-slugger` for URL slug generation
 
 ## Architecture
 
@@ -80,10 +89,11 @@ Key files:
 ### Frontend Architecture
 
 The tank-world demo (`packages/tank-world/`) demonstrates:
-- React 19 with TypeScript
-- Tailwind CSS v4 with PostCSS
-- Integration with the ECS system
-- Theme context and components
+- React 19 with TypeScript and Vite
+- Tailwind CSS v4 with PostCSS and Vite plugin (`@tailwindcss/vite`)
+- Integration with the ECS system and SQLite WASM
+- Theme context and components with dark/light mode toggle
+- Vitest for testing with coverage support
 
 ## Development Guidelines
 
