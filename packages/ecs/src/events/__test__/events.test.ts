@@ -1,19 +1,28 @@
 import { describe, expect, test } from 'bun:test';
 
+import { DatabaseType } from '@db';
 import { queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
 import { createWorld, flush } from '@world';
 
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
+
 describe('EventSystem', () => {
-  test('should create event system', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should create event system', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     expect(eventSystem).toBeDefined();
   });
 
-  test('should schedule events for systems', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should schedule events for systems', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     // Schedule an event for a system
@@ -28,8 +37,10 @@ describe('EventSystem', () => {
     expect(JSON.parse(eventEntity.event.payload)).toEqual({ message: 'hello' });
   });
 
-  test('should schedule future events', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should schedule future events', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     // Schedule an event for 1 hour in the future
@@ -50,8 +61,10 @@ describe('EventSystem', () => {
     expect(readyEvents).toHaveLength(0);
   });
 
-  test('should get pending events', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should get pending events', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     eventSystem.scheduleEvent('system1', 'event1', { data: 1 });
@@ -63,8 +76,10 @@ describe('EventSystem', () => {
     expect(pendingEvents.every(e => !e.event.processed)).toBe(true);
   });
 
-  test('should get events by type', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should get events by type', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     eventSystem.scheduleEvent('system1', 'type-a', { data: 1 });
@@ -81,8 +96,10 @@ describe('EventSystem', () => {
     expect(typeBEvents[0].event.type).toBe('type-b');
   });
 
-  test('should collect events for system', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should collect events for system', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     eventSystem.scheduleEvent('test-system', 'event1', { value: 1 });
@@ -101,8 +118,10 @@ describe('EventSystem', () => {
     expect(stillPending).toHaveLength(0);
   });
 
-  test('should get events for specific system', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should get events for specific system', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     eventSystem.scheduleEvent('system1', 'event-a', { data: 'a' });
@@ -121,8 +140,10 @@ describe('EventSystem', () => {
     expect(system2Events[0].event.targetSystem).toBe('system2');
   });
 
-  test('should handle JSON parse errors gracefully', () => {
-    const world = createWorld().registerComponent(eventComponent).build();
+  test('should handle JSON parse errors gracefully', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
     const eventSystem = createEventSystem(world);
 
     // Manually create an event with invalid JSON

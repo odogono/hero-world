@@ -1,16 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 
+import { DatabaseType } from '@db';
 import { createWorld } from '@world';
 
-import { DatabaseType } from '../../db';
 import {
   createGameLoop,
   createSystem,
   logSystemPerformance
 } from '../game-loop';
 
-const createTestWorld = async () =>
-  await createWorld({ dbType: DatabaseType.BUN });
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
 
 describe('GameLoop', () => {
   test('should create empty game loop', async () => {

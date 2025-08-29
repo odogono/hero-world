@@ -15,11 +15,13 @@ const healthComponent = defineComponent({
 });
 
 // Example demonstrating the iterator functionality
-export const iteratorExample = () => {
+export const iteratorExample = async () => {
   console.log('=== Query Entities Iterator Example ===\n');
 
   // Create a world with the health component
-  const world = createWorld().registerComponent(healthComponent).build();
+  const world = (await createWorld())
+    .registerComponent(healthComponent)
+    .build();
 
   // Create some entities
   createEntity(world, { health: { current: 100, max: 100 } });

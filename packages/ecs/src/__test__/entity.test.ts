@@ -48,8 +48,9 @@ const locationComponent = defineComponent({
   tableName: 'tbl_location'
 });
 
-const createTestWorld = async () =>
-  await createWorld({ dbType: DatabaseType.BUN });
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
 
 describe('createEntity', () => {
   test('createEntity should create entity without components', async () => {

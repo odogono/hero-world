@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
 import { defineComponent } from '@component';
+import { DatabaseType } from '@db';
 import { createEntity } from '@entity';
 import {
   createEntitySystem,
@@ -13,7 +14,6 @@ import {
 import { createWorld, flush } from '@world';
 
 import { createEventSystem, eventComponent } from '..';
-import { DatabaseType } from '../../db';
 
 // Test components
 const testComponent = defineComponent({
@@ -23,8 +23,9 @@ const testComponent = defineComponent({
   }
 });
 
-const createTestWorld = async () =>
-  await createWorld({ dbType: DatabaseType.BUN });
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
 
 describe('System Events Integration', () => {
   test('should create event-aware game loop', async () => {

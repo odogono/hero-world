@@ -37,8 +37,9 @@ const inventoryComponent = defineComponent({
   }
 });
 
-const createTestWorld = async () =>
-  await createWorld({ dbType: DatabaseType.WASM });
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
 
 describe('component', () => {
   describe('addComponent', () => {
