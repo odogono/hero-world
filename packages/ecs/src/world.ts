@@ -200,12 +200,19 @@ export const flush = <T extends Components>(world: World<T>) => {
         }
         if (entry.exists) {
           // update
-          const updateData = convertKeysToSnakeCase({ ...entry.data, eid });
-          // log.debug('[flush] update', updateData, eid);
+          const { id, ...dataWithoutId } = entry.data as Record<
+            string,
+            unknown
+          >;
+          const updateData = convertKeysToSnakeCase({ ...dataWithoutId, eid });
           def!.stmtUpdate.run(updateData);
         } else {
           // insert
-          const insertData = convertKeysToSnakeCase({ ...entry.data, eid });
+          const { id, ...dataWithoutId } = entry.data as Record<
+            string,
+            unknown
+          >;
+          const insertData = convertKeysToSnakeCase({ ...dataWithoutId, eid });
           def!.stmtInsert.run(insertData);
           entry.exists = true;
         }

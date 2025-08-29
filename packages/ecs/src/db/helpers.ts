@@ -5,7 +5,8 @@ export const convertKeysToNamedParams = (
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    const namedParam = `:${toSnakeCase(key) || key}`;
+    const snakeCaseKey = toSnakeCase(key) || key;
+    const namedParam = `:${snakeCaseKey}`;
     result[namedParam] = value;
   }
   return result;

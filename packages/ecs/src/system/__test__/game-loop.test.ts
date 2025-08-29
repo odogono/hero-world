@@ -2,15 +2,19 @@ import { describe, expect, test } from 'bun:test';
 
 import { createWorld } from '@world';
 
+import { DatabaseType } from '../../db';
 import {
   createGameLoop,
   createSystem,
   logSystemPerformance
 } from '../game-loop';
 
+const createTestWorld = async () =>
+  await createWorld({ dbType: DatabaseType.BUN });
+
 describe('GameLoop', () => {
-  test('should create empty game loop', () => {
-    const world = createWorld().build();
+  test('should create empty game loop', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     expect(gameLoop).toBeDefined();
@@ -18,8 +22,8 @@ describe('GameLoop', () => {
     expect(gameLoop.getPerformance()).toHaveLength(0);
   });
 
-  test('should add system with default options', () => {
-    const world = createWorld().build();
+  test('should add system with default options', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem((world, deltaTime) => {
@@ -37,8 +41,8 @@ describe('GameLoop', () => {
     expect(systems[0].enabled).toBe(true);
   });
 
-  test('should add system with custom options', () => {
-    const world = createWorld().build();
+  test('should add system with custom options', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem((world, deltaTime) => {});
@@ -56,8 +60,8 @@ describe('GameLoop', () => {
     expect(systems[0].enabled).toBe(false);
   });
 
-  test('should sort systems by priority (highest first)', () => {
-    const world = createWorld().build();
+  test('should sort systems by priority (highest first)', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const system1 = createSystem(() => {});
@@ -76,8 +80,8 @@ describe('GameLoop', () => {
     expect(systems[2].id).toBe('low-priority');
   });
 
-  test('should remove system', () => {
-    const world = createWorld().build();
+  test('should remove system', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -92,8 +96,8 @@ describe('GameLoop', () => {
     expect(gameLoop.getPerformance()).toHaveLength(0);
   });
 
-  test('should enable and disable systems', () => {
-    const world = createWorld().build();
+  test('should enable and disable systems', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -108,8 +112,8 @@ describe('GameLoop', () => {
     expect(gameLoop.getSystems()[0].enabled).toBe(true);
   });
 
-  test('should execute systems in priority order', () => {
-    const world = createWorld().build();
+  test('should execute systems in priority order', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const executionOrder: string[] = [];
@@ -134,8 +138,8 @@ describe('GameLoop', () => {
     expect(executionOrder).toEqual(['system2', 'system3', 'system1']);
   });
 
-  test('should pass world and deltaTime to systems', () => {
-    const world = createWorld().build();
+  test('should pass world and deltaTime to systems', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     let receivedWorld: any;
@@ -153,8 +157,8 @@ describe('GameLoop', () => {
     expect(receivedDeltaTime).toBe(16.67);
   });
 
-  test('should not execute disabled systems', () => {
-    const world = createWorld().build();
+  test('should not execute disabled systems', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     let systemExecuted = false;
@@ -169,8 +173,8 @@ describe('GameLoop', () => {
     expect(systemExecuted).toBe(false);
   });
 
-  test('should respect system frequency', () => {
-    const world = createWorld().build();
+  test('should respect system frequency', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -204,8 +208,8 @@ describe('GameLoop', () => {
     expect(executionCount).toBe(2);
   });
 
-  test('should track system performance', () => {
-    const world = createWorld().build();
+  test('should track system performance', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const slowSystem = createSystem(() => {
@@ -237,8 +241,8 @@ describe('GameLoop', () => {
     );
   });
 
-  test('should continue executing other systems if one throws error', () => {
-    const world = createWorld().build();
+  test('should continue executing other systems if one throws error', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     let system1Executed = false;
@@ -268,8 +272,8 @@ describe('GameLoop', () => {
     expect(system3Executed).toBe(true);
   });
 
-  test('should replace existing system with same id', () => {
-    const world = createWorld().build();
+  test('should replace existing system with same id', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     let system1Executed = false;
@@ -294,8 +298,8 @@ describe('GameLoop', () => {
     expect(system2Executed).toBe(true);
   });
 
-  test('should handle non-existent system operations gracefully', () => {
-    const world = createWorld().build();
+  test('should handle non-existent system operations gracefully', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     // Should not throw errors
@@ -304,8 +308,8 @@ describe('GameLoop', () => {
     expect(() => gameLoop.disableSystem('non-existent')).not.toThrow();
   });
 
-  test('should return performance sorted by last execution time', () => {
-    const world = createWorld().build();
+  test('should return performance sorted by last execution time', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const fastSystem = createSystem(() => {
@@ -347,8 +351,8 @@ describe('createSystem helper', () => {
 });
 
 describe('logSystemPerformance', () => {
-  test('should log slow systems', () => {
-    const world = createWorld().build();
+  test('should log slow systems', async () => {
+    const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
     const slowSystem = createSystem(() => {

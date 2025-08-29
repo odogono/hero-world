@@ -1,4 +1,4 @@
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { defineComponent } from '../component';
 
@@ -13,7 +13,7 @@ export const healthComponent = defineComponent({
   },
   statements: {
     // Optional: custom SQL statements
-    selectByCurrentHealth: 'SELECT * FROM tbl_health WHERE current = ?1'
+    selectByCurrentHealth: 'SELECT * FROM tbl_health WHERE current = ?'
   }
 });
 

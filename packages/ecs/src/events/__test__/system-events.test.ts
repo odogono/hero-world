@@ -13,6 +13,7 @@ import {
 import { createWorld, flush } from '@world';
 
 import { createEventSystem, eventComponent } from '..';
+import { DatabaseType } from '../../db';
 
 // Test components
 const testComponent = defineComponent({
@@ -22,9 +23,12 @@ const testComponent = defineComponent({
   }
 });
 
+const createTestWorld = async () =>
+  await createWorld({ dbType: DatabaseType.BUN });
+
 describe('System Events Integration', () => {
-  test('should create event-aware game loop', () => {
-    const world = createWorld()
+  test('should create event-aware game loop', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -36,8 +40,8 @@ describe('System Events Integration', () => {
     expect(gameLoop.update).toBeDefined();
   });
 
-  test('should pass events to system when executed', () => {
-    const world = createWorld()
+  test('should pass events to system when executed', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -68,8 +72,8 @@ describe('System Events Integration', () => {
     expect(receivedEvents[0].payload).toEqual({ message: 'hello' });
   });
 
-  test('should process events only for target system', () => {
-    const world = createWorld()
+  test('should process events only for target system', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -106,8 +110,8 @@ describe('System Events Integration', () => {
     expect(system2Events[0].payload.data).toBe(2);
   });
 
-  test('should handle scheduled events', () => {
-    const world = createWorld()
+  test('should handle scheduled events', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -144,8 +148,8 @@ describe('System Events Integration', () => {
     }, 150);
   });
 
-  test('should work with entity systems', () => {
-    const world = createWorld()
+  test('should work with entity systems', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -185,8 +189,8 @@ describe('System Events Integration', () => {
     expect(receivedEvents[0].payload.action).toBe('update');
   });
 
-  test('should support event-driven systems', () => {
-    const world = createWorld()
+  test('should support event-driven systems', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -223,8 +227,8 @@ describe('System Events Integration', () => {
     expect(executionCount).toBe(1);
   });
 
-  test('should convert regular systems to ignore events', () => {
-    const world = createWorld()
+  test('should convert regular systems to ignore events', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -252,8 +256,8 @@ describe('System Events Integration', () => {
     expect(regularSystemExecuted).toBe(true);
   });
 
-  test('should handle multiple events for same system', () => {
-    const world = createWorld()
+  test('should handle multiple events for same system', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
@@ -282,8 +286,8 @@ describe('System Events Integration', () => {
     expect(allEvents.map(e => e.payload.id)).toEqual([1, 2, 3]);
   });
 
-  test('should handle events from different systems separately', () => {
-    const world = createWorld()
+  test('should handle events from different systems separately', async () => {
+    const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .registerComponent(testComponent)
       .build();
