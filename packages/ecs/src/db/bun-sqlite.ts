@@ -36,11 +36,8 @@ export class BunDatabaseWrapper implements Database {
     return {
       all: (args?: StatementArgs) =>
         stmt.all(args as unknown as SQLQueryBindings),
-      bind: (args: StatementArgs) => {
-        // stmt.bind(convertKeysToNamedParams(args));
-      },
       finalize: () => stmt.finalize(),
-      get: (input: StatementArgs, ...rest: StatementArgs[]) => {
+      get: (input?: StatementArgs, ...rest: StatementArgs[]) => {
         const args = parseArgs(input, ...rest);
         return stmt.get(args as unknown as SQLQueryBindings);
       },
@@ -56,42 +53,41 @@ export class BunDatabaseWrapper implements Database {
         return convertChangesToStatementRunResult(
           stmt.run(args as SQLQueryBindings)
         );
-      },
-      step: () => false
+      }
     };
   }
 
-  selectArray(sql: string): unknown[] {
-    const stmt = this.db.prepare(sql);
-    const result = stmt.all();
-    stmt.finalize();
-    return result as unknown[];
-  }
+  // selectArray(sql: string): unknown[] {
+  //   const stmt = this.db.prepare(sql);
+  //   const result = stmt.all();
+  //   stmt.finalize();
+  //   return result as unknown[];
+  // }
 
-  selectArrays(sql: string): unknown[][] {
-    const stmt = this.db.prepare(sql);
-    const result = stmt.all();
-    stmt.finalize();
-    return result as unknown[][];
-  }
+  // selectArrays(sql: string): unknown[][] {
+  //   const stmt = this.db.prepare(sql);
+  //   const result = stmt.all();
+  //   stmt.finalize();
+  //   return result as unknown[][];
+  // }
 
-  selectObjects(sql: string): unknown[] {
-    const stmt = this.db.prepare(sql);
-    const result = stmt.all();
-    stmt.finalize();
-    return result as unknown[];
-  }
+  // selectObjects(sql: string): unknown[] {
+  //   const stmt = this.db.prepare(sql);
+  //   const result = stmt.all();
+  //   stmt.finalize();
+  //   return result as unknown[];
+  // }
 
-  selectValue(sql: string): number {
-    const stmt = this.db.prepare(sql);
-    const result = stmt.get();
-    stmt.finalize();
-    return result as number;
-  }
+  // selectValue(sql: string): number {
+  //   const stmt = this.db.prepare(sql);
+  //   const result = stmt.get();
+  //   stmt.finalize();
+  //   return result as number;
+  // }
 
-  lastInsertRowId(): number {
-    return 0;
-  }
+  // lastInsertRowId(): number {
+  //   return 0;
+  // }
 
   saveToPath(path: string) {
     // if the file exists, delete it

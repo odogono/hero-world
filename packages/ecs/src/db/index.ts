@@ -2,13 +2,13 @@
 export type Database = {
   close: () => void;
   exec: (sql: string) => void;
-  lastInsertRowId: () => number;
+  // lastInsertRowId: () => number;
   prepare: (sql: string) => Statement;
   saveToPath: (path: string) => void;
-  selectArray: (sql: string) => unknown[];
-  selectArrays: (sql: string) => unknown[][];
-  selectObjects: (sql: string) => unknown[];
-  selectValue: (sql: string) => number;
+  // selectArray: (sql: string) => unknown[];
+  // selectArrays: (sql: string) => unknown[][];
+  // selectObjects: (sql: string) => unknown[];
+  // selectValue: (sql: string) => number;
   transaction: <T>(fn: () => T) => T;
 };
 
@@ -20,18 +20,17 @@ export type StatementRunResult = {
 export type StatementArgs = unknown[] | Record<string, unknown> | unknown;
 
 export type StatementGet = (
-  input: StatementArgs,
+  input?: StatementArgs,
   ...rest: StatementArgs[]
 ) => unknown | null;
 
 export type Statement = {
   all: (args?: StatementArgs) => unknown | null;
-  bind: (args: StatementArgs) => void;
+
   finalize: () => void;
   get: StatementGet;
   getColumnNames: () => string[];
   run: (args?: StatementArgs) => StatementRunResult;
-  step: () => boolean;
 };
 
 // Database type enum

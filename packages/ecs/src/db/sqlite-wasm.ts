@@ -70,18 +70,32 @@ export class WasmDatabaseWrapper implements Database {
     const stmt = this.db.prepare(sql);
     return {
       all: (args?: StatementArgs) => {
-        console.log('all', sql, args);
-        throw new Error('Method not implemented.');
+        stmt.reset();
+        // console.log('all', sql, args);
+        stmt.bind(args as unknown as BindingSpec);
+        const results: unknown[] = [];
+        while (stmt.step()) {
+          results.push(stmt.get([]));
+        }
+        return results;
       },
-      bind: (args: StatementArgs) => {
-        // stmt.bind(convertKeysToNamedParams(args));
-      },
+
       finalize: () => {
         throw new Error('Method not implemented.');
       },
-      get: (input: StatementArgs, ...rest: StatementArgs[]) => {
+      get: (input?: StatementArgs, ...rest: StatementArgs[]) => {
         const args = parseArgs(input, ...rest);
-        throw new Error('Method not implemented.');
+        // console.log('get', sql, args);
+        stmt.reset();
+        if (args) {
+          stmt.bind(args as unknown as BindingSpec);
+        }
+        if (stmt.step()) {
+          const result = stmt.get({});
+          // console.log('result', result);
+          return result;
+        }
+        return null;
       },
       getColumnNames: () => {
         throw new Error('Method not implemented.');
@@ -90,10 +104,11 @@ export class WasmDatabaseWrapper implements Database {
         const args = parseArgs(input, ...rest);
         stmt.reset();
         if (args) {
-          if (isObject(args)) {
-            stmt.bind(convertKeysToNamedParams(args) as BindingSpec);
-          } else {
+          if (Array.isArray(args)) {
             stmt.bind(args as BindingSpec);
+          } else if (isObject(args)) {
+            // console.log('run', sql, args);
+            stmt.bind(convertKeysToNamedParams(args) as BindingSpec);
           }
         }
         stmt.step();
@@ -101,27 +116,8 @@ export class WasmDatabaseWrapper implements Database {
           changes: this.changes(),
           lastInsertRowId: this.lastInsertRowId()
         };
-      },
-      step: () => {
-        throw new Error('Method not implemented.');
       }
     };
-  }
-
-  selectArray(sql: string): unknown[] {
-    return this.db.selectArray(sql);
-  }
-
-  selectArrays(sql: string): unknown[][] {
-    return this.db.selectArrays(sql);
-  }
-
-  selectObjects(sql: string): unknown[] {
-    return this.db.selectObjects(sql);
-  }
-
-  selectValue(sql: string): number {
-    return this.db.selectValue(sql);
   }
 
   changes(): number {
