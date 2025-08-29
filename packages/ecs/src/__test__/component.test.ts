@@ -7,6 +7,7 @@ import {
   defineComponent,
   removeComponent
 } from '../component';
+import { DatabaseType } from '../db';
 import { createEntity } from '../entity';
 import { createWorld, flush } from '../world';
 
@@ -36,10 +37,15 @@ const inventoryComponent = defineComponent({
   }
 });
 
+const createTestWorld = async () =>
+  await createWorld({ dbType: DatabaseType.WASM });
+
 describe('component', () => {
   describe('addComponent', () => {
-    test('should add a component to an entity', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should add a component to an entity', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'stats_test', {
@@ -54,8 +60,10 @@ describe('component', () => {
       expect(entityWithStats.stats_test.mana).toBe(50);
     });
 
-    test('should mark entity as dirty when adding component', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should mark entity as dirty when adding component', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
@@ -64,8 +72,10 @@ describe('component', () => {
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
     });
 
-    test('should cache component data in entityCache', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should cache component data in entityCache', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
@@ -79,8 +89,10 @@ describe('component', () => {
       expect(cache!.stats_test!.exists).toBe(false); // New component, not yet persisted
     });
 
-    test('should create tracked component with proxy', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should create tracked component with proxy', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
@@ -97,8 +109,8 @@ describe('component', () => {
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
     });
 
-    test('should add multiple components to same entity', () => {
-      const world = createWorld()
+    test('should add multiple components to same entity', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .build();
@@ -126,8 +138,10 @@ describe('component', () => {
       );
     });
 
-    test('should persist component after flush', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should persist component after flush', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       addComponent(entity, 'stats_test', { health: 100, level: 1, mana: 50 });
@@ -145,8 +159,8 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
     });
 
-    test('should work with different component types', () => {
-      const world = createWorld()
+    test('should work with different component types', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .registerComponent(inventoryComponent)
@@ -177,8 +191,10 @@ describe('component', () => {
       );
     });
 
-    test('should handle component modifications after adding', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should handle component modifications after adding', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'stats_test', {
@@ -200,8 +216,8 @@ describe('component', () => {
       expect(world.dirtyEntities.get(entity.id)?.has('stats_test')).toBe(true);
     });
 
-    test('should work with entity that already has components', () => {
-      const world = createWorld()
+    test('should work with entity that already has components', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .build();
@@ -225,8 +241,8 @@ describe('component', () => {
       );
     });
 
-    test('should add multiple components to same entity with different names', () => {
-      const world = createWorld()
+    test('should add multiple components to same entity with different names', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .build();
@@ -245,8 +261,10 @@ describe('component', () => {
   });
 
   describe('removeComponent', () => {
-    test('should remove a component from an entity', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should remove a component from an entity', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
@@ -257,25 +275,36 @@ describe('component', () => {
       expect(entity.stats_test).toBeUndefined();
     });
 
-    test('should remove component from database', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should remove component from database', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
       flush(world);
 
       // Verify component exists in database
-      const stmt = world.db.query('SELECT * FROM tbl_stats_test WHERE eid = ?');
-      expect(stmt.get(entity.id)).toBeDefined();
+      const e = world.db.query(
+        'SELECT * FROM tbl_stats_test WHERE eid = ?',
+        entity.id
+      );
+      expect(e).toBeDefined();
 
       removeComponent(entity, 'stats_test');
 
+      const e2 = world.db.query(
+        'SELECT * FROM tbl_stats_test WHERE eid = ?',
+        entity.id
+      );
       // Verify component is removed from database
-      expect(stmt.get(entity.id)).toBeNull();
+      expect(e2).toHaveLength(0);
     });
 
-    test('should remove component from entityCache', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should remove component from entityCache', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
@@ -290,8 +319,10 @@ describe('component', () => {
       expect(world.entityCache.get(entity.id)!.stats_test).toBeUndefined();
     });
 
-    test('should remove component from dirtyEntities tracking', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should remove component from dirtyEntities tracking', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
@@ -308,8 +339,10 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
     });
 
-    test('should clean up dirtyEntities entry when no components remain', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should clean up dirtyEntities entry when no components remain', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
@@ -325,8 +358,8 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
     });
 
-    test('should remove one component while keeping others', () => {
-      const world = createWorld()
+    test('should remove one component while keeping others', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .build();
@@ -353,8 +386,8 @@ describe('component', () => {
       );
     });
 
-    test('should throw error for non-existent component definition', () => {
-      const world = createWorld().build();
+    test('should throw error for non-existent component definition', async () => {
+      const world = (await createTestWorld()).build();
       const entity = createEntity(world);
 
       expect(() => {
@@ -362,8 +395,10 @@ describe('component', () => {
       }).toThrow('Component def not found for nonexistent');
     });
 
-    test('should handle removing component that was never added', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should handle removing component that was never added', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world) as any;
 
       // Entity has no stats component
@@ -378,8 +413,10 @@ describe('component', () => {
       expect(entity.stats_test).toBeUndefined();
     });
 
-    test('should work with multiple entities independently', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should work with multiple entities independently', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
 
       const entity1 = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
@@ -400,8 +437,10 @@ describe('component', () => {
       expect(entity2.stats_test.health).toBe(80);
     });
 
-    test('should handle removing component with pending changes', () => {
-      const world = createWorld().registerComponent(statsComponent).build();
+    test('should handle removing component with pending changes', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(statsComponent)
+        .build();
       const entity = createEntity(world, {
         stats_test: { health: 100, level: 1, mana: 50 }
       });
@@ -418,8 +457,10 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
     });
 
-    test('should work with complex component data', () => {
-      const world = createWorld().registerComponent(inventoryComponent).build();
+    test('should work with complex component data', async () => {
+      const world = (await createTestWorld())
+        .registerComponent(inventoryComponent)
+        .build();
       const entity = createEntity(world, {
         inventory_test: {
           capacity: 20,
@@ -440,21 +481,21 @@ describe('component', () => {
       expect(entity.inventory_test).toBeUndefined();
 
       // Verify database cleanup
-      const stmt = world.db.query(
+      const stmt = world.db.prepare(
         'SELECT * FROM tbl_inventory_test WHERE eid = ?'
       );
       expect(stmt.get(entity.id)).toBeNull();
 
       // Verify entity still exists
-      const estmt = world.db.query('SELECT * FROM tbl_entity WHERE id = ?');
+      const estmt = world.db.prepare('SELECT * FROM tbl_entity WHERE id = ?');
       expect(estmt.get(entity.id)).toBeDefined();
 
       // Verify entity is not dirty
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
     });
 
-    test('should handle removing component from entity with multiple components', () => {
-      const world = createWorld()
+    test('should handle removing component from entity with multiple components', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .registerComponent(inventoryComponent)
@@ -479,8 +520,8 @@ describe('component', () => {
       expect(entity.inventory_test.capacity).toBe(10);
     });
 
-    test('should handle removing several named components at once', () => {
-      const world = createWorld()
+    test('should handle removing several named components at once', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .registerComponent(inventoryComponent)
@@ -501,8 +542,8 @@ describe('component', () => {
       expect(entity.inventory_test).toBeUndefined();
     });
 
-    test('should handle removing all components at once', () => {
-      const world = createWorld()
+    test('should handle removing all components at once', async () => {
+      const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .registerComponent(locationComponent)
         .registerComponent(inventoryComponent)

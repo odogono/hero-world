@@ -203,8 +203,9 @@ export const queryEntities = <T extends Components>(
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
 
-  const stmt = world.db.query(sql);
-  const rows = args && args.length > 0 ? stmt.all(...args) : stmt.all();
+  // const stmt = world.db.prepare(sql);
+  // const rows = args && args.length > 0 ? stmt.all(...args) : stmt.all();
+  const rows = world.db.query(sql, args);
 
   return rows.map((row: any) =>
     mapRowToEntity(world, componentsToInclude, row)
@@ -216,7 +217,7 @@ export const queryEntitiesIterator = <T extends Components>(
   options?: QueryOptions<T>
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
-  const stmt = world.db.query(sql);
+  const stmt = world.db.prepare(sql);
 
   // Use Bun's iterate capability for incremental results
   const iterator =

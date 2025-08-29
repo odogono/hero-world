@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 import { createLog } from 'odgn-helpers';
 import z from 'zod';
 
@@ -62,7 +62,7 @@ describe('createEntity', () => {
     expect(entity.id).toBeGreaterThan(0);
     expect(entity.world).toBe(world);
 
-    await world.db.saveToPath('world.db');
+    // await world.db.saveToPath('world.db');
   });
 
   test('createEntity should create multiple entities with unique IDs', async () => {
@@ -238,6 +238,8 @@ describe('createEntity', () => {
 
     // Flush to persist
     flush(world);
+
+    // await world.db.saveToPath('world.db');
 
     // After flush - should be marked as existing in database
     const cacheAfter = world.entityCache.get(entity.id)!.inventory!;
@@ -419,7 +421,7 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
 
-  test('should work with custom component statements', async () => {
+  it('should work with custom component statements', async () => {
     const world = (await createTestWorld())
       .registerComponent(statsComponent)
       .build();
@@ -437,6 +439,8 @@ describe('createEntity', () => {
 
     // Execute custom statement
     const results = def!.statsByLevel!.all([5]);
+
+    // console.log(results);
 
     expect(results).toBeDefined();
     expect(Array.isArray(results)).toBe(true);

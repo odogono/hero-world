@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import z from 'zod';
 
-import { defineComponent, removeComponent } from '../component';
-import { createEntity, queryEntities, queryEntitiesIterator } from '../entity';
-import { createWorld, flush } from '../world';
+import { defineComponent, removeComponent } from '@component';
+import { DatabaseType } from '@db';
+import { createEntity, queryEntities, queryEntitiesIterator } from '@entity';
+import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
   name: 'status' as const,
@@ -35,9 +36,14 @@ const nameComponent = defineComponent({
   }
 });
 
+const createTestWorld = async () =>
+  await createWorld({ dbType: DatabaseType.WASM });
+
 describe('query', () => {
-  test('should query all entities with status component', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should query all entities with status component', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'idle' } });
@@ -55,8 +61,10 @@ describe('query', () => {
     expect(allEntities).toHaveLength(6);
   });
 
-  test('should return component properties with camelCase', () => {
-    const world = createWorld().registerComponent(nameComponent).build();
+  test('should return component properties with camelCase', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(nameComponent)
+      .build();
     createEntity(world, { name: { fullName: 'John Doe' } });
     flush(world);
     const entities = queryEntities(world, { with: ['name'] });
@@ -64,8 +72,10 @@ describe('query', () => {
     expect(entities[0]!.name!.fullName).toBe('John Doe');
   });
 
-  test('should filter entities with where clause', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should filter entities with where clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'idle' } });
@@ -77,26 +87,28 @@ describe('query', () => {
     flush(world);
 
     const idleEntities = queryEntities(world, {
-      where: 'status = "idle"',
+      where: `status = 'idle'`,
       with: ['status']
     });
     expect(idleEntities).toHaveLength(3);
 
     const walkingEntities = queryEntities(world, {
-      where: 'status = "walking"',
+      where: `status = 'walking'`,
       with: ['status']
     });
     expect(walkingEntities).toHaveLength(1);
 
     const activeEntities = queryEntities(world, {
-      where: 'status IN ("walking", "fighting")',
+      where: `status IN ('walking', 'fighting')`,
       with: ['status']
     });
     expect(activeEntities).toHaveLength(2);
   });
 
-  test('where clause should support args', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('where clause should support args', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
     createEntity(world, { status: { status: 'fighting' } });
@@ -111,8 +123,10 @@ describe('query', () => {
     expect(entities).toHaveLength(1);
   });
 
-  test('should query single entity by ID', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should query single entity by ID', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     const entity1 = createEntity(world, { status: { status: 'idle' } });
 
@@ -127,8 +141,10 @@ describe('query', () => {
     expect(result[0]?.status.status).toBe('idle');
   });
 
-  test('should set a limit on the number of entities returned', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should set a limit on the number of entities returned', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -143,8 +159,10 @@ describe('query', () => {
     expect(entities[1]?.status.status).toBe('walking');
   });
 
-  test('should set an offset on the number of entities returned', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should set an offset on the number of entities returned', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -159,8 +177,10 @@ describe('query', () => {
     expect(entities[1]?.status.status).toBe('dead');
   });
 
-  test('should combine limit and offset options', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should combine limit and offset options', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -180,8 +200,10 @@ describe('query', () => {
     expect(entities[1]?.status.status).toBe('fighting');
   });
 
-  test('should return an iterator over the entities', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should return an iterator over the entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -200,8 +222,10 @@ describe('query', () => {
     expect(result).toEqual(['idle', 'walking', 'fighting', 'dead']);
   });
 
-  test('should return an iterator with filtering options', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('should return an iterator with filtering options', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -211,7 +235,7 @@ describe('query', () => {
     world.flush();
 
     const query = queryEntitiesIterator(world, {
-      where: 'status IN ("walking", "fighting")',
+      where: `status IN ('walking', 'fighting')`,
       with: ['status']
     });
 
@@ -223,8 +247,10 @@ describe('query', () => {
     expect(result).toEqual(['walking', 'fighting']);
   });
 
-  test('iterator should support args in where clause', () => {
-    const world = createWorld().registerComponent(statusComponent).build();
+  test('iterator should support args in where clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
     createEntity(world, { status: { status: 'fighting' } });
@@ -246,8 +272,8 @@ describe('query', () => {
     expect(result).toEqual(['fighting']);
   });
 
-  test('query returns entities with both components', () => {
-    const world = createWorld()
+  test('query returns entities with both components', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -270,8 +296,8 @@ describe('query', () => {
     // saveWorld(world, './world.db');
   });
 
-  test('should query entities that do not have a specific component', () => {
-    const world = createWorld()
+  test('should query entities that do not have a specific component', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -292,8 +318,8 @@ describe('query', () => {
     expect(stationary[1]?.position.x).toBe(1);
   });
 
-  test('should query entities that do not have multiple components', () => {
-    const world = createWorld()
+  test('should query entities that do not have multiple components', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -322,8 +348,8 @@ describe('query', () => {
     expect(basic[0]?.position.x).toBe(0);
   });
 
-  test('should combine without with other query options', () => {
-    const world = createWorld()
+  test('should combine without with other query options', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -353,8 +379,8 @@ describe('query', () => {
     expect(limited[0]?.position.x).toBe(0);
   });
 
-  test('should work with iterator queries', () => {
-    const world = createWorld()
+  test('should work with iterator queries', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -378,8 +404,8 @@ describe('query', () => {
     expect(result).toEqual([0, 1]);
   });
 
-  test('should use with option to specify which components to include', () => {
-    const world = createWorld()
+  test('should use with option to specify which components to include', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -403,8 +429,8 @@ describe('query', () => {
     expect((result[0] as any).velocity).toBeUndefined();
   });
 
-  test('should combine with and without options', () => {
-    const world = createWorld()
+  test('should combine with and without options', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -432,8 +458,8 @@ describe('query', () => {
     expect(result[0]?.status.status).toBe('idle');
   });
 
-  test('removing components from world should not affect queries', () => {
-    const world = createWorld()
+  test('removing components from world should not affect queries', async () => {
+    const world = (await createTestWorld())
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -448,7 +474,7 @@ describe('query', () => {
     flush(world);
 
     for (const entity of queryEntitiesIterator(world, {
-      where: 'status.status = "idle"',
+      where: `status.status = 'idle'`,
       with: ['position', 'status']
     })) {
       removeComponent(entity, 'position');

@@ -26,8 +26,26 @@ export class BunDatabaseWrapper implements Database {
     this.db.close();
   }
 
-  exec(sql: string): void {
-    this.db.run(sql);
+  exec(
+    sql: string,
+    input?: StatementArgs,
+    ...rest: StatementArgs[]
+  ): Changes | void {
+    const args = parseArgs(input, ...rest);
+    return !args
+      ? this.db.run(sql)
+      : this.db.query(sql).run(args as unknown as SQLQueryBindings);
+  }
+
+  query(
+    sql: string,
+    input?: StatementArgs,
+    ...rest: StatementArgs[]
+  ): unknown[] {
+    const args = parseArgs(input, ...rest);
+    return !args
+      ? this.db.query(sql).all()
+      : this.db.query(sql).all(args as unknown as SQLQueryBindings);
   }
 
   prepare(sql: string): Statement {
@@ -42,6 +60,8 @@ export class BunDatabaseWrapper implements Database {
         return stmt.get(args as unknown as SQLQueryBindings);
       },
       getColumnNames: () => stmt.columnNames,
+      iterate: (args?: StatementArgs) =>
+        stmt.iterate(args as unknown as SQLQueryBindings),
       run: (input?: StatementArgs, ...rest: StatementArgs[]) => {
         const args = parseArgs(input, ...rest);
         if (!args) {
@@ -99,7 +119,7 @@ export class BunDatabaseWrapper implements Database {
   }
 
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn) as T;
+    return this.db.transaction(fn)() as T;
   }
 }
 

@@ -1,9 +1,14 @@
 // Unified database interface
 export type Database = {
   close: () => void;
-  exec: (sql: string) => void;
+  exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
   // lastInsertRowId: () => number;
   prepare: (sql: string) => Statement;
+  query: (
+    sql: string,
+    args?: StatementArgs,
+    ...rest: StatementArgs[]
+  ) => unknown[];
   saveToPath: (path: string) => void;
   // selectArray: (sql: string) => unknown[];
   // selectArrays: (sql: string) => unknown[][];
@@ -26,10 +31,10 @@ export type StatementGet = (
 
 export type Statement = {
   all: (args?: StatementArgs) => unknown | null;
-
   finalize: () => void;
   get: StatementGet;
   getColumnNames: () => string[];
+  iterate: (args?: StatementArgs) => unknown | null;
   run: (args?: StatementArgs) => StatementRunResult;
 };
 

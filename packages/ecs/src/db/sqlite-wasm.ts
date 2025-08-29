@@ -7,47 +7,6 @@ import type {
 import { convertKeysToNamedParams, isObject, parseArgs } from './helpers';
 import type { Database, Statement, StatementArgs } from './index';
 
-// Types for sqlite-wasm
-// type Sqlite3Stmt = {
-//   bind: (args: unknown[]) => void;
-//   free: () => void;
-//   get: (args: unknown[]) => unknown[];
-//   getColumnNames: () => string[];
-//   reset: () => void;
-//   step: () => boolean;
-// };
-
-// type Sqlite3 = {
-//   capi: {
-//     sqlite3_changes: (pointer: number) => bigint;
-//     sqlite3_js_db_export: (pointer: number) => Uint8Array;
-//     sqlite3_last_insert_rowid: (pointer: number) => bigint;
-//     sqlite3_trace_v2: (
-//       pointer: number,
-//       mask: number,
-//       callback: number,
-//       context: number
-//     ) => void;
-//   };
-//   config: {
-//     error: (errCode: number, msg: string) => void;
-//   };
-//   oo1: {
-//     DB: new (path: string, mode: string) => unknown;
-//   };
-// };
-
-// type Sqlite3DB = {
-//   close: () => void;
-//   exec: (sql: string) => void;
-//   pointer: number;
-//   prepare: (sql: string) => Sqlite3Stmt;
-//   selectArray: (sql: string) => unknown[];
-//   selectArrays: (sql: string) => unknown[][];
-//   selectObjects: (sql: string) => unknown[];
-//   selectValue: (sql: string) => number;
-// };
-
 // Wrapper for SQLite WASM database
 export class WasmDatabaseWrapper implements Database {
   private db: Sqlite3Database;
@@ -62,24 +21,47 @@ export class WasmDatabaseWrapper implements Database {
     this.db.close();
   }
 
-  exec(sql: string): void {
-    this.db.exec(sql);
+  exec(sql: string, input?: StatementArgs, ...rest: StatementArgs[]): void {
+    const args = parseArgs(input, ...rest);
+    if (!args) {
+      this.db.exec(sql);
+    } else {
+      this.db.selectObjects(sql, args as unknown as BindingSpec);
+    }
+  }
+
+  query(
+    sql: string,
+    input?: StatementArgs,
+    ...rest: StatementArgs[]
+  ): unknown[] {
+    const args = parseArgs(input, ...rest);
+    return !args
+      ? this.db.selectObjects(sql)
+      : this.db.selectObjects(sql, args as unknown as BindingSpec);
   }
 
   prepare(sql: string): Statement {
+    // console.log('prepare', sql);
     const stmt = this.db.prepare(sql);
     return {
       all: (args?: StatementArgs) => {
-        stmt.reset();
+        const results = this.db.selectObjects(
+          sql,
+          args as unknown as BindingSpec
+        );
+        // this.db.exec('BEGIN');
+        // stmt.reset();
         // console.log('all', sql, args);
-        stmt.bind(args as unknown as BindingSpec);
-        const results: unknown[] = [];
-        while (stmt.step()) {
-          results.push(stmt.get([]));
-        }
+        // // throw new Error('test');
+        // stmt.bind(args as unknown as BindingSpec);
+        // const results: unknown[] = [];
+        // while (stmt.step()) {
+        //   results.push(stmt.get({}));
+        // }
+        // this.db.exec('COMMIT');
         return results;
       },
-
       finalize: () => {
         throw new Error('Method not implemented.');
       },
@@ -99,6 +81,19 @@ export class WasmDatabaseWrapper implements Database {
       },
       getColumnNames: () => {
         throw new Error('Method not implemented.');
+      },
+      iterate: (args?: StatementArgs) => {
+        stmt.reset();
+        if (args) {
+          stmt.bind(args as unknown as BindingSpec);
+        }
+        return {
+          *[Symbol.iterator]() {
+            while (stmt.step()) {
+              yield stmt.get({});
+            }
+          }
+        };
       },
       run: (input?: StatementArgs, ...rest: StatementArgs[]) => {
         const args = parseArgs(input, ...rest);
@@ -176,6 +171,13 @@ export const createWasmDatabaseInstance = async (
     // Suppress or redirect SQLite error logs
     // console.warn('SQLite error:', errCode, msg);
   };
+
+  // NOTE doesnt affect performance sadly
+  // db.exec(`
+  //   PRAGMA synchronous = OFF;
+  //   PRAGMA journal_mode = MEMORY;
+  //   PRAGMA temp_store = MEMORY;
+  // `);
 
   return new WasmDatabaseWrapper(db, sqlite3);
 };

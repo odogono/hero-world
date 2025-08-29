@@ -187,6 +187,7 @@ const registerComponentDef = <T extends Components>(
 export const flush = <T extends Components>(world: World<T>) => {
   const { db, defs, dirtyEntities, entityCache, stmts } = world;
   db.transaction(() => {
+    // log.debug('[flush] dirtyEntities', dirtyEntities);
     for (const [eid, components] of dirtyEntities.entries()) {
       const cache = entityCache.get(eid);
 
@@ -194,7 +195,7 @@ export const flush = <T extends Components>(world: World<T>) => {
         const entry = cache![c as string]!;
         const def = defs.get(c as string);
         if (!def) {
-          log.debug('[flush] defs', Object.keys(defs));
+          // log.debug('[flush] defs', Object.keys(defs));
           throw new Error(`Component def not found for ${c as string}`);
         }
         if (entry.exists) {

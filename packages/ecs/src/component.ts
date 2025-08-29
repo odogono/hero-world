@@ -147,7 +147,7 @@ export function removeComponent<T extends keyof Components>(
         const def = world.defs.get(componentName);
         if (def) {
           // delete from db
-          world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
+          world.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, id);
         }
 
         delete (cache as any)[componentName];
@@ -168,7 +168,7 @@ export function removeComponent<T extends keyof Components>(
     }
 
     // delete from db
-    world.db.query(`DELETE FROM ${def.tableName} WHERE eid = ?1`).run(id);
+    world.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, id);
 
     const cache = entity.world.entityCache.get(id);
     if (cache) {
