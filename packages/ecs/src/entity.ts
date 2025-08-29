@@ -1,4 +1,3 @@
-import type { SQLQueryBindings } from 'bun:sqlite';
 import { toCamelCase } from 'odgn-helpers';
 
 import { makeTrackedComponent } from '@component';
@@ -28,7 +27,7 @@ export const createEntity: CreateEntityOverloads = <
   world: World<TComponents>,
   initialComponents?: C
 ): EntityWithComponents<TComponents, keyof C & keyof TComponents> => {
-  const eid = world.stmts.insertEntity!.run().lastInsertRowid as number;
+  const eid = world.stmts.insertEntity!.run().lastInsertRowId;
 
   const entity: any = { id: eid, world };
   world.entityCache.set(eid, {});
@@ -61,7 +60,7 @@ export const deleteEntity = <T extends Components>(
 ) => {
   const { id, world } = entity;
 
-  world.stmts.deleteEntity!.run(id);
+  const r = world.stmts.deleteEntity!.run(id);
 
   // Clean up caches
   world.entityCache.delete(id);
@@ -78,13 +77,13 @@ export const getEntity = <T extends Components>(
   if (!stmt) {
     throw new Error('selectEntityById not found');
   }
-  const eid = stmt.get(id);
+  const eid = stmt.get(id) as { id: number } | null;
 
-  return eid ? ({ id: eid, world } as GenericEntity<T>) : null;
+  return eid ? ({ id: eid.id, world } as GenericEntity<T>) : null;
 };
 
 export type QueryOptions<T extends Components> = {
-  args?: SQLQueryBindings[];
+  args?: unknown[];
   entity?: GenericEntity<T>;
   limit?: number;
   offset?: number;

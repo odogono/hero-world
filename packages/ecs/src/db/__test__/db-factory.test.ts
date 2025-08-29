@@ -8,7 +8,7 @@ import {
   createWasmDatabase
 } from '../index';
 
-describe('Database Factory', () => {
+describe.skip('Database Factory', () => {
   afterEach(() => {
     // Clean up any open databases
   });

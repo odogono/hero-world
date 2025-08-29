@@ -1,28 +1,46 @@
 // Unified database interface
-export type UnifiedDatabase = {
+export type Database = {
   close: () => void;
   exec: (sql: string) => void;
   lastInsertRowId: () => number;
-  prepare: (sql: string) => UnifiedStatement;
+  prepare: (sql: string) => Statement;
+  saveToPath: (path: string) => Promise<void>;
   selectArray: (sql: string) => unknown[];
   selectArrays: (sql: string) => unknown[][];
   selectObjects: (sql: string) => unknown[];
   selectValue: (sql: string) => number;
+  transaction: (fn: () => void) => () => void;
 };
 
-export type UnifiedStatement = {
-  bind: (args: unknown[]) => void;
-  free: () => void;
-  get: (args: unknown[]) => unknown[];
+export type StatementRunResult = {
+  changes: number;
+  lastInsertRowId: number;
+};
+
+export type StatementArgs = unknown[] | Record<string, unknown> | unknown;
+
+export type StatementGet = (
+  input: StatementArgs,
+  ...rest: StatementArgs[]
+) => unknown | null;
+
+export type Statement = {
+  all: (args?: StatementArgs) => unknown | null;
+  bind: (args: StatementArgs) => void;
+  finalize: () => void;
+  get: StatementGet;
   getColumnNames: () => string[];
+  run: (args?: StatementArgs) => StatementRunResult;
   step: () => boolean;
 };
 
 // Database type enum
-export enum DatabaseType {
-  BUN = 'bun',
-  WASM = 'wasm'
-}
+export const DatabaseType = {
+  BUN: 'bun',
+  WASM: 'wasm'
+} as const;
+
+export type DatabaseType = (typeof DatabaseType)[keyof typeof DatabaseType];
 
 // Options for database creation
 export type CreateDatabaseOptions = {
@@ -32,9 +50,9 @@ export type CreateDatabaseOptions = {
 };
 
 // Main database factory function
-export const createDatabase = async function (
+export const createDatabase = async (
   options: CreateDatabaseOptions
-): Promise<UnifiedDatabase> {
+): Promise<Database> => {
   const { enableTracing = false, path = ':memory:', type } = options;
 
   switch (type) {
@@ -54,33 +72,31 @@ export const createDatabase = async function (
 };
 
 // Convenience functions for common use cases
-export const createBunDatabase = async function (
+export const createBunDatabase = async (
   path?: string,
   enableTracing?: boolean
-): Promise<UnifiedDatabase> {
-  return createDatabase({
+): Promise<Database> =>
+  createDatabase({
     enableTracing,
     path,
     type: DatabaseType.BUN
   });
-};
 
-export const createWasmDatabase = async function (
+export const createWasmDatabase = async (
   path?: string,
   enableTracing?: boolean
-): Promise<UnifiedDatabase> {
-  return createDatabase({
+): Promise<Database> =>
+  createDatabase({
     enableTracing,
     path,
     type: DatabaseType.WASM
   });
-};
 
 // Auto-detect function that tries Bun first, falls back to WASM
-export const createAutoDatabase = async function (
+export const createAutoDatabase = async (
   path?: string,
   enableTracing?: boolean
-): Promise<UnifiedDatabase> {
+): Promise<Database> => {
   try {
     return await createBunDatabase(path, enableTracing);
   } catch {

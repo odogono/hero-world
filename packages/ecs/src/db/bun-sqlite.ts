@@ -1,9 +1,43 @@
-import type { Database as BunDatabase } from 'bun:sqlite';
+import { existsSync, unlinkSync } from 'node:fs';
 
-import type { UnifiedDatabase, UnifiedStatement } from './index';
+import type {
+  Database as BunDatabase,
+  Changes,
+  SQLQueryBindings
+} from 'bun:sqlite';
+
+import type {
+  Database,
+  Statement,
+  StatementArgs,
+  StatementRunResult
+} from './index';
+
+const isArray = (args: unknown): args is unknown[] => Array.isArray(args);
+const isObject = (args: unknown): args is Record<string, unknown> =>
+  typeof args === 'object' && args !== null;
+
+const parseArgs = (
+  args: unknown[] | Record<string, unknown> | unknown,
+  ...rest: unknown[]
+) => {
+  if (!args && rest.length === 0) {
+    return null;
+  }
+
+  if (Array.isArray(args)) {
+    return args;
+  } else if (isObject(args) && rest.length === 0) {
+    return args;
+  } else if (rest.length > 0) {
+    return [args, ...rest];
+  } else {
+    return [args];
+  }
+};
 
 // Wrapper for Bun SQLite database
-export class BunDatabaseWrapper implements UnifiedDatabase {
+export class BunDatabaseWrapper implements Database {
   private db: BunDatabase;
 
   constructor(db: BunDatabase) {
@@ -18,26 +52,34 @@ export class BunDatabaseWrapper implements UnifiedDatabase {
     this.db.run(sql);
   }
 
-  prepare(sql: string): UnifiedStatement {
-    const stmt = this.db.prepare(sql);
+  prepare(sql: string): Statement {
+    const stmt = this.db.query(sql);
+    // console.log('prepare', sql, stmt.toString());
     return {
-      bind: (args: unknown[]) => {
-        // Bun SQLite uses a different binding API
-        if (args.length === 1) {
-          stmt.bind(args[0]);
-        } else {
-          stmt.bind(args);
-        }
+      all: (args?: StatementArgs) =>
+        stmt.all(args as unknown as SQLQueryBindings),
+      bind: (args: StatementArgs) => {
+        // stmt.bind(convertKeysToNamedParams(args));
       },
-      free: () => stmt.finalize(),
-      get: (args: unknown[]) => {
-        if (args.length === 1) {
-          return stmt.get(args[0]) as unknown[];
-        }
-        return stmt.get(args) as unknown[];
+      finalize: () => stmt.finalize(),
+      get: (input: StatementArgs, ...rest: StatementArgs[]) => {
+        const args = parseArgs(input, ...rest);
+        return stmt.get(args as unknown as SQLQueryBindings);
       },
       getColumnNames: () => stmt.columnNames,
-      step: () => stmt.step()
+      run: (input?: StatementArgs, ...rest: StatementArgs[]) => {
+        const args = parseArgs(input, ...rest);
+        if (!args) {
+          return convertChangesToStatementRunResult(
+            stmt.run() as unknown as Changes
+          );
+        }
+
+        return convertChangesToStatementRunResult(
+          stmt.run(args as SQLQueryBindings)
+        );
+      },
+      step: () => false
     };
   }
 
@@ -70,15 +112,36 @@ export class BunDatabaseWrapper implements UnifiedDatabase {
   }
 
   lastInsertRowId(): number {
-    return this.db.lastInsertRowId;
+    return 0;
+  }
+
+  saveToPath(path: string): Promise<void> {
+    // if the file exists, delete it
+    if (existsSync(path)) {
+      unlinkSync(path);
+    }
+
+    this.db.run(`VACUUM main INTO '${path}'`);
+    return Promise.resolve();
+  }
+
+  transaction(fn: () => void): () => void {
+    return this.db.transaction(fn);
   }
 }
 
 // Factory function for Bun SQLite
 export const createBunDatabaseInstance = async (
   path: string
-): Promise<UnifiedDatabase> => {
+): Promise<Database> => {
   const { Database } = await import('bun:sqlite');
-  const db = new Database(path);
+  const db = new Database(path, { strict: true });
   return new BunDatabaseWrapper(db);
 };
+
+const convertChangesToStatementRunResult = (
+  changes: Changes
+): StatementRunResult => ({
+  changes: Number(changes.changes),
+  lastInsertRowId: Number(changes.lastInsertRowid)
+});

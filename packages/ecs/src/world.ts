@@ -1,7 +1,8 @@
-import { Database, Statement } from 'bun:sqlite';
-import { createLog, toSnakeCase } from 'odgn-helpers';
+import { createLog } from 'odgn-helpers';
 import z from 'zod';
 
+import { DatabaseType, createDatabase, type Statement } from '@db';
+import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
   zodSchemaToSqliteInsert,
   zodSchemaToSqliteTable,
@@ -20,36 +21,35 @@ import {
 
 const log = createLog('world');
 
-// Helper function to convert object keys from camelCase to snake_case
-const convertKeysToSnakeCase = (
-  obj: Record<string, any>
-): Record<string, any> => {
-  const result: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const snakeKey = toSnakeCase(key) || key;
-    result[snakeKey] = value;
-  }
-  return result;
+type CreateWorldOptions = {
+  dbType?: DatabaseType;
 };
 
-const createWorldInternal = <T extends Components>(): World<T> => {
+const createWorldInternal = async <T extends Components>(
+  options: CreateWorldOptions = {}
+): Promise<World<T>> => {
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entityCache: EntityCache = new Map();
 
-  const db = new Database(':memory:', { strict: true });
+  const db = await createDatabase({
+    path: ':memory:',
+    type: options.dbType || DatabaseType.BUN
+  });
 
-  db.run('PRAGMA journal_mode = WAL;');
-  db.run('PRAGMA foreign_keys = ON');
+  // const db = new Database(':memory:', { strict: true });
+
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA foreign_keys = ON');
 
   const { sql } = zodSchemaToSqliteTable(entitySchema, {
     ifNotExists: true
   });
-  db.run(sql);
+  db.exec(sql);
 
   const insertEntity = db.prepare('INSERT INTO tbl_entity DEFAULT VALUES;');
-  const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?1;');
+  const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?;');
   const selectEntityById = db.prepare(
-    'SELECT id FROM tbl_entity WHERE id = ?1;'
+    'SELECT id FROM tbl_entity WHERE id = ?;'
   );
 
   return {
@@ -66,8 +66,10 @@ const createWorldInternal = <T extends Components>(): World<T> => {
   };
 };
 
-export const createWorld = <T extends Components>(): WorldBuilder<T> => {
-  const world = createWorldInternal<T>();
+export const createWorld = async <T extends Components>(
+  options: CreateWorldOptions = {}
+): Promise<WorldBuilder<T>> => {
+  const world = await createWorldInternal<T>(options);
 
   const build = () => ({ ...world, flush: () => flush(world) });
 
@@ -104,7 +106,7 @@ export const saveWorld = async <T extends Components>(
   if (await Bun.file(path).exists()) {
     await Bun.file(path).delete();
   }
-  world.db.exec(`VACUUM main INTO '${path}'`);
+  await world.db.saveToPath(path);
 };
 
 type ComponentStatements = {

@@ -1,5 +1,6 @@
-import { Database, Statement } from 'bun:sqlite';
 import { z } from 'zod';
+
+import type { Database, Statement } from '@db';
 
 import { pkWithAutoIncrement } from './schema';
 import type { ColumnInfo, SchemaType } from './schema/types';
