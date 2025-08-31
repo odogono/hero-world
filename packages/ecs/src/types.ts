@@ -28,12 +28,6 @@ export type ComponentDef = {
   [key: string]: Statement;
 };
 
-export const componentSchema = z.object({
-  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
-  // eslint-disable-next-line perfectionist/sort-objects
-  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
-});
-
 /**
  * Component definition
  */

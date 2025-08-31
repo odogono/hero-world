@@ -143,9 +143,6 @@ const registerComponentDef = <T extends Components>(
     namedParams: true
   });
 
-  // log.debug('[registerComponentDef] sqlInsert', name, sqlInsert);
-  // log.debug('[registerComponentDef] sqlUpdate', name, sqlUpdate);
-
   const additionalStmts = Object.entries(statements).reduce(
     (acc, [key, sql]) => {
       acc[key] = world.db.prepare(sql);

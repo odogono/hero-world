@@ -275,11 +275,6 @@ describe('createEntity', () => {
 
   test('createEntity should handle different component data types', async () => {
     // Test with string component
-    // const nameSchema = componentSchema.extend({
-    //   firstName: string(),
-    //   lastName: string(),
-    //   title: string().optional(),
-    // }).meta({ id: '/name', name: 'tbl_names' });
 
     const nameComponent = defineComponent({
       name: 'test_name' as const,

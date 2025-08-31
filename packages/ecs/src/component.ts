@@ -2,7 +2,6 @@ import { toSnakeCase } from 'odgn-helpers';
 import { z } from 'zod';
 
 import {
-  componentSchema,
   type ComponentDefinition,
   type Components,
   type Entity,
@@ -16,6 +15,12 @@ type DefineComponentExOptions<Name extends string> = {
   statements?: Record<string, string>;
   tableName?: string;
 };
+
+const componentSchema = z.object({
+  id: z.int().optional().meta({ autoIncrement: true, primaryKey: true }),
+  // eslint-disable-next-line perfectionist/sort-objects
+  eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
+});
 
 export const defineComponent = <Name extends string>(
   options: DefineComponentExOptions<Name>

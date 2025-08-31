@@ -197,14 +197,33 @@ const mapRowToEntity = <T extends Components>(
   return entity;
 };
 
+/**
+ * Query a single entity
+ * @param world
+ * @param options
+ * @returns
+ */
+export const queryEntity = <T extends Components>(
+  world: World<T>,
+  options?: QueryOptions<T>
+) => {
+  const { args, componentsToInclude, sql } = buildQuery(world, {
+    ...options,
+    limit: 1
+  });
+  const stmt = world.db.prepare(sql);
+  const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
+  const result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
+  stmt.finalize();
+  return result;
+};
+
 export const queryEntities = <T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
 
-  // const stmt = world.db.prepare(sql);
-  // const rows = args && args.length > 0 ? stmt.all(...args) : stmt.all();
   const rows = world.db.query(sql, args);
 
   return rows.map((row: any) =>

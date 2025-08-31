@@ -3,7 +3,13 @@ import z from 'zod';
 
 import { defineComponent, removeComponent } from '@component';
 import { DatabaseType } from '@db';
-import { createEntity, queryEntities, queryEntitiesIterator } from '@entity';
+import {
+  createEntity,
+  queryEntities,
+  queryEntitiesIterator,
+  queryEntity
+} from '@entity';
+import type { Entity } from '@types';
 import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
@@ -140,6 +146,311 @@ describe('query', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe(entity1.id);
     expect(result[0]?.status.status).toBe('idle');
+  });
+
+  test('should query single entity by ID using queryEntity', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    const entity1 = createEntity(world, { status: { status: 'idle' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      entity: entity1,
+      with: ['status']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe(entity1.id);
+    expect((result as any)?.status?.status).toBe('idle');
+  });
+
+  test('should return null when entity does not exist', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    // Create a fake entity with non-existent ID
+    const fakeEntity = { id: 999, world } as Entity;
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      entity: fakeEntity,
+      with: ['status']
+    });
+    expect(result).toBeNull();
+  });
+
+  test('should query single entity with where clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      where: `status = 'walking'`,
+      with: ['status']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.status.status).toBe('walking');
+  });
+
+  test('should return null when where clause matches no entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      where: `status = 'dead'`,
+      with: ['status']
+    });
+    expect(result).toBeNull();
+  });
+
+  test('should query single entity with args in where clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      args: ['fighting'],
+      where: 'status = ?1',
+      with: ['status']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.status.status).toBe('fighting');
+  });
+
+  test('should query single entity with multiple components', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(positionComponent)
+      .registerComponent(velocityComponent)
+      .build();
+
+    createEntity(world, { position: { x: 0, y: 0 } });
+    createEntity(world, {
+      position: { x: 1, y: 1 },
+      velocity: { x: 2, y: 2 }
+    });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      with: ['position', 'velocity']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.position.x).toBe(1);
+    expect(result?.position.y).toBe(1);
+    expect(result?.velocity.x).toBe(2);
+    expect(result?.velocity.y).toBe(2);
+  });
+
+  test('should query single entity with without clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(positionComponent)
+      .registerComponent(velocityComponent)
+      .build();
+
+    createEntity(world, { position: { x: 0, y: 0 } });
+    createEntity(world, {
+      position: { x: 1, y: 1 },
+      velocity: { x: 2, y: 2 }
+    });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      with: ['position'],
+      without: ['velocity']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.position.x).toBe(0);
+    expect(result?.position.y).toBe(0);
+    expect((result as any).velocity).toBeUndefined();
+  });
+
+  test('should return null when without clause excludes all entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(positionComponent)
+      .registerComponent(velocityComponent)
+      .build();
+
+    createEntity(world, {
+      position: { x: 0, y: 0 },
+      velocity: { x: 1, y: 1 }
+    });
+    createEntity(world, {
+      position: { x: 1, y: 1 },
+      velocity: { x: 2, y: 2 }
+    });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      with: ['position'],
+      without: ['velocity']
+    });
+    expect(result).toBeNull();
+  });
+
+  test('should query single entity with offset', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      offset: 1,
+      with: ['status']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.status.status).toBe('walking');
+  });
+
+  test('should return null when offset is beyond available entities', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      offset: 5,
+      with: ['status']
+    });
+    expect(result).toBeNull();
+  });
+
+  test('should query single entity with complex where clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(positionComponent)
+      .registerComponent(velocityComponent)
+      .build();
+
+    createEntity(world, { position: { x: 0, y: 0 } });
+    createEntity(world, {
+      position: { x: 10, y: 10 },
+      velocity: { x: 5, y: 5 }
+    });
+    createEntity(world, {
+      position: { x: 20, y: 20 },
+      velocity: { x: 10, y: 10 }
+    });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      where: `position.x > 5 AND velocity.x > 3`,
+      with: ['position', 'velocity']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.position.x).toBe(10);
+    expect(result?.velocity.x).toBe(5);
+  });
+
+  test('should query single entity with IN clause', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { status: { status: 'idle' } });
+    createEntity(world, { status: { status: 'walking' } });
+    createEntity(world, { status: { status: 'fighting' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      where: `status IN ('walking', 'fighting')`,
+      with: ['status']
+    });
+    expect(result).not.toBeNull();
+    expect(['walking', 'fighting']).toContain(result?.status.status);
+  });
+
+  test('should query single entity with camelCase component properties', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(nameComponent)
+      .build();
+
+    createEntity(world, { name: { fullName: 'John Doe' } });
+    createEntity(world, { name: { fullName: 'Jane Smith' } });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      where: `name.full_name = 'Jane Smith'`,
+      with: ['name']
+    });
+    expect(result).not.toBeNull();
+    expect((result as any)?.name?.fullName).toBe('Jane Smith');
+  });
+
+  test('should return null when no entities exist', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(statusComponent)
+      .build();
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      with: ['status']
+    });
+    expect(result).toBeNull();
+  });
+
+  test('should query single entity with multiple without clauses', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(positionComponent)
+      .registerComponent(velocityComponent)
+      .registerComponent(statusComponent)
+      .build();
+
+    createEntity(world, { position: { x: 0, y: 0 } });
+    createEntity(world, {
+      position: { x: 1, y: 1 },
+      status: { status: 'idle' }
+    });
+    createEntity(world, {
+      position: { x: 2, y: 2 },
+      velocity: { x: 3, y: 3 }
+    });
+
+    flush(world);
+
+    const result = queryEntity(world, {
+      with: ['position'],
+      without: ['velocity', 'status']
+    });
+    expect(result).not.toBeNull();
+    expect(result?.position.x).toBe(0);
+    expect((result as any).velocity).toBeUndefined();
+    expect((result as any).status).toBeUndefined();
   });
 
   test('should set a limit on the number of entities returned', async () => {
