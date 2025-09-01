@@ -80,36 +80,54 @@ class AlasqlStatementWrapper implements Statement {
     const args = parseArgs(input, ...rest);
 
     try {
-      // Use the database's exec method which handles SQL conversion
-      const r = this.db.exec(this.sql, args);
+      let lastInsertRowId = 0;
+      
+      // Handle INSERT statements with auto-increment ID generation
+      if (this.sql.trim().toUpperCase().startsWith('INSERT')) {
+        const tableMatch = this.sql.match(/insert\s+into\s+(\w+)/i);
+        if (tableMatch) {
+          const tableName = tableMatch[1];
+          
+          // Generate the next ID for this table
+          const nextId = this.db.generateNextId(tableName, 'id');
+          lastInsertRowId = nextId;
+          
+          // If the INSERT doesn't include an ID column, add it
+          if (!this.sql.toLowerCase().includes('(id,') && !this.sql.toLowerCase().includes('(id ')) {
+            // Modify the SQL to include the generated ID
+            let modifiedSql = this.sql;
+            const valuesMatch = modifiedSql.match(/\(([^)]+)\)\s+VALUES\s+\(([^)]+)\)/i);
+            if (valuesMatch) {
+              const [, columns, values] = valuesMatch;
+              const newColumns = `id, ${columns}`;
+              const newValues = `${nextId}, ${values}`;
+              modifiedSql = modifiedSql.replace(
+                /\(([^)]+)\)\s+VALUES\s+\(([^)]+)\)/i,
+                `(${newColumns}) VALUES (${newValues})`
+              );
+              
+              // Execute the modified SQL
+              this.db.exec(modifiedSql, args);
+            } else {
+              // Fallback to original execution
+              this.db.exec(this.sql, args);
+            }
+          } else {
+            // SQL already includes ID, execute as-is
+            this.db.exec(this.sql, args);
+          }
+        } else {
+          // No table match, execute as-is
+          this.db.exec(this.sql, args);
+        }
+      } else {
+        // Not an INSERT, execute normally
+        this.db.exec(this.sql, args);
+      }
+
       if (this.sql.includes('DEFAULT VALUES')) {
         throw new Error('DEFAULT VALUES is not supported');
       }
-
-      // For INSERT statements, try to get the last inserted ID
-      const lastInsertRowId = 0;
-      // if (this.sql.trim().toUpperCase().startsWith('INSERT')) {
-      //   const lastRow = alasql(
-      //     `SELECT * FROM tbl_entity ORDER BY id DESC LIMIT 1`
-      //   );
-
-      //   // AlasQL doesn't have built-in last insert ID, so we simulate it
-      //   // by querying the max ID from the table if possible
-      //   const tableMatch = this.sql.match(/insert\s+into\s+(\w+)/i);
-      //   if (tableMatch) {
-      //     const tableName = tableMatch[1];
-      //     try {
-      //       const maxResult = alasql(
-      //         `SELECT MAX(id) as maxId FROM ${tableName}`
-      //       );
-      //       if (maxResult && maxResult.length > 0 && maxResult[0].maxId) {
-      //         lastInsertRowId = maxResult[0].maxId + 1;
-      //       }
-      //     } catch {
-      //       // Ignore errors when trying to get max ID
-      //     }
-      //   }
-      // }
 
       // For AlasQL, we assume 1 change for successful operations
       const changes = 1;
@@ -144,16 +162,27 @@ export class AlasqlDatabaseWrapper implements Database {
   }
 
   addEntity(): number {
-    // Manually manage IDs since AlasQL IDENTITY doesn't work reliably
-    const existingRows = alasql(
-      'SELECT id FROM tbl_entity ORDER BY id DESC LIMIT 1'
-    ) as { id: number }[];
-    const nextId = existingRows.length > 0 ? (existingRows[0]?.id ?? 0) + 1 : 1;
-
-    // Insert with explicit ID since IDENTITY seems problematic
+    const nextId = this.generateNextId('tbl_entity', 'id');
+    
+    // Insert with explicit ID since IDENTITY doesn't work reliably
     alasql(`INSERT INTO tbl_entity (id) VALUES (${nextId})`);
 
     return nextId;
+  }
+
+  generateNextId(tableName: string, idColumn: string = 'id'): number {
+    // Manually manage IDs since AlasQL IDENTITY doesn't work reliably
+    try {
+      const existingRows = alasql(
+        `SELECT ${idColumn} FROM ${tableName} ORDER BY ${idColumn} DESC LIMIT 1`
+      ) as { [key: string]: number }[];
+      const nextId = existingRows.length > 0 ? (existingRows[0]?.[idColumn] ?? 0) + 1 : 1;
+
+      return nextId;
+    } catch {
+      // If table doesn't exist or is empty, start from 1
+      return 1;
+    }
   }
 
   close(): void {
@@ -339,11 +368,10 @@ export class AlasqlDatabaseWrapper implements Database {
       '$1[$2]$3'
     );
 
-    // Special handling for entity table - don't use IDENTITY
-    if (convertedSql.includes('tbl_entity')) {
-      convertedSql = convertedSql.replaceAll(/\bautoincrement\b/gi, '');
-      convertedSql = convertedSql.replaceAll(/\bidentity\b/gi, '');
-    }
+    // AlasQL's IDENTITY doesn't work reliably, remove it from all tables
+    // We'll handle ID generation manually in the statement run method
+    convertedSql = convertedSql.replaceAll(/\bautoincrement\b/gi, '');
+    convertedSql = convertedSql.replaceAll(/\bidentity\b/gi, '');
 
     // Convert SQL data types to AlasQL compatible types
     convertedSql = convertedSql.replaceAll(/\btext\b/gi, 'STRING');
