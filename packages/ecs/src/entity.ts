@@ -1,4 +1,4 @@
-import { toCamelCase } from 'odgn-helpers';
+import { toCamelCase } from 'odgn-helpers/string';
 
 import { makeTrackedComponent } from '@component';
 import type {

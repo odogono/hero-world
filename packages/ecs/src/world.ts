@@ -1,4 +1,4 @@
-import { createLog } from 'odgn-helpers';
+import { createLog } from 'odgn-helpers/log';
 import z from 'zod';
 
 import {

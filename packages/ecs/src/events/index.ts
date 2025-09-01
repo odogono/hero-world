@@ -83,6 +83,14 @@ export class EventSystem {
       with: ['event']
     });
 
+    const allEvents = queryEntities(this.world, { with: ['event'] });
+
+    // console.log(
+    //   '[EventSystem][collectEventsForSystem] readyEvents',
+    //   readyEvents,
+    //   'allEvents',
+    //   allEvents
+    // );
     const events: Array<{ entity: Entity<'event'>; payload: T; type: string }> =
       [];
 
@@ -98,7 +106,7 @@ export class EventSystem {
         // Mark as processed
         entity.event.processed = true;
       } catch {
-        // console.error('Error parsing event payload:', error);
+        console.error('Error parsing event payload:', error);
         // Mark as processed to prevent retries
         entity.event.processed = true;
       }

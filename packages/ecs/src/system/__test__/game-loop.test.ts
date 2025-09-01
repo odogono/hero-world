@@ -5,11 +5,7 @@ import { createEventSystem } from '@events';
 import { createWorldSystem } from '@system';
 import { createWorld } from '@world';
 
-import {
-  createEventAwareGameLoop,
-  createGameLoop,
-  logSystemPerformance
-} from '../game-loop';
+import { createGameLoop, logSystemPerformance } from '../game-loop';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
@@ -35,7 +31,7 @@ describe('GameLoop', () => {
 
     gameLoop.addSystem('test-system', testSystem);
 
-    const systems = gameLoop.getSystems();
+    const systems = gameLoop.getSystems()!;
     expect(systems).toHaveLength(1);
     expect(systems[0].id).toBe('test-system');
     expect(systems[0].options.priority).toBe(50); // default priority
@@ -556,11 +552,11 @@ describe('GameLoop', () => {
   });
 });
 
-describe('createEventAwareGameLoop', () => {
+describe('createGameLoop', () => {
   test('should create event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     expect(gameLoop).toBeDefined();
     expect(gameLoop.getSystems()).toHaveLength(0);
@@ -570,7 +566,7 @@ describe('createEventAwareGameLoop', () => {
   test('should add system to event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     const testSystem = createWorldSystem((world, deltaTime, events) => {
       expect(events).toBeDefined();
@@ -592,7 +588,7 @@ describe('createEventAwareGameLoop', () => {
       collectEventsForSystem: () => []
     };
 
-    const gameLoop = createEventAwareGameLoop(
+    const gameLoop = createGameLoop(
       world,
       mockEventSystem as unknown as import('@events').EventSystem
     );
@@ -614,7 +610,7 @@ describe('createEventAwareGameLoop', () => {
   test('should handle system removal in event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     const testSystem = createWorldSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
@@ -629,7 +625,7 @@ describe('createEventAwareGameLoop', () => {
   test('should handle system enable/disable in event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     const testSystem = createWorldSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
@@ -646,7 +642,7 @@ describe('createEventAwareGameLoop', () => {
   test('should handle non-existent system operations in event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     expect(() => gameLoop.removeSystem('non-existent')).not.toThrow();
     expect(() => gameLoop.enableSystem('non-existent')).not.toThrow();
@@ -656,7 +652,7 @@ describe('createEventAwareGameLoop', () => {
   test('should handle system errors in event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     let otherSystemExecuted = false;
 
@@ -682,7 +678,7 @@ describe('createEventAwareGameLoop', () => {
   test('should support method chaining in event-aware game loop', async () => {
     const world = (await createTestWorld()).build();
     const eventSystem = createEventSystem(world);
-    const gameLoop = createEventAwareGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world, eventSystem);
 
     const testSystem = createWorldSystem(() => {});
 

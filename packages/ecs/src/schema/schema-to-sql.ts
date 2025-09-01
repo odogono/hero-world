@@ -1,5 +1,5 @@
 /* eslint-disable @nkzw/no-instanceof */
-import { toSnakeCase } from 'odgn-helpers';
+import { toSnakeCase } from 'odgn-helpers/string';
 import { z } from 'zod';
 
 import type {

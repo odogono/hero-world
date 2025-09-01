@@ -1,4 +1,4 @@
-import { toSnakeCase } from 'odgn-helpers';
+import { toSnakeCase } from 'odgn-helpers/string';
 
 export const convertKeysToNamedParams = (
   obj: Record<string, unknown>

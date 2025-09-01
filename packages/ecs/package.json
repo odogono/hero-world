@@ -2,13 +2,14 @@
   "name": "odgn-ecs",
   "module": "index.ts",
   "type": "module",
+  "exports": {
+    "./component": "./src/component.ts",
+    "./entity": "./src/entity.ts",
+    "./events": "./src/events/index.ts",
+    "./system": "./src/system/index.ts",
+    "./world": "./src/world.ts"
+  },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "^4.6.3",
-    "@nkzw/eslint-config": "^3.0.2",
-    "@types/bun": "latest",
-    "eslint": "^9.34.0",
-    "knip": "^5.63.0",
-    "prettier": "^3.6.2",
     "vite-tsconfig-paths": "^5.1.4",
     "odgn-helpers": "workspace:*"
   },
@@ -26,10 +27,8 @@
     "unused": "knip"
   },
   "dependencies": {
-    "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
     "alasql": "^4.6.6",
     "mitt": "^3.0.1",
-    "odgn-helpers": "workspace:*",
-    "zod": "^4.1.4"
+    "odgn-helpers": "workspace:*"
   }
 }

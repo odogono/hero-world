@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
-import { createLog } from 'odgn-helpers';
+import { createLog } from 'odgn-helpers/log';
 import z from 'zod';
 
 import { defineComponent } from '../component';

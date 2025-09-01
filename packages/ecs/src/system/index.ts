@@ -6,7 +6,7 @@ import type { SystemFunction } from './types';
 
 // Export event-aware system functionality
 // Re-export the event-aware game loop as the main game loop
-export { createEventAwareGameLoop as createGameLoop } from './game-loop';
+export { createGameLoop } from './game-loop';
 
 /**
  * Creates a simple system function that operates on the world directly

@@ -1,4 +1,4 @@
-import { toSnakeCase } from 'odgn-helpers';
+import { toSnakeCase } from 'odgn-helpers/string';
 
 // Helper function to convert object keys from camelCase to snake_case
 export const convertKeysToSnakeCase = (

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
+import z from 'zod';
 
 import { defineComponent } from '@component';
 import { DatabaseType } from '@db';

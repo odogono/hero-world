@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type SchemaType = z.ZodObject<z.ZodRawShape>;
+export type SchemaType = z.ZodTypeAny;
 
 /**
  * Column information for SQLite table generation

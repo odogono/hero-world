@@ -1,4 +1,4 @@
-import { toSnakeCase } from 'odgn-helpers';
+import { toSnakeCase } from 'odgn-helpers/string';
 import z from 'zod';
 
 import {
