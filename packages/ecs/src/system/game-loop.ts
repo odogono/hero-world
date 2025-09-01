@@ -156,8 +156,21 @@ export const createGameLoop = <TComponents extends Components>(
 
         // console.log('[GameLoop][update] events', events);
 
-        // Execute system with events
-        system.fn(world, deltaTime, events);
+        // Execute system with events, disabling flush to prevent double flushing
+        system.fn(world, deltaTime, events, { flush: false });
+
+        // Delete processed event entities
+        if (events.length > 0) {
+          for (const event of events) {
+            // Mark entity for deletion (id should always be available for created entities)
+            if (event.entity.id !== undefined) {
+              world.entitiesToDelete.add(event.entity.id);
+            }
+          }
+        }
+
+        // Always flush to persist any changes made by the system or event deletions
+        world.flush();
 
         const executionTime = Date.now() - startTime;
         const perf = performance.get(system.id)!;

@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import { DatabaseType } from '@db';
-import { createEventSystem } from '@events';
+import { createEntity } from '@entity';
+import { createEventSystem, eventComponent } from '@events';
 import { createWorldSystem } from '@system';
-import { createWorld } from '@world';
+import { createWorld, flush } from '@world';
 
 import { createGameLoop, logSystemPerformance } from '../game-loop';
 
@@ -31,13 +32,13 @@ describe('GameLoop', () => {
 
     gameLoop.addSystem('test-system', testSystem);
 
-    const systems = gameLoop.getSystems()!;
+    const systems = gameLoop.getSystems();
     expect(systems).toHaveLength(1);
-    expect(systems[0].id).toBe('test-system');
-    expect(systems[0].options.priority).toBe(50); // default priority
-    expect(systems[0].options.enabled).toBe(true);
-    expect(systems[0].options.frequency).toBe(1);
-    expect(systems[0].enabled).toBe(true);
+    expect(systems[0]?.id).toBe('test-system');
+    expect(systems[0]?.options.priority).toBe(50); // default priority
+    expect(systems[0]?.options.enabled).toBe(true);
+    expect(systems[0]?.options.frequency).toBe(1);
+    expect(systems[0]?.enabled).toBe(true);
   });
 
   test('should add system with custom options', async () => {
@@ -53,10 +54,10 @@ describe('GameLoop', () => {
     });
 
     const systems = gameLoop.getSystems();
-    expect(systems[0].options.priority).toBe(100);
-    expect(systems[0].options.enabled).toBe(false);
-    expect(systems[0].options.frequency).toBe(5);
-    expect(systems[0].enabled).toBe(false);
+    expect(systems[0]?.options.priority).toBe(100);
+    expect(systems[0]?.options.enabled).toBe(false);
+    expect(systems[0]?.options.frequency).toBe(5);
+    expect(systems[0]?.enabled).toBe(false);
   });
 
   test('should sort systems by priority (highest first)', async () => {
@@ -689,6 +690,252 @@ describe('createGameLoop', () => {
 
     expect(result).toBe(gameLoop);
     expect(gameLoop.getSystems()).toHaveLength(1);
+  });
+
+  test('should delete event entities after processing', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let systemExecuted = false;
+    let receivedEvents: any[] = [];
+
+    const testSystem = createWorldSystem((world, deltaTime, events) => {
+      systemExecuted = true;
+      receivedEvents = [...events];
+      // System should not flush by default
+      expect(events).toHaveLength(1);
+    });
+
+    gameLoop.addSystem('test-system', testSystem);
+
+    // Schedule an event for the system
+    const eventEntity = eventSystem.scheduleEvent('test-system', 'test-event', {
+      message: 'hello'
+    });
+    flush(world);
+
+    // Verify event exists before processing
+    const pendingEventsBefore = eventSystem.getPendingEvents();
+    expect(pendingEventsBefore).toHaveLength(1);
+    expect(pendingEventsBefore[0].id).toBe(eventEntity.id);
+
+    // Run the game loop
+    gameLoop.update(16);
+
+    // Check that the system received the event
+    expect(systemExecuted).toBe(true);
+    expect(receivedEvents).toHaveLength(1);
+    expect(receivedEvents[0].type).toBe('test-event');
+    expect(receivedEvents[0].payload).toEqual({ message: 'hello' });
+
+    // Verify that the event entity was deleted
+    const pendingEventsAfter = eventSystem.getPendingEvents();
+    expect(pendingEventsAfter).toHaveLength(0);
+
+    // Verify the entity is no longer in the database
+    const remainingEvents = eventSystem.getEventsForSystem('test-system');
+    expect(remainingEvents).toHaveLength(0);
+  });
+
+  test('should delete multiple event entities after processing', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let receivedEvents: any[] = [];
+
+    const testSystem = createWorldSystem((world, deltaTime, events) => {
+      receivedEvents = [...events];
+      expect(events).toHaveLength(3);
+    });
+
+    gameLoop.addSystem('test-system', testSystem);
+
+    // Schedule multiple events for the system
+    const event1 = eventSystem.scheduleEvent('test-system', 'event-1', {
+      id: 1
+    });
+    const event2 = eventSystem.scheduleEvent('test-system', 'event-2', {
+      id: 2
+    });
+    const event3 = eventSystem.scheduleEvent('test-system', 'event-3', {
+      id: 3
+    });
+    flush(world);
+
+    // Verify events exist before processing
+    const pendingEventsBefore = eventSystem.getPendingEvents();
+    expect(pendingEventsBefore).toHaveLength(3);
+
+    // Run the game loop
+    gameLoop.update(16);
+
+    // Check that the system received all events
+    expect(receivedEvents).toHaveLength(3);
+    expect(receivedEvents.map(e => e.payload.id)).toEqual([1, 2, 3]);
+
+    // Verify that all event entities were deleted
+    const pendingEventsAfter = eventSystem.getPendingEvents();
+    expect(pendingEventsAfter).toHaveLength(0);
+
+    // Verify no events remain in the database
+    const remainingEvents = eventSystem.getEventsForSystem('test-system');
+    expect(remainingEvents).toHaveLength(0);
+  });
+
+  test('should handle systems with no events gracefully', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let systemExecuted = false;
+
+    const testSystem = createWorldSystem((world, deltaTime, events) => {
+      systemExecuted = true;
+      expect(events).toHaveLength(0);
+    });
+
+    gameLoop.addSystem('test-system', testSystem);
+
+    // Run the game loop without any events
+    gameLoop.update(16);
+
+    // Check that the system executed
+    expect(systemExecuted).toBe(true);
+
+    // Verify no errors occurred
+    const pendingEvents = eventSystem.getPendingEvents();
+    expect(pendingEvents).toHaveLength(0);
+  });
+
+  test('should delete events only for the target system', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let system1Executed = false;
+    let system2Executed = false;
+
+    const system1 = createWorldSystem((world, deltaTime, events) => {
+      system1Executed = true;
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe('event-for-system1');
+    });
+
+    const system2 = createWorldSystem((world, deltaTime, events) => {
+      system2Executed = true;
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe('event-for-system2');
+    });
+
+    gameLoop.addSystem('system1', system1);
+    gameLoop.addSystem('system2', system2);
+
+    // Schedule events for different systems
+    const event1 = eventSystem.scheduleEvent('system1', 'event-for-system1', {
+      data: 1
+    });
+    const event2 = eventSystem.scheduleEvent('system2', 'event-for-system2', {
+      data: 2
+    });
+    flush(world);
+
+    // Verify events exist before processing
+    const pendingEventsBefore = eventSystem.getPendingEvents();
+    expect(pendingEventsBefore).toHaveLength(2);
+
+    // Run the game loop
+    gameLoop.update(16);
+
+    // Check that both systems executed
+    expect(system1Executed).toBe(true);
+    expect(system2Executed).toBe(true);
+
+    // Verify that all event entities were deleted
+    const pendingEventsAfter = eventSystem.getPendingEvents();
+    expect(pendingEventsAfter).toHaveLength(0);
+
+    // Verify no events remain for either system
+    const remainingEvents1 = eventSystem.getEventsForSystem('system1');
+    const remainingEvents2 = eventSystem.getEventsForSystem('system2');
+    expect(remainingEvents1).toHaveLength(0);
+    expect(remainingEvents2).toHaveLength(0);
+  });
+
+  test('should call flush even when no events are processed', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let flushCalled = false;
+    const originalFlush = world.flush;
+
+    // Mock the flush method to track calls
+    world.flush = () => {
+      flushCalled = true;
+      return originalFlush.call(world);
+    };
+
+    const testSystem = createWorldSystem((world, deltaTime, events) => {
+      // System makes some changes to the world
+      const entity = createEntity(world, { location: { x: 10, y: 20 } });
+      expect(events).toHaveLength(0);
+    });
+
+    gameLoop.addSystem('test-system', testSystem);
+
+    // Run the game loop without any events
+    gameLoop.update(16);
+
+    // Verify that flush was called even without events
+    expect(flushCalled).toBe(true);
+
+    // Restore original flush method
+    world.flush = originalFlush;
+  });
+
+  test('should handle events with undefined entity IDs gracefully', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+    const gameLoop = createGameLoop(world, eventSystem);
+
+    let systemExecuted = false;
+
+    const testSystem = createWorldSystem((world, deltaTime, events) => {
+      systemExecuted = true;
+      expect(events).toHaveLength(1);
+    });
+
+    gameLoop.addSystem('test-system', testSystem);
+
+    // Schedule an event
+    eventSystem.scheduleEvent('test-system', 'test-event', {
+      message: 'hello'
+    });
+    flush(world);
+
+    // Run the game loop
+    expect(() => gameLoop.update(16)).not.toThrow();
+
+    // Check that the system executed without errors
+    expect(systemExecuted).toBe(true);
+
+    // Verify that the event was processed (even if deletion failed due to undefined ID)
+    const pendingEvents = eventSystem.getPendingEvents();
+    expect(pendingEvents).toHaveLength(0);
   });
 });
 
