@@ -144,13 +144,13 @@ export class AlasqlDatabaseWrapper implements Database {
   }
 
   addEntity(): number {
-    // For AlasQL with IDENTITY, don't specify the id column
-    // Let's try a different approach - manually manage the ID
+    // Manually manage IDs since AlasQL IDENTITY doesn't work reliably
     const existingRows = alasql(
       'SELECT id FROM tbl_entity ORDER BY id DESC LIMIT 1'
     ) as { id: number }[];
     const nextId = existingRows.length > 0 ? (existingRows[0]?.id ?? 0) + 1 : 1;
 
+    // Insert with explicit ID since IDENTITY seems problematic
     alasql(`INSERT INTO tbl_entity (id) VALUES (${nextId})`);
 
     return nextId;
@@ -293,6 +293,58 @@ export class AlasqlDatabaseWrapper implements Database {
       return ''; // Return empty string for pragma statements
     }
 
+    // Handle CREATE TABLE column definitions first
+    convertedSql = convertedSql.replaceAll(
+      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+text)/gi,
+      '$1[$2]$3'
+    );
+    convertedSql = convertedSql.replaceAll(
+      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+integer)/gi,
+      '$1[$2]$3'
+    );
+    convertedSql = convertedSql.replaceAll(
+      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+real)/gi,
+      '$1[$2]$3'
+    );
+
+    // Handle reserved words in column lists and SELECT column references (but not in CREATE TABLE or UPDATE)
+    if (
+      !convertedSql.includes('CREATE TABLE') &&
+      !convertedSql.includes('UPDATE ')
+    ) {
+      // Replace reserved words in column lists (but not parameter names starting with :)
+      convertedSql = convertedSql.replaceAll(
+        /(?<!:)\b(value|counter|name|order|group|user|date|time|index)\b(?=\s*[),])/gi,
+        '[$1]'
+      );
+
+      // Also replace reserved words in SELECT column references like table.column
+      convertedSql = convertedSql.replaceAll(
+        /(\w+)\.(value|counter|name|order|group|user|date|time|index)\b/gi,
+        '$1.[$2]'
+      );
+    }
+
+    // Handle reserved words in UPDATE SET clauses
+    if (convertedSql.includes('UPDATE ')) {
+      convertedSql = convertedSql.replaceAll(
+        /\bset\s+([^=]+)\b(value|counter|name|order|group|user|date|time|index)\b/gi,
+        (match, before, reservedWord) => `SET ${before}[${reservedWord}]`
+      );
+    }
+
+    // Handle reserved words in WHERE clauses and other expressions
+    convertedSql = convertedSql.replaceAll(
+      /(\s|\w+\.)(value|counter|name|order|group|user|date|time|index)(\s*[\s!),<=>])/gi,
+      '$1[$2]$3'
+    );
+
+    // Special handling for entity table - don't use IDENTITY
+    if (convertedSql.includes('tbl_entity')) {
+      convertedSql = convertedSql.replaceAll(/\bautoincrement\b/gi, '');
+      convertedSql = convertedSql.replaceAll(/\bidentity\b/gi, '');
+    }
+
     // Convert SQL data types to AlasQL compatible types
     convertedSql = convertedSql.replaceAll(/\btext\b/gi, 'STRING');
     convertedSql = convertedSql.replaceAll(/\breal\b/gi, 'FLOAT');
@@ -345,12 +397,6 @@ export class AlasqlDatabaseWrapper implements Database {
     convertedSql = convertedSql.replaceAll(
       /references[^),]*(?:on\s+delete\s+cascade)?,?\s*/gi,
       ''
-    );
-
-    // Quote reserved words that might be used as column names (but not in DDL contexts like PRIMARY KEY)
-    convertedSql = convertedSql.replaceAll(
-      /\b(value|text|order|group|user|date|time|index)\s+(?!key)/gi,
-      '"$1" '
     );
 
     // Handle SQLite's UPDATE syntax - convert tuple updates to individual SET clauses

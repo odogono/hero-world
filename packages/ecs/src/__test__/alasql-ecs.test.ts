@@ -8,7 +8,15 @@ import { createWorld, flush } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.ALASQL;
 
-const createTestWorld = async () => await createWorld({ dbType });
+// Generate unique database name for each test to avoid data persistence issues
+let testCounter = 0;
+const createTestWorld = async () => {
+  const uniqueDbName = `test_${Date.now()}_${testCounter++}`;
+  return await createWorld({
+    dbType,
+    path: uniqueDbName
+  });
+};
 
 describe('ECS with AlasQL Backend', () => {
   test('should create world with AlasQL backend', async () => {
@@ -124,11 +132,16 @@ describe('ECS with AlasQL Backend', () => {
     flush(world);
 
     // Query to verify update
+    const allEntities = queryEntities(world, { with: ['mutable'] });
+    expect(allEntities).toHaveLength(1);
+    expect(allEntities[0].mutable.counter).toBe(42);
+    expect(allEntities[0].mutable.name).toBe('updated');
+
+    // Test WHERE clause with reserved words
     const updated = queryEntities(world, {
       where: 'mutable.counter = 42',
       with: ['mutable']
     });
-
     expect(updated).toHaveLength(1);
     expect(updated[0].mutable.name).toBe('updated');
 

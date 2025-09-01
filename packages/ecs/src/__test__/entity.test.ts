@@ -75,8 +75,6 @@ describe('createEntity', () => {
       }
     });
 
-    type Stats = z.infer<typeof stats.schema>;
-
     const world = builder.registerComponent(stats).build();
 
     const entity = createEntity(world, {
