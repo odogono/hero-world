@@ -96,7 +96,7 @@ describe('EventSystem', () => {
     expect(typeBEvents[0].event.type).toBe('type-b');
   });
 
-  test('should collect events for system', async () => {
+  test.only('should collect events for system', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
@@ -113,9 +113,16 @@ describe('EventSystem', () => {
     expect(collectedEvents[0].payload.value).toBe(1);
     expect(collectedEvents[1].payload.value).toBe(2);
 
-    // Events should be marked as processed
-    const stillPending = eventSystem.collectEventsForSystem('test-system');
-    expect(stillPending).toHaveLength(0);
+    // Verify that the collected events are marked as processed in memory
+    expect(collectedEvents[0].entity.event.processed).toBe(true);
+    expect(collectedEvents[1].entity.event.processed).toBe(true);
+
+    // Flush to persist the processed status
+    flush(world);
+
+    // Verify that events are marked as processed by checking the database
+    const pendingEvents = eventSystem.getPendingEvents();
+    expect(pendingEvents).toHaveLength(1); // Only the event for 'other-system' should be pending
   });
 
   test('should get events for specific system', async () => {

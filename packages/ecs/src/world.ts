@@ -35,6 +35,7 @@ const createWorldInternal = async <T extends Components>(
 ): Promise<World<T>> => {
   const registry = z.registry();
   const dirtyEntities = new Map<number, Set<keyof Components>>();
+  const entitiesToDelete = new Set<number>();
   const entityCache: EntityCache = new Map();
 
   const db = await createDatabase({
@@ -60,6 +61,7 @@ const createWorldInternal = async <T extends Components>(
     db,
     defs: new Map(),
     dirtyEntities,
+    entitiesToDelete,
     entityCache,
     flush: () => ({}) as unknown as World<T>,
     registry,
@@ -191,10 +193,36 @@ const registerComponentDef = <T extends Components>(
 // }
 
 export const flush = <T extends Components>(world: World<T>) => {
-  const { db, defs, dirtyEntities, entityCache, stmts } = world;
+  const { db, defs, dirtyEntities, entitiesToDelete, entityCache, stmts } =
+    world;
   db.transaction(() => {
-    // log.debug('[flush] dirtyEntities', dirtyEntities);
+    // Handle entity deletions first
+    if (entitiesToDelete.size > 0) {
+      // Convert Set to Array for SQL IN clause
+      const entityIds = Array.from(entitiesToDelete);
+
+      // Batch delete entities - components will be cascade deleted due to ON DELETE CASCADE
+      const placeholders = entityIds
+        .map((_, index) => `?${index + 1}`)
+        .join(',');
+      const deleteSql = `DELETE FROM tbl_entity WHERE id IN (${placeholders})`;
+
+      world.db.exec(deleteSql, entityIds);
+
+      // Clean up cache entries for deleted entities
+      for (const eid of entityIds) {
+        entityCache.delete(eid);
+        dirtyEntities.delete(eid);
+      }
+    }
+
+    // Handle component updates and insertions (only for entities that still exist)
     for (const [eid, components] of dirtyEntities.entries()) {
+      // Skip if entity was deleted (cache should have been cleaned up above)
+      if (!entityCache.has(eid)) {
+        continue;
+      }
+
       const cache = entityCache.get(eid);
 
       for (const c of components) {
@@ -226,7 +254,9 @@ export const flush = <T extends Components>(world: World<T>) => {
     }
   });
 
+  // Clear all tracking
   dirtyEntities.clear();
+  entitiesToDelete.clear();
 
   return world;
 };

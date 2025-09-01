@@ -1,10 +1,15 @@
-import type { Components, World, Entity } from '../types';
+import type { Components, Entity, World } from '../types';
+
+export type SystemFunctionOptions = {
+  flush?: boolean;
+};
 
 // System Loop Types
 export type SystemFunction<TComponents extends Components> = (
   world: World<TComponents>,
   deltaTime: number,
-  events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+  events: Array<{ entity: Entity<'event'>; payload: any; type: string }>,
+  options?: SystemFunctionOptions
 ) => void;
 
 export type SystemOptions = {

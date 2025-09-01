@@ -83,7 +83,7 @@ export class EventSystem {
       with: ['event']
     });
 
-    const allEvents = queryEntities(this.world, { with: ['event'] });
+    // const allEvents = queryEntities(this.world, { with: ['event'] });
 
     // console.log(
     //   '[EventSystem][collectEventsForSystem] readyEvents',
@@ -105,17 +105,14 @@ export class EventSystem {
 
         // Mark as processed
         entity.event.processed = true;
-      } catch {
+      } catch (error) {
         console.error('Error parsing event payload:', error);
         // Mark as processed to prevent retries
         entity.event.processed = true;
       }
     }
 
-    // Flush changes
-    if (readyEvents.length > 0) {
-      this.world.flush();
-    }
+    // Note: Caller is responsible for calling flush() to persist changes
 
     return events;
   }

@@ -68,7 +68,7 @@ describe('createEntity', () => {
 
   test('create entity with components', async () => {
     const stats = defineComponent({
-      name: 'stats',
+      name: 'special_stats',
       schema: {
         agility: z.number(),
         strength: z.number()
@@ -78,13 +78,13 @@ describe('createEntity', () => {
     const world = builder.registerComponent(stats).build();
 
     const entity = createEntity(world, {
-      stats: {
+      special_stats: {
         agility: 10,
         strength: 20
       }
     });
 
-    expect(entity.stats.strength).toBe(20);
+    expect(entity.special_stats.strength).toBe(20);
   });
 
   test('createEntity should create entity without components', async () => {
@@ -511,9 +511,16 @@ describe('deleteEntity', () => {
     // Delete entity
     deleteEntity(entity);
 
-    // Verify entity is removed
+    // Verify entity is marked for deletion but not yet removed from database
     const e2 = getEntity(world, entity.id);
-    expect(e2).toBeNull();
+    expect(e2).toBeDefined(); // Entity still exists until flush
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
+    const e3 = getEntity(world, entity.id);
+    expect(e3).toBeNull();
   });
 
   test('deleteEntity should remove entity with components', async () => {
@@ -531,7 +538,13 @@ describe('deleteEntity', () => {
     // Delete entity
     deleteEntity(entity);
 
-    // Verify entity is removed
+    // Verify entity is marked for deletion but not yet removed from database
+    expect(getEntity(world, entity.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
@@ -595,10 +608,16 @@ describe('deleteEntity', () => {
     // Delete entity
     deleteEntity(entity);
 
-    // Verify entity is removed
+    // Verify entity is marked for deletion but not yet removed from database
+    expect(getEntity(world, entity.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
     expect(getEntity(world, entity.id)).toBeNull();
 
-    // Verify components are cascade deleted from database due to foreign key constraints
+    // Verify components are cascade deleted from database
     expect(locationStmt.get(entity.id)).toBeNull();
     expect(statsStmt.get(entity.id)).toBeNull();
   });
@@ -626,7 +645,15 @@ describe('deleteEntity', () => {
     // Delete middle entity
     deleteEntity(entity2);
 
-    // Verify only middle entity is removed
+    // Verify middle entity is marked for deletion but not yet removed from database
+    expect(getEntity(world, entity1.id)).toBeDefined();
+    expect(getEntity(world, entity2.id)).toBeDefined();
+    expect(getEntity(world, entity3.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify only middle entity is now removed
     expect(getEntity(world, entity1.id)).toBeDefined();
     expect(getEntity(world, entity2.id)).toBeNull();
     expect(getEntity(world, entity3.id)).toBeDefined();
@@ -660,9 +687,17 @@ describe('deleteEntity', () => {
     // Delete entity
     deleteEntity(entity);
 
-    // Verify cleanup
+    // Verify cleanup of caches
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
+
+    // Entity should still exist in database until flush
+    expect(getEntity(world, entity.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
@@ -683,9 +718,17 @@ describe('deleteEntity', () => {
     // Delete entity with pending changes
     deleteEntity(entity);
 
-    // Verify complete cleanup
+    // Verify cache cleanup
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
+
+    // Entity should still exist in database until flush
+    expect(getEntity(world, entity.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
     expect(getEntity(world, entity.id)).toBeNull();
   });
 
@@ -711,10 +754,18 @@ describe('deleteEntity', () => {
     // Delete entity
     deleteEntity(entity);
 
-    // Verify entity and cache cleanup
-    expect(getEntity(world, entity.id)).toBeNull();
+    // Verify cache cleanup
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
+
+    // Entity should still exist in database until flush
+    expect(getEntity(world, entity.id)).toBeDefined();
+
+    // Flush to actually delete from database
+    flush(world);
+
+    // Verify entity is now removed
+    expect(getEntity(world, entity.id)).toBeNull();
 
     // Verify database cascade delete worked
     const locationStmt = world.db.prepare(

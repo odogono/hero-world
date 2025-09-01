@@ -50,6 +50,7 @@ export type World<TComponents extends Components> = {
   db: Database;
   defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
+  entitiesToDelete: Set<number>;
   entityCache: EntityCache;
   flush: () => World<TComponents>;
   registry: ReturnType<typeof z.registry>;

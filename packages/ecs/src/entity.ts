@@ -67,7 +67,8 @@ export const deleteEntity = <T extends Components>(
 ) => {
   const { id, world } = entity;
 
-  const r = world.stmts.deleteEntity!.run(id);
+  // Mark entity for deletion instead of immediate deletion
+  world.entitiesToDelete.add(id);
 
   // Clean up caches
   world.entityCache.delete(id);

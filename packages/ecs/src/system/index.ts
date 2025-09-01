@@ -8,6 +8,10 @@ import type { SystemFunction } from './types';
 // Re-export the event-aware game loop as the main game loop
 export { createGameLoop } from './game-loop';
 
+type SystemFunctionOptions = {
+  flush?: boolean;
+};
+
 /**
  * Creates a simple system function that operates on the world directly
  * Compatible with the game loop architecture
@@ -20,9 +24,12 @@ export const createWorldSystem =
       events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
     ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events) => {
+  (world: World<TComponents>, deltaTime: number, events, options) => {
+    const flushSystem = options?.flush ?? true;
     systemFn(world, deltaTime, events);
-    flush(world);
+    if (flushSystem) {
+      flush(world);
+    }
   };
 
 /**
@@ -45,14 +52,17 @@ export const createSystem =
     ) => void,
     queryOptions?: QueryOptions<TComponents>
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events) => {
+  (world: World<TComponents>, deltaTime: number, events, options) => {
+    const flushSystem = options?.flush ?? true;
     const entities = queryEntitiesIterator(world, queryOptions);
 
     for (const entity of entities) {
       processFn(entity as TEntity, world, deltaTime, events);
     }
 
-    flush(world);
+    if (flushSystem) {
+      flush(world);
+    }
   };
 
 /**
@@ -78,13 +88,16 @@ export const createEventDrivenSystem =
       events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
     ) => void
   ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events) => {
+  (world: World<TComponents>, deltaTime: number, events, options) => {
+    const flushSystem = options?.flush ?? true;
     // Only run if we have events of the specified types
     const relevantEvents = events.filter(event =>
       eventTypes.includes(event.type)
     );
     if (relevantEvents.length > 0) {
       systemFn(world, deltaTime, relevantEvents);
-      flush(world);
+      if (flushSystem) {
+        flush(world);
+      }
     }
   };
