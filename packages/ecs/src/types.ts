@@ -46,11 +46,13 @@ export type Components = Record<string, unknown>;
  * World type that includes component types
  */
 export type World<TComponents extends Components> = {
+  close: () => void;
   db: Database;
   defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
   entityCache: EntityCache;
   flush: () => World<TComponents>;
+  registry: ReturnType<typeof z.registry>;
   stmts: Record<string, Statement>;
 };
 

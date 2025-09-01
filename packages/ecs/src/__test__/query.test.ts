@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import z from 'zod';
 
 import { defineComponent, removeComponent } from '@component';
@@ -9,7 +9,7 @@ import {
   queryEntitiesIterator,
   queryEntity
 } from '@entity';
-import type { Entity } from '@types';
+import type { Components, Entity, WorldBuilder } from '@types';
 import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
@@ -44,13 +44,23 @@ const nameComponent = defineComponent({
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const createTestWorld = async () =>
+  // await createWorld({ dbType });
+  await createWorld({ clearExisting: true, dbType, path: ':memory:' });
 
 describe('query', () => {
+  let builder: WorldBuilder<Components>;
+
+  beforeEach(async () => {
+    builder = await createTestWorld();
+  });
+
+  afterEach(() => {
+    builder.close();
+  });
+
   test('should query all entities with status component', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'idle' } });
@@ -62,6 +72,7 @@ describe('query', () => {
     flush(world);
 
     const entities = queryEntities(world, { with: ['status'] });
+    // console.debug('entities', entities);
     expect(entities).toHaveLength(6);
 
     const allEntities = queryEntities(world);
@@ -69,9 +80,7 @@ describe('query', () => {
   });
 
   test('should return component properties with camelCase', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(nameComponent)
-      .build();
+    const world = builder.registerComponent(nameComponent).build();
     createEntity(world, { name: { fullName: 'John Doe' } });
     flush(world);
     const entities = queryEntities(world, { with: ['name'] });
@@ -80,9 +89,7 @@ describe('query', () => {
   });
 
   test('should filter entities with where clause', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'idle' } });
@@ -113,9 +120,7 @@ describe('query', () => {
   });
 
   test('where clause should support args', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
     createEntity(world, { status: { status: 'fighting' } });
@@ -131,9 +136,7 @@ describe('query', () => {
   });
 
   test('should query single entity by ID', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     const entity1 = createEntity(world, { status: { status: 'idle' } });
 
@@ -149,9 +152,7 @@ describe('query', () => {
   });
 
   test('should query single entity by ID using queryEntity', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     const entity1 = createEntity(world, { status: { status: 'idle' } });
 
@@ -167,9 +168,7 @@ describe('query', () => {
   });
 
   test('should return null when entity does not exist', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     // Create a fake entity with non-existent ID
     const fakeEntity = { id: 999, world } as Entity;
@@ -184,9 +183,7 @@ describe('query', () => {
   });
 
   test('should query single entity with where clause', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -203,9 +200,7 @@ describe('query', () => {
   });
 
   test('should return null when where clause matches no entities', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -220,9 +215,7 @@ describe('query', () => {
   });
 
   test('should query single entity with args in where clause', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -240,7 +233,7 @@ describe('query', () => {
   });
 
   test('should query single entity with multiple components', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -264,7 +257,7 @@ describe('query', () => {
   });
 
   test('should query single entity with without clause', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -288,7 +281,7 @@ describe('query', () => {
   });
 
   test('should return null when without clause excludes all entities', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -312,9 +305,7 @@ describe('query', () => {
   });
 
   test('should query single entity with offset', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -331,9 +322,7 @@ describe('query', () => {
   });
 
   test('should return null when offset is beyond available entities', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -348,7 +337,7 @@ describe('query', () => {
   });
 
   test('should query single entity with complex where clause', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -375,9 +364,7 @@ describe('query', () => {
   });
 
   test('should query single entity with IN clause', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -394,9 +381,7 @@ describe('query', () => {
   });
 
   test('should query single entity with camelCase component properties', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(nameComponent)
-      .build();
+    const world = builder.registerComponent(nameComponent).build();
 
     createEntity(world, { name: { fullName: 'John Doe' } });
     createEntity(world, { name: { fullName: 'Jane Smith' } });
@@ -412,9 +397,7 @@ describe('query', () => {
   });
 
   test('should return null when no entities exist', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     flush(world);
 
@@ -425,7 +408,7 @@ describe('query', () => {
   });
 
   test('should query single entity with multiple without clauses', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -454,9 +437,7 @@ describe('query', () => {
   });
 
   test('should set a limit on the number of entities returned', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -472,9 +453,7 @@ describe('query', () => {
   });
 
   test('should set an offset on the number of entities returned', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -490,9 +469,7 @@ describe('query', () => {
   });
 
   test('should combine limit and offset options', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -513,9 +490,7 @@ describe('query', () => {
   });
 
   test('should return an iterator over the entities', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -535,9 +510,7 @@ describe('query', () => {
   });
 
   test('should return an iterator with filtering options', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
 
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
@@ -560,9 +533,7 @@ describe('query', () => {
   });
 
   test('iterator should support args in where clause', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statusComponent)
-      .build();
+    const world = builder.registerComponent(statusComponent).build();
     createEntity(world, { status: { status: 'idle' } });
     createEntity(world, { status: { status: 'walking' } });
     createEntity(world, { status: { status: 'fighting' } });
@@ -585,7 +556,7 @@ describe('query', () => {
   });
 
   test('query returns entities with both components', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -609,7 +580,7 @@ describe('query', () => {
   });
 
   test('should query entities that do not have a specific component', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -631,7 +602,7 @@ describe('query', () => {
   });
 
   test('should query entities that do not have multiple components', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -661,7 +632,7 @@ describe('query', () => {
   });
 
   test('should combine without with other query options', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -692,7 +663,7 @@ describe('query', () => {
   });
 
   test('should work with iterator queries', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .build();
@@ -717,7 +688,7 @@ describe('query', () => {
   });
 
   test('should use with option to specify which components to include', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -742,7 +713,7 @@ describe('query', () => {
   });
 
   test('should combine with and without options', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)
@@ -771,7 +742,7 @@ describe('query', () => {
   });
 
   test('removing components from world should not affect queries', async () => {
-    const world = (await createTestWorld())
+    const world = builder
       .registerComponent(positionComponent)
       .registerComponent(velocityComponent)
       .registerComponent(statusComponent)

@@ -8,6 +8,7 @@ import type {
 
 import { parseArgs } from './helpers';
 import type {
+  CreateDatabaseOptions,
   Database,
   LoadFromJSONOptions,
   SaveToJSONOptions,
@@ -144,10 +145,30 @@ export class BunDatabaseWrapper implements Database {
 
 // Factory function for Bun SQLite
 export const createBunDatabaseInstance = async (
-  path: string
+  options: CreateDatabaseOptions
 ): Promise<Database> => {
+  const {
+    clearExisting = false,
+    path = ':memory:',
+    readonly = false,
+    walMode = 'OFF'
+  } = options;
   const { Database } = await import('bun:sqlite');
-  const db = new Database(path, { strict: true });
+
+  if (path !== ':memory:' && clearExisting) {
+    if (existsSync(path)) {
+      unlinkSync(path);
+    }
+  }
+
+  const db = new Database(path, { readonly, strict: true });
+
+  if (walMode === 'WAL') {
+    db.run('PRAGMA journal_mode = WAL;');
+  } else {
+    db.run('PRAGMA journal_mode = OFF;');
+  }
+
   return new BunDatabaseWrapper(db);
 };
 

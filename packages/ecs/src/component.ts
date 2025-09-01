@@ -1,5 +1,5 @@
 import { toSnakeCase } from 'odgn-helpers';
-import { z } from 'zod';
+import z from 'zod';
 
 import {
   type ComponentDefinition,

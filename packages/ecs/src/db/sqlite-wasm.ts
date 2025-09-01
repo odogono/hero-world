@@ -6,6 +6,7 @@ import type {
 
 import { convertKeysToNamedParams, isObject, parseArgs } from './helpers';
 import type {
+  CreateDatabaseOptions,
   Database,
   LoadFromJSONOptions,
   SaveToJSONOptions,
@@ -169,9 +170,9 @@ export class WasmDatabaseWrapper implements Database {
 
 // Factory function for SQLite WASM
 export const createWasmDatabaseInstance = async (
-  path: string,
-  enableTracing: boolean = false
+  options: CreateDatabaseOptions
 ): Promise<Database> => {
+  const { enableTracing = false, path = ':memory:' } = options;
   const sqliteWasm = await import('@sqlite.org/sqlite-wasm');
   const sqlite3 = await sqliteWasm.default({
     print: () => {},

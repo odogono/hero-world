@@ -1,7 +1,12 @@
 import { createLog } from 'odgn-helpers';
 import z from 'zod';
 
-import { DatabaseType, createDatabase, type Statement } from '@db';
+import {
+  DatabaseType,
+  createDatabase,
+  type CreateDatabaseOptions,
+  type Statement
+} from '@db';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
   zodSchemaToSqliteInsert,
@@ -21,29 +26,28 @@ import {
 
 const log = createLog('world');
 
-type CreateWorldOptions = {
+type CreateWorldOptions = Partial<CreateDatabaseOptions> & {
   dbType?: DatabaseType;
 };
 
 const createWorldInternal = async <T extends Components>(
   options: CreateWorldOptions = {}
 ): Promise<World<T>> => {
+  const registry = z.registry();
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entityCache: EntityCache = new Map();
 
   const db = await createDatabase({
-    path: ':memory:',
+    ...options,
     type: options.dbType || DatabaseType.BUN
   });
 
-  // const db = new Database(':memory:', { strict: true });
-
-  db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON');
 
   const { sql } = zodSchemaToSqliteTable(entitySchema, {
     ifNotExists: true
   });
+
   db.exec(sql);
 
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?;');
@@ -52,11 +56,13 @@ const createWorldInternal = async <T extends Components>(
   );
 
   return {
+    close: () => db.close(),
     db,
     defs: new Map(),
     dirtyEntities,
     entityCache,
     flush: () => ({}) as unknown as World<T>,
+    registry,
     stmts: {
       deleteEntity,
       selectEntityById
@@ -121,16 +127,21 @@ const registerComponentDef = <T extends Components>(
   if (!meta?.id) {
     throw new Error('componentDef must have an id');
   }
-  const name = meta.id;
 
-  const existing = world.defs.get(name);
-  if (existing) {
+  if (world.registry.get(componentDef)) {
     return world;
   }
 
-  // log.debug('[registerComponentDef] name', name, meta.id);
+  world.registry.add(componentDef, {
+    description: meta.description ?? meta.id
+  });
 
-  // const cid = insertComponentDef(world, meta.id);
+  const name = meta.id;
+
+  // const existing = world.defs.get(name);
+  // if (existing) {
+  //   return world;
+  // }
 
   const result = zodSchemaToSqliteTable(componentDef, { ifNotExists: true });
   // log.debug('[registerComponentDef] result', result);

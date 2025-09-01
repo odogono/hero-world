@@ -2,6 +2,7 @@ import alasql from 'alasql';
 
 import { parseArgs } from './helpers';
 import type {
+  CreateDatabaseOptions,
   Database,
   LoadFromJSONOptions,
   SaveToJSONOptions,
@@ -420,8 +421,9 @@ export class AlasqlDatabaseWrapper implements Database {
 
 // Factory function for AlasQL
 export const createAlasqlDatabaseInstance = async (
-  path: string = ':memory:'
+  options: CreateDatabaseOptions
 ): Promise<Database> => {
+  const { path = ':memory:' } = options;
   const dbName =
     path === ':memory:' ? undefined : path.replaceAll(/[^\dA-Za-z]/g, '_');
   return new AlasqlDatabaseWrapper(dbName);
