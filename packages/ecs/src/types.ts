@@ -79,13 +79,17 @@ export type Entity<C extends keyof Components = never> = EntitySchema & {
  * Entity type for a world with specific components
  */
 export type EntityWithComponents<
-  TComponents extends Record<string, any>,
+  TComponents extends Record<string, unknown>,
   C extends keyof TComponents = never
 > = {
   id: number;
   world: World<TComponents>;
 } & {
-  [K in C]-?: NonNullable<TComponents[K]>;
+  [K in C]-?: TComponents[K] extends infer TData
+    ? TData extends Record<string, unknown>
+      ? TData
+      : NonNullable<TComponents[K]>
+    : NonNullable<TComponents[K]>;
 };
 
 export type EntitySchema = z.infer<typeof entitySchema>;

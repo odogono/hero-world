@@ -77,10 +77,7 @@ describe('createEntity', () => {
 
     type Stats = z.infer<typeof stats.schema>;
 
-    const world = builder
-      .registerComponent(stats)
-      .registerComponent(stats)
-      .build();
+    const world = builder.registerComponent(stats).build();
 
     const entity = createEntity(world, {
       stats: {
@@ -89,7 +86,7 @@ describe('createEntity', () => {
       }
     });
 
-    expect(entity.stats.agility).toBe(10);
+    expect(entity.stats.strength).toBe(20);
   });
 
   test('createEntity should create entity without components', async () => {
