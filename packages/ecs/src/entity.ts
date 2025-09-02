@@ -147,6 +147,9 @@ export type QueryOptions<T extends Components> = {
   where?: string;
   with?: (keyof Components)[];
   without?: (keyof Components)[];
+  // If true, wrap the returned entity/entities in a proxy that intercepts
+  // component add/remove via property assignment, similar to createEntity
+  proxied?: boolean;
 };
 
 const buildQuery = <T extends Components>(
@@ -256,6 +259,47 @@ export const mapRowToEntity = <T extends Components>(
 };
 
 /**
+ * Wrap a queried entity in a Proxy to intercept component add/remove via
+ * property assignment, matching the ergonomics of createEntity.
+ */
+export const asProxiedEntity = <T extends Components>(
+  entity: GenericEntity<T>
+) => {
+  const { world } = entity;
+  return new Proxy(entity as any, {
+    set(target, prop, value) {
+      const propName = String(prop);
+
+      if (
+        propName !== 'id' &&
+        propName !== 'world' &&
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        if (world.defs.has(propName)) {
+          addComponent(target, propName as any, value);
+          return true;
+        }
+      }
+
+      if (
+        propName !== 'id' &&
+        propName !== 'world' &&
+        (value === null || value === undefined)
+      ) {
+        if (world.defs.has(propName)) {
+          removeComponent(target, propName as any);
+          return true;
+        }
+      }
+
+      target[prop] = value;
+      return true;
+    }
+  }) as GenericEntity<T>;
+};
+
+/**
  * Query a single entity
  * @param world
  * @param options
@@ -273,8 +317,11 @@ export const queryEntity = <T extends Components>(
   const stmt = world.db.prepare(sql);
   const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
   // console.debug('row', row);
-  const result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
+  let result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
   stmt.finalize();
+  if (result && options?.proxied) {
+    result = asProxiedEntity(result as any) as any;
+  }
   return result;
 };
 
@@ -286,9 +333,15 @@ export const queryEntities = <T extends Components>(
 
   const rows = world.db.query(sql, args);
 
-  return rows.map((row: any) =>
+  const entities = rows.map((row: any) =>
     mapRowToEntity(world, componentsToInclude, row)
   );
+
+  if (options?.proxied) {
+    return entities.map(e => asProxiedEntity(e as any)) as any;
+  }
+
+  return entities;
 };
 
 export const queryEntitiesIterator = <T extends Components>(
@@ -305,7 +358,10 @@ export const queryEntitiesIterator = <T extends Components>(
   return {
     *[Symbol.iterator]() {
       for (const row of iterator) {
-        const entity = mapRowToEntity(world, componentsToInclude, row);
+        let entity = mapRowToEntity(world, componentsToInclude, row);
+        if (options?.proxied) {
+          entity = asProxiedEntity(entity as any) as any;
+        }
         yield entity;
       }
     }

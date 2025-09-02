@@ -23,7 +23,7 @@ import {
   type Components,
   type EntityCache,
   type World,
-  type WorldBuilder
+  type WorldBuilderGeneric
 } from '@types';
 
 const log = createLog('world');
@@ -38,7 +38,7 @@ const createWorldInternal = async <T extends Components>(
   const registry = z.registry();
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entitiesToDelete = new Set<number>();
-  const entityCache: EntityCache = new Map();
+  const entityCache: EntityCache<T> = new Map();
 
   const db = await createDatabase({
     ...options,
@@ -76,25 +76,27 @@ const createWorldInternal = async <T extends Components>(
 
 export const createWorld = async <T extends Components>(
   options: CreateWorldOptions = {}
-): Promise<WorldBuilder<T>> => {
+): Promise<WorldBuilderGeneric<T>> => {
   const world = await createWorldInternal<T>(options);
 
-  const build = () => ({ ...world, flush: () => flush(world) });
+  const build = <U extends Components = T>(): World<U> =>
+    ({ ...world, flush: () => flush(world) }) as World<U>;
 
   const registerComponent = <Name extends string, Schema extends SchemaType>(
-    def: ComponentDefinition<Name, Schema>
-  ): WorldBuilder<T & { [K in Name]: z.infer<Schema> }> => {
+    def: ComponentDefinition<Schema>
+  ): WorldBuilderGeneric<T & { [K in Name]: z.infer<Schema> }> => {
     registerComponentDef(world, def.schema, def.statements || {});
+
     return {
       ...world,
-      build,
+      build: build<T & { [K in Name]: z.infer<Schema> }>,
       registerComponent
-    } as WorldBuilder<T & { [K in Name]: z.infer<Schema> }>;
+    } as WorldBuilderGeneric<T & { [K in Name]: z.infer<Schema> }>;
   };
 
   return {
     ...world,
-    build,
+    build: build<T>,
     registerComponent
   };
 };
@@ -103,16 +105,12 @@ export const loadWorldFromJSON = <T extends Components>(
   world: World<T>,
   json: unknown,
   options: LoadFromJSONOptions = {}
-) => {
-  return world.db.loadFromJSON(json, options);
-};
+) => world.db.loadFromJSON(json, options);
 
 export const saveWorldToJSON = <T extends Components>(
   world: World<T>,
   options: SaveToJSONOptions = {}
-) => {
-  return world.db.saveToJSON(options);
-};
+) => world.db.saveToJSON(options);
 
 export const saveWorld = async <T extends Components>(
   world: World<T>,
@@ -278,7 +276,9 @@ export const flush = <T extends Components>(world: World<T>) => {
       }
 
       const cache = entityCache.get(eid);
-      if (!cache) continue;
+      if (!cache) {
+        continue;
+      }
 
       for (const c of components) {
         const entry = cache[c as string];

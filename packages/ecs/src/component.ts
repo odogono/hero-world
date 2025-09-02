@@ -4,17 +4,19 @@ import { z } from 'zod';
 import {
   type ComponentDefinition,
   type Components,
-  type Entity,
   type EntityWithComponents,
   type World
 } from '@types';
 
 import { extractDefaults } from './schema';
 
-type DefineComponentExOptions<Name extends string> = {
+type DefineComponentExOptions<
+  Name extends string,
+  Schema extends Record<string, z.ZodTypeAny>
+> = {
   meta?: Record<string, any>;
   name: Name;
-  schema: Record<string, z.ZodTypeAny>;
+  schema: Schema;
   statements?: Record<string, string>;
   tableName?: string;
 };
@@ -24,9 +26,13 @@ const componentSchema = z.object({
   // eslint-disable-next-line perfectionist/sort-objects
   eid: z.int().optional().meta({ cascade: true, foreignKey: 'tbl_entity' })
 });
+type ComponentSchemaBase = z.infer<typeof componentSchema>;
 
-export const defineComponent = <Name extends string>(
-  options: DefineComponentExOptions<Name>
+export const defineComponent = <
+  Name extends string,
+  Schema extends Record<string, z.ZodTypeAny>
+>(
+  options: DefineComponentExOptions<Name, Schema>
 ) => {
   const name = toCamelCase(options.name);
   const { statements } = options;
@@ -38,21 +44,30 @@ export const defineComponent = <Name extends string>(
     name: tableName
   };
 
-  const schema = componentSchema.extend(options.schema).meta(meta);
+  // shortcut the schema type inference
+  type optionsSchema = z.infer<typeof options.schema>;
+  type resultSchema = ComponentSchemaBase & optionsSchema;
+
+  const schema = componentSchema
+    .extend(options.schema)
+    .meta(meta) as unknown as resultSchema;
 
   return {
     name,
     schema,
     statements
-  } as ComponentDefinition<Name, typeof schema>;
+  } as ComponentDefinition<Name, resultSchema>;
 };
 
-export const makeTrackedComponent = <T extends keyof Components>(
-  entity: Entity,
-  componentName: T,
-  data: Components[T],
+export const makeTrackedComponent = <
+  TWorldComponents extends Components,
+  TComponentName extends keyof TWorldComponents
+>(
+  entity: EntityWithComponents<TWorldComponents, never>,
+  componentName: TComponentName,
+  data: TWorldComponents[TComponentName],
   exists = true
-): Components[T] => {
+): TWorldComponents[TComponentName] => {
   const { id, world } = entity;
 
   // Ensure id is defined
@@ -82,13 +97,13 @@ export const makeTrackedComponent = <T extends keyof Components>(
 };
 
 export const addComponent = <
-  E extends Entity<any> | EntityWithComponents<any, any>,
-  T extends keyof Components
+  TWorldComponents extends Components,
+  TComponentName extends keyof TWorldComponents
 >(
-  entity: E,
-  componentName: T,
-  data: Components[T]
-): E & { [K in T]: Components[T] } => {
+  entity: EntityWithComponents<TWorldComponents, never>,
+  componentName: TComponentName,
+  data: TWorldComponents[TComponentName]
+): EntityWithComponents<TWorldComponents, TComponentName> => {
   const { id, world } = entity;
 
   // Ensure id is defined
@@ -105,7 +120,7 @@ export const addComponent = <
   const dataWithDefaults = applyComponentDefaults(
     world,
     componentName as string,
-    data as Partial<Components[T]>
+    data as Partial<TWorldComponents[TComponentName]>
   );
 
   (entity as any)[componentName] = makeTrackedComponent(
@@ -113,23 +128,25 @@ export const addComponent = <
     componentName,
     dataWithDefaults,
     isUpdate // mark as existing if updating, new if adding
-  ) as Components[T];
+  ) as TWorldComponents[TComponentName];
 
   if (!world.dirtyEntities.has(id)) {
     world.dirtyEntities.set(id, new Set());
   }
   world.dirtyEntities.get(id)!.add(componentName);
 
-  return entity as E & { [K in T]: Components[T] };
+  return entity as EntityWithComponents<TWorldComponents, TComponentName>;
 };
 
 export const addComponents = <
-  E extends Entity<any> | EntityWithComponents<any, any>,
-  T extends Record<string, any>
+  TWorldComponents extends Components,
+  TComponentData extends Partial<{
+    [K in keyof TWorldComponents]: TWorldComponents[K];
+  }>
 >(
-  entity: E,
-  components: T
-): E & { [K in keyof T]: T[K] } => {
+  entity: EntityWithComponents<TWorldComponents, never>,
+  components: TComponentData
+): EntityWithComponents<TWorldComponents, keyof TComponentData> => {
   const { id, world } = entity;
 
   // Ensure id is defined
@@ -162,11 +179,11 @@ export const addComponents = <
  * This follows the same pattern as addComponent
  */
 export const removeComponent = <
-  E extends Entity<any> | EntityWithComponents<any, any>,
-  T extends keyof Components
+  TWorldComponents extends Components,
+  TComponentName extends keyof TWorldComponents
 >(
-  entity: E,
-  componentName: T
+  entity: EntityWithComponents<TWorldComponents, any>,
+  componentName: TComponentName
 ): void => {
   const { id, world } = entity;
 

@@ -9,7 +9,7 @@ import {
 } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntity } from '@entity';
-import type { EntityWithComponents } from '@types';
+import type { EntityWithComponents, ExtractBuilderComponents } from '@types';
 
 import { createWorld, flush } from '../world';
 
@@ -46,9 +46,11 @@ const createTestWorld = async () => await createWorld({ dbType });
 describe('component', () => {
   describe('addComponent', () => {
     test('should add a component to an entity', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const worldBuilder = (await createTestWorld()).registerComponent(
+        statsComponent
+      );
+      type WorldComponents = ExtractBuilderComponents<typeof worldBuilder>;
+      const world = worldBuilder.build();
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'statsTest', {
@@ -411,11 +413,16 @@ describe('component', () => {
       });
 
       test('should handle mixed add and delete operations via property assignment', async () => {
-        const world = (await createTestWorld())
+        const worldBuilder = (await createTestWorld())
           .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
-        const entity = createEntity(world);
+          .registerComponent(locationComponent);
+        type WorldComponents = ExtractBuilderComponents<typeof worldBuilder>;
+        const world = worldBuilder.build();
+
+        const entity = createEntity(world) as EntityWithComponents<
+          WorldComponents,
+          'locationTest' | 'statsTest'
+        >;
 
         // Add components
         entity.locationTest = {
@@ -447,7 +454,12 @@ describe('component', () => {
         flush(world);
 
         // Verify location is removed and stats is updated
-        e = queryEntity(world, { with: ['statsTest'] });
+        e = queryEntity<EntityWithComponents<WorldComponents, 'statsTest'>>(
+          world,
+          {
+            with: ['statsTest']
+          }
+        );
         expect(e).toBeDefined();
         expect(e.locationTest).toBeUndefined();
         expect(e.statsTest).toBeDefined();

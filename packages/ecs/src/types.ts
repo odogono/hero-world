@@ -12,10 +12,10 @@ type ComponentCacheEntry<T> = {
   exists: boolean;
 };
 
-export type EntityCache = Map<
+export type EntityCache<TWorldComponents extends Components> = Map<
   number,
   Partial<{
-    [K in keyof Components]: ComponentCacheEntry<Components[K]>;
+    [K in keyof TWorldComponents]: ComponentCacheEntry<TWorldComponents[K]>;
   }>
 >;
 
@@ -34,10 +34,7 @@ export type ComponentDef = {
 /**
  * Component definition
  */
-export type ComponentDefinition<
-  Name extends string,
-  Schema extends SchemaType
-> = {
+export type ComponentDefinition<Name extends string, Schema> = {
   name: Name;
   schema: Schema;
   statements?: Record<string, string>;
@@ -54,7 +51,7 @@ export type World<TComponents extends Components> = {
   defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
   entitiesToDelete: Set<number>;
-  entityCache: EntityCache;
+  entityCache: EntityCache<TComponents>;
   flush: () => World<TComponents>;
   registry: ReturnType<typeof z.registry>;
   stmts: Record<string, Statement>;
@@ -67,6 +64,22 @@ export type WorldBuilder<TComponents extends Components> =
       def: ComponentDefinition<Name, Schema>
     ) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
   };
+
+// Alternative approach: make build generic to preserve type information
+export type WorldBuilderGeneric<TComponents extends Components> =
+  World<TComponents> & {
+    build: <U extends Components = TComponents>() => World<U>;
+    registerComponent: <Name extends string, Schema extends SchemaType>(
+      def: ComponentDefinition<Name, Schema>
+    ) => WorldBuilderGeneric<TComponents & { [K in Name]: z.infer<Schema> }>;
+  };
+
+// Helper type to extract component types from a World instance
+export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;
+
+// Helper type to extract component types from a WorldBuilder instance
+export type ExtractBuilderComponents<T> =
+  T extends WorldBuilder<infer C> ? C : never;
 
 export type GenericEntity<T extends Components> = {
   id: number;
