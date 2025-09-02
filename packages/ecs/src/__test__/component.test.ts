@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
+import z from 'zod';
 
 import {
   addComponent,
@@ -9,7 +9,6 @@ import {
 } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntity } from '@entity';
-import type { EntityWithComponents, ExtractBuilderComponents } from '@types';
 
 import { createWorld, flush } from '../world';
 
@@ -49,7 +48,6 @@ describe('component', () => {
       const worldBuilder = (await createTestWorld()).registerComponent(
         statsComponent
       );
-      type WorldComponents = ExtractBuilderComponents<typeof worldBuilder>;
       const world = worldBuilder.build();
       const entity = createEntity(world);
 
@@ -107,9 +105,9 @@ describe('component', () => {
       expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
       // Modify component - should mark as dirty again
-      (entity as any).statsTest.health = 90;
+      entity.statsTest!.health = 90;
 
-      expect((entity as any).statsTest.health).toBe(90);
+      expect(entity.statsTest!.health).toBe(90);
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(true);
     });
@@ -133,7 +131,7 @@ describe('component', () => {
 
       expect(entityWithBoth.statsTest).toBeDefined();
       expect(entityWithBoth.locationTest).toBeDefined();
-      expect(entityWithBoth.statsTest.health).toBe(100);
+      expect(entityWithBoth.statsTest!.health).toBe(100);
       expect(entityWithBoth.locationTest.name).toBe('Forest');
 
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
@@ -228,7 +226,7 @@ describe('component', () => {
 
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
-      }) as any;
+      });
       flush(world);
 
       // Add another component to existing entity
@@ -238,7 +236,7 @@ describe('component', () => {
       });
 
       expect(entity.statsTest.health).toBe(100);
-      expect(entity.locationTest.name).toBe('Forest');
+      expect(entity.locationTest!.name).toBe('Forest');
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('locationTest')).toBe(
         true
@@ -271,17 +269,17 @@ describe('component', () => {
           .build();
         const entity = createEntity(world);
 
-        (entity as EntityWithComponents<any, 'locationTest'>).locationTest = {
+        entity.locationTest = {
           name: 'Dungeon',
           region: 'North'
         };
 
         flush(world);
 
-        const e = queryEntity(world, { with: ['locationTest'] });
-        expect(e).toBeDefined();
-        expect(e.locationTest.name).toBe('Dungeon');
-        expect(e.locationTest.region).toBe('North');
+        const e2 = queryEntity(world, { with: ['locationTest'] })!;
+        expect(e2).toBeDefined();
+        expect(e2.locationTest.name).toBe('Dungeon');
+        expect(e2.locationTest.region).toBe('North');
       });
 
       test('should add component via direct property assignment', async () => {
@@ -299,10 +297,10 @@ describe('component', () => {
 
         flush(world);
 
-        const e = queryEntity(world, { with: ['locationTest'] })!;
-        expect(e).toBeDefined();
-        expect(e.locationTest!.name).toBe('Castle');
-        expect(e.locationTest!.region).toBe('South');
+        const e2 = queryEntity(world, { with: ['locationTest'] })!;
+        expect(e2).toBeDefined();
+        expect(e2.locationTest!.name).toBe('Castle');
+        expect(e2.locationTest!.region).toBe('South');
       });
 
       test('should add multiple components via direct property assignment', async () => {
@@ -413,11 +411,10 @@ describe('component', () => {
       });
 
       test('should handle mixed add and delete operations via property assignment', async () => {
-        const worldBuilder = (await createTestWorld())
+        const world = (await createTestWorld())
           .registerComponent(statsComponent)
-          .registerComponent(locationComponent);
-        type WorldComponents = ExtractBuilderComponents<typeof worldBuilder>;
-        const world = worldBuilder.build();
+          .registerComponent(locationComponent)
+          .build();
 
         const entity = createEntity(world);
 
@@ -601,7 +598,7 @@ describe('component', () => {
 
       // removeComponent doesn't throw for non-existent components
       expect(() => {
-        removeComponent(entity, 'nonexistent' as any);
+        removeComponent(entity, 'nonexistent');
       }).not.toThrow();
     });
 
@@ -609,7 +606,7 @@ describe('component', () => {
       const world = (await createTestWorld())
         .registerComponent(statsComponent)
         .build();
-      const entity = createEntity(world) as any;
+      const entity = createEntity(world);
 
       // Entity has no stats component
       expect(entity.statsTest).toBeUndefined();

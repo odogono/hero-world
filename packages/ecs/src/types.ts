@@ -80,10 +80,6 @@ export type WorldBuilderGeneric<TComponents extends Components> =
 // Helper type to extract component types from a World instance
 export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;
 
-// Helper type to extract component types from a WorldBuilder instance
-export type ExtractBuilderComponents<T> =
-  T extends WorldBuilder<infer C> ? C : never;
-
 export type GenericEntity<T extends Components> = {
   id: number;
   world: World<T>;
@@ -98,9 +94,7 @@ export type Entity<C extends keyof Components = never> = EntitySchema & {
 /**
  * Entity type for a world with specific components
  */
-type ComponentData<T> = T extends Record<string, unknown>
-  ? T
-  : NonNullable<T>;
+type ComponentData<T> = T extends Record<string, unknown> ? T : NonNullable<T>;
 
 export type EntityWithComponents<
   TComponents extends Record<string, unknown>,

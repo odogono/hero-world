@@ -174,7 +174,7 @@ export const removeComponent = <
   TWorldComponents extends Components,
   TComponentName extends keyof TWorldComponents
 >(
-  entity: EntityWithComponents<TWorldComponents, any>,
+  entity: GenericEntity<TWorldComponents>,
   componentName: TComponentName
 ): void => {
   const { id, world } = entity;
