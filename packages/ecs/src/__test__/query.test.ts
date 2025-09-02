@@ -10,8 +10,8 @@ import {
   queryEntity
 } from '@entity';
 import { dateTime } from '@schema';
-import type { Components, Entity, WorldBuilder } from '@types';
-import { createWorld, flush, saveWorld } from '@world';
+import type { Components, GenericEntity, WorldBuilder } from '@types';
+import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
   name: 'status' as const,
@@ -46,9 +46,9 @@ const nameComponent = defineComponent({
 const testStateComponent = defineComponent({
   name: 'testState',
   schema: {
-    status: z.enum(['pending', 'in_progress', 'completed']).default('pending'),
+    createdAt: dateTime(),
     isComplete: z.boolean().default(false),
-    createdAt: dateTime()
+    status: z.enum(['pending', 'in_progress', 'completed']).default('pending')
   }
 });
 
@@ -430,11 +430,11 @@ describe('query', () => {
     // Query with only position and status, even though entity has velocity
     const result = queryEntities(world, {
       with: ['position', 'status']
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0]?.position.x).toBe(0);
-    expect(result[0]?.status.status).toBe('walking');
-    expect((result[0] as any).velocity).toBeUndefined();
+    })[0]!;
+    expect(result).not.toBeUndefined();
+    expect(result.position.x).toBe(0);
+    expect(result.status.status).toBe('walking');
+    expect(result.velocity).toBeUndefined();
   });
 
   test('should combine with and without options', async () => {
@@ -509,17 +509,20 @@ describe('query', () => {
       const result = queryEntity(world, {
         entity: entity1,
         with: ['status']
-      });
+      })!;
       expect(result).not.toBeNull();
-      expect(result?.id).toBe(entity1.id);
-      expect((result as any)?.status?.status).toBe('idle');
+      expect(result.id).toBe(entity1.id);
+      expect(result.status.status).toBe('idle');
     });
 
     test('should return null when entity does not exist', async () => {
       const world = builder.registerComponent(statusComponent).build();
 
       // Create a fake entity with non-existent ID
-      const fakeEntity = { id: 999, world } as Entity;
+      const fakeEntity = {
+        id: 999,
+        world
+      } as unknown as GenericEntity<Components>;
 
       flush(world);
 
@@ -621,11 +624,11 @@ describe('query', () => {
       const result = queryEntity(world, {
         with: ['position'],
         without: ['velocity']
-      });
+      })!;
       expect(result).not.toBeNull();
-      expect(result?.position.x).toBe(0);
-      expect(result?.position.y).toBe(0);
-      expect((result as any).velocity).toBeUndefined();
+      expect(result.position.x).toBe(0);
+      expect(result.position.y).toBe(0);
+      expect(result.velocity).toBeUndefined();
     });
 
     test('should return null when without clause excludes all entities', async () => {
@@ -739,9 +742,9 @@ describe('query', () => {
       const result = queryEntity(world, {
         where: `name.full_name = 'Jane Smith'`,
         with: ['name']
-      });
+      })!;
       expect(result).not.toBeNull();
-      expect((result as any)?.name?.fullName).toBe('Jane Smith');
+      expect(result.name.fullName).toBe('Jane Smith');
     });
 
     test('should return null when no entities exist', async () => {
@@ -788,9 +791,9 @@ describe('query', () => {
       const world = builder.registerComponent(testStateComponent).build();
       createEntity(world, {
         testState: {
-          status: 'pending',
+          createdAt: new Date().toISOString(),
           isComplete: false,
-          createdAt: new Date().toISOString()
+          status: 'pending'
         }
       });
       flush(world);
@@ -803,16 +806,17 @@ describe('query', () => {
 
     test('should automatically apply default values from schema', async () => {
       const world = builder.registerComponent(testStateComponent).build();
+      type TestStateComponent = z.infer<typeof testStateComponent.schema>;
       // This is the original scenario that was failing - create entity with empty testState
       // Defaults should be applied automatically from the Zod schema
-      createEntity(world, { testState: {} });
+      createEntity(world, { testState: {} as unknown as TestStateComponent });
       flush(world);
       const result = queryEntity(world, { with: ['testState'] })!;
       expect(result).not.toBeNull();
       // All fields should have default values applied automatically
-      expect(result.testState?.status).toBe('pending');
-      expect(result.testState?.isComplete).toBe(0); // SQLite stores booleans as integers
-      expect(result.testState?.createdAt).toBeDefined();
+      expect(result.testState.status).toBe('pending');
+      expect(result.testState.isComplete).toBe(0); // SQLite stores booleans as integers
+      expect(result.testState.createdAt).toBeDefined();
 
       result.testState!.status = 'in_progress';
       flush(world);

@@ -4,6 +4,13 @@ export type SystemFunctionOptions = {
   flush?: boolean;
 };
 
+export type SystemFunctionProps<TComponents extends Components> =
+  SystemFunctionOptions & {
+    deltaTime: number;
+    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>;
+    world: World<TComponents>;
+  };
+
 // System Loop Types
 export type SystemFunction<TComponents extends Components> = (
   world: World<TComponents>,

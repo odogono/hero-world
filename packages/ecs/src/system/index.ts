@@ -49,6 +49,7 @@ export function createSystem<
   ) => void,
   queryOptions: QueryOptions<TComponents> & { with: W }
 ): SystemFunction<TComponents>;
+
 export function createSystem<TComponents extends Components>(
   processFn: (
     entity: EntityWithComponents<TComponents, never>,
@@ -58,12 +59,13 @@ export function createSystem<TComponents extends Components>(
   ) => void,
   queryOptions?: QueryOptions<TComponents>
 ): SystemFunction<TComponents>;
+
 export function createSystem<
   TComponents extends Components,
-  TEntity extends EntityWithComponents<
+  TEntity extends EntityWithComponents<TComponents, any> = EntityWithComponents<
     TComponents,
     any
-  > = EntityWithComponents<TComponents, any>
+  >
 >(
   processFn: (
     entity: TEntity,

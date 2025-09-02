@@ -281,6 +281,7 @@ describe('Systems', () => {
     const world = (await createTestWorld())
       .registerComponent(healthComponent)
       .build();
+    type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
     const entity = createEntity(world, { health: { current: 100, max: 100 } });
@@ -289,7 +290,7 @@ describe('Systems', () => {
     flush(world);
 
     // Create a system that heals entities
-    const system = createSystem(
+    const system = createSystem<C>(
       entity => {
         if (entity.health && entity.health.current < entity.health.max) {
           entity.health.current = Math.min(

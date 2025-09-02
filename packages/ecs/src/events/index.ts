@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import { defineComponent } from '@component';
 import { createEntity, queryEntities } from '@entity';
-import type { Entity, World } from '@types';
+import type {
+  Components,
+  Entity,
+  EntityWithComponents,
+  World
+} from '@types';
 
 // Event component definition
 export const eventComponent = defineComponent({
@@ -21,10 +26,10 @@ export type EventComponent = z.infer<typeof eventComponent.schema>;
 type EventEntity = Entity<'event'>;
 
 // Simple event system
-export class EventSystem {
-  private world: World<any>;
+export class EventSystem<TComponents extends Components = Components> {
+  private world: World<TComponents>;
 
-  constructor(world: World<any>) {
+  constructor(world: World<TComponents>) {
     this.world = world;
   }
 
@@ -34,7 +39,7 @@ export class EventSystem {
     type: string,
     payload: T,
     scheduledAt: number = Date.now()
-  ): Entity {
+  ): EntityWithComponents<TComponents, 'event'> {
     return createEntity(this.world, {
       event: {
         payload: JSON.stringify(payload),
@@ -47,38 +52,50 @@ export class EventSystem {
   }
 
   // Publish event immediately to a system (bypasses scheduling)
-  publishEvent<T = any>(systemId: string, type: string, payload: T): Entity {
+  publishEvent<T = any>(
+    systemId: string,
+    type: string,
+    payload: T
+  ): EntityWithComponents<TComponents, 'event'> {
     return this.scheduleEvent(systemId, type, payload);
   }
 
   // Get all pending events
-  getPendingEvents(): EventEntity[] {
+  getPendingEvents(): Array<EntityWithComponents<TComponents, 'event'>> {
     return queryEntities(this.world, {
       where: 'processed = 0',
       with: ['event']
-    }) as EventEntity[];
+    }) as Array<EntityWithComponents<TComponents, 'event'>>;
   }
 
   // Get events by type
-  getEventsByType(type: string): EventEntity[] {
+  getEventsByType(
+    type: string
+  ): Array<EntityWithComponents<TComponents, 'event'>> {
     return queryEntities(this.world, {
       where: `type = '${type}'`,
       with: ['event']
-    }) as EventEntity[];
+    }) as Array<EntityWithComponents<TComponents, 'event'>>;
   }
 
   // Get events for a specific system (both processed and unprocessed)
-  getEventsForSystem(systemId: string): EventEntity[] {
+  getEventsForSystem(
+    systemId: string
+  ): Array<EntityWithComponents<TComponents, 'event'>> {
     return queryEntities(this.world, {
       where: `target_system = '${systemId}'`,
       with: ['event']
-    }) as EventEntity[];
+    }) as Array<EntityWithComponents<TComponents, 'event'>>;
   }
 
   // Collect ready events for a system and return their parsed payloads
   collectEventsForSystem<T = any>(
     systemId: string
-  ): Array<{ entity: EventEntity; payload: T; type: string }> {
+  ): Array<{
+    entity: EntityWithComponents<TComponents, 'event'>;
+    payload: T;
+    type: string;
+  }> {
     const now = Date.now();
     const readyEvents = queryEntities(this.world, {
       where: `target_system = '${systemId}' AND processed = 0 AND scheduled_at <= ${now}`,
@@ -93,7 +110,11 @@ export class EventSystem {
     //   'allEvents',
     //   allEvents
     // );
-    const events: Array<{ entity: EventEntity; payload: T; type: string }> = [];
+    const events: Array<{
+      entity: EntityWithComponents<TComponents, 'event'>;
+      payload: T;
+      type: string;
+    }> = [];
 
     for (const entity of readyEvents) {
       try {
@@ -106,7 +127,7 @@ export class EventSystem {
 
         // Mark as processed
         entity.event.processed = true;
-      } catch (error) {
+      } catch {
         // console.error('Error parsing event payload:', error);
         // Mark as processed to prevent retries
         entity.event.processed = true;
@@ -120,5 +141,6 @@ export class EventSystem {
 }
 
 // Helper function to create event system
-export const createEventSystem = (world: World<any>): EventSystem =>
-  new EventSystem(world);
+export const createEventSystem = <TComponents extends Components>(
+  world: World<TComponents>
+): EventSystem<TComponents> => new EventSystem(world);

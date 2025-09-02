@@ -6,6 +6,7 @@ import { createEventSystem, eventComponent } from '@events';
 import { createWorldSystem } from '@system';
 import { createWorld, flush } from '@world';
 
+import type { ExtractWorldComponents, World } from '../../types';
 import { createGameLoop, logSystemPerformance } from '../game-loop';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
@@ -73,11 +74,11 @@ describe('GameLoop', () => {
       .addSystem('high-priority', system2, { priority: 100 })
       .addSystem('mid-priority', system3, { priority: 50 });
 
-    const systems = gameLoop.getSystems();
+    const systems = gameLoop.getSystems()!;
     expect(systems).toHaveLength(3);
-    expect(systems[0].id).toBe('high-priority');
-    expect(systems[1].id).toBe('mid-priority');
-    expect(systems[2].id).toBe('low-priority');
+    expect(systems[0]!.id).toBe('high-priority');
+    expect(systems[1]!.id).toBe('mid-priority');
+    expect(systems[2]!.id).toBe('low-priority');
   });
 
   test('should remove system', async () => {
@@ -103,13 +104,13 @@ describe('GameLoop', () => {
     const testSystem = createWorldSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
 
-    expect(gameLoop.getSystems()[0].enabled).toBe(true);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
 
     gameLoop.disableSystem('test-system');
-    expect(gameLoop.getSystems()[0].enabled).toBe(false);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(false);
 
     gameLoop.enableSystem('test-system');
-    expect(gameLoop.getSystems()[0].enabled).toBe(true);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
   });
 
   test('should execute systems in priority order', async () => {
@@ -140,9 +141,10 @@ describe('GameLoop', () => {
 
   test('should pass world and deltaTime to systems', async () => {
     const world = (await createTestWorld()).build();
+    type C = ExtractWorldComponents<typeof world>;
     const gameLoop = createGameLoop(world);
 
-    let receivedWorld: any;
+    let receivedWorld: World<C>;
     let receivedDeltaTime: number;
 
     const testSystem = createWorldSystem((w, dt) => {
@@ -230,7 +232,7 @@ describe('GameLoop', () => {
     const performance = gameLoop.getPerformance();
     expect(performance).toHaveLength(1);
 
-    const perf = performance[0];
+    const perf = performance[0]!;
     expect(perf.id).toBe('slow-system');
     expect(perf.executionCount).toBe(3);
     expect(perf.lastExecutionTime).toBeGreaterThan(0);
@@ -330,12 +332,12 @@ describe('GameLoop', () => {
 
     gameLoop.update(16.67);
 
-    const performance = gameLoop.getPerformance();
+    const performance = gameLoop.getPerformance()!;
     expect(performance).toHaveLength(2);
 
     // Should be sorted by lastExecutionTime (descending)
-    expect(performance[0].lastExecutionTime).toBeGreaterThanOrEqual(
-      performance[1].lastExecutionTime
+    expect(performance[0]!.lastExecutionTime).toBeGreaterThanOrEqual(
+      performance[1]!.lastExecutionTime
     );
   });
 
@@ -448,7 +450,7 @@ describe('GameLoop', () => {
     gameLoop.addSystem('test-system', testSystem);
     gameLoop.update(0);
 
-    expect(receivedDeltaTime).toBe(0);
+    expect(receivedDeltaTime!).toBe(0);
   });
 
   test('should handle negative deltaTime', async () => {
@@ -464,7 +466,7 @@ describe('GameLoop', () => {
     gameLoop.addSystem('test-system', testSystem);
     gameLoop.update(-16.67);
 
-    expect(receivedDeltaTime).toBe(-16.67);
+    expect(receivedDeltaTime!).toBe(-16.67);
   });
 
   test('should handle system that throws different error types', async () => {
@@ -549,7 +551,7 @@ describe('GameLoop', () => {
 
     expect(result).toBe(gameLoop);
     expect(gameLoop.getSystems()).toHaveLength(1);
-    expect(gameLoop.getSystems()[0].id).toBe('system2');
+    expect(gameLoop.getSystems()[0]!.id).toBe('system2');
   });
 });
 
@@ -578,7 +580,7 @@ describe('createGameLoop', () => {
 
     const systems = gameLoop.getSystems();
     expect(systems).toHaveLength(1);
-    expect(systems[0].id).toBe('test-system');
+    expect(systems[0]!.id).toBe('test-system');
   });
 
   test('should execute system with events in event-aware game loop', async () => {
@@ -631,13 +633,13 @@ describe('createGameLoop', () => {
     const testSystem = createWorldSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
 
-    expect(gameLoop.getSystems()[0].enabled).toBe(true);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
 
     gameLoop.disableSystem('test-system');
-    expect(gameLoop.getSystems()[0].enabled).toBe(false);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(false);
 
     gameLoop.enableSystem('test-system');
-    expect(gameLoop.getSystems()[0].enabled).toBe(true);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
   });
 
   test('should handle non-existent system operations in event-aware game loop', async () => {
@@ -714,13 +716,13 @@ describe('createGameLoop', () => {
     // Schedule an event for the system
     const eventEntity = eventSystem.scheduleEvent('test-system', 'test-event', {
       message: 'hello'
-    });
+    })!;
     flush(world);
 
     // Verify event exists before processing
     const pendingEventsBefore = eventSystem.getPendingEvents();
     expect(pendingEventsBefore).toHaveLength(1);
-    expect(pendingEventsBefore[0].id).toBe(eventEntity.id);
+    expect(pendingEventsBefore[0]!.id).toBe(eventEntity.id!);
 
     // Run the game loop
     gameLoop.update(16);
@@ -728,7 +730,7 @@ describe('createGameLoop', () => {
     // Check that the system received the event
     expect(systemExecuted).toBe(true);
     expect(receivedEvents).toHaveLength(1);
-    expect(receivedEvents[0].type).toBe('test-event');
+    expect(receivedEvents[0]!.type).toBe('test-event');
     expect(receivedEvents[0].payload).toEqual({ message: 'hello' });
 
     // Verify that the event entity was deleted
@@ -828,13 +830,13 @@ describe('createGameLoop', () => {
     const system1 = createWorldSystem((world, deltaTime, events) => {
       system1Executed = true;
       expect(events).toHaveLength(1);
-      expect(events[0].type).toBe('event-for-system1');
+      expect(events[0]!.type).toBe('event-for-system1');
     });
 
     const system2 = createWorldSystem((world, deltaTime, events) => {
       system2Executed = true;
       expect(events).toHaveLength(1);
-      expect(events[0].type).toBe('event-for-system2');
+      expect(events[0]!.type).toBe('event-for-system2');
     });
 
     gameLoop.addSystem('system1', system1);
@@ -1081,7 +1083,7 @@ describe('Edge Cases and Error Handling', () => {
     }).not.toThrow();
 
     expect(gameLoop.getSystems()).toHaveLength(1);
-    expect(gameLoop.getSystems()[0].id).toBe('');
+    expect(gameLoop.getSystems()[0]!.id).toBe('');
   });
 
   test('should handle system id with special characters', async () => {
@@ -1095,7 +1097,7 @@ describe('Edge Cases and Error Handling', () => {
     }).not.toThrow();
 
     expect(gameLoop.getSystems()).toHaveLength(1);
-    expect(gameLoop.getSystems()[0].id).toBe(
+    expect(gameLoop.getSystems()[0]!.id).toBe(
       'system-with-special-chars!@#$%^&*()'
     );
   });
@@ -1112,8 +1114,8 @@ describe('Edge Cases and Error Handling', () => {
       .addSystem('system2', system2, { priority: Number.MIN_SAFE_INTEGER });
 
     const systems = gameLoop.getSystems();
-    expect(systems[0].id).toBe('system1');
-    expect(systems[1].id).toBe('system2');
+    expect(systems[0]!.id).toBe('system1');
+    expect(systems[1]!.id).toBe('system2');
   });
 
   test('should handle very large frequency values', async () => {
@@ -1174,7 +1176,7 @@ describe('Edge Cases and Error Handling', () => {
     gameLoop.update(16.67);
 
     expect(executionCount).toBe(1);
-    expect(gameLoop.getSystems()[0].enabled).toBe(false);
+    expect(gameLoop.getSystems()[0]!.enabled).toBe(false);
   });
 
   test('should handle system that adds new systems during execution', async () => {

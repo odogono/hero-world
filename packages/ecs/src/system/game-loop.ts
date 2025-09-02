@@ -155,8 +155,6 @@ export const createGameLoop = <TComponents extends Components>(
         // Collect events for this system
         const events = eventSystem?.collectEventsForSystem(system.id) ?? [];
 
-        // console.log('[GameLoop][update] events', events);
-
         // Execute system with events, disabling flush to prevent double flushing
         system.fn(world, deltaTime, events, { flush: false });
 
@@ -164,9 +162,10 @@ export const createGameLoop = <TComponents extends Components>(
         if (events.length > 0) {
           for (const event of events) {
             // Mark entity for deletion (id should always be available for created entities)
-            if (event.entity.id !== undefined) {
-              deleteEntity(event.entity);
-              // world.entitiesToDelete.add(event.entity.id);
+            const { id, world: entityWorld } = event.entity;
+            if (id !== undefined) {
+              // Pass a minimal, type-safe shape expected by deleteEntity
+              deleteEntity({ id, world: entityWorld });
             }
           }
         }

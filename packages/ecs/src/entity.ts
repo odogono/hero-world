@@ -73,9 +73,10 @@ export const createEntity: CreateEntityOverloads = <
   >;
 };
 
-export const deleteEntity = (
-  entity: { id: number; world: World<any> }
-) => {
+export const deleteEntity = (entity: {
+  id: number;
+  world: World<Components>;
+}) => {
   const { id, world } = entity;
 
   // Mark entity for deletion instead of immediate deletion
@@ -278,7 +279,10 @@ export const asProxiedEntity = <T extends Components>(
  * @returns
  */
 // Overloads to narrow result based on `with` keys
-export function queryEntity<T extends Components, W extends readonly (keyof T)[]>(
+export function queryEntity<
+  T extends Components,
+  W extends readonly (keyof T)[]
+>(
   world: World<T>,
   options: QueryOptions<T> & { with: W }
 ): EntityWithComponents<T, W[number]> | null;
@@ -304,9 +308,12 @@ export function queryEntity<T extends Components>(
     result = asProxiedEntity(result as any) as any;
   }
   return result as any;
-};
+}
 
-export function queryEntities<T extends Components, W extends readonly (keyof T)[]>(
+export function queryEntities<
+  T extends Components,
+  W extends readonly (keyof T)[]
+>(
   world: World<T>,
   options: QueryOptions<T> & { with: W }
 ): Array<EntityWithComponents<T, W[number]>>;
@@ -332,7 +339,7 @@ export function queryEntities<T extends Components>(
   }
 
   return entities as any;
-};
+}
 
 export function queryEntitiesIterator<
   T extends Components,
@@ -342,11 +349,15 @@ export function queryEntitiesIterator<
   options: QueryOptions<T> & { with: W }
 ): {
   [Symbol.iterator](): IterableIterator<EntityWithComponents<T, W[number]>>;
+} & {
+  [Symbol.dispose](): void;
 };
 export function queryEntitiesIterator<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
-): { [Symbol.iterator](): IterableIterator<EntityWithComponents<T, never>> };
+): { [Symbol.iterator](): IterableIterator<EntityWithComponents<T, never>> } & {
+  [Symbol.dispose](): void;
+};
 export function queryEntitiesIterator<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
@@ -354,20 +365,40 @@ export function queryEntitiesIterator<T extends Components>(
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.prepare(sql);
   const asProxy = options?.asProxy ?? false;
+  let finalized = false;
+
+  const finalize = () => {
+    if (finalized) {
+      return;
+    }
+    finalized = true;
+    try {
+      stmt.finalize();
+    } catch {
+      /* ignore double finalize */
+    }
+  };
 
   // Use Bun's iterate capability for incremental results
   const iterator =
     args && args.length > 0 ? stmt.iterate(...args) : stmt.iterate();
 
   return {
+    [Symbol.dispose]: () => {
+      finalize();
+    },
     *[Symbol.iterator]() {
-      for (const row of iterator) {
-        let entity = mapRowToEntity(world, componentsToInclude, row);
-        if (asProxy) {
-          entity = asProxiedEntity(entity as any) as any;
+      try {
+        for (const row of iterator) {
+          let entity = mapRowToEntity(world, componentsToInclude, row);
+          if (asProxy) {
+            entity = asProxiedEntity(entity as any) as any;
+          }
+          yield entity as any;
         }
-        yield entity as any;
+      } finally {
+        finalize();
       }
     }
   } as any;
-};
+}
