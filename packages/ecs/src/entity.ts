@@ -1,6 +1,11 @@
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import { applyComponentDefaults, makeTrackedComponent } from '@component';
+import {
+  addComponent,
+  applyComponentDefaults,
+  makeTrackedComponent,
+  markComponentForDeletion
+} from '@component';
 import type {
   Components,
   Entity,
@@ -59,7 +64,48 @@ export const createEntity: CreateEntityOverloads = <
       }
     }
   }
-  return entity as EntityWithComponents<
+
+  // Create a Proxy that intercepts property assignments to automatically add components
+  const entityProxy = new Proxy(entity, {
+    set(target, prop, value) {
+      const propName = String(prop);
+
+      // Check if this is a component property assignment
+      if (
+        propName !== 'id' &&
+        propName !== 'world' &&
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        // Check if this component is registered in the world
+        if (world.defs.has(propName)) {
+          // This is a component assignment, use addComponent
+          addComponent(target, propName, value);
+          return true;
+        }
+      }
+
+      // Check if this is a component deletion (null or undefined)
+      if (
+        propName !== 'id' &&
+        propName !== 'world' &&
+        (value === null || value === undefined)
+      ) {
+        // Check if this component is registered in the world
+        if (world.defs.has(propName)) {
+          // This is a component deletion, use markComponentForDeletion
+          markComponentForDeletion(target, propName);
+          return true;
+        }
+      }
+
+      // Default property assignment
+      target[prop] = value;
+      return true;
+    }
+  });
+
+  return entityProxy as EntityWithComponents<
     TComponents,
     keyof C & keyof TComponents
   >;

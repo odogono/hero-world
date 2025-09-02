@@ -6,9 +6,11 @@ import {
   addComponents,
   defineComponent,
   removeComponent
-} from '../component';
-import { DatabaseType } from '../db';
-import { createEntity } from '../entity';
+} from '@component';
+import { DatabaseType } from '@db';
+import { createEntity, queryEntity } from '@entity';
+import type { EntityWithComponents } from '@types';
+
 import { createWorld, flush } from '../world';
 
 // Component definitions for testing - using unique names to avoid Zod registry conflicts
@@ -257,6 +259,202 @@ describe('component', () => {
       expect(entityWithComponents.locationTest).toBeDefined();
       expect(entityWithComponents.statsTest.health).toBe(100);
       expect(entityWithComponents.locationTest.name).toBe('Forest');
+    });
+
+    describe('addComponent via object', () => {
+      test('should add a component to an entity', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        (entity as EntityWithComponents<any, 'locationTest'>).locationTest = {
+          name: 'Dungeon',
+          region: 'North'
+        };
+
+        flush(world);
+
+        const e = queryEntity(world, { with: ['locationTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest.name).toBe('Dungeon');
+        expect(e.locationTest.region).toBe('North');
+      });
+
+      test('should add component via direct property assignment', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        // Direct property assignment - this should automatically add the component
+        entity.locationTest = {
+          name: 'Castle',
+          region: 'South'
+        };
+
+        flush(world);
+
+        const e = queryEntity(world, { with: ['locationTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest.name).toBe('Castle');
+        expect(e.locationTest.region).toBe('South');
+      });
+
+      test('should add multiple components via direct property assignment', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        // Add multiple components via direct assignment
+        entity.locationTest = {
+          name: 'Village',
+          region: 'East'
+        };
+        entity.statsTest = {
+          health: 75,
+          level: 5,
+          mana: 25
+        };
+
+        flush(world);
+
+        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest.name).toBe('Village');
+        expect(e.locationTest.region).toBe('East');
+        expect(e.statsTest.health).toBe(75);
+        expect(e.statsTest.level).toBe(5);
+        expect(e.statsTest.mana).toBe(25);
+      });
+
+      test('should delete component via direct property assignment with null', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        // Add components first
+        entity.locationTest = {
+          name: 'Forest',
+          region: 'North'
+        };
+        entity.statsTest = {
+          health: 100,
+          level: 1,
+          mana: 50
+        };
+
+        flush(world);
+
+        // Verify components exist
+        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeDefined();
+        expect(e.statsTest).toBeDefined();
+
+        // Delete location component by setting to null
+        entity.locationTest = null;
+
+        flush(world);
+
+        // Verify location component is removed
+        e = queryEntity(world, { with: ['statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeUndefined();
+        expect(e.statsTest).toBeDefined();
+        expect(e.statsTest.health).toBe(100);
+      });
+
+      test('should delete component via direct property assignment with undefined', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        // Add components first
+        entity.locationTest = {
+          name: 'Forest',
+          region: 'North'
+        };
+        entity.statsTest = {
+          health: 100,
+          level: 1,
+          mana: 50
+        };
+
+        flush(world);
+
+        // Verify components exist
+        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeDefined();
+        expect(e.statsTest).toBeDefined();
+
+        // Delete stats component by setting to undefined
+        entity.statsTest = undefined;
+
+        flush(world);
+
+        // Verify stats component is removed
+        e = queryEntity(world, { with: ['locationTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeDefined();
+        expect(e.locationTest.name).toBe('Forest');
+        expect(e.statsTest).toBeUndefined();
+      });
+
+      test('should handle mixed add and delete operations via property assignment', async () => {
+        const world = (await createTestWorld())
+          .registerComponent(statsComponent)
+          .registerComponent(locationComponent)
+          .build();
+        const entity = createEntity(world);
+
+        // Add components
+        entity.locationTest = {
+          name: 'Forest',
+          region: 'North'
+        };
+        entity.statsTest = {
+          health: 100,
+          level: 1,
+          mana: 50
+        };
+
+        flush(world);
+
+        // Verify both components exist
+        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeDefined();
+        expect(e.statsTest).toBeDefined();
+
+        // Delete one component and modify another
+        entity.locationTest = null;
+        entity.statsTest = {
+          health: 75,
+          level: 2,
+          mana: 25
+        };
+
+        flush(world);
+
+        // Verify location is removed and stats is updated
+        e = queryEntity(world, { with: ['statsTest'] });
+        expect(e).toBeDefined();
+        expect(e.locationTest).toBeUndefined();
+        expect(e.statsTest).toBeDefined();
+        expect(e.statsTest.health).toBe(75);
+        expect(e.statsTest.level).toBe(2);
+        expect(e.statsTest.mana).toBe(25);
+      });
     });
   });
 

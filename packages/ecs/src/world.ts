@@ -242,6 +242,12 @@ export const flush = <T extends Components>(world: World<T>) => {
           // log.debug('[flush] defs', Object.keys(defs));
           throw new Error(`Component def not found for ${c as string}`);
         }
+
+        // Skip components marked for deletion (they'll be handled in the next loop)
+        if (entry.exists === false && entry.data === null) {
+          continue;
+        }
+
         if (entry.exists) {
           // update
           const { id, ...dataWithoutId } = entry.data as Record<
@@ -260,6 +266,30 @@ export const flush = <T extends Components>(world: World<T>) => {
           // log.debug('[flush] insertData', insertData);
           def!.stmtInsert.run(insertData);
           entry.exists = true;
+        }
+      }
+    }
+
+    // Handle deferred component deletions
+    for (const [eid, components] of dirtyEntities.entries()) {
+      // Skip if entity was deleted
+      if (!entityCache.has(eid)) {
+        continue;
+      }
+
+      const cache = entityCache.get(eid);
+      if (!cache) continue;
+
+      for (const c of components) {
+        const entry = cache[c as string];
+        if (entry && entry.exists === false && entry.data === null) {
+          // Component marked for deletion - delete from database
+          const def = defs.get(c as string);
+          if (def) {
+            world.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, eid);
+            // Remove from cache
+            delete cache[c as string];
+          }
         }
       }
     }

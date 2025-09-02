@@ -96,6 +96,11 @@ export const addComponent = <
     throw new Error('Entity ID is required');
   }
 
+  // Check if component already exists and has been persisted
+  const existingComponent =
+    world.entityCache.get(id)?.[componentName as string];
+  const isUpdate = existingComponent !== undefined && existingComponent.exists;
+
   // Apply default values from the component schema
   const dataWithDefaults = applyComponentDefaults(
     world,
@@ -107,7 +112,7 @@ export const addComponent = <
     entity,
     componentName,
     dataWithDefaults,
-    false // mark as new
+    isUpdate // mark as existing if updating, new if adding
   ) as Components[T];
 
   if (!world.dirtyEntities.has(id)) {
@@ -228,6 +233,42 @@ export function removeComponent<T extends keyof Components>(
     }
   }
 }
+
+/**
+ * Mark a component for deferred deletion (will be deleted on next flush)
+ * This follows the same pattern as addComponent
+ */
+export const markComponentForDeletion = <
+  E extends Entity<any> | EntityWithComponents<any, any>,
+  T extends keyof Components
+>(
+  entity: E,
+  componentName: T
+): void => {
+  const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
+  // Mark component for deletion in cache
+  const cache = world.entityCache.get(id);
+  if (cache && cache[componentName as string]) {
+    const cacheEntry = cache[componentName as string];
+    cacheEntry.exists = false; // Mark as deleted
+    cacheEntry.data = null; // Clear the data
+  }
+
+  // Remove from entity object
+  delete (entity as any)[componentName];
+
+  // Mark entity as dirty for this component
+  if (!world.dirtyEntities.has(id)) {
+    world.dirtyEntities.set(id, new Set());
+  }
+  world.dirtyEntities.get(id)!.add(componentName);
+};
 
 /**
  * Apply default values from a Zod schema to component data
