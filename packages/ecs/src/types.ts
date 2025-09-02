@@ -98,6 +98,10 @@ export type Entity<C extends keyof Components = never> = EntitySchema & {
 /**
  * Entity type for a world with specific components
  */
+type ComponentData<T> = T extends Record<string, unknown>
+  ? T
+  : NonNullable<T>;
+
 export type EntityWithComponents<
   TComponents extends Record<string, unknown>,
   C extends keyof TComponents = never
@@ -105,11 +109,11 @@ export type EntityWithComponents<
   id: number;
   world: World<TComponents>;
 } & {
-  [K in C]-?: TComponents[K] extends infer TData
-    ? TData extends Record<string, unknown>
-      ? TData
-      : NonNullable<TComponents[K]>
-    : NonNullable<TComponents[K]>;
+  // All components are available as optional properties for ergonomic reads/assignments
+  [K in keyof TComponents]?: ComponentData<TComponents[K]>;
+} & {
+  // Components in C are known-present and therefore required
+  [K in C]-?: ComponentData<TComponents[K]>;
 };
 
 export type EntitySchema = z.infer<typeof entitySchema>;
