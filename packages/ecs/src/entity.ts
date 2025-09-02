@@ -64,48 +64,10 @@ export const createEntity: CreateEntityOverloads = <
       }
     }
   }
+  // Wrap in a Proxy that intercepts component add/remove via assignment
+  const proxied = proxyEntity(world, entity);
 
-  // Create a Proxy that intercepts property assignments to automatically add components
-  const entityProxy = new Proxy(entity, {
-    set(target, prop, value) {
-      const propName = String(prop);
-
-      // Check if this is a component property assignment
-      if (
-        propName !== 'id' &&
-        propName !== 'world' &&
-        typeof value === 'object' &&
-        value !== null
-      ) {
-        // Check if this component is registered in the world
-        if (world.defs.has(propName)) {
-          // This is a component assignment, use addComponent
-          addComponent(target, propName, value);
-          return true;
-        }
-      }
-
-      // Check if this is a component deletion (null or undefined)
-      if (
-        propName !== 'id' &&
-        propName !== 'world' &&
-        (value === null || value === undefined)
-      ) {
-        // Check if this component is registered in the world
-        if (world.defs.has(propName)) {
-          // This is a component deletion, use removeComponent
-          removeComponent(target, propName);
-          return true;
-        }
-      }
-
-      // Default property assignment
-      target[prop] = value;
-      return true;
-    }
-  });
-
-  return entityProxy as EntityWithComponents<
+  return proxied as EntityWithComponents<
     TComponents,
     keyof C & keyof TComponents
   >;
@@ -141,15 +103,15 @@ export const getEntity = <T extends Components>(
 
 export type QueryOptions<T extends Components> = {
   args?: unknown[];
+  // If true, wrap the returned entity/entities in a proxy that intercepts
+  // component add/remove via property assignment, similar to createEntity
+  asProxy?: boolean;
   entity?: GenericEntity<T>;
   limit?: number;
   offset?: number;
   where?: string;
   with?: (keyof Components)[];
   without?: (keyof Components)[];
-  // If true, wrap the returned entity/entities in a proxy that intercepts
-  // component add/remove via property assignment, similar to createEntity
-  proxied?: boolean;
 };
 
 const buildQuery = <T extends Components>(
@@ -259,17 +221,15 @@ export const mapRowToEntity = <T extends Components>(
 };
 
 /**
- * Wrap a queried entity in a Proxy to intercept component add/remove via
- * property assignment, matching the ergonomics of createEntity.
+ * Create a Proxy wrapper around an entity object that intercepts
+ * component add/remove via property assignment.
  */
-export const asProxiedEntity = <T extends Components>(
-  entity: GenericEntity<T>
-) => {
-  const { world } = entity;
-  return new Proxy(entity as any, {
+const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
+  new Proxy(entity, {
     set(target, prop, value) {
       const propName = String(prop);
 
+      // Add/replace component by assignment of an object
       if (
         propName !== 'id' &&
         propName !== 'world' &&
@@ -282,6 +242,7 @@ export const asProxiedEntity = <T extends Components>(
         }
       }
 
+      // Remove component by assigning null/undefined
       if (
         propName !== 'id' &&
         propName !== 'world' &&
@@ -293,10 +254,21 @@ export const asProxiedEntity = <T extends Components>(
         }
       }
 
-      target[prop] = value;
+      // Fallback to normal set
+      (target as any)[prop] = value;
       return true;
     }
-  }) as GenericEntity<T>;
+  });
+
+/**
+ * Wrap a queried entity in a Proxy to intercept component add/remove via
+ * property assignment, matching the ergonomics of createEntity.
+ */
+export const asProxiedEntity = <T extends Components>(
+  entity: GenericEntity<T>
+) => {
+  const { world } = entity;
+  return proxyEntity(world, entity) as GenericEntity<T>;
 };
 
 /**
@@ -319,7 +291,7 @@ export const queryEntity = <T extends Components>(
   // console.debug('row', row);
   let result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
   stmt.finalize();
-  if (result && options?.proxied) {
+  if (result && options?.asProxy) {
     result = asProxiedEntity(result as any) as any;
   }
   return result;
@@ -330,6 +302,7 @@ export const queryEntities = <T extends Components>(
   options?: QueryOptions<T>
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
+  const asProxy = options?.asProxy ?? false;
 
   const rows = world.db.query(sql, args);
 
@@ -337,7 +310,7 @@ export const queryEntities = <T extends Components>(
     mapRowToEntity(world, componentsToInclude, row)
   );
 
-  if (options?.proxied) {
+  if (asProxy) {
     return entities.map(e => asProxiedEntity(e as any)) as any;
   }
 
@@ -350,6 +323,7 @@ export const queryEntitiesIterator = <T extends Components>(
 ) => {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.prepare(sql);
+  const asProxy = options?.asProxy ?? false;
 
   // Use Bun's iterate capability for incremental results
   const iterator =
@@ -359,7 +333,7 @@ export const queryEntitiesIterator = <T extends Components>(
     *[Symbol.iterator]() {
       for (const row of iterator) {
         let entity = mapRowToEntity(world, componentsToInclude, row);
-        if (options?.proxied) {
+        if (asProxy) {
           entity = asProxiedEntity(entity as any) as any;
         }
         yield entity;

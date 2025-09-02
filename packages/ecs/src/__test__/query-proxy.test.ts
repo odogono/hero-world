@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { defineComponent } from '@component';
 import { createEntity, queryEntity } from '@entity';
-import type { ExtractBuilderComponents } from '@types';
 
 import { createWorld, flush } from '../world';
 
@@ -25,7 +24,10 @@ const locationComponent = defineComponent({
 });
 
 const createTestWorld = async () =>
-  (await createWorld()).registerComponent(statsComponent).registerComponent(locationComponent).build();
+  (await createWorld())
+    .registerComponent(statsComponent)
+    .registerComponent(locationComponent)
+    .build();
 
 describe('queryEntity proxied option', () => {
   test('default snapshot: add via assignment does not persist', async () => {
@@ -56,7 +58,10 @@ describe('queryEntity proxied option', () => {
     flush(world);
 
     // Opt in to proxied result
-    const proxy = queryEntity(world, { with: ['statsProxyTest'], proxied: true })!;
+    const proxy = queryEntity(world, {
+      asProxy: true,
+      with: ['statsProxyTest']
+    })!;
     (proxy as any).locationProxyTest = { name: 'Forest', region: 'North' };
     flush(world);
 
@@ -76,4 +81,3 @@ describe('queryEntity proxied option', () => {
     expect(removed).toBeNull();
   });
 });
-
