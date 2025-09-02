@@ -5,7 +5,7 @@ import z from 'zod';
 import { defineComponent } from '../component';
 import { DatabaseType } from '../db';
 import { createEntity, deleteEntity, getEntity } from '../entity';
-import type { Components, WorldBuilder } from '../types';
+import type { WorldBuilderGeneric } from '../types';
 import { createWorld, flush } from '../world';
 
 const log = createLog('test-entity');
@@ -56,7 +56,7 @@ const createTestWorld = async () => {
 };
 
 describe('createEntity', () => {
-  let builder: WorldBuilder<Components>;
+  let builder: WorldBuilderGeneric<any>;
 
   beforeEach(async () => {
     builder = await createTestWorld();
@@ -489,7 +489,7 @@ describe('createEntity', () => {
 });
 
 describe('deleteEntity', () => {
-  let builder: WorldBuilder<Components>;
+  let builder: WorldBuilderGeneric<any>;
 
   beforeEach(async () => {
     builder = await createTestWorld();

@@ -73,8 +73,8 @@ export const createEntity: CreateEntityOverloads = <
   >;
 };
 
-export const deleteEntity = <T extends Components>(
-  entity: GenericEntity<T>
+export const deleteEntity = (
+  entity: { id: number; world: World<any> }
 ) => {
   const { id, world } = entity;
 

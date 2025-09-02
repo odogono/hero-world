@@ -1,5 +1,6 @@
 import { createLog } from 'odgn-helpers/log';
 
+import { deleteEntity } from '@entity';
 import type { EventSystem } from '@events';
 import type { Components, World } from '@types';
 
@@ -50,7 +51,7 @@ export const createGameLoop = <TComponents extends Components>(
 ): GameLoop<TComponents> => {
   const { logErrors = false } = options;
   const systems = new Map<string, SystemRegistration<TComponents>>();
-  const performance = new Map<string, SystemPerformance>();
+  const perfMap = new Map<string, SystemPerformance>();
   let frameCount = 0;
 
   const addSystem = (
@@ -76,7 +77,7 @@ export const createGameLoop = <TComponents extends Components>(
 
     systems.set(id, systemRegistration);
 
-    performance.set(id, {
+    perfMap.set(id, {
       averageExecutionTime: 0,
       executionCount: 0,
       id,
@@ -97,7 +98,7 @@ export const createGameLoop = <TComponents extends Components>(
     }
 
     systems.delete(id);
-    performance.delete(id);
+    perfMap.delete(id);
     log.debug(`Removed system '${id}'`);
     return gameLoop;
   };
@@ -164,7 +165,8 @@ export const createGameLoop = <TComponents extends Components>(
           for (const event of events) {
             // Mark entity for deletion (id should always be available for created entities)
             if (event.entity.id !== undefined) {
-              world.entitiesToDelete.add(event.entity.id);
+              deleteEntity(event.entity);
+              // world.entitiesToDelete.add(event.entity.id);
             }
           }
         }
@@ -173,7 +175,7 @@ export const createGameLoop = <TComponents extends Components>(
         world.flush();
 
         const executionTime = Date.now() - startTime;
-        const perf = performance.get(system.id)!;
+        const perf = perfMap.get(system.id)!;
 
         perf.lastExecutionTime = executionTime;
         perf.totalExecutionTime += executionTime;
@@ -189,7 +191,7 @@ export const createGameLoop = <TComponents extends Components>(
   };
 
   const getPerformance = (): SystemPerformance[] =>
-    Array.from(performance.values()).sort(
+    Array.from(perfMap.values()).sort(
       (a, b) => b.lastExecutionTime - a.lastExecutionTime
     );
 

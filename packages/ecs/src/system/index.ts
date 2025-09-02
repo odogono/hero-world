@@ -36,23 +36,44 @@ export const createWorldSystem =
  * Creates a system that processes entities one by one with an iterator
  * More memory efficient for large entity sets
  */
-export const createSystem =
-  <
-    TComponents extends Components,
-    TEntity extends EntityWithComponents<
-      TComponents,
-      any
-    > = EntityWithComponents<TComponents, any>
-  >(
-    processFn: (
-      entity: TEntity,
-      world: World<TComponents>,
-      deltaTime: number,
-      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-    ) => void,
-    queryOptions?: QueryOptions<TComponents>
-  ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events, options) => {
+// Overloads to infer entity type from `with` keys
+export function createSystem<
+  TComponents extends Components,
+  W extends readonly (keyof TComponents)[]
+>(
+  processFn: (
+    entity: EntityWithComponents<TComponents, W[number]>,
+    world: World<TComponents>,
+    deltaTime: number,
+    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+  ) => void,
+  queryOptions: QueryOptions<TComponents> & { with: W }
+): SystemFunction<TComponents>;
+export function createSystem<TComponents extends Components>(
+  processFn: (
+    entity: EntityWithComponents<TComponents, never>,
+    world: World<TComponents>,
+    deltaTime: number,
+    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+  ) => void,
+  queryOptions?: QueryOptions<TComponents>
+): SystemFunction<TComponents>;
+export function createSystem<
+  TComponents extends Components,
+  TEntity extends EntityWithComponents<
+    TComponents,
+    any
+  > = EntityWithComponents<TComponents, any>
+>(
+  processFn: (
+    entity: TEntity,
+    world: World<TComponents>,
+    deltaTime: number,
+    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+  ) => void,
+  queryOptions?: QueryOptions<TComponents>
+): SystemFunction<TComponents> {
+  return (world: World<TComponents>, deltaTime: number, events, options) => {
     const flushSystem = options?.flush ?? true;
     const entities = queryEntitiesIterator(world, queryOptions);
 
@@ -64,6 +85,7 @@ export const createSystem =
       flush(world);
     }
   };
+}
 
 /**
  * Wrapper that converts a system function without events to one that ignores events
