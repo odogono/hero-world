@@ -5,6 +5,7 @@ import {
   type ComponentDefinition,
   type Components,
   type EntityWithComponents,
+  type GenericEntity,
   type World
 } from '@types';
 
@@ -55,7 +56,7 @@ export const makeTrackedComponent = <
   TWorldComponents extends Components,
   TComponentName extends keyof TWorldComponents
 >(
-  entity: EntityWithComponents<TWorldComponents, never>,
+  entity: GenericEntity<TWorldComponents>,
   componentName: TComponentName,
   data: TWorldComponents[TComponentName],
   exists = true
@@ -92,7 +93,7 @@ export const addComponent = <
   TWorldComponents extends Components,
   TComponentName extends keyof TWorldComponents
 >(
-  entity: EntityWithComponents<TWorldComponents, never>,
+  entity: GenericEntity<TWorldComponents>,
   componentName: TComponentName,
   data: TWorldComponents[TComponentName]
 ): EntityWithComponents<TWorldComponents, TComponentName> => {
@@ -136,7 +137,7 @@ export const addComponents = <
     [K in keyof TWorldComponents]: TWorldComponents[K];
   }>
 >(
-  entity: EntityWithComponents<TWorldComponents, never>,
+  entity: GenericEntity<TWorldComponents>,
   components: TComponentData
 ): EntityWithComponents<TWorldComponents, keyof TComponentData> => {
   const { id, world } = entity;
@@ -163,7 +164,10 @@ export const addComponents = <
     world.dirtyEntities.get(id)!.add(componentName);
   }
 
-  return entity as E & { [K in keyof T]: T[K] };
+  return entity as EntityWithComponents<
+    TWorldComponents,
+    keyof TComponentData
+  >;
 };
 
 /**
