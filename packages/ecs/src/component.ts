@@ -157,88 +157,11 @@ export const addComponents = <
   return entity as E & { [K in keyof T]: T[K] };
 };
 
-// Overloaded function signatures for removeComponent
-export function removeComponent(
-  entity: Entity<any> | EntityWithComponents<any, any>
-): void;
-
-export function removeComponent<T extends keyof Components>(
-  entity: Entity<any> | EntityWithComponents<any, any>,
-  componentName: T
-): void;
-
-export function removeComponent<T extends keyof Components>(
-  entity: Entity<any> | EntityWithComponents<any, any>,
-  ...componentNames: T[]
-): void;
-
-export function removeComponent<T extends keyof Components>(
-  entity: Entity<any> | EntityWithComponents<any, any>,
-  ...componentNames: T[]
-): void {
-  const { id, world } = entity;
-
-  // Ensure id is defined
-  if (id === undefined) {
-    throw new Error('Entity ID is required');
-  }
-
-  // If no component names provided, remove all components from the entity
-  if (componentNames.length === 0) {
-    const cache = entity.world.entityCache.get(id);
-    if (cache) {
-      // Get all component names from the cache
-      const allComponentNames = Object.keys(cache);
-
-      for (const componentName of allComponentNames) {
-        const def = world.defs.get(componentName);
-        if (def) {
-          // delete from db
-          world.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, id);
-        }
-
-        delete (cache as any)[componentName];
-        delete (entity as any)[componentName];
-      }
-    }
-
-    // Clean up dirty tracking
-    world.dirtyEntities.delete(id);
-    return;
-  }
-
-  // Remove specific components
-  for (const componentName of componentNames) {
-    const def = world.defs.get(componentName);
-    if (!def) {
-      throw new Error(`Component def not found for ${componentName}`);
-    }
-
-    // delete from db
-    world.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, id);
-
-    const cache = entity.world.entityCache.get(id);
-    if (cache) {
-      delete (cache as any)[componentName];
-    }
-
-    delete (entity as any)[componentName];
-
-    const dirty = entity.world.dirtyEntities.get(id);
-    if (dirty) {
-      dirty.delete(componentName);
-      if (dirty.size === 0) {
-        world.dirtyEntities.delete(id);
-      }
-    }
-  }
-}
-
 /**
  * Mark a component for deferred deletion (will be deleted on next flush)
  * This follows the same pattern as addComponent
  */
-export const markComponentForDeletion = <
+export const removeComponent = <
   E extends Entity<any> | EntityWithComponents<any, any>,
   T extends keyof Components
 >(

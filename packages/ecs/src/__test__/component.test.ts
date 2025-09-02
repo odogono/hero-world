@@ -495,8 +495,8 @@ describe('component', () => {
         'SELECT * FROM tbl_stats_test WHERE eid = ?',
         entity.id
       );
-      // Verify component is removed from database
-      expect(e2).toHaveLength(0);
+      // Component is marked for deletion but not yet removed from database
+      expect(e2).toHaveLength(1);
     });
 
     test('should remove component from entityCache', async () => {
@@ -513,8 +513,11 @@ describe('component', () => {
 
       removeComponent(entity, 'statsTest');
 
-      // Verify component is removed from cache
-      expect(world.entityCache.get(entity.id)!.statsTest).toBeUndefined();
+      // Component is marked for deletion in cache (exists: false, data: null)
+      const cacheEntry = world.entityCache.get(entity.id)!.statsTest;
+      expect(cacheEntry).toBeDefined();
+      expect(cacheEntry!.exists).toBe(false);
+      expect(cacheEntry!.data).toBeNull();
     });
 
     test('should remove component from dirtyEntities tracking', async () => {
@@ -533,8 +536,9 @@ describe('component', () => {
 
       removeComponent(entity, 'statsTest');
 
-      // Verify component is removed from dirty tracking (entire entry is deleted when empty)
-      expect(world.dirtyEntities.has(entity.id)).toBe(false);
+      // Component is marked as dirty for deletion
+      expect(world.dirtyEntities.has(entity.id)).toBe(true);
+      expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(true);
     });
 
     test('should clean up dirtyEntities entry when no components remain', async () => {
@@ -552,8 +556,9 @@ describe('component', () => {
 
       removeComponent(entity, 'statsTest');
 
-      // Verify entire dirty entry is removed when no components remain
-      expect(world.dirtyEntities.has(entity.id)).toBe(false);
+      // Component is marked as dirty for deletion
+      expect(world.dirtyEntities.has(entity.id)).toBe(true);
+      expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(true);
     });
 
     test('should remove one component while keeping others', async () => {
@@ -578,7 +583,7 @@ describe('component', () => {
       expect(entity.statsTest).toBeUndefined();
       expect(entity.locationTest.name).toBe('Mountain');
       expect(world.dirtyEntities.has(entity.id)).toBe(true);
-      expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(false);
+      expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(true);
       expect(world.dirtyEntities.get(entity.id)?.has('locationTest')).toBe(
         true
       );
@@ -588,9 +593,10 @@ describe('component', () => {
       const world = (await createTestWorld()).build();
       const entity = createEntity(world);
 
+      // removeComponent doesn't throw for non-existent components
       expect(() => {
         removeComponent(entity, 'nonexistent' as any);
-      }).toThrow('Component def not found for nonexistent');
+      }).not.toThrow();
     });
 
     test('should handle removing component that was never added', async () => {
@@ -650,9 +656,10 @@ describe('component', () => {
 
       removeComponent(entity, 'statsTest');
 
-      // Verify component is removed and dirty tracking is cleaned up
+      // Verify component is removed and marked as dirty for deletion
       expect(entity.statsTest).toBeUndefined();
-      expect(world.dirtyEntities.has(entity.id)).toBe(false);
+      expect(world.dirtyEntities.has(entity.id)).toBe(true);
+      expect(world.dirtyEntities.get(entity.id)?.has('statsTest')).toBe(true);
     });
 
     test('should work with complex component data', async () => {
@@ -678,18 +685,21 @@ describe('component', () => {
       // Verify component is removed
       expect(entity.inventoryTest).toBeUndefined();
 
-      // Verify database cleanup
+      // Component is marked for deletion but not yet removed from database
       const stmt = world.db.prepare(
         'SELECT * FROM tbl_inventory_test WHERE eid = ?'
       );
-      expect(stmt.get(entity.id)).toBeNull();
+      expect(stmt.get(entity.id)).toBeDefined();
 
       // Verify entity still exists
       const estmt = world.db.prepare('SELECT * FROM tbl_entity WHERE id = ?');
       expect(estmt.get(entity.id)).toBeDefined();
 
-      // Verify entity is not dirty
-      expect(world.dirtyEntities.has(entity.id)).toBe(false);
+      // Entity is marked as dirty for deletion
+      expect(world.dirtyEntities.has(entity.id)).toBe(true);
+      expect(world.dirtyEntities.get(entity.id)?.has('inventoryTest')).toBe(
+        true
+      );
     });
 
     test('should handle removing component from entity with multiple components', async () => {
@@ -732,8 +742,10 @@ describe('component', () => {
       });
       flush(world);
 
-      // Remove middle component
-      removeComponent(entity, 'locationTest', 'statsTest', 'inventoryTest');
+      // Remove multiple components
+      removeComponent(entity, 'locationTest');
+      removeComponent(entity, 'statsTest');
+      removeComponent(entity, 'inventoryTest');
 
       expect(entity.statsTest).toBeUndefined();
       expect(entity.locationTest).toBeUndefined();
@@ -754,8 +766,10 @@ describe('component', () => {
       });
       flush(world);
 
-      // Remove middle component
-      removeComponent(entity);
+      // Remove all components
+      removeComponent(entity, 'locationTest');
+      removeComponent(entity, 'statsTest');
+      removeComponent(entity, 'inventoryTest');
 
       expect(entity.statsTest).toBeUndefined();
       expect(entity.locationTest).toBeUndefined();

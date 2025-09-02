@@ -4,7 +4,7 @@ import {
   addComponent,
   applyComponentDefaults,
   makeTrackedComponent,
-  markComponentForDeletion
+  removeComponent
 } from '@component';
 import type {
   Components,
@@ -93,8 +93,8 @@ export const createEntity: CreateEntityOverloads = <
       ) {
         // Check if this component is registered in the world
         if (world.defs.has(propName)) {
-          // This is a component deletion, use markComponentForDeletion
-          markComponentForDeletion(target, propName);
+          // This is a component deletion, use removeComponent
+          removeComponent(target, propName);
           return true;
         }
       }
