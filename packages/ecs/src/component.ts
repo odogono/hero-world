@@ -12,11 +12,11 @@ import { extractDefaults } from './schema';
 
 type DefineComponentExOptions<
   Name extends string,
-  Schema extends Record<string, z.ZodTypeAny>
+  Shape extends z.ZodRawShape
 > = {
   meta?: Record<string, any>;
   name: Name;
-  schema: Schema;
+  schema: Shape;
   statements?: Record<string, string>;
   tableName?: string;
 };
@@ -30,10 +30,8 @@ type ComponentSchemaBase = z.infer<typeof componentSchema>;
 
 export const defineComponent = <
   Name extends string,
-  Schema extends Record<string, z.ZodTypeAny>
->(
-  options: DefineComponentExOptions<Name, Schema>
-) => {
+  Shape extends z.ZodRawShape
+>(options: DefineComponentExOptions<Name, Shape>) => {
   const name = toCamelCase(options.name);
   const { statements } = options;
   const tableName = options.tableName || `tbl_${toSnakeCase(name)}`;
@@ -44,19 +42,13 @@ export const defineComponent = <
     name: tableName
   };
 
-  // shortcut the schema type inference
-  type optionsSchema = z.infer<typeof options.schema>;
-  type resultSchema = ComponentSchemaBase & optionsSchema;
-
-  const schema = componentSchema
-    .extend(options.schema)
-    .meta(meta) as unknown as resultSchema;
+  const schema = componentSchema.extend(options.schema).meta(meta);
 
   return {
     name,
     schema,
     statements
-  } as ComponentDefinition<Name, resultSchema>;
+  } as ComponentDefinition<Name, typeof schema>;
 };
 
 export const makeTrackedComponent = <

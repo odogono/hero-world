@@ -34,7 +34,10 @@ export type ComponentDef = {
 /**
  * Component definition
  */
-export type ComponentDefinition<Name extends string, Schema> = {
+export type ComponentDefinition<
+  Name extends string,
+  Schema extends SchemaType
+> = {
   name: Name;
   schema: Schema;
   statements?: Record<string, string>;

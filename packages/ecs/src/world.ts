@@ -83,7 +83,7 @@ export const createWorld = async <T extends Components>(
     ({ ...world, flush: () => flush(world) }) as World<U>;
 
   const registerComponent = <Name extends string, Schema extends SchemaType>(
-    def: ComponentDefinition<Schema>
+    def: ComponentDefinition<Name, Schema>
   ): WorldBuilderGeneric<T & { [K in Name]: z.infer<Schema> }> => {
     registerComponentDef(world, def.schema, def.statements || {});
 
