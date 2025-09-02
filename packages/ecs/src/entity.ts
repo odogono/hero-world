@@ -110,8 +110,8 @@ export type QueryOptions<T extends Components> = {
   limit?: number;
   offset?: number;
   where?: string;
-  with?: (keyof Components)[];
-  without?: (keyof Components)[];
+  with?: (keyof T)[];
+  without?: (keyof T)[];
 };
 
 const buildQuery = <T extends Components>(
@@ -277,10 +277,19 @@ export const asProxiedEntity = <T extends Components>(
  * @param options
  * @returns
  */
-export const queryEntity = <T extends Components>(
+// Overloads to narrow result based on `with` keys
+export function queryEntity<T extends Components, W extends readonly (keyof T)[]>(
+  world: World<T>,
+  options: QueryOptions<T> & { with: W }
+): EntityWithComponents<T, W[number]> | null;
+export function queryEntity<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
-) => {
+): EntityWithComponents<T, never> | null;
+export function queryEntity<T extends Components>(
+  world: World<T>,
+  options?: QueryOptions<T>
+) {
   const { args, componentsToInclude, sql } = buildQuery(world, {
     ...options,
     limit: 1
@@ -294,13 +303,21 @@ export const queryEntity = <T extends Components>(
   if (result && options?.asProxy) {
     result = asProxiedEntity(result as any) as any;
   }
-  return result;
+  return result as any;
 };
 
-export const queryEntities = <T extends Components>(
+export function queryEntities<T extends Components, W extends readonly (keyof T)[]>(
+  world: World<T>,
+  options: QueryOptions<T> & { with: W }
+): Array<EntityWithComponents<T, W[number]>>;
+export function queryEntities<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
-) => {
+): Array<EntityWithComponents<T, never>>;
+export function queryEntities<T extends Components>(
+  world: World<T>,
+  options?: QueryOptions<T>
+) {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const asProxy = options?.asProxy ?? false;
 
@@ -314,13 +331,26 @@ export const queryEntities = <T extends Components>(
     return entities.map(e => asProxiedEntity(e as any)) as any;
   }
 
-  return entities;
+  return entities as any;
 };
 
-export const queryEntitiesIterator = <T extends Components>(
+export function queryEntitiesIterator<
+  T extends Components,
+  W extends readonly (keyof T)[]
+>(
+  world: World<T>,
+  options: QueryOptions<T> & { with: W }
+): {
+  [Symbol.iterator](): IterableIterator<EntityWithComponents<T, W[number]>>;
+};
+export function queryEntitiesIterator<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
-) => {
+): { [Symbol.iterator](): IterableIterator<EntityWithComponents<T, never>> };
+export function queryEntitiesIterator<T extends Components>(
+  world: World<T>,
+  options?: QueryOptions<T>
+) {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.prepare(sql);
   const asProxy = options?.asProxy ?? false;
@@ -336,8 +366,8 @@ export const queryEntitiesIterator = <T extends Components>(
         if (asProxy) {
           entity = asProxiedEntity(entity as any) as any;
         }
-        yield entity;
+        yield entity as any;
       }
     }
-  };
+  } as any;
 };

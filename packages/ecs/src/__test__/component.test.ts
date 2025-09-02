@@ -299,10 +299,10 @@ describe('component', () => {
 
         flush(world);
 
-        const e = queryEntity(world, { with: ['locationTest'] });
+        const e = queryEntity(world, { with: ['locationTest'] })!;
         expect(e).toBeDefined();
-        expect(e.locationTest.name).toBe('Castle');
-        expect(e.locationTest.region).toBe('South');
+        expect(e.locationTest!.name).toBe('Castle');
+        expect(e.locationTest!.region).toBe('South');
       });
 
       test('should add multiple components via direct property assignment', async () => {
@@ -325,7 +325,7 @@ describe('component', () => {
 
         flush(world);
 
-        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] })!;
         expect(e).toBeDefined();
         expect(e.locationTest.name).toBe('Village');
         expect(e.locationTest.region).toBe('East');
@@ -355,22 +355,22 @@ describe('component', () => {
         flush(world);
 
         // Verify components exist
-        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] })!;
         expect(e).toBeDefined();
         expect(e.locationTest).toBeDefined();
         expect(e.statsTest).toBeDefined();
 
         // Delete location component by setting to null
-        entity.locationTest = null;
+        entity.locationTest = undefined;
 
         flush(world);
 
         // Verify location component is removed
-        e = queryEntity(world, { with: ['statsTest'] });
-        expect(e).toBeDefined();
-        expect(e.locationTest).toBeUndefined();
-        expect(e.statsTest).toBeDefined();
-        expect(e.statsTest.health).toBe(100);
+        const e2 = queryEntity(world, { with: ['statsTest'] })!;
+        expect(e2).toBeDefined();
+        expect(e2.locationTest).toBeUndefined();
+        expect(e2.statsTest).toBeDefined();
+        expect(e2.statsTest.health).toBe(100);
       });
 
       test('should delete component via direct property assignment with undefined', async () => {
@@ -394,7 +394,7 @@ describe('component', () => {
         flush(world);
 
         // Verify components exist
-        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] })!;
         expect(e).toBeDefined();
         expect(e.locationTest).toBeDefined();
         expect(e.statsTest).toBeDefined();
@@ -405,11 +405,11 @@ describe('component', () => {
         flush(world);
 
         // Verify stats component is removed
-        e = queryEntity(world, { with: ['locationTest'] });
+        const e2 = queryEntity(world, { with: ['locationTest'] })!;
         expect(e).toBeDefined();
-        expect(e.locationTest).toBeDefined();
-        expect(e.locationTest.name).toBe('Forest');
-        expect(e.statsTest).toBeUndefined();
+        expect(e2.locationTest).toBeDefined();
+        expect(e2.locationTest.name).toBe('Forest');
+        expect(e2.statsTest).toBeUndefined();
       });
 
       test('should handle mixed add and delete operations via property assignment', async () => {
@@ -419,10 +419,7 @@ describe('component', () => {
         type WorldComponents = ExtractBuilderComponents<typeof worldBuilder>;
         const world = worldBuilder.build();
 
-        const entity = createEntity(world) as EntityWithComponents<
-          WorldComponents,
-          'locationTest' | 'statsTest'
-        >;
+        const entity = createEntity(world);
 
         // Add components
         entity.locationTest = {
@@ -438,13 +435,13 @@ describe('component', () => {
         flush(world);
 
         // Verify both components exist
-        let e = queryEntity(world, { with: ['locationTest', 'statsTest'] });
+        const e = queryEntity(world, { with: ['locationTest', 'statsTest'] })!;
         expect(e).toBeDefined();
         expect(e.locationTest).toBeDefined();
         expect(e.statsTest).toBeDefined();
 
         // Delete one component and modify another
-        entity.locationTest = null;
+        entity.locationTest = undefined;
         entity.statsTest = {
           health: 75,
           level: 2,
@@ -454,18 +451,15 @@ describe('component', () => {
         flush(world);
 
         // Verify location is removed and stats is updated
-        e = queryEntity<EntityWithComponents<WorldComponents, 'statsTest'>>(
-          world,
-          {
-            with: ['statsTest']
-          }
-        );
-        expect(e).toBeDefined();
-        expect(e.locationTest).toBeUndefined();
-        expect(e.statsTest).toBeDefined();
-        expect(e.statsTest.health).toBe(75);
-        expect(e.statsTest.level).toBe(2);
-        expect(e.statsTest.mana).toBe(25);
+        const e2 = queryEntity(world, {
+          with: ['statsTest']
+        })!;
+        expect(e2).toBeDefined();
+        expect(e2.locationTest).toBeUndefined();
+        expect(e2.statsTest).toBeDefined();
+        expect(e2.statsTest.health).toBe(75);
+        expect(e2.statsTest.level).toBe(2);
+        expect(e2.statsTest.mana).toBe(25);
       });
     });
   });
