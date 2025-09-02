@@ -8,14 +8,14 @@ import { createEntity, queryEntitiesIterator } from '@entity';
 import { eventComponent } from '@events';
 import { createSystem, createWorldSystem } from '@system';
 import type { Components, EntityWithComponents, World } from '@types';
-import { createWorld, flush } from '@world';
+import { createWorld, flush, saveWorld } from '@world';
 
 const createTestWorld = async () =>
   await createWorld({ dbType: DatabaseType.BUN });
 
 describe('Systems', () => {
   const locationComponent = defineComponent({
-    name: 'system_location' as const,
+    name: 'systemLocation',
     schema: {
       name: z.string(),
       region: z.string()
@@ -66,7 +66,7 @@ describe('Systems', () => {
       .build();
     type TestComponents = Components & {
       health: Record<string, unknown>;
-      system_location: Record<string, unknown>;
+      systemLocation: Record<string, unknown>;
     };
 
     // Create entities with different component combinations
@@ -74,11 +74,11 @@ describe('Systems', () => {
       health: { current: 100, max: 100 }
     });
     const locationEntity = createEntity(world, {
-      system_location: { name: 'Forest', region: 'North' }
+      systemLocation: { name: 'Forest', region: 'North' }
     });
     const fullEntity = createEntity(world, {
       health: { current: 75, max: 100 },
-      system_location: { name: 'Cave', region: 'South' }
+      systemLocation: { name: 'Cave', region: 'South' }
     });
 
     // Flush to persist to database
@@ -242,7 +242,7 @@ describe('Systems', () => {
 
     type TestComponents = Components & {
       health: Record<string, unknown>;
-      system_location: Record<string, unknown>;
+      systemLocation: Record<string, unknown>;
     };
 
     // Create entities with different component combinations
@@ -250,11 +250,11 @@ describe('Systems', () => {
       health: { current: 100, max: 100 }
     });
     const locationEntity = createEntity(world, {
-      system_location: { name: 'Forest', region: 'North' }
+      systemLocation: { name: 'Forest', region: 'North' }
     });
     const fullEntity = createEntity(world, {
       health: { current: 75, max: 100 },
-      system_location: { name: 'Cave', region: 'South' }
+      systemLocation: { name: 'Cave', region: 'South' }
     });
 
     // Flush to persist to database
@@ -269,7 +269,7 @@ describe('Systems', () => {
         processedEntities.push(entity.id);
       },
       {
-        with: ['system_location'],
+        with: ['systemLocation'],
         without: ['health']
       }
     );
@@ -398,21 +398,21 @@ describe('Systems', () => {
 
     type TestComponents = Components & {
       health: Record<string, unknown>;
-      system_location: Record<string, unknown>;
+      systemLocation: Record<string, unknown>;
     };
 
     // Create entities with different combinations
     const entity1 = createEntity(world, {
       health: { current: 100, max: 100 },
-      system_location: { name: 'Forest', region: 'North' }
+      systemLocation: { name: 'Forest', region: 'North' }
     });
     const entity2 = createEntity(world, {
       health: { current: 50, max: 100 },
-      system_location: { name: 'Cave', region: 'South' }
+      systemLocation: { name: 'Cave', region: 'South' }
     });
     const entity3 = createEntity(world, {
       health: { current: 25, max: 100 },
-      system_location: { name: 'Mountain', region: 'North' }
+      systemLocation: { name: 'Mountain', region: 'North' }
     });
 
     // Flush to persist to database
@@ -428,8 +428,8 @@ describe('Systems', () => {
       },
       {
         limit: 1,
-        where: `health_current < 75 AND system_location_region = 'North'`,
-        with: ['health', 'system_location']
+        where: `health_current < 75 AND system_location.region = 'North'`,
+        with: ['health', 'systemLocation']
       }
     );
 
@@ -439,6 +439,8 @@ describe('Systems', () => {
     // Verify only the matching entity was processed
     expect(processedEntities).toHaveLength(1);
     expect(processedEntities).toContain(entity3.id);
+
+    saveWorld(world, 'system.world.db');
   });
 
   test('should create event-aware entity system', async () => {

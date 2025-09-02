@@ -96,7 +96,7 @@ describe('EventSystem', () => {
     expect(typeBEvents[0].event.type).toBe('type-b');
   });
 
-  test.only('should collect events for system', async () => {
+  test('should collect events for system', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
@@ -164,6 +164,9 @@ describe('EventSystem', () => {
 
     // Should not throw, but should mark event as processed
     const collectedEvents = eventSystem.collectEventsForSystem('test-system');
+
+    // Flush to persist the processed status
+    flush(world);
 
     // Re-query the entity to get updated data
     const updatedEntities = queryEntities(world, {

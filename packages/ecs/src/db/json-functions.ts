@@ -1,3 +1,5 @@
+import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
+
 import type { Database, LoadFromJSONOptions, SaveToJSONOptions } from './index';
 
 /**
@@ -81,7 +83,7 @@ export const saveAsComponents = (db: Database): unknown => {
 
   for (const { name: tableName } of tables) {
     // Extract component name from table name (remove tbl_ prefix)
-    const componentName = tableName.replace(/^tbl_/, '');
+    const componentName = toCamelCase(tableName.replace(/^tbl_/, ''));
 
     // Get all records from this component table
     const records = db.query(`SELECT * FROM ${tableName}`);
@@ -90,7 +92,7 @@ export const saveAsComponents = (db: Database): unknown => {
       // Manually construct the object to avoid serialization issues
       const componentObj: any = { type: componentName };
       for (const [key, value] of Object.entries(record)) {
-        componentObj[key] = value;
+        componentObj[toCamelCase(key)] = value;
       }
       result.push(componentObj);
     }
@@ -118,7 +120,7 @@ export const saveAsEntities = (db: Database): unknown => {
 
     // For each component table, check if this entity has a record
     for (const { name: tableName } of tables) {
-      const componentName = tableName.replace(/^tbl_/, '');
+      const componentName = toCamelCase(tableName.replace(/^tbl_/, ''));
       const componentDataArray = db.query(
         `SELECT * FROM ${tableName} WHERE eid = ?`,
         [entity.id]
@@ -128,7 +130,16 @@ export const saveAsEntities = (db: Database): unknown => {
         const componentData = componentDataArray[0];
         // Remove the eid and id columns from component data
         const { eid, id, ...cleanComponentData } = componentData as any;
-        entityData[componentName] = cleanComponentData;
+        const correctedComponentData = Object.entries(
+          cleanComponentData
+        ).reduce(
+          (acc, [key, value]) => {
+            acc[toCamelCase(key)] = value;
+            return acc;
+          },
+          {} as Record<string, unknown>
+        );
+        entityData[componentName] = correctedComponentData;
       }
     }
 
@@ -192,7 +203,7 @@ export const loadFromComponents = (db: Database, json: unknown): void => {
         continue;
       }
 
-      const tableName = `tbl_${type}`;
+      const tableName = `tbl_${toSnakeCase(type)}`;
       // Get column names for this table - skip tables that don't exist
       let columns: { name: string }[];
       try {
@@ -258,7 +269,7 @@ export const loadFromEntities = (db: Database, json: unknown): void => {
       // Process each component
       for (const [componentName, componentData] of Object.entries(components)) {
         if (typeof componentData === 'object' && componentData !== null) {
-          const tableName = `tbl_${componentName}`;
+          const tableName = `tbl_${toSnakeCase(componentName)}`;
 
           // Get column names for this table - skip tables that don't exist
           let columns: { name: string }[];

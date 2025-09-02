@@ -26,3 +26,46 @@ export const pkWithAutoIncrement = () =>
   z.int().optional().meta({ autoIncrement: true, primaryKey: true });
 
 export const dateTime = () => z.iso.datetime().default('CURRENT_TIMESTAMP');
+
+/**
+ * Extract default values from a Zod schema
+ * This function recursively traverses the schema and extracts all default values
+ */
+export const extractDefaults = (schema: z.ZodTypeAny): Record<string, any> => {
+  const defaults: Record<string, any> = {};
+
+  if (schema instanceof z.ZodObject) {
+    const shape = schema.shape;
+    for (const [key, fieldSchema] of Object.entries(shape)) {
+      if (fieldSchema instanceof z.ZodDefault) {
+        // The defaultValue can be either a function or a direct value
+        const defaultValue = fieldSchema._def.defaultValue;
+        const value =
+          typeof defaultValue === 'function' ? defaultValue() : defaultValue;
+
+        // Handle special SQL values
+        if (value === 'CURRENT_TIMESTAMP') {
+          // Convert CURRENT_TIMESTAMP to current ISO datetime
+          defaults[key] = new Date().toISOString();
+        } else {
+          defaults[key] = value;
+        }
+      } else if (fieldSchema instanceof z.ZodObject) {
+        const nestedDefaults = extractDefaults(fieldSchema);
+        if (Object.keys(nestedDefaults).length > 0) {
+          defaults[key] = nestedDefaults;
+        }
+      } else {
+        const nestedDefaults = extractDefaults(fieldSchema);
+        if (Object.keys(nestedDefaults).length > 0) {
+          defaults[key] = nestedDefaults;
+        }
+      }
+    }
+  } else if (schema instanceof z.ZodDefault) {
+    // This shouldn't happen at the top level, but handle it just in case
+    return {};
+  }
+
+  return defaults;
+};

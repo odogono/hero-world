@@ -1,12 +1,15 @@
-import { toSnakeCase } from 'odgn-helpers/string';
-import z from 'zod';
+import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
+import { z } from 'zod';
 
 import {
   type ComponentDefinition,
   type Components,
   type Entity,
-  type EntityWithComponents
+  type EntityWithComponents,
+  type World
 } from '@types';
+
+import { extractDefaults } from './schema';
 
 type DefineComponentExOptions<Name extends string> = {
   meta?: Record<string, any>;
@@ -25,7 +28,8 @@ const componentSchema = z.object({
 export const defineComponent = <Name extends string>(
   options: DefineComponentExOptions<Name>
 ) => {
-  const { name, statements } = options;
+  const name = toCamelCase(options.name);
+  const { statements } = options;
   const tableName = options.tableName || `tbl_${toSnakeCase(name)}`;
 
   const meta = {
@@ -50,6 +54,12 @@ export const makeTrackedComponent = <T extends keyof Components>(
   exists = true
 ): Components[T] => {
   const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
   if (!world.entityCache.has(id)) {
     world.entityCache.set(id, {});
   }
@@ -60,6 +70,7 @@ export const makeTrackedComponent = <T extends keyof Components>(
 
   return new Proxy(data as any, {
     set(target, prop, value) {
+      // console.debug('[makeTrackedComponent] set', prop, value);
       (target as any)[prop] = value;
       if (!world.dirtyEntities.has(id)) {
         world.dirtyEntities.set(id, new Set());
@@ -79,10 +90,23 @@ export const addComponent = <
   data: Components[T]
 ): E & { [K in T]: Components[T] } => {
   const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
+  // Apply default values from the component schema
+  const dataWithDefaults = applyComponentDefaults(
+    world,
+    componentName as string,
+    data as Partial<Components[T]>
+  );
+
   (entity as any)[componentName] = makeTrackedComponent(
     entity,
     componentName,
-    data,
+    dataWithDefaults,
     false // mark as new
   ) as Components[T];
 
@@ -103,11 +127,19 @@ export const addComponents = <
 ): E & { [K in keyof T]: T[K] } => {
   const { id, world } = entity;
 
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
   for (const [componentName, data] of Object.entries(components)) {
+    // Apply default values from the component schema
+    const dataWithDefaults = applyComponentDefaults(world, componentName, data);
+
     (entity as any)[componentName] = makeTrackedComponent(
       entity,
       componentName,
-      data,
+      dataWithDefaults,
       false // mark as new
     );
 
@@ -140,6 +172,11 @@ export function removeComponent<T extends keyof Components>(
   ...componentNames: T[]
 ): void {
   const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
 
   // If no component names provided, remove all components from the entity
   if (componentNames.length === 0) {
@@ -191,3 +228,44 @@ export function removeComponent<T extends keyof Components>(
     }
   }
 }
+
+/**
+ * Apply default values from a Zod schema to component data
+ * This function merges the provided data with default values from the schema
+ */
+export const applyDefaults = <T>(schema: z.ZodType<T>, data: Partial<T>): T => {
+  const defaults = extractDefaults(schema);
+
+  // Merge defaults with provided data, with provided data taking precedence
+  const merged = { ...defaults, ...data };
+
+  // Validate the merged data against the schema
+  return schema.parse(merged);
+};
+
+/**
+ * Apply default values to component data using the world's component definitions
+ * This function looks up the component schema and applies defaults
+ */
+export const applyComponentDefaults = <T extends Components>(
+  world: World<T>,
+  componentName: string,
+  data: any
+): any => {
+  const def = world.defs.get(componentName);
+  if (!def || !def.schema) {
+    // If no schema found, return data as-is
+    return data;
+  }
+
+  try {
+    return applyDefaults(def.schema, data);
+  } catch (error) {
+    // If validation fails, log error and return data as-is
+    console.warn(
+      `Failed to apply defaults for component ${componentName}:`,
+      error
+    );
+    return data;
+  }
+};

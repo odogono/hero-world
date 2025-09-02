@@ -18,6 +18,8 @@ export const eventComponent = defineComponent({
 
 export type EventComponent = z.infer<typeof eventComponent.schema>;
 
+type EventEntity = Entity<'event'>;
+
 // Simple event system
 export class EventSystem {
   private world: World<any>;
@@ -50,33 +52,33 @@ export class EventSystem {
   }
 
   // Get all pending events
-  getPendingEvents(): Entity<'event'>[] {
+  getPendingEvents(): EventEntity[] {
     return queryEntities(this.world, {
       where: 'processed = 0',
       with: ['event']
-    }) as Entity<'event'>[];
+    }) as EventEntity[];
   }
 
   // Get events by type
-  getEventsByType(type: string): Entity<'event'>[] {
+  getEventsByType(type: string): EventEntity[] {
     return queryEntities(this.world, {
       where: `type = '${type}'`,
       with: ['event']
-    }) as Entity<'event'>[];
+    }) as EventEntity[];
   }
 
   // Get events for a specific system (both processed and unprocessed)
-  getEventsForSystem(systemId: string): Entity<'event'>[] {
+  getEventsForSystem(systemId: string): EventEntity[] {
     return queryEntities(this.world, {
       where: `target_system = '${systemId}'`,
       with: ['event']
-    }) as Entity<'event'>[];
+    }) as EventEntity[];
   }
 
   // Collect ready events for a system and return their parsed payloads
   collectEventsForSystem<T = any>(
     systemId: string
-  ): Array<{ entity: Entity<'event'>; payload: T; type: string }> {
+  ): Array<{ entity: EventEntity; payload: T; type: string }> {
     const now = Date.now();
     const readyEvents = queryEntities(this.world, {
       where: `target_system = '${systemId}' AND processed = 0 AND scheduled_at <= ${now}`,
@@ -91,8 +93,7 @@ export class EventSystem {
     //   'allEvents',
     //   allEvents
     // );
-    const events: Array<{ entity: Entity<'event'>; payload: T; type: string }> =
-      [];
+    const events: Array<{ entity: EventEntity; payload: T; type: string }> = [];
 
     for (const entity of readyEvents) {
       try {
@@ -106,7 +107,7 @@ export class EventSystem {
         // Mark as processed
         entity.event.processed = true;
       } catch (error) {
-        console.error('Error parsing event payload:', error);
+        // console.error('Error parsing event payload:', error);
         // Mark as processed to prevent retries
         entity.event.processed = true;
       }

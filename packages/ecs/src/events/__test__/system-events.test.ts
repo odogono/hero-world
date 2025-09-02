@@ -17,7 +17,7 @@ import { createEventSystem, eventComponent } from '..';
 
 // Test components
 const testComponent = defineComponent({
-  name: 'system_test' as const,
+  name: 'systemTest',
   schema: {
     value: z.number()
   }
@@ -56,10 +56,10 @@ describe('System Events Integration', () => {
       receivedEvents = [...events];
     });
 
-    gameLoop.addSystem('test-system', testSystem);
+    gameLoop.addSystem('test_system', testSystem);
 
     // Schedule an event for the system
-    eventSystem.scheduleEvent('test-system', 'test-event', {
+    eventSystem.scheduleEvent('test_system', 'test-event', {
       message: 'hello'
     });
     flush(world);
@@ -125,12 +125,12 @@ describe('System Events Integration', () => {
       receivedEvents.push(...events);
     });
 
-    gameLoop.addSystem('test-system', testSystem);
+    gameLoop.addSystem('test_system', testSystem);
 
     // Schedule an event for 100ms in the future
     const futureTime = Date.now() + 100;
     eventSystem.scheduleEvent(
-      'test-system',
+      'test_system',
       'future-event',
       { message: 'future' },
       futureTime
@@ -158,8 +158,8 @@ describe('System Events Integration', () => {
     const gameLoop = createGameLoop(world, eventSystem);
 
     // Create some test entities
-    createEntity(world, { system_test: { value: 10 } });
-    createEntity(world, { system_test: { value: 20 } });
+    createEntity(world, { systemTest: { value: 10 } });
+    createEntity(world, { systemTest: { value: 20 } });
     flush(world);
 
     const processedEntities: any[] = [];
@@ -170,7 +170,7 @@ describe('System Events Integration', () => {
         processedEntities.push(entity);
         receivedEvents = events;
       },
-      { with: ['system_test'] }
+      { with: ['systemTest'] }
     );
 
     gameLoop.addSystem('entity-system', entitySystem);

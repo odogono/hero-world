@@ -181,9 +181,9 @@ export const createGameLoop = <TComponents extends Components>(
         perf.averageExecutionTime =
           perf.totalExecutionTime / perf.executionCount;
       } catch (error) {
-        if (logErrors) {
-          log.error(`System '${system.id}' threw an error:`, error);
-        }
+        // if (logErrors) {
+        log.error(`System '${system.id}' threw an error:`, error);
+        // }
       }
     }
   };

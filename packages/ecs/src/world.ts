@@ -5,6 +5,8 @@ import {
   DatabaseType,
   createDatabase,
   type CreateDatabaseOptions,
+  type LoadFromJSONOptions,
+  type SaveToJSONOptions,
   type Statement
 } from '@db';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
@@ -81,7 +83,7 @@ export const createWorld = async <T extends Components>(
 
   const registerComponent = <Name extends string, Schema extends SchemaType>(
     def: ComponentDefinition<Name, Schema>
-  ): WorldBuilder<T> => {
+  ): WorldBuilder<T & { [K in Name]: z.infer<Schema> }> => {
     registerComponentDef(world, def.schema, def.statements || {});
     return {
       ...world,
@@ -97,13 +99,20 @@ export const createWorld = async <T extends Components>(
   };
 };
 
-// export const getComponentDef = <T extends Components>(world: World<T>, url: string) => {
-//   const stmt = world.stmts.selectComponentDefByUrl;
-//   if (!stmt) {
-//     throw new Error('selectComponentDefByUrl not found');
-//   }
-//   return stmt.get(url);
-// }
+export const loadWorldFromJSON = <T extends Components>(
+  world: World<T>,
+  json: unknown,
+  options: LoadFromJSONOptions = {}
+) => {
+  return world.db.loadFromJSON(json, options);
+};
+
+export const saveWorldToJSON = <T extends Components>(
+  world: World<T>,
+  options: SaveToJSONOptions = {}
+) => {
+  return world.db.saveToJSON(options);
+};
 
 export const saveWorld = async <T extends Components>(
   world: World<T>,
@@ -146,12 +155,12 @@ const registerComponentDef = <T extends Components>(
   // }
 
   const result = zodSchemaToSqliteTable(componentDef, { ifNotExists: true });
-  // log.debug('[registerComponentDef] result', result);
   world.db.exec(result.sql);
 
   const sqlInsert = zodSchemaToSqliteInsert(componentDef, {
     namedParams: true
   });
+  // log.debug('[registerComponentDef] sqlInsert', sqlInsert);
   const sqlUpdate = zodSchemaToSqliteUpdate(componentDef, {
     namedParams: true
   });
@@ -167,6 +176,7 @@ const registerComponentDef = <T extends Components>(
   const def = {
     columns: result.columns,
     name,
+    schema: componentDef, // Store the schema for default value access
     stmtInsert: world.db.prepare(sqlInsert),
     stmtUpdate: world.db.prepare(sqlUpdate),
     tableName: result.tableName,
@@ -247,6 +257,7 @@ export const flush = <T extends Components>(world: World<T>) => {
             unknown
           >;
           const insertData = convertKeysToSnakeCase({ ...dataWithoutId, eid });
+          // log.debug('[flush] insertData', insertData);
           def!.stmtInsert.run(insertData);
           entry.exists = true;
         }

@@ -150,7 +150,7 @@ describe('ECS with AlasQL Backend', () => {
 
   test('should handle multiple entities with mixed components', async () => {
     const nameComponent = defineComponent({
-      name: 'alasql_name' as const,
+      name: 'alasqlName',
       schema: {
         first: z.string(),
         last: z.string()
@@ -158,7 +158,7 @@ describe('ECS with AlasQL Backend', () => {
     });
 
     const ageComponent = defineComponent({
-      name: 'alasql_age' as const,
+      name: 'alasqlAge',
       schema: {
         years: z.number()
       }
@@ -171,17 +171,17 @@ describe('ECS with AlasQL Backend', () => {
 
     // Create entities with different component combinations
     const person1 = createEntity(world, {
-      alasql_age: { years: 30 },
-      alasql_name: { first: 'John', last: 'Doe' }
+      alasqlAge: { years: 30 },
+      alasqlName: { first: 'John', last: 'Doe' }
     });
 
     const person2 = createEntity(world, {
-      alasql_name: { first: 'Jane', last: 'Smith' }
+      alasqlName: { first: 'Jane', last: 'Smith' }
       // No age component
     });
 
     const person3 = createEntity(world, {
-      alasql_age: { years: 25 }
+      alasqlAge: { years: 25 }
       // No name component
     });
 
@@ -189,17 +189,17 @@ describe('ECS with AlasQL Backend', () => {
 
     // Query for entities with both components
     const withBoth = queryEntities(world, {
-      with: ['alasql_name', 'alasql_age']
+      with: ['alasqlName', 'alasqlAge']
     });
     expect(withBoth).toHaveLength(1);
     expect(withBoth[0].id).toBe(person1.id);
 
     // Query for entities with just name
-    const withName = queryEntities(world, { with: ['alasql_name'] });
+    const withName = queryEntities(world, { with: ['alasqlName'] });
     expect(withName).toHaveLength(2);
 
     // Query for entities with just age
-    const withAge = queryEntities(world, { with: ['alasql_age'] });
+    const withAge = queryEntities(world, { with: ['alasqlAge'] });
     expect(withAge).toHaveLength(2);
 
     world.db.close();

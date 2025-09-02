@@ -5,6 +5,8 @@ import type { Database, Statement } from '@db';
 import { pkWithAutoIncrement } from './schema';
 import type { ColumnInfo, SchemaType } from './schema/types';
 
+export type EntityId = number;
+
 type ComponentCacheEntry<T> = {
   data: T;
   exists: boolean;
@@ -20,6 +22,7 @@ export type EntityCache = Map<
 export type ComponentDef = {
   columns: ColumnInfo[];
   name: string;
+  schema: SchemaType; // Add schema to access defaults
   stmtInsert: Statement;
   stmtUpdate: Statement;
   tableName: string;

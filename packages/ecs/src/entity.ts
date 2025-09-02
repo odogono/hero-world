@@ -1,6 +1,6 @@
-import { toCamelCase } from 'odgn-helpers/string';
+import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import { makeTrackedComponent } from '@component';
+import { applyComponentDefaults, makeTrackedComponent } from '@component';
 import type {
   Components,
   Entity,
@@ -42,10 +42,13 @@ export const createEntity: CreateEntityOverloads = <
     for (const [c, data] of Object.entries(initialComponents)) {
       const name = c as string;
       if (data) {
+        // Apply default values from the component schema
+        const dataWithDefaults = applyComponentDefaults(world, name, data);
+
         entity[name] = makeTrackedComponent(
           entity,
           name,
-          { ...data } as any,
+          dataWithDefaults,
           false
         );
 
@@ -119,7 +122,7 @@ const buildQuery = <T extends Components>(
     if (!def) {
       throw new Error(`Component def not found for ${String(c)}`);
     }
-    const alias = def.name;
+    const alias = toSnakeCase(def.name);
     const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
     joins.push(join);
     def.columns.forEach(column => {
@@ -183,7 +186,7 @@ const buildQuery = <T extends Components>(
   };
 };
 
-const mapRowToEntity = <T extends Components>(
+export const mapRowToEntity = <T extends Components>(
   world: World<T>,
   componentsToInclude: (keyof T)[],
   row: unknown
@@ -194,10 +197,11 @@ const mapRowToEntity = <T extends Components>(
 
   for (const c of componentsToInclude) {
     const def = world.defs.get(c as string)!;
+    const defName = toSnakeCase(def.name);
     const data: Record<string, unknown> = {};
     for (const column of def.columns) {
       const key = toCamelCase(column.name);
-      data[key] = row[`${def.name}_${column.name}`];
+      data[key] = row[`${defName}_${column.name}`];
     }
     entity[c] = makeTrackedComponent(entity, c as string, data);
   }
@@ -219,8 +223,10 @@ export const queryEntity = <T extends Components>(
     ...options,
     limit: 1
   });
+  // console.debug('queryEntity', sql);
   const stmt = world.db.prepare(sql);
   const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
+  // console.debug('row', row);
   const result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
   stmt.finalize();
   return result;
