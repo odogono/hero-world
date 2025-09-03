@@ -9,7 +9,7 @@ import {
   queryEntitiesIterator,
   queryEntity
 } from '@entity';
-import { dateTime } from '@schema';
+import { dateTimeWithDefault } from '@schema';
 import type { Components, GenericEntity, WorldBuilder } from '@types';
 import { createWorld, flush } from '@world';
 
@@ -46,7 +46,7 @@ const nameComponent = defineComponent({
 const testStateComponent = defineComponent({
   name: 'testState',
   schema: {
-    createdAt: dateTime(),
+    createdAt: dateTimeWithDefault(),
     isComplete: z.boolean().default(false),
     status: z.enum(['pending', 'in_progress', 'completed']).default('pending')
   }
@@ -244,13 +244,13 @@ describe('query', () => {
 
     world.flush();
 
-    const query = queryEntitiesIterator(world, {
+    using entities = queryEntitiesIterator(world, {
       where: `status IN ('walking', 'fighting')`,
       with: ['status']
     });
 
     const result: string[] = [];
-    for (const entity of query) {
+    for (const entity of entities) {
       result.push(entity.status.status);
     }
 
@@ -266,14 +266,14 @@ describe('query', () => {
 
     flush(world);
 
-    const query = queryEntitiesIterator(world, {
+    using entities = queryEntitiesIterator(world, {
       args: ['fighting'],
       where: 'status = ?1',
       with: ['status']
     });
 
     const result: string[] = [];
-    for (const entity of query) {
+    for (const entity of entities) {
       result.push(entity.status.status);
     }
 

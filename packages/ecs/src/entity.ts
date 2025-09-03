@@ -329,6 +329,7 @@ export function queryEntities<T extends Components>(
   const asProxy = options?.asProxy ?? false;
 
   const rows = world.db.query(sql, args);
+  // console.debug('queryEntities', sql, args, rows.length);
 
   const entities = rows.map((row: any) =>
     mapRowToEntity(world, componentsToInclude, row)

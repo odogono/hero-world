@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from '@db';
 import { queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
-import { createWorld, flush } from '@world';
+import { createWorld, flush, saveWorld } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
@@ -19,21 +19,20 @@ describe('EventSystem', () => {
     expect(eventSystem).toBeDefined();
   });
 
-  test('should schedule events for systems', async () => {
+  test('should schedule events', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
     const eventSystem = createEventSystem(world);
 
-    // Schedule an event for a system
-    const eventEntity = eventSystem.scheduleEvent('test-system', 'test-event', {
+    // Schedule an event
+    const eventEntity = eventSystem.scheduleEvent('test-event', {
       message: 'hello'
     });
     flush(world);
 
     expect(eventEntity.event.type).toBe('test-event');
-    expect(eventEntity.event.targetSystem).toBe('test-system');
-    expect(eventEntity.event.processed).toBe(false);
+    expect(eventEntity.event.isProcessed).toBe(false);
     expect(JSON.parse(eventEntity.event.payload)).toEqual({ message: 'hello' });
   });
 
@@ -46,7 +45,6 @@ describe('EventSystem', () => {
     // Schedule an event for 1 hour in the future
     const futureTime = Date.now() + 60 * 60 * 1000;
     const eventEntity = eventSystem.scheduleEvent(
-      'test-system',
       'future-event',
       { message: 'future' },
       futureTime
@@ -54,10 +52,10 @@ describe('EventSystem', () => {
     flush(world);
 
     expect(eventEntity.event.scheduledAt).toBe(futureTime);
-    expect(eventEntity.event.processed).toBe(false);
+    expect(eventEntity.event.isProcessed).toBe(false);
 
-    // collectEventsForSystem should not return future events
-    const readyEvents = eventSystem.collectEventsForSystem('test-system');
+    // collectEventsByType should not return future events
+    const readyEvents = eventSystem.collectEventsByType('future-event');
     expect(readyEvents).toHaveLength(0);
   });
 
@@ -67,13 +65,13 @@ describe('EventSystem', () => {
       .build();
     const eventSystem = createEventSystem(world);
 
-    eventSystem.scheduleEvent('system1', 'event1', { data: 1 });
-    eventSystem.scheduleEvent('system2', 'event2', { data: 2 });
+    eventSystem.scheduleEvent('event1', { data: 1 });
+    eventSystem.scheduleEvent('event2', { data: 2 });
     flush(world);
 
     const pendingEvents = eventSystem.getPendingEvents();
     expect(pendingEvents).toHaveLength(2);
-    expect(pendingEvents.every(e => !e.event.processed)).toBe(true);
+    expect(pendingEvents.every(e => !e.event.isProcessed)).toBe(true);
   });
 
   test('should get events by type', async () => {
@@ -82,9 +80,9 @@ describe('EventSystem', () => {
       .build();
     const eventSystem = createEventSystem(world);
 
-    eventSystem.scheduleEvent('system1', 'type-a', { data: 1 });
-    eventSystem.scheduleEvent('system2', 'type-b', { data: 2 });
-    eventSystem.scheduleEvent('system3', 'type-a', { data: 3 });
+    eventSystem.scheduleEvent('type-a', { data: 1 });
+    eventSystem.scheduleEvent('type-b', { data: 2 });
+    eventSystem.scheduleEvent('type-a', { data: 3 });
     flush(world);
 
     const typeAEvents = eventSystem.getEventsByType('type-a');
@@ -96,55 +94,36 @@ describe('EventSystem', () => {
     expect(typeBEvents[0].event.type).toBe('type-b');
   });
 
-  test('should collect events for system', async () => {
+  test('should collect events by type', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
     const eventSystem = createEventSystem(world);
 
-    eventSystem.scheduleEvent('test-system', 'event1', { value: 1 });
-    eventSystem.scheduleEvent('test-system', 'event2', { value: 2 });
-    eventSystem.scheduleEvent('other-system', 'event3', { value: 3 });
+    eventSystem.scheduleEvent('event1', { value: 1 });
+    eventSystem.scheduleEvent('event2', { value: 2 });
+    eventSystem.scheduleEvent('event3', { value: 3 });
     flush(world);
 
-    const collectedEvents = eventSystem.collectEventsForSystem('test-system');
+    saveWorld(world, 'world.db');
 
-    expect(collectedEvents).toHaveLength(2);
-    expect(collectedEvents[0].payload.value).toBe(1);
-    expect(collectedEvents[1].payload.value).toBe(2);
+    // await wait(500);
 
-    // Verify that the collected events are marked as processed in memory
-    expect(collectedEvents[0].entity.event.processed).toBe(true);
-    expect(collectedEvents[1].entity.event.processed).toBe(true);
+    // Test collecting events by single type
+    const collectedEvents = eventSystem.collectEventsByType('event1');
+
+    expect(collectedEvents).toHaveLength(1);
+    expect(collectedEvents[0]?.payload.value).toBe(1);
+
+    // Verify that the collected event is marked as processed in memory
+    expect(collectedEvents[0]?.entity.event.isProcessed).toBe(true);
 
     // Flush to persist the processed status
     flush(world);
 
     // Verify that events are marked as processed by checking the database
     const pendingEvents = eventSystem.getPendingEvents();
-    expect(pendingEvents).toHaveLength(1); // Only the event for 'other-system' should be pending
-  });
-
-  test('should get events for specific system', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-
-    eventSystem.scheduleEvent('system1', 'event-a', { data: 'a' });
-    eventSystem.scheduleEvent('system2', 'event-b', { data: 'b' });
-    eventSystem.scheduleEvent('system1', 'event-c', { data: 'c' });
-    flush(world);
-
-    const system1Events = eventSystem.getEventsForSystem('system1');
-    const system2Events = eventSystem.getEventsForSystem('system2');
-
-    expect(system1Events).toHaveLength(2);
-    expect(system2Events).toHaveLength(1);
-    expect(system1Events.every(e => e.event.targetSystem === 'system1')).toBe(
-      true
-    );
-    expect(system2Events[0].event.targetSystem).toBe('system2');
+    expect(pendingEvents).toHaveLength(2); // event2 and event3 should still be pending
   });
 
   test('should handle JSON parse errors gracefully', async () => {
@@ -154,16 +133,12 @@ describe('EventSystem', () => {
     const eventSystem = createEventSystem(world);
 
     // Manually create an event with invalid JSON
-    const eventEntity = eventSystem.scheduleEvent(
-      'test-system',
-      'error-test',
-      {}
-    );
+    const eventEntity = eventSystem.scheduleEvent('error-test', {});
     eventEntity.event.payload = '{"malformed": json}';
     flush(world);
 
     // Should not throw, but should mark event as processed
-    const collectedEvents = eventSystem.collectEventsForSystem('test-system');
+    const collectedEvents = eventSystem.collectEventsByType('error-test');
 
     // Flush to persist the processed status
     flush(world);
@@ -174,7 +149,8 @@ describe('EventSystem', () => {
       with: ['event']
     });
 
-    expect(updatedEntities[0].event.processed).toBeTruthy();
+    // The event should be marked as processed due to the parse error
+    expect(updatedEntities[0]?.event.isProcessed).toBeTruthy();
     expect(collectedEvents).toHaveLength(0); // No events collected due to parse error
   });
 });

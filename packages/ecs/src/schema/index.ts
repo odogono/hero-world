@@ -25,7 +25,8 @@ export const withForeignKey = <T extends z.ZodTypeAny>(
 export const pkWithAutoIncrement = () =>
   z.int().optional().meta({ autoIncrement: true, primaryKey: true });
 
-export const dateTime = () => z.iso.datetime().default('CURRENT_TIMESTAMP');
+export const dateTimeWithDefault = () =>
+  z.iso.datetime().default('CURRENT_TIMESTAMP');
 
 /**
  * Extract default values from a Zod schema
@@ -44,12 +45,8 @@ export const extractDefaults = (schema: z.ZodTypeAny): Record<string, any> => {
           typeof defaultValue === 'function' ? defaultValue() : defaultValue;
 
         // Handle special SQL values
-        if (value === 'CURRENT_TIMESTAMP') {
-          // Convert CURRENT_TIMESTAMP to current ISO datetime
-          defaults[key] = new Date().toISOString();
-        } else {
-          defaults[key] = value;
-        }
+        defaults[key] =
+          value === 'CURRENT_TIMESTAMP' ? new Date().toISOString() : value;
       } else if (fieldSchema instanceof z.ZodObject) {
         const nestedDefaults = extractDefaults(fieldSchema);
         if (Object.keys(nestedDefaults).length > 0) {

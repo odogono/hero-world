@@ -152,8 +152,9 @@ export const createGameLoop = <TComponents extends Components>(
       const startTime = Date.now();
 
       try {
-        // Collect events for this system
-        const events = eventSystem?.collectEventsForSystem(system.id) ?? [];
+        // Collect events for this system - using new API that collects all events
+        // since system targeting was removed
+        const events = eventSystem?.collectAllEvents() ?? [];
 
         // Execute system with events, disabling flush to prevent double flushing
         system.fn(world, deltaTime, events, { flush: false });
@@ -173,14 +174,16 @@ export const createGameLoop = <TComponents extends Components>(
         // Always flush to persist any changes made by the system or event deletions
         world.flush();
 
-        const executionTime = Date.now() - startTime;
-        const perf = perfMap.get(system.id)!;
+        const perf = perfMap.get(system.id);
 
-        perf.lastExecutionTime = executionTime;
-        perf.totalExecutionTime += executionTime;
-        perf.executionCount++;
-        perf.averageExecutionTime =
-          perf.totalExecutionTime / perf.executionCount;
+        if (perf) {
+          const executionTime = Date.now() - startTime;
+          perf.lastExecutionTime = executionTime;
+          perf.totalExecutionTime += executionTime;
+          perf.executionCount++;
+          perf.averageExecutionTime =
+            perf.totalExecutionTime / perf.executionCount;
+        }
       } catch (error) {
         // if (logErrors) {
         log.error(`System '${system.id}' threw an error:`, error);

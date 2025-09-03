@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
 import {
-  dateTime,
+  dateTimeWithDefault,
   pkWithAutoIncrement,
   withForeignKey,
   withIndex,
@@ -373,11 +373,11 @@ describe('zodSchemaToSqliteTable', () => {
     const schema = z
       .object({
         age: z.number().default(18),
-        createdAt: dateTime(),
+        createdAt: dateTimeWithDefault(),
         id: pkWithAutoIncrement(),
         isActive: z.boolean().default(true),
         name: z.string().default('John Doe'),
-        updatedAt: dateTime()
+        updatedAt: dateTimeWithDefault()
       })
       .meta({ name: 'users' });
 

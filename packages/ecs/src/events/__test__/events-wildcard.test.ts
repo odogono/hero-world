@@ -1,0 +1,67 @@
+import { describe, expect, test } from 'bun:test';
+
+import { DatabaseType } from '@db';
+import { createEventSystem, eventComponent } from '@events';
+import { createWorld, flush } from '@world';
+
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
+
+const createTestWorld = async () => await createWorld({ dbType });
+
+describe('EventSystem wildcards', () => {
+  test('should get events by wildcard type patterns', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+
+    // Schedule various event types
+    eventSystem.scheduleEvent('enemy-spawn', { id: 1 });
+    eventSystem.scheduleEvent('enemy-die', { id: 2 });
+    eventSystem.scheduleEvent('boss1', { phase: 1 });
+    eventSystem.scheduleEvent('boss12', { phase: 2 });
+    flush(world);
+
+    // '*' should match all types (no type filter)
+    const all = eventSystem.getEventsByType('*');
+    expect(all).toHaveLength(4);
+
+    // Pattern with * should match both enemy-* events
+    const enemies = eventSystem.getEventsByType('enemy-*');
+    expect(enemies).toHaveLength(2);
+    expect(enemies.every(e => e.event.type.startsWith('enemy-'))).toBe(true);
+
+    // Mixed list with pattern and literal, '?' matches single char
+    const mixed = eventSystem.getEventsByType(['enemy-*', 'boss?']);
+    // boss? should match boss1 but not boss12
+    const mixedTypes = mixed.map(e => e.event.type).sort();
+    expect(mixedTypes).toEqual(['boss1', 'enemy-die', 'enemy-spawn'].sort());
+  });
+
+  test('should collect events by wildcard type patterns', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+    const eventSystem = createEventSystem(world);
+
+    eventSystem.scheduleEvent('warn-1', { level: 1 });
+    eventSystem.scheduleEvent('warn-2', { level: 2 });
+    eventSystem.scheduleEvent('error-a', { code: 'A' });
+    eventSystem.scheduleEvent('info', { });
+    flush(world);
+
+    // Collect with wildcard pattern
+    const collectedWarns = eventSystem.collectEventsByType('warn-*');
+    expect(collectedWarns).toHaveLength(2);
+    expect(collectedWarns.every(e => e.type.startsWith('warn-'))).toBe(true);
+
+    // Flush to persist processed marks
+    flush(world);
+
+    // Collect with list including '?' single-char pattern
+    const collectedMixed = eventSystem.collectEventsByType(['error-?', 'info']);
+    const types = collectedMixed.map(e => e.type).sort();
+    expect(types).toEqual(['error-a', 'info'].sort());
+  });
+});
+
