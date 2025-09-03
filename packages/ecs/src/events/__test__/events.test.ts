@@ -107,8 +107,6 @@ describe('EventSystem', () => {
 
     saveWorld(world, 'world.db');
 
-    // await wait(500);
-
     // Test collecting events by single type
     const collectedEvents = eventSystem.collectEventsByType('event1');
 

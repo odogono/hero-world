@@ -77,7 +77,7 @@ export function createSystem<
 ): SystemFunction<TComponents> {
   return (world: World<TComponents>, deltaTime: number, events, options) => {
     const flushSystem = options?.flush ?? true;
-    const entities = queryEntitiesIterator(world, queryOptions);
+    using entities = queryEntitiesIterator(world, queryOptions);
 
     for (const entity of entities) {
       processFn(entity as TEntity, world, deltaTime, events);

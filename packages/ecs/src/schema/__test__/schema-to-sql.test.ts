@@ -153,9 +153,11 @@ describe('zodSchemaToSqliteTable', () => {
   test('should use metadata to generate table name', () => {
     const schema = z
       .object({
-        createdAt: dateTime(),
+        // no default for createdAt
+        createdAt: z.iso.datetime(),
         id: pkWithAutoIncrement(),
-        updatedAt: dateTime()
+        // default current timestamp for updatedAt
+        updatedAt: dateTimeWithDefault()
       })
       .meta({
         name: 'tbl_entities'

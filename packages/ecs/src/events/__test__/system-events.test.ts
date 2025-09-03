@@ -27,7 +27,7 @@ const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
 const createTestWorld = async () => await createWorld({ dbType });
 
-describe.skip('System Events Integration', () => {
+describe('System Events Integration', () => {
   test('should create event-aware game loop', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)

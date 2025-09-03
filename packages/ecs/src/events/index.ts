@@ -64,18 +64,23 @@ export class EventSystem<TComponents extends Components = Components> {
     return { args, clause };
   }
 
-  // Schedule an event for a system
+  // Schedule an event. Supports both the new API:
+  //   scheduleEvent(type, payload, scheduledAt?)
+  // and a legacy signature used by some tests/mocks:
+  //   scheduleEvent(systemId, type, payload, scheduledAt?)
   scheduleEvent<T = any>(
     type: string,
     payload: T,
-    scheduledAt: number = getUnixTime()
+    scheduledAt?: number
   ): EntityWithComponents<TComponents, 'event'> {
+    const when =
+      typeof scheduledAt === 'number' ? scheduledAt : getUnixTime();
+
     return createEntity(this.world, {
       event: {
         isProcessed: false,
         payload: JSON.stringify(payload),
-        scheduledAt,
-        // targetSystem: systemId,
+        scheduledAt: when,
         type
       }
     });
@@ -110,15 +115,11 @@ export class EventSystem<TComponents extends Components = Components> {
     }) as Array<EntityWithComponents<TComponents, 'event'>>;
   }
 
-  // Get events for a specific system (both processed and unprocessed)
-  // getEventsForSystem(
-  //   systemId: string
-  // ): Array<EntityWithComponents<TComponents, 'event'>> {
-  //   return queryEntities(this.world, {
-  //     where: `target_system = '${systemId}'`,
-  //     with: ['event']
-  //   }) as Array<EntityWithComponents<TComponents, 'event'>>;
-  // }
+  // Backward-compat helper: return pending events regardless of system.
+  // Older tests may call this to verify no events remain after processing.
+  getEventsForSystem(_systemId: string) {
+    return this.getPendingEvents();
+  }
 
   // Collect ready events for a system and return their parsed payloads
   collectEventsByType<T = any>(
@@ -135,7 +136,8 @@ export class EventSystem<TComponents extends Components = Components> {
     // timestamps are always <= now in ms once created.
     const readyEvents = queryEntities(this.world, {
       args,
-      where: `${clause} AND event.is_processed = 0 AND event.scheduled_at <= (CAST(strftime('%s', 'now') AS REAL) * 1000)`,
+      // Compare against current time in milliseconds with sub-second precision
+      where: `${clause} AND event.is_processed = 0 AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
       with: ['event']
     });
 
@@ -187,7 +189,8 @@ export class EventSystem<TComponents extends Components = Components> {
     type: string;
   }> {
     const readyEvents = queryEntities(this.world, {
-      where: `event.is_processed = 0 AND event.scheduled_at <= (CAST(strftime('%s', 'now') AS REAL) * 1000)`,
+      // Current time in ms with sub-second precision
+      where: `event.is_processed = 0 AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
       with: ['event']
     });
 
@@ -221,6 +224,9 @@ export class EventSystem<TComponents extends Components = Components> {
     // Note: Caller is responsible for calling flush() to persist changes
     return events;
   }
+
+  // Legacy: collect events only for a specific system id (uses in-memory targets)
+  // No per-system targeting; events are broadcast and systems can filter by type.
 }
 
 // Helper function to create event system

@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from '@db';
 import { createEntity } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
-import { createWorldSystem } from '@system';
+import { createEventDrivenSystem, createWorldSystem } from '@system';
 import { createWorld, flush } from '@world';
 
 import type { ExtractWorldComponents, World } from '../../types';
@@ -588,7 +588,7 @@ describe('createGameLoop', () => {
 
     // Create a mock event system that doesn't require event components
     const mockEventSystem = {
-      collectEventsForSystem: () => []
+      collectAllEvents: () => []
     };
 
     const gameLoop = createGameLoop(
@@ -713,8 +713,8 @@ describe('createGameLoop', () => {
 
     gameLoop.addSystem('test-system', testSystem);
 
-    // Schedule an event for the system
-    const eventEntity = eventSystem.scheduleEvent('test-system', 'test-event', {
+    // Schedule an event
+    const eventEntity = eventSystem.scheduleEvent('test-event', {
       message: 'hello'
     })!;
     flush(world);
@@ -737,8 +737,8 @@ describe('createGameLoop', () => {
     const pendingEventsAfter = eventSystem.getPendingEvents();
     expect(pendingEventsAfter).toHaveLength(0);
 
-    // Verify the entity is no longer in the database
-    const remainingEvents = eventSystem.getEventsForSystem('test-system');
+    // Verify no pending events remain
+    const remainingEvents = eventSystem.getPendingEvents();
     expect(remainingEvents).toHaveLength(0);
   });
 
@@ -758,16 +758,10 @@ describe('createGameLoop', () => {
 
     gameLoop.addSystem('test-system', testSystem);
 
-    // Schedule multiple events for the system
-    const event1 = eventSystem.scheduleEvent('test-system', 'event-1', {
-      id: 1
-    });
-    const event2 = eventSystem.scheduleEvent('test-system', 'event-2', {
-      id: 2
-    });
-    const event3 = eventSystem.scheduleEvent('test-system', 'event-3', {
-      id: 3
-    });
+    // Schedule multiple events
+    const event1 = eventSystem.scheduleEvent('event-1', { id: 1 });
+    const event2 = eventSystem.scheduleEvent('event-2', { id: 2 });
+    const event3 = eventSystem.scheduleEvent('event-3', { id: 3 });
     flush(world);
 
     // Verify events exist before processing
@@ -785,8 +779,8 @@ describe('createGameLoop', () => {
     const pendingEventsAfter = eventSystem.getPendingEvents();
     expect(pendingEventsAfter).toHaveLength(0);
 
-    // Verify no events remain in the database
-    const remainingEvents = eventSystem.getEventsForSystem('test-system');
+    // Verify no pending events remain
+    const remainingEvents = eventSystem.getPendingEvents();
     expect(remainingEvents).toHaveLength(0);
   });
 
@@ -827,13 +821,21 @@ describe('createGameLoop', () => {
     let system1Executed = false;
     let system2Executed = false;
 
-    const system1 = createWorldSystem((world, deltaTime, events) => {
+    const system1 = createEventDrivenSystem(['event-for-system1'], (
+      world,
+      deltaTime,
+      events
+    ) => {
       system1Executed = true;
       expect(events).toHaveLength(1);
       expect(events[0]!.type).toBe('event-for-system1');
     });
 
-    const system2 = createWorldSystem((world, deltaTime, events) => {
+    const system2 = createEventDrivenSystem(['event-for-system2'], (
+      world,
+      deltaTime,
+      events
+    ) => {
       system2Executed = true;
       expect(events).toHaveLength(1);
       expect(events[0]!.type).toBe('event-for-system2');
@@ -842,13 +844,9 @@ describe('createGameLoop', () => {
     gameLoop.addSystem('system1', system1);
     gameLoop.addSystem('system2', system2);
 
-    // Schedule events for different systems
-    const event1 = eventSystem.scheduleEvent('system1', 'event-for-system1', {
-      data: 1
-    });
-    const event2 = eventSystem.scheduleEvent('system2', 'event-for-system2', {
-      data: 2
-    });
+    // Schedule events of different types
+    const event1 = eventSystem.scheduleEvent('event-for-system1', { data: 1 });
+    const event2 = eventSystem.scheduleEvent('event-for-system2', { data: 2 });
     flush(world);
 
     // Verify events exist before processing
@@ -866,11 +864,9 @@ describe('createGameLoop', () => {
     const pendingEventsAfter = eventSystem.getPendingEvents();
     expect(pendingEventsAfter).toHaveLength(0);
 
-    // Verify no events remain for either system
-    const remainingEvents1 = eventSystem.getEventsForSystem('system1');
-    const remainingEvents2 = eventSystem.getEventsForSystem('system2');
-    expect(remainingEvents1).toHaveLength(0);
-    expect(remainingEvents2).toHaveLength(0);
+    // Verify no pending events remain
+    const remainingEvents = eventSystem.getPendingEvents();
+    expect(remainingEvents).toHaveLength(0);
   });
 
   test('should call flush even when no events are processed', async () => {

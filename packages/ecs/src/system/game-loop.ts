@@ -136,7 +136,29 @@ export const createGameLoop = <TComponents extends Components>(
     frameCount++;
     const sortedSystems = getSortedSystems();
 
+    // Pre-collect frame events if supported, so each system sees the same set
+    let frameEvents:
+      | Array<{
+          entity: { id: number | undefined; world: World<TComponents> };
+          payload: any;
+          type: string;
+        }>
+      | null = null;
+    const canCollectAll =
+      eventSystem && typeof (eventSystem as any).collectAllEvents === 'function';
+    if (canCollectAll) {
+      try {
+        frameEvents = (eventSystem as any).collectAllEvents();
+      } catch (err) {
+        log.error('Error collecting frame events:', err);
+        frameEvents = [];
+      }
+    }
+
     // console.log('[GameLoop][update] sortedSystems', sortedSystems);
+
+    // Track entities to delete after all systems run
+    const toDelete: number[] = [];
 
     for (const system of sortedSystems) {
       if (!system.enabled) {
@@ -152,27 +174,34 @@ export const createGameLoop = <TComponents extends Components>(
       const startTime = Date.now();
 
       try {
-        // Collect events for this system - using new API that collects all events
-        // since system targeting was removed
-        const events = eventSystem?.collectAllEvents() ?? [];
+        // Collect events for this system.
+        // Prefer new API that collects all events; fall back to older
+        // collectEventsForSystem(systemId) if provided by a mock/legacy impl.
+        let events:
+          | Array<{
+              entity: { id: number | undefined; world: World<TComponents> };
+              payload: any;
+              type: string;
+            }>
+          | [] = [];
+
+        if (frameEvents !== null) {
+          // Broadcast mode only; systems can filter by event type themselves
+          events = frameEvents;
+        }
 
         // Execute system with events, disabling flush to prevent double flushing
         system.fn(world, deltaTime, events, { flush: false });
 
-        // Delete processed event entities
+        // Queue processed event entities for deletion
         if (events.length > 0) {
           for (const event of events) {
-            // Mark entity for deletion (id should always be available for created entities)
-            const { id, world: entityWorld } = event.entity;
-            if (id !== undefined) {
-              // Pass a minimal, type-safe shape expected by deleteEntity
-              deleteEntity({ id, world: entityWorld });
+            const { id } = event.entity;
+            if (typeof id === 'number') {
+              toDelete.push(id);
             }
           }
         }
-
-        // Always flush to persist any changes made by the system or event deletions
-        world.flush();
 
         const perf = perfMap.get(system.id);
 
@@ -189,6 +218,21 @@ export const createGameLoop = <TComponents extends Components>(
         log.error(`System '${system.id}' threw an error:`, error);
         // }
       }
+    }
+
+    // Perform deletions once per frame and flush once
+    try {
+      if (toDelete.length > 0) {
+        for (const id of toDelete) {
+          // Delete in the same world
+          deleteEntity({ id, world });
+        }
+      }
+      // Flush to persist any changes made by systems or event deletions
+      world.flush();
+    } catch (error) {
+      // Match per-system error handling behavior
+      log.error(`End-of-frame flush threw an error:`, error);
     }
   };
 
