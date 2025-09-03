@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
 import { DatabaseType } from '@db';
-import { createEntity } from '@entity';
-import { createEventSystem, eventComponent } from '@events';
-import { createEventDrivenSystem, createWorldSystem } from '@system';
-import { createWorld, flush } from '@world';
+import { eventComponent } from '@events';
+import { createSystem } from '@system';
+import type { ExtractWorldComponents, World } from '@types';
+import { createWorld } from '@world';
 
-import type { ExtractWorldComponents, World } from '../../types';
 import { createGameLoop, logSystemPerformance } from '../game-loop';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
@@ -27,7 +26,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem((world, deltaTime) => {
+    const testSystem = createSystem(({ deltaTime, world }) => {
       // Test system that does nothing
     });
 
@@ -46,7 +45,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem((world, deltaTime) => {});
+    const testSystem = createSystem(({ deltaTime, world }) => {});
 
     gameLoop.addSystem('test-system', testSystem, {
       enabled: false,
@@ -65,9 +64,9 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const system1 = createWorldSystem(() => {});
-    const system2 = createWorldSystem(() => {});
-    const system3 = createWorldSystem(() => {});
+    const system1 = createSystem(() => {});
+    const system2 = createSystem(() => {});
+    const system3 = createSystem(() => {});
 
     gameLoop
       .addSystem('low-priority', system1, { priority: 10 })
@@ -85,7 +84,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem(() => {});
+    const testSystem = createSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
 
     expect(gameLoop.getSystems()).toHaveLength(1);
@@ -101,7 +100,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem(() => {});
+    const testSystem = createSystem(() => {});
     gameLoop.addSystem('test-system', testSystem);
 
     expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
@@ -119,13 +118,13 @@ describe('GameLoop', () => {
 
     const executionOrder: string[] = [];
 
-    const system1 = createWorldSystem(() => {
+    const system1 = createSystem(() => {
       executionOrder.push('system1');
     });
-    const system2 = createWorldSystem(() => {
+    const system2 = createSystem(() => {
       executionOrder.push('system2');
     });
-    const system3 = createWorldSystem(() => {
+    const system3 = createSystem(() => {
       executionOrder.push('system3');
     });
 
@@ -147,9 +146,9 @@ describe('GameLoop', () => {
     let receivedWorld: World<C>;
     let receivedDeltaTime: number;
 
-    const testSystem = createWorldSystem((w, dt) => {
-      receivedWorld = w;
-      receivedDeltaTime = dt;
+    const testSystem = createSystem(({ deltaTime, world }) => {
+      receivedWorld = world;
+      receivedDeltaTime = deltaTime;
     });
 
     gameLoop.addSystem('test-system', testSystem);
@@ -165,7 +164,7 @@ describe('GameLoop', () => {
 
     let systemExecuted = false;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       systemExecuted = true;
     });
 
@@ -181,7 +180,7 @@ describe('GameLoop', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -214,7 +213,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const slowSystem = createWorldSystem(() => {
+    const slowSystem = createSystem(() => {
       // Simulate some work
       const start = Date.now();
       while (Date.now() - start < 10) {
@@ -250,15 +249,15 @@ describe('GameLoop', () => {
     let system1Executed = false;
     let system3Executed = false;
 
-    const system1 = createWorldSystem(() => {
+    const system1 = createSystem(() => {
       system1Executed = true;
     });
 
-    const system2 = createWorldSystem(() => {
+    const system2 = createSystem(() => {
       throw new Error('System error');
     });
 
-    const system3 = createWorldSystem(() => {
+    const system3 = createSystem(() => {
       system3Executed = true;
     });
 
@@ -281,11 +280,11 @@ describe('GameLoop', () => {
     let system1Executed = false;
     let system2Executed = false;
 
-    const system1 = createWorldSystem(() => {
+    const system1 = createSystem(() => {
       system1Executed = true;
     });
 
-    const system2 = createWorldSystem(() => {
+    const system2 = createSystem(() => {
       system2Executed = true;
     });
 
@@ -314,11 +313,11 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const fastSystem = createWorldSystem(() => {
+    const fastSystem = createSystem(() => {
       // Very fast system
     });
 
-    const slowSystem = createWorldSystem(() => {
+    const slowSystem = createSystem(() => {
       // Simulate slower system
       const start = Date.now();
       while (Date.now() - start < 5) {
@@ -347,7 +346,7 @@ describe('GameLoop', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -367,7 +366,7 @@ describe('GameLoop', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -387,7 +386,7 @@ describe('GameLoop', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -407,15 +406,15 @@ describe('GameLoop', () => {
 
     let executionCount = 0;
 
-    const system1 = createWorldSystem(() => {
+    const system1 = createSystem(() => {
       executionCount = 1;
     });
 
-    const system2 = createWorldSystem(() => {
+    const system2 = createSystem(() => {
       executionCount = 2;
     });
 
-    const system3 = createWorldSystem(() => {
+    const system3 = createSystem(() => {
       executionCount = 3;
     });
 
@@ -443,8 +442,8 @@ describe('GameLoop', () => {
 
     let receivedDeltaTime: number;
 
-    const testSystem = createWorldSystem((w, dt) => {
-      receivedDeltaTime = dt;
+    const testSystem = createSystem(({ deltaTime }) => {
+      receivedDeltaTime = deltaTime;
     });
 
     gameLoop.addSystem('test-system', testSystem);
@@ -459,8 +458,8 @@ describe('GameLoop', () => {
 
     let receivedDeltaTime: number;
 
-    const testSystem = createWorldSystem((w, dt) => {
-      receivedDeltaTime = dt;
+    const testSystem = createSystem(({ deltaTime }) => {
+      receivedDeltaTime = deltaTime;
     });
 
     gameLoop.addSystem('test-system', testSystem);
@@ -475,11 +474,11 @@ describe('GameLoop', () => {
 
     let otherSystemExecuted = false;
 
-    const errorSystem = createWorldSystem(() => {
+    const errorSystem = createSystem(() => {
       throw new TypeError('Type error');
     });
 
-    const otherSystem = createWorldSystem(() => {
+    const otherSystem = createSystem(() => {
       otherSystemExecuted = true;
     });
 
@@ -497,11 +496,11 @@ describe('GameLoop', () => {
 
     let otherSystemExecuted = false;
 
-    const errorSystem = createWorldSystem(() => {
+    const errorSystem = createSystem(() => {
       throw 'String error';
     });
 
-    const otherSystem = createWorldSystem(() => {
+    const otherSystem = createSystem(() => {
       otherSystemExecuted = true;
     });
 
@@ -519,11 +518,11 @@ describe('GameLoop', () => {
 
     let otherSystemExecuted = false;
 
-    const errorSystem = createWorldSystem(() => {
+    const errorSystem = createSystem(() => {
       throw undefined;
     });
 
-    const otherSystem = createWorldSystem(() => {
+    const otherSystem = createSystem(() => {
       otherSystemExecuted = true;
     });
 
@@ -539,7 +538,7 @@ describe('GameLoop', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem(() => {});
+    const testSystem = createSystem(() => {});
 
     // Should support method chaining
     const result = gameLoop
@@ -556,384 +555,25 @@ describe('GameLoop', () => {
 });
 
 describe('createGameLoop', () => {
-  test('should create event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    expect(gameLoop).toBeDefined();
-    expect(gameLoop.getSystems()).toHaveLength(0);
-    expect(gameLoop.getPerformance()).toHaveLength(0);
-  });
-
-  test('should add system to event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      expect(events).toBeDefined();
-      expect(Array.isArray(events)).toBe(true);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-
-    const systems = gameLoop.getSystems();
-    expect(systems).toHaveLength(1);
-    expect(systems[0]!.id).toBe('test-system');
-  });
-
-  test('should execute system with events in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-
-    // Create a mock event system that doesn't require event components
-    const mockEventSystem = {
-      collectAllEvents: () => []
-    };
-
-    const gameLoop = createGameLoop(
-      world,
-      mockEventSystem as unknown as import('@events').EventSystem
-    );
-
-    let systemExecuted = false;
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      systemExecuted = true;
-      expect(events).toBeDefined();
-      expect(Array.isArray(events)).toBe(true);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-    gameLoop.update(16.67);
-
-    expect(systemExecuted).toBe(true);
-  });
-
-  test('should handle system removal in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    const testSystem = createWorldSystem(() => {});
-    gameLoop.addSystem('test-system', testSystem);
-
-    expect(gameLoop.getSystems()).toHaveLength(1);
-
-    gameLoop.removeSystem('test-system');
-
-    expect(gameLoop.getSystems()).toHaveLength(0);
-  });
-
-  test('should handle system enable/disable in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    const testSystem = createWorldSystem(() => {});
-    gameLoop.addSystem('test-system', testSystem);
-
-    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
-
-    gameLoop.disableSystem('test-system');
-    expect(gameLoop.getSystems()[0]!.enabled).toBe(false);
-
-    gameLoop.enableSystem('test-system');
-    expect(gameLoop.getSystems()[0]!.enabled).toBe(true);
-  });
-
-  test('should handle non-existent system operations in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    expect(() => gameLoop.removeSystem('non-existent')).not.toThrow();
-    expect(() => gameLoop.enableSystem('non-existent')).not.toThrow();
-    expect(() => gameLoop.disableSystem('non-existent')).not.toThrow();
-  });
-
-  test('should handle system errors in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let otherSystemExecuted = false;
-
-    const errorSystem = createWorldSystem(() => {
-      throw new Error('System error');
-    });
-
-    const otherSystem = createWorldSystem(() => {
-      otherSystemExecuted = true;
-    });
-
-    gameLoop
-      .addSystem('error-system', errorSystem)
-      .addSystem('other-system', otherSystem);
-
-    // The event system might fail due to missing component definitions,
-    // but the game loop should still handle errors gracefully
-    expect(() => gameLoop.update(16.67)).not.toThrow();
-    // Note: otherSystemExecuted might be false due to event system errors
-    // This test verifies that the game loop doesn't crash
-  });
-
-  test('should support method chaining in event-aware game loop', async () => {
-    const world = (await createTestWorld()).build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    const testSystem = createWorldSystem(() => {});
-
-    const result = gameLoop
-      .addSystem('system1', testSystem)
-      .addSystem('system2', testSystem)
-      .removeSystem('system1');
-
-    expect(result).toBe(gameLoop);
-    expect(gameLoop.getSystems()).toHaveLength(1);
-  });
-
   test('should delete event entities after processing', async () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
+    const gameLoop = createGameLoop(world);
 
     let systemExecuted = false;
-    let receivedEvents: any[] = [];
 
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
+    const testSystem = createSystem(({ deltaTime, world }) => {
       systemExecuted = true;
-      receivedEvents = [...events];
-      // System should not flush by default
-      expect(events).toHaveLength(1);
     });
 
     gameLoop.addSystem('test-system', testSystem);
-
-    // Schedule an event
-    const eventEntity = eventSystem.scheduleEvent('test-event', {
-      message: 'hello'
-    })!;
-    flush(world);
-
-    // Verify event exists before processing
-    const pendingEventsBefore = eventSystem.getPendingEvents();
-    expect(pendingEventsBefore).toHaveLength(1);
-    expect(pendingEventsBefore[0]!.id).toBe(eventEntity.id!);
 
     // Run the game loop
     gameLoop.update(16);
 
     // Check that the system received the event
     expect(systemExecuted).toBe(true);
-    expect(receivedEvents).toHaveLength(1);
-    expect(receivedEvents[0]!.type).toBe('test-event');
-    expect(receivedEvents[0].payload).toEqual({ message: 'hello' });
-
-    // Verify that the event entity was deleted
-    const pendingEventsAfter = eventSystem.getPendingEvents();
-    expect(pendingEventsAfter).toHaveLength(0);
-
-    // Verify no pending events remain
-    const remainingEvents = eventSystem.getPendingEvents();
-    expect(remainingEvents).toHaveLength(0);
-  });
-
-  test('should delete multiple event entities after processing', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let receivedEvents: any[] = [];
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      receivedEvents = [...events];
-      expect(events).toHaveLength(3);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-
-    // Schedule multiple events
-    const event1 = eventSystem.scheduleEvent('event-1', { id: 1 });
-    const event2 = eventSystem.scheduleEvent('event-2', { id: 2 });
-    const event3 = eventSystem.scheduleEvent('event-3', { id: 3 });
-    flush(world);
-
-    // Verify events exist before processing
-    const pendingEventsBefore = eventSystem.getPendingEvents();
-    expect(pendingEventsBefore).toHaveLength(3);
-
-    // Run the game loop
-    gameLoop.update(16);
-
-    // Check that the system received all events
-    expect(receivedEvents).toHaveLength(3);
-    expect(receivedEvents.map(e => e.payload.id)).toEqual([1, 2, 3]);
-
-    // Verify that all event entities were deleted
-    const pendingEventsAfter = eventSystem.getPendingEvents();
-    expect(pendingEventsAfter).toHaveLength(0);
-
-    // Verify no pending events remain
-    const remainingEvents = eventSystem.getPendingEvents();
-    expect(remainingEvents).toHaveLength(0);
-  });
-
-  test('should handle systems with no events gracefully', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let systemExecuted = false;
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      systemExecuted = true;
-      expect(events).toHaveLength(0);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-
-    // Run the game loop without any events
-    gameLoop.update(16);
-
-    // Check that the system executed
-    expect(systemExecuted).toBe(true);
-
-    // Verify no errors occurred
-    const pendingEvents = eventSystem.getPendingEvents();
-    expect(pendingEvents).toHaveLength(0);
-  });
-
-  test('should delete events only for the target system', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let system1Executed = false;
-    let system2Executed = false;
-
-    const system1 = createEventDrivenSystem(['event-for-system1'], (
-      world,
-      deltaTime,
-      events
-    ) => {
-      system1Executed = true;
-      expect(events).toHaveLength(1);
-      expect(events[0]!.type).toBe('event-for-system1');
-    });
-
-    const system2 = createEventDrivenSystem(['event-for-system2'], (
-      world,
-      deltaTime,
-      events
-    ) => {
-      system2Executed = true;
-      expect(events).toHaveLength(1);
-      expect(events[0]!.type).toBe('event-for-system2');
-    });
-
-    gameLoop.addSystem('system1', system1);
-    gameLoop.addSystem('system2', system2);
-
-    // Schedule events of different types
-    const event1 = eventSystem.scheduleEvent('event-for-system1', { data: 1 });
-    const event2 = eventSystem.scheduleEvent('event-for-system2', { data: 2 });
-    flush(world);
-
-    // Verify events exist before processing
-    const pendingEventsBefore = eventSystem.getPendingEvents();
-    expect(pendingEventsBefore).toHaveLength(2);
-
-    // Run the game loop
-    gameLoop.update(16);
-
-    // Check that both systems executed
-    expect(system1Executed).toBe(true);
-    expect(system2Executed).toBe(true);
-
-    // Verify that all event entities were deleted
-    const pendingEventsAfter = eventSystem.getPendingEvents();
-    expect(pendingEventsAfter).toHaveLength(0);
-
-    // Verify no pending events remain
-    const remainingEvents = eventSystem.getPendingEvents();
-    expect(remainingEvents).toHaveLength(0);
-  });
-
-  test('should call flush even when no events are processed', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let flushCalled = false;
-    const originalFlush = world.flush;
-
-    // Mock the flush method to track calls
-    world.flush = () => {
-      flushCalled = true;
-      return originalFlush.call(world);
-    };
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      // System makes some changes to the world
-      const entity = createEntity(world, { location: { x: 10, y: 20 } });
-      expect(events).toHaveLength(0);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-
-    // Run the game loop without any events
-    gameLoop.update(16);
-
-    // Verify that flush was called even without events
-    expect(flushCalled).toBe(true);
-
-    // Restore original flush method
-    world.flush = originalFlush;
-  });
-
-  test('should handle events with undefined entity IDs gracefully', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-    const eventSystem = createEventSystem(world);
-    const gameLoop = createGameLoop(world, eventSystem);
-
-    let systemExecuted = false;
-
-    const testSystem = createWorldSystem((world, deltaTime, events) => {
-      systemExecuted = true;
-      expect(events).toHaveLength(1);
-    });
-
-    gameLoop.addSystem('test-system', testSystem);
-
-    // Schedule an event
-    eventSystem.scheduleEvent('test-system', 'test-event', {
-      message: 'hello'
-    });
-    flush(world);
-
-    // Run the game loop
-    expect(() => gameLoop.update(16)).not.toThrow();
-
-    // Check that the system executed without errors
-    expect(systemExecuted).toBe(true);
-
-    // Verify that the event was processed (even if deletion failed due to undefined ID)
-    const pendingEvents = eventSystem.getPendingEvents();
-    expect(pendingEvents).toHaveLength(0);
   });
 });
 
@@ -942,7 +582,7 @@ describe('logSystemPerformance', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const slowSystem = createWorldSystem(() => {
+    const slowSystem = createSystem(() => {
       const start = Date.now();
       while (Date.now() - start < 20) {
         // Simulate 20ms execution time
@@ -968,7 +608,7 @@ describe('logSystemPerformance', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const fastSystem = createWorldSystem(() => {
+    const fastSystem = createSystem(() => {
       // Very fast system
     });
 
@@ -983,7 +623,7 @@ describe('logSystemPerformance', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const slowSystem = createWorldSystem(() => {
+    const slowSystem = createSystem(() => {
       const start = Date.now();
       while (Date.now() - start < 5) {
         // Simulate 5ms execution time
@@ -1001,7 +641,7 @@ describe('logSystemPerformance', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const fastSystem = createWorldSystem(() => {
+    const fastSystem = createSystem(() => {
       // Very fast system
     });
 
@@ -1016,14 +656,14 @@ describe('logSystemPerformance', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const slowSystem1 = createWorldSystem(() => {
+    const slowSystem1 = createSystem(() => {
       const start = Date.now();
       while (Date.now() - start < 20) {
         // Simulate 20ms execution time
       }
     });
 
-    const slowSystem2 = createWorldSystem(() => {
+    const slowSystem2 = createSystem(() => {
       const start = Date.now();
       while (Date.now() - start < 15) {
         // Simulate 15ms execution time
@@ -1072,7 +712,7 @@ describe('Edge Cases and Error Handling', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem(() => {});
+    const testSystem = createSystem(() => {});
 
     expect(() => {
       gameLoop.addSystem('', testSystem);
@@ -1086,7 +726,7 @@ describe('Edge Cases and Error Handling', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const testSystem = createWorldSystem(() => {});
+    const testSystem = createSystem(() => {});
 
     expect(() => {
       gameLoop.addSystem('system-with-special-chars!@#$%^&*()', testSystem);
@@ -1102,8 +742,8 @@ describe('Edge Cases and Error Handling', () => {
     const world = (await createTestWorld()).build();
     const gameLoop = createGameLoop(world);
 
-    const system1 = createWorldSystem(() => {});
-    const system2 = createWorldSystem(() => {});
+    const system1 = createSystem(() => {});
+    const system2 = createSystem(() => {});
 
     gameLoop
       .addSystem('system1', system1, { priority: Number.MAX_SAFE_INTEGER })
@@ -1120,7 +760,7 @@ describe('Edge Cases and Error Handling', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -1139,7 +779,7 @@ describe('Edge Cases and Error Handling', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
     });
 
@@ -1162,7 +802,7 @@ describe('Edge Cases and Error Handling', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
       // This should not affect the current execution
       gameLoop.disableSystem('test-system');
@@ -1181,8 +821,8 @@ describe('Edge Cases and Error Handling', () => {
 
     let newSystemExecuted = false;
 
-    const testSystem = createWorldSystem(() => {
-      const newSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
+      const newSystem = createSystem(() => {
         newSystemExecuted = true;
       });
       gameLoop.addSystem('new-system', newSystem);
@@ -1202,7 +842,7 @@ describe('Edge Cases and Error Handling', () => {
 
     let executionCount = 0;
 
-    const testSystem = createWorldSystem(() => {
+    const testSystem = createSystem(() => {
       executionCount++;
       gameLoop.removeSystem('test-system');
     });

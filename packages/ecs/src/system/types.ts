@@ -1,4 +1,21 @@
-import type { Components, Entity, World } from '../types';
+import type { QueryOptions } from '@entity';
+import type { Components, Entity, World } from '@types';
+
+type EventsType = { entity: Entity<'event'>; payload: any; type: string };
+
+export type ExecProps<T extends Components> = {
+  deltaTime: number;
+  flushOnExec?: boolean;
+  world: World<T>;
+};
+
+export type EntityExecProps<E, T extends Components> = ExecProps<T> & {
+  entity: E;
+};
+
+export type System<T extends Components> = SystemOptions<T> & {
+  exec: (props: ExecProps<T>) => void;
+};
 
 export type SystemFunctionOptions = {
   flush?: boolean;
@@ -7,7 +24,6 @@ export type SystemFunctionOptions = {
 export type SystemFunctionProps<TComponents extends Components> =
   SystemFunctionOptions & {
     deltaTime: number;
-    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>;
     world: World<TComponents>;
   };
 
@@ -15,22 +31,27 @@ export type SystemFunctionProps<TComponents extends Components> =
 export type SystemFunction<TComponents extends Components> = (
   world: World<TComponents>,
   deltaTime: number,
-  events: Array<{ entity: Entity<'event'>; payload: any; type: string }>,
+  events: Array<EventsType>,
   options?: SystemFunctionOptions
 ) => void;
 
-export type SystemOptions = {
+export type SystemOptions<T extends Components> = QueryOptions<T> & {
   enabled?: boolean;
   frequency?: number; // Run every N frames (1 = every frame)
   priority?: number;
+  // withEvents?: string | string[];
 };
 
 export type SystemRegistration<TComponents extends Components> = {
   enabled: boolean;
-  fn: SystemFunction<TComponents>;
   frameCount: number; // Internal frame counter for frequency
   id: string;
-  options: Required<SystemOptions>;
+  options: Required<{
+    enabled: boolean;
+    frequency: number;
+    priority: number;
+  }>;
+  system: System<TComponents>;
 };
 
 export type SystemPerformance = {
@@ -44,8 +65,8 @@ export type SystemPerformance = {
 export type GameLoop<TComponents extends Components> = {
   addSystem: (
     id: string,
-    fn: SystemFunction<TComponents>,
-    options?: SystemOptions
+    system: System<TComponents>,
+    options?: SystemOptions<TComponents>
   ) => GameLoop<TComponents>;
   disableSystem: (id: string) => GameLoop<TComponents>;
   enableSystem: (id: string) => GameLoop<TComponents>;

@@ -5,10 +5,11 @@ import { healthComponent } from '@/components/health';
 import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntitiesIterator } from '@entity';
-import { eventComponent } from '@events';
-import { createSystem, createWorldSystem } from '@system';
-import type { ExtractWorldComponents, World } from '@types';
-import { createWorld, flush, saveWorld } from '@world';
+import { createSystem } from '@system';
+import type { ExtractWorldComponents } from '@types';
+import { createWorld, flush } from '@world';
+
+import type { EntityExecProps } from '../types';
 
 const createTestWorld = async () =>
   await createWorld({ dbType: DatabaseType.BUN });
@@ -42,12 +43,15 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that tracks processed entities
-    const system = createSystem<C>(entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
+        processedEntities.push(entity.id);
+      },
+      { with: ['health'] }
+    );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify all entities were processed
     expect(processedEntities).toHaveLength(3);
@@ -83,15 +87,15 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with health component
-    const system = createSystem<C>(
-      entity => {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       { with: ['health'] }
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify only entities with health component were processed
     expect(processedEntities).toHaveLength(2);
@@ -126,8 +130,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with low health
-    const system = createSystem<C>(
-      entity => {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       {
@@ -137,7 +141,7 @@ describe('Systems', () => {
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify only entities with low health were processed
     expect(processedEntities).toHaveLength(1);
@@ -169,8 +173,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes only first 3 entities
-    const system = createSystem<C>(
-      entity => {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       {
@@ -180,7 +184,7 @@ describe('Systems', () => {
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify only 3 entities were processed
     expect(processedEntities).toHaveLength(3);
@@ -209,7 +213,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that skips first 2 entities
-    const system = createSystem<C>(
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
       entity => {
         processedEntities.push(entity.id);
       },
@@ -220,7 +224,7 @@ describe('Systems', () => {
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify entities after offset were processed
     expect(processedEntities).toHaveLength(3);
@@ -256,8 +260,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes entities with location but without health component
-    const system = createSystem<C>(
-      entity => {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       {
@@ -267,7 +271,7 @@ describe('Systems', () => {
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify only entities with location but without health component were processed
     expect(processedEntities).toHaveLength(1);
@@ -290,9 +294,9 @@ describe('Systems', () => {
     flush(world);
 
     // Create a system that heals entities
-    const system = createSystem<C>(
-      entity => {
-        if (entity.health && entity.health.current < entity.health.max) {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
+        if (entity.health.current < entity.health.max) {
           entity.health.current = Math.min(
             entity.health.current + 25,
             entity.health.max
@@ -309,7 +313,7 @@ describe('Systems', () => {
     flush(world);
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify the entity was healed by querying it again
     const healedEntities = queryEntitiesIterator(world, { with: ['health'] });
@@ -333,12 +337,15 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem<C>(entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
+        processedEntities.push(entity.id);
+      },
+      { with: ['health'] }
+    );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify no entities were processed
     expect(processedEntities).toHaveLength(0);
@@ -362,14 +369,17 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem<C>(entity => {
-      processedEntities.push(entity.id);
-    });
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
+        processedEntities.push(entity.id);
+      },
+      { with: ['health'] }
+    );
 
     // Run the system multiple times
-    system(world, 16, []);
-    system(world, 16, []);
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
+    system.exec({ deltaTime: 16, world });
+    system.exec({ deltaTime: 16, world });
 
     // Verify the entity was processed each time
     expect(processedEntities).toHaveLength(3);
@@ -406,8 +416,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system with complex query options
-    const system = createSystem<C>(
-      entity => {
+    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       {
@@ -418,76 +428,12 @@ describe('Systems', () => {
     );
 
     // Run the system
-    system(world, 16, []);
+    system.exec({ deltaTime: 16, world });
 
     // Verify only the matching entity was processed
     expect(processedEntities).toHaveLength(1);
     expect(processedEntities).toContain(entity3.id);
 
-    saveWorld(world, 'system.world.db');
-  });
-
-  test('should create event-aware entity system', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .registerComponent(eventComponent)
-      .build();
-
-    type C = ExtractWorldComponents<typeof world>;
-
-    // Create entities
-    createEntity(world, { health: { current: 100, max: 100 } });
-    createEntity(world, { health: { current: 75, max: 100 } });
-    flush(world);
-
-    const processedEntities: number[] = [];
-    let receivedEvents: any[] = [];
-
-    // Create system that processes entities and events
-    const system = createSystem<C>(
-      (e, _world: World<C>, _deltaTime: number, events: any[]) => {
-        processedEntities.push(e.id);
-        receivedEvents = events;
-      },
-      { with: ['health'] }
-    );
-
-    // Run system with events
-    const mockEvents = [
-      { entity: {} as any, payload: { test: 'data' }, type: 'test-event' }
-    ];
-
-    system(world, 16, mockEvents);
-
-    expect(processedEntities).toHaveLength(2);
-    expect(receivedEvents).toHaveLength(1);
-    expect(receivedEvents[0].payload.test).toBe('data');
-  });
-
-  test('should create event-aware world system', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
-
-    let receivedWorld: any = null;
-    let receivedDeltaTime: number = 0;
-    let receivedEvents: any[] = [];
-
-    const system = createWorldSystem((w, dt, events) => {
-      receivedWorld = w;
-      receivedDeltaTime = dt;
-      receivedEvents = [...events];
-    });
-
-    const mockEvents = [
-      { entity: {} as any, payload: { action: 'jump' }, type: 'player-action' }
-    ];
-
-    system(world, 33, mockEvents);
-
-    expect(receivedWorld).toBe(world);
-    expect(receivedDeltaTime).toBe(33);
-    expect(receivedEvents).toHaveLength(1);
-    expect(receivedEvents[0].payload.action).toBe('jump');
+    // saveWorld(world, 'system.world.db');
   });
 });

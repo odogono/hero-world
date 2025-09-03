@@ -1,8 +1,8 @@
 import { queryEntitiesIterator, type QueryOptions } from '@entity';
-import type { Components, Entity, EntityWithComponents, World } from '@types';
+import type { Components, World } from '@types';
 import { flush } from '@world';
 
-import type { SystemFunction } from './types';
+import type { ExecProps, System, SystemFunction, SystemOptions } from './types';
 
 // Export event-aware system functionality
 // Re-export the event-aware game loop as the main game loop
@@ -13,81 +13,110 @@ type SystemFunctionOptions = {
 };
 
 /**
+ * Helper to create event-driven system that only processes when specific events are received
+ */
+// export const createEventDrivenSystem =
+//   <TComponents extends Components>(
+//     systemFn: (
+//       world: World<TComponents>,
+//       deltaTime: number,
+//       events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+//     ) => void,
+//     options?: SystemOptions
+//   ): SystemFunction<TComponents> =>
+//   (world: World<TComponents>, deltaTime: number, events, options) => {
+//     if (events.length === 0) {
+//       return;
+//     }
+
+//     systemFn(world, deltaTime, events);
+//     if (options?.flush ?? true) {
+//       flush(world);
+//     }
+//   };
+
+/**
  * Creates a simple system function that operates on the world directly
  * Compatible with the game loop architecture
  */
-export const createWorldSystem =
-  <TComponents extends Components>(
-    systemFn: (
-      world: World<TComponents>,
-      deltaTime: number,
-      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-    ) => void
-  ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events, options) => {
-    const flushSystem = options?.flush ?? true;
-    systemFn(world, deltaTime, events);
-    if (flushSystem) {
-      flush(world);
-    }
-  };
+// export const createWorldSystem =
+//   <TComponents extends Components>(
+//     systemFn: (
+//       world: World<TComponents>,
+//       deltaTime: number,
+//       events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
+//     ) => void
+//   ): SystemFunction<TComponents> =>
+//   (world: World<TComponents>, deltaTime: number, events, options) => {
+//     systemFn(world, deltaTime, events);
+//     if (options?.flush ?? true) {
+//       flush(world);
+//     }
+//   };
 
 /**
  * Creates a system that processes entities one by one with an iterator
  * More memory efficient for large entity sets
  */
 // Overloads to infer entity type from `with` keys
-export function createSystem<
+// export function createSystem<
+//   TComponents extends Components,
+//   W extends readonly (keyof TComponents)[]
+// >(
+//   processFn: (
+//     entity: EntityWithComponents<TComponents, W[number]>,
+//     world: World<TComponents>,
+//     deltaTime: number,
+//   ) => void,
+//   options?: SystemOptions<TComponents> & { with: W }
+// ): SystemFunction<TComponents>;
+
+// export function createSystem<TComponents extends Components>(
+//   processFn: (
+//     entity: EntityWithComponents<TComponents, never>,
+//     world: World<TComponents>,
+//     deltaTime: number
+//   ) => void,
+//   options: SystemOptions<TComponents>
+// ): SystemFunction<TComponents>;
+
+export const createSystem = <
   TComponents extends Components,
-  W extends readonly (keyof TComponents)[]
+  TExecProps extends ExecProps<TComponents>
 >(
-  processFn: (
-    entity: EntityWithComponents<TComponents, W[number]>,
-    world: World<TComponents>,
-    deltaTime: number,
-    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-  ) => void,
-  queryOptions: QueryOptions<TComponents> & { with: W }
-): SystemFunction<TComponents>;
+  processFn: (props: TExecProps) => void,
+  options: SystemOptions<TComponents> = {}
+): System<TComponents> => {
+  const hasQuery = hasQueryOptions<TComponents>(options);
 
-export function createSystem<TComponents extends Components>(
-  processFn: (
-    entity: EntityWithComponents<TComponents, never>,
-    world: World<TComponents>,
-    deltaTime: number,
-    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-  ) => void,
-  queryOptions?: QueryOptions<TComponents>
-): SystemFunction<TComponents>;
+  const exec = ({
+    deltaTime,
+    flushOnExec = true,
+    world
+  }: ExecProps<TComponents>) => {
+    if (hasQuery) {
+      using entities = queryEntitiesIterator(
+        world,
+        options as QueryOptions<TComponents>
+      );
 
-export function createSystem<
-  TComponents extends Components,
-  TEntity extends EntityWithComponents<TComponents, any> = EntityWithComponents<
-    TComponents,
-    any
-  >
->(
-  processFn: (
-    entity: TEntity,
-    world: World<TComponents>,
-    deltaTime: number,
-    events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-  ) => void,
-  queryOptions?: QueryOptions<TComponents>
-): SystemFunction<TComponents> {
-  return (world: World<TComponents>, deltaTime: number, events, options) => {
-    const flushSystem = options?.flush ?? true;
-    using entities = queryEntitiesIterator(world, queryOptions);
-
-    for (const entity of entities) {
-      processFn(entity as TEntity, world, deltaTime, events);
+      for (const entity of entities) {
+        processFn({ deltaTime, entity, world } as unknown as TExecProps);
+      }
+    } else {
+      processFn({ deltaTime, world } as unknown as TExecProps);
     }
 
-    if (flushSystem) {
+    if (flushOnExec) {
       flush(world);
     }
   };
-}
+
+  return {
+    ...options,
+    exec
+  };
+};
 
 /**
  * Wrapper that converts a system function without events to one that ignores events
@@ -100,28 +129,10 @@ export const ignoreEvents =
     systemFn(world, deltaTime);
   };
 
-/**
- * Helper to create event-driven system that only processes when specific events are received
- */
-export const createEventDrivenSystem =
-  <TComponents extends Components>(
-    eventTypes: string[],
-    systemFn: (
-      world: World<TComponents>,
-      deltaTime: number,
-      events: Array<{ entity: Entity<'event'>; payload: any; type: string }>
-    ) => void
-  ): SystemFunction<TComponents> =>
-  (world: World<TComponents>, deltaTime: number, events, options) => {
-    const flushSystem = options?.flush ?? true;
-    // Only run if we have events of the specified types
-    const relevantEvents = events.filter(event =>
-      eventTypes.includes(event.type)
-    );
-    if (relevantEvents.length > 0) {
-      systemFn(world, deltaTime, relevantEvents);
-      if (flushSystem) {
-        flush(world);
-      }
-    }
-  };
+export const hasQueryOptions = <T extends Components>(
+  options: SystemOptions<T>
+) =>
+  options.with !== undefined ||
+  options.without !== undefined ||
+  options.where !== undefined ||
+  options.entity !== undefined;

@@ -1,12 +1,10 @@
 import { createLog } from 'odgn-helpers/log';
 
-import { deleteEntity } from '@entity';
-import type { EventSystem } from '@events';
 import type { Components, World } from '@types';
 
 import type {
   GameLoop,
-  SystemFunction,
+  System,
   SystemOptions,
   SystemPerformance,
   SystemRegistration
@@ -46,7 +44,6 @@ export const logSystemPerformance = (
  */
 export const createGameLoop = <TComponents extends Components>(
   world: World<TComponents>,
-  eventSystem?: EventSystem,
   options: GameLoopOptions = {}
 ): GameLoop<TComponents> => {
   const { logErrors = false } = options;
@@ -56,23 +53,27 @@ export const createGameLoop = <TComponents extends Components>(
 
   const addSystem = (
     id: string,
-    fn: SystemFunction<TComponents>,
-    options: SystemOptions = {}
+    system: System<TComponents>,
+    options?: SystemOptions<TComponents>
   ): GameLoop<TComponents> => {
     if (systems.has(id)) {
       log.warn(`System '${id}' already exists, replacing`);
     }
 
+    const allOptions = { ...system, ...options };
+
+    const { enabled = true, exec, frequency = 1, priority = 50 } = allOptions;
+
     const systemRegistration: SystemRegistration<TComponents> = {
-      enabled: options.enabled ?? true,
-      fn,
+      enabled,
       frameCount: 0,
       id,
       options: {
-        enabled: options.enabled ?? true,
-        frequency: options.frequency ?? 1,
-        priority: options.priority ?? 50
-      }
+        enabled,
+        frequency,
+        priority
+      },
+      system
     };
 
     systems.set(id, systemRegistration);
@@ -136,29 +137,10 @@ export const createGameLoop = <TComponents extends Components>(
     frameCount++;
     const sortedSystems = getSortedSystems();
 
-    // Pre-collect frame events if supported, so each system sees the same set
-    let frameEvents:
-      | Array<{
-          entity: { id: number | undefined; world: World<TComponents> };
-          payload: any;
-          type: string;
-        }>
-      | null = null;
-    const canCollectAll =
-      eventSystem && typeof (eventSystem as any).collectAllEvents === 'function';
-    if (canCollectAll) {
-      try {
-        frameEvents = (eventSystem as any).collectAllEvents();
-      } catch (err) {
-        log.error('Error collecting frame events:', err);
-        frameEvents = [];
-      }
-    }
-
     // console.log('[GameLoop][update] sortedSystems', sortedSystems);
 
     // Track entities to delete after all systems run
-    const toDelete: number[] = [];
+    // const toDelete: number[] = [];
 
     for (const system of sortedSystems) {
       if (!system.enabled) {
@@ -174,34 +156,8 @@ export const createGameLoop = <TComponents extends Components>(
       const startTime = Date.now();
 
       try {
-        // Collect events for this system.
-        // Prefer new API that collects all events; fall back to older
-        // collectEventsForSystem(systemId) if provided by a mock/legacy impl.
-        let events:
-          | Array<{
-              entity: { id: number | undefined; world: World<TComponents> };
-              payload: any;
-              type: string;
-            }>
-          | [] = [];
-
-        if (frameEvents !== null) {
-          // Broadcast mode only; systems can filter by event type themselves
-          events = frameEvents;
-        }
-
         // Execute system with events, disabling flush to prevent double flushing
-        system.fn(world, deltaTime, events, { flush: false });
-
-        // Queue processed event entities for deletion
-        if (events.length > 0) {
-          for (const event of events) {
-            const { id } = event.entity;
-            if (typeof id === 'number') {
-              toDelete.push(id);
-            }
-          }
-        }
+        system.system.exec({ deltaTime, flushOnExec: false, world });
 
         const perf = perfMap.get(system.id);
 
@@ -222,12 +178,12 @@ export const createGameLoop = <TComponents extends Components>(
 
     // Perform deletions once per frame and flush once
     try {
-      if (toDelete.length > 0) {
-        for (const id of toDelete) {
-          // Delete in the same world
-          deleteEntity({ id, world });
-        }
-      }
+      // if (toDelete.length > 0) {
+      //   for (const id of toDelete) {
+      //     // Delete in the same world
+      //     deleteEntity({ id, world });
+      //   }
+      // }
       // Flush to persist any changes made by systems or event deletions
       world.flush();
     } catch (error) {
