@@ -13,7 +13,7 @@ import type { EntityExecProps } from '../system/types';
 export const eventComponent = defineComponent({
   name: 'event' as const,
   schema: {
-    payload: z.string().meta({ type: 'json' }), // JSON stringified payload
+    payload: z.string(), //object().default({}).meta({ type: 'json' }), // JSON stringified payload
     scheduledAt: z.number(), // timestamp in seconds (float)
     type: withIndex(z.string()),
     // eslint-disable-next-line perfectionist/sort-objects
@@ -22,6 +22,9 @@ export const eventComponent = defineComponent({
 });
 
 export type EventComponent = z.infer<typeof eventComponent.schema>;
+export type EventComponentWithPayload = EventComponent & {
+  payload: Record<string, unknown>;
+};
 
 type EventExecProps<
   TComponents extends Components & { event: EventComponent }
@@ -103,7 +106,7 @@ export const getEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponent> => {
+): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {
@@ -126,7 +129,7 @@ export const getAllEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponent> => {
+): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {
@@ -148,7 +151,7 @@ export const getPendingEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponent> => {
+): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {

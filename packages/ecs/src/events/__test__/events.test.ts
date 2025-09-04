@@ -117,4 +117,28 @@ describe('EventSystem', () => {
     expect(collectedEvents).toHaveLength(1);
     expect(collectedEvents[0]?.payload.value).toBe(1);
   });
+
+  test('event system processing events', async () => {
+    const world = (await createTestWorld())
+      .registerComponent(eventComponent)
+      .build();
+
+    let receivedCount = 0;
+    const eventSystem = createEventSystem('type-a', ({ type }) => {
+      receivedCount++;
+    });
+
+    scheduleEvent(world, 'type-a', { value: 1 });
+    scheduleEvent(world, 'type-b', { value: 2 });
+    scheduleEvent(world, 'type-a', { value: 3 });
+    flush(world);
+
+    eventSystem.exec({ deltaTime: 16, world });
+
+    expect(receivedCount).toBe(2);
+
+    // should not process events again
+    eventSystem.exec({ deltaTime: 16, world });
+    expect(receivedCount).toBe(2);
+  });
 });
