@@ -2,15 +2,17 @@ import { getUnixTime } from 'odgn-helpers/time';
 import { z } from 'zod';
 
 import { defineComponent } from '@component';
-import { createEntity, queryEntities } from '@entity';
+import { createEntity, deleteEntity, queryEntities } from '@entity';
 import { dateTimeWithDefault, withIndex } from '@schema';
+import { createSystem } from '@system';
 import type { Components, EntityWithComponents, World } from '@types';
+
+import type { EntityExecProps } from '../system/types';
 
 // Event component definition
 export const eventComponent = defineComponent({
   name: 'event' as const,
   schema: {
-    isProcessed: z.boolean().default(false),
     payload: z.string(), // JSON stringified payload
     scheduledAt: z.number(), // timestamp in seconds (float)
     type: withIndex(z.string()),
@@ -21,215 +23,171 @@ export const eventComponent = defineComponent({
 
 export type EventComponent = z.infer<typeof eventComponent.schema>;
 
-// Simple event system
-export class EventSystem<TComponents extends Components = Components> {
-  private world: World<TComponents>;
-
-  constructor(world: World<TComponents>) {
-    this.world = world;
-  }
-
-  // Build a WHERE clause (and args) that supports:
-  // - exact type match (event.type = ?)
-  // - wildcard patterns using * and ? (converted to SQL LIKE with % and _)
-  // - '*' (or '%') as a catch-all that skips type filtering
-  private buildTypeWhereClause(type: string | string[]): {
-    args: string[];
-    clause: string;
-  } {
-    const types = Array.isArray(type) ? type : [type];
-
-    // If any entry is a full wildcard, skip type filtering
-    if (types.some(t => t === '*' || t === '%')) {
-      return { args: [], clause: '1=1' };
-    }
-
-    const clauses: string[] = [];
-    const args: string[] = [];
-
-    for (const t of types) {
-      if (t.includes('*') || t.includes('?')) {
-        const pattern = t.replaceAll('*', '%').replaceAll('?', '_');
-        clauses.push('event.type LIKE ?');
-        args.push(pattern);
-      } else {
-        clauses.push('event.type = ?');
-        args.push(t);
-      }
-    }
-
-    // Combine with OR across patterns/literals
-    const clause =
-      clauses.length > 1 ? `(${clauses.join(' OR ')})` : clauses[0];
-    return { args, clause };
-  }
-
-  // Schedule an event. Supports both the new API:
-  //   scheduleEvent(type, payload, scheduledAt?)
-  // and a legacy signature used by some tests/mocks:
-  //   scheduleEvent(systemId, type, payload, scheduledAt?)
-  scheduleEvent<T = any>(
-    type: string,
-    payload: T,
-    scheduledAt?: number
-  ): EntityWithComponents<TComponents, 'event'> {
-    const when =
-      typeof scheduledAt === 'number' ? scheduledAt : getUnixTime();
-
-    return createEntity(this.world, {
-      event: {
-        isProcessed: false,
-        payload: JSON.stringify(payload),
-        scheduledAt: when,
-        type
-      }
-    });
-  }
-
-  // Publish event immediately to a system (bypasses scheduling)
-  publishEvent<T = any>(
-    // systemId: string,
-    type: string,
-    payload: T
-  ): EntityWithComponents<TComponents, 'event'> {
-    return this.scheduleEvent(type, payload);
-  }
-
-  // Get all pending events
-  getPendingEvents(): Array<EntityWithComponents<TComponents, 'event'>> {
-    return queryEntities(this.world, {
-      where: 'is_processed = 0',
-      with: ['event']
-    }) as Array<EntityWithComponents<TComponents, 'event'>>;
-  }
-
-  // Get events by type
-  getEventsByType(
-    type: string | string[]
-  ): Array<EntityWithComponents<TComponents, 'event'>> {
-    const { args, clause } = this.buildTypeWhereClause(type);
-    return queryEntities(this.world, {
-      args,
-      where: clause,
-      with: ['event']
-    }) as Array<EntityWithComponents<TComponents, 'event'>>;
-  }
-
-  // Backward-compat helper: return pending events regardless of system.
-  // Older tests may call this to verify no events remain after processing.
-  getEventsForSystem(_systemId: string) {
-    return this.getPendingEvents();
-  }
-
-  // Collect ready events for a system and return their parsed payloads
-  collectEventsByType<T = any>(
-    type: string | string[]
-  ): Array<{
-    entity: EntityWithComponents<TComponents, 'event'>;
-    payload: T;
-    type: string;
-  }> {
-    const { args, clause } = this.buildTypeWhereClause(type);
-
-    // Compare scheduled_at against current time in milliseconds. This supports
-    // events scheduled in either seconds or milliseconds: second-based
-    // timestamps are always <= now in ms once created.
-    const readyEvents = queryEntities(this.world, {
-      args,
-      // Compare against current time in milliseconds with sub-second precision
-      where: `${clause} AND event.is_processed = 0 AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
-      with: ['event']
-    });
-
-    // const allEvents = queryEntities(this.world, { with: ['event'] });
-
-    // console.log(
-    //   '[EventSystem][collectEventsForSystem] readyEvents',
-    //   readyEvents,
-    //   'allEvents',
-    //   allEvents
-    // );
-    const events: Array<{
-      entity: EntityWithComponents<TComponents, 'event'>;
-      payload: T;
-      type: string;
-    }> = [];
-
-    for (const entity of readyEvents) {
-      if (!entity.event) {
-        continue;
-      }
-
-      try {
-        const payload = JSON.parse(entity.event.payload);
-        events.push({
-          entity: entity as EntityWithComponents<TComponents, 'event'>,
-          payload,
-          type: entity.event.type
-        });
-
-        // Mark as processed
-        entity.event.isProcessed = true;
-      } catch {
-        // console.error('Error parsing event payload:', error);
-        // Mark as processed to prevent retries
-        entity.event.isProcessed = true;
-      }
-    }
-
-    // Note: Caller is responsible for calling flush() to persist changes
-
-    return events;
-  }
-
-  // Collect all ready events regardless of type
-  collectAllEvents<T = any>(): Array<{
-    entity: EntityWithComponents<TComponents, 'event'>;
-    payload: T;
-    type: string;
-  }> {
-    const readyEvents = queryEntities(this.world, {
-      // Current time in ms with sub-second precision
-      where: `event.is_processed = 0 AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
-      with: ['event']
-    });
-
-    const events: Array<{
-      entity: EntityWithComponents<TComponents, 'event'>;
-      payload: T;
-      type: string;
-    }> = [];
-
-    for (const entity of readyEvents) {
-      if (!entity.event) {
-        continue;
-      }
-
-      try {
-        const payload = JSON.parse(entity.event.payload);
-        events.push({
-          entity: entity as EntityWithComponents<TComponents, 'event'>,
-          payload,
-          type: entity.event.type
-        });
-
-        // Mark as processed
-        entity.event.isProcessed = true;
-      } catch {
-        // Mark as processed to prevent retries
-        entity.event.isProcessed = true;
-      }
-    }
-
-    // Note: Caller is responsible for calling flush() to persist changes
-    return events;
-  }
-
-  // Legacy: collect events only for a specific system id (uses in-memory targets)
-  // No per-system targeting; events are broadcast and systems can filter by type.
-}
+type EventExecProps<
+  TComponents extends Components & { event: EventComponent }
+> = {
+  event: EntityWithComponents<TComponents, 'event'>;
+  payload: unknown;
+  type: string;
+};
 
 // Helper function to create event system
-export const createEventSystem = <TComponents extends Components>(
-  world: World<TComponents>
-): EventSystem<TComponents> => new EventSystem(world);
+export const createEventSystem = <
+  TComponents extends Components & { event: EventComponent }
+>(
+  type: string | string[],
+  exec: (props: EventExecProps<TComponents>) => void
+) => {
+  const { args, clause } = buildTypeWhereClause(type);
+
+  const system = createSystem<
+    TComponents,
+    EntityExecProps<EntityWithComponents<TComponents, 'event'>, TComponents>
+  >(
+    ({ entity }) => {
+      const payload = JSON.parse(entity.event.payload);
+      exec({
+        event: entity as EntityWithComponents<TComponents, 'event'>,
+        payload,
+        type: entity.event.type
+      });
+
+      deleteEntity(entity);
+    },
+    {
+      args,
+      where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
+      with: ['event'] as const
+    }
+  );
+
+  return system;
+};
+
+// Schedule an event.
+export const scheduleEvent = <
+  TComponents extends Components & { event: EventComponent } = Components & {
+    event: EventComponent;
+  }
+>(
+  world: World<TComponents>,
+  type: string,
+  payload: unknown,
+  scheduledAt?: number
+): EntityWithComponents<TComponents, 'event'> => {
+  const when = scheduledAt ?? getUnixTime();
+
+  const e = createEntity(world, {
+    event: {
+      createdAt: new Date().toISOString(),
+      payload: JSON.stringify(payload),
+      scheduledAt: when,
+      type
+    }
+  } as Partial<TComponents>);
+
+  return e as EntityWithComponents<TComponents, 'event'>;
+};
+
+/**
+ * Returns upcomning events for a given type
+ *
+ * @param world
+ * @param type
+ * @returns
+ */
+export const getEvents = <
+  TComponents extends Components & { event: EventComponent } = Components & {
+    event: EventComponent;
+  }
+>(
+  world: World<TComponents>,
+  type: string | string[]
+): Array<EntityWithComponents<TComponents, 'event'>> => {
+  const { args, clause } = buildTypeWhereClause(type);
+
+  const entities = queryEntities(world, {
+    args,
+    where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
+    with: ['event'] as const
+  });
+
+  return entities;
+};
+
+export const getAllEvents = <
+  TComponents extends Components & { event: EventComponent } = Components & {
+    event: EventComponent;
+  }
+>(
+  world: World<TComponents>,
+  type: string | string[]
+): Array<{ payload: unknown; type: string }> => {
+  const { args, clause } = buildTypeWhereClause(type);
+
+  const entities = queryEntities(world, {
+    args,
+    where: clause,
+    with: ['event'] as const
+  });
+
+  return entities
+    .filter(e => !!e.event)
+    .map(e => ({ payload: JSON.parse(e.event!.payload), type: e.event!.type }));
+};
+
+export const getPendingEvents = <
+  TComponents extends Components & { event: EventComponent } = Components & {
+    event: EventComponent;
+  }
+>(
+  world: World<TComponents>,
+  type: string | string[]
+): Array<EntityWithComponents<TComponents, 'event'>> => {
+  const { args, clause } = buildTypeWhereClause(type);
+
+  const entities = queryEntities(world, {
+    args,
+    // Ready-to-process events: scheduled_at <= now
+    where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
+    with: ['event'] as const
+  });
+
+  return entities;
+};
+
+// Build a WHERE clause (and args) that supports:
+// - exact type match (event.type = ?)
+// - wildcard patterns using * and ? (converted to SQL LIKE with % and _)
+// - '*' (or '%') as a catch-all that skips type filtering
+const buildTypeWhereClause = (
+  type: string | string[]
+): {
+  args: string[];
+  clause: string;
+} => {
+  const types = Array.isArray(type) ? type : [type];
+
+  // If any entry is a full wildcard, skip type filtering
+  if (types.some(t => t === '*' || t === '%')) {
+    return { args: [], clause: '1=1' };
+  }
+
+  const clauses: string[] = [];
+  const args: string[] = [];
+
+  for (const t of types) {
+    if (t.includes('*') || t.includes('?')) {
+      const pattern = t.replaceAll('*', '%').replaceAll('?', '_');
+      clauses.push('event.type LIKE ?');
+      args.push(pattern);
+    } else {
+      clauses.push('event.type = ?');
+      args.push(t);
+    }
+  }
+
+  // Combine with OR across patterns/literals
+  const clause = clauses.length > 1 ? `(${clauses.join(' OR ')})` : clauses[0];
+  return { args, clause };
+};
