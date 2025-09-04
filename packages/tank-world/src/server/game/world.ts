@@ -7,16 +7,16 @@ import {
 import { createGameLoop } from 'odgn-ecs/system';
 import { createWorld as createWorldECS } from 'odgn-ecs/world';
 
-import { commandSystem } from './system/command';
-import { movementSystem } from './system/movement';
-import { notificationSystem } from './system/notification';
 import {
   healthComponent,
   moveOrderComponent,
   positionComponent,
   teamComponent,
   velocityComponent
-} from './types';
+} from './components';
+import { commandSystem } from './system/command';
+import { movementSystem } from './system/movement';
+import { notificationSystem } from './system/notification';
 
 export type TankWorld = Awaited<ReturnType<typeof createWorld>>;
 export type World = TankWorld['world'];
@@ -43,6 +43,9 @@ export const createWorld = async () => {
     .addSystem('notification', notificationSystem, { priority: 10 })
     .addSystem('command', commandSystem, { priority: 100 })
     .addSystem('movement', movementSystem, { priority: 90 });
+
+  const run = () => {};
+  const stop = () => {};
 
   return { loop, scheduleEvent, world };
 };
