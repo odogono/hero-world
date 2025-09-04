@@ -611,6 +611,21 @@ describe('zodSchemaToSqliteTable', () => {
     expect(result.sql).toContain('REFERENCES tbl_entity');
     expect(result.sql).toContain('ON DELETE CASCADE');
   });
+
+  describe('JSON', () => {
+    test('should generate JSON column', () => {
+      const schema = z
+        .object({
+          id: pkWithAutoIncrement(),
+          data: z.json()
+        })
+        .meta({ name: 'tbl_users' });
+
+      const result = zodSchemaToSqliteTable(schema);
+
+      expect(result.sql).toContain('data TEXT NOT NULL');
+    });
+  });
 });
 
 describe('SQLite Index Generation', () => {

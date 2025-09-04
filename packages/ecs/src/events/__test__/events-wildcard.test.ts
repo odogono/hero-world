@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { DatabaseType } from '@db';
-import { createEventSystem, eventComponent } from '@events';
+import { eventComponent, getEvents, scheduleEvent } from '@events';
 import { createWorld, flush } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
@@ -13,28 +13,27 @@ describe('EventSystem wildcards', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem(world);
 
     // Schedule various event types
-    eventSystem.scheduleEvent('enemy-spawn', { id: 1 });
-    eventSystem.scheduleEvent('enemy-die', { id: 2 });
-    eventSystem.scheduleEvent('boss1', { phase: 1 });
-    eventSystem.scheduleEvent('boss12', { phase: 2 });
+    scheduleEvent(world, 'enemy-spawn', { id: 1 });
+    scheduleEvent(world, 'enemy-die', { id: 2 });
+    scheduleEvent(world, 'boss1', { phase: 1 });
+    scheduleEvent(world, 'boss12', { phase: 2 });
     flush(world);
 
     // '*' should match all types (no type filter)
-    const all = eventSystem.getEventsByType('*');
+    const all = getEvents(world, '*');
     expect(all).toHaveLength(4);
 
     // Pattern with * should match both enemy-* events
-    const enemies = eventSystem.getEventsByType('enemy-*');
+    const enemies = getEvents(world, 'enemy-*');
     expect(enemies).toHaveLength(2);
-    expect(enemies.every(e => e.event.type.startsWith('enemy-'))).toBe(true);
+    expect(enemies.every(e => e.type.startsWith('enemy-'))).toBe(true);
 
     // Mixed list with pattern and literal, '?' matches single char
-    const mixed = eventSystem.getEventsByType(['enemy-*', 'boss?']);
+    const mixed = getEvents(world, ['enemy-*', 'boss?']);
     // boss? should match boss1 but not boss12
-    const mixedTypes = mixed.map(e => e.event.type).sort();
+    const mixedTypes = mixed.map(e => e.type).sort();
     expect(mixedTypes).toEqual(['boss1', 'enemy-die', 'enemy-spawn'].sort());
   });
 
@@ -42,16 +41,15 @@ describe('EventSystem wildcards', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem(world);
 
-    eventSystem.scheduleEvent('warn-1', { level: 1 });
-    eventSystem.scheduleEvent('warn-2', { level: 2 });
-    eventSystem.scheduleEvent('error-a', { code: 'A' });
-    eventSystem.scheduleEvent('info', { });
+    scheduleEvent(world, 'warn-1', { level: 1 });
+    scheduleEvent(world, 'warn-2', { level: 2 });
+    scheduleEvent(world, 'error-a', { code: 'A' });
+    scheduleEvent(world, 'info', {});
     flush(world);
 
     // Collect with wildcard pattern
-    const collectedWarns = eventSystem.collectEventsByType('warn-*');
+    const collectedWarns = getEvents(world, 'warn-*');
     expect(collectedWarns).toHaveLength(2);
     expect(collectedWarns.every(e => e.type.startsWith('warn-'))).toBe(true);
 
@@ -59,9 +57,8 @@ describe('EventSystem wildcards', () => {
     flush(world);
 
     // Collect with list including '?' single-char pattern
-    const collectedMixed = eventSystem.collectEventsByType(['error-?', 'info']);
+    const collectedMixed = getEvents(world, ['error-?', 'info']);
     const types = collectedMixed.map(e => e.type).sort();
     expect(types).toEqual(['error-a', 'info'].sort());
   });
 });
-

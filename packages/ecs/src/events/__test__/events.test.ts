@@ -91,11 +91,11 @@ describe('EventSystem', () => {
 
     const typeAEvents = getEvents(world, 'type-a');
     expect(typeAEvents).toHaveLength(2);
-    expect(typeAEvents.every(e => e.event.type === 'type-a')).toBe(true);
+    expect(typeAEvents.every(e => e.type === 'type-a')).toBe(true);
 
     const typeBEvents = getEvents(world, 'type-b');
     expect(typeBEvents).toHaveLength(1);
-    expect(typeBEvents[0]!.event.type).toBe('type-b');
+    expect(typeBEvents[0]!.type).toBe('type-b');
   });
 
   test('should collect events by type', async () => {
@@ -112,7 +112,7 @@ describe('EventSystem', () => {
     // saveWorld(world, 'world.db');
 
     // Test collecting events by single type
-    const collectedEvents = getAllEvents(world, 'event1');
+    const collectedEvents = getAllEvents<{ value: number }>(world, 'event1');
 
     expect(collectedEvents).toHaveLength(1);
     expect(collectedEvents[0]?.payload.value).toBe(1);

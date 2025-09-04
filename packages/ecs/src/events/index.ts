@@ -13,7 +13,7 @@ import type { EntityExecProps } from '../system/types';
 export const eventComponent = defineComponent({
   name: 'event' as const,
   schema: {
-    payload: z.string(), // JSON stringified payload
+    payload: z.string().meta({ type: 'json' }), // JSON stringified payload
     scheduledAt: z.number(), // timestamp in seconds (float)
     type: withIndex(z.string()),
     // eslint-disable-next-line perfectionist/sort-objects
@@ -103,7 +103,7 @@ export const getEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EntityWithComponents<TComponents, 'event'>> => {
+): Array<EventComponent> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {
@@ -112,17 +112,21 @@ export const getEvents = <
     with: ['event'] as const
   });
 
-  return entities;
+  return entities.map(e => ({
+    ...e.event!,
+    payload: JSON.parse(e.event!.payload)
+  }));
 };
 
 export const getAllEvents = <
+  TPayload = unknown,
   TComponents extends Components & { event: EventComponent } = Components & {
     event: EventComponent;
   }
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<{ payload: unknown; type: string }> => {
+): Array<EventComponent> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {
@@ -131,9 +135,10 @@ export const getAllEvents = <
     with: ['event'] as const
   });
 
-  return entities
-    .filter(e => !!e.event)
-    .map(e => ({ payload: JSON.parse(e.event!.payload), type: e.event!.type }));
+  return entities.map(e => ({
+    ...e.event!,
+    payload: JSON.parse(e.event!.payload)
+  }));
 };
 
 export const getPendingEvents = <
@@ -143,7 +148,7 @@ export const getPendingEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EntityWithComponents<TComponents, 'event'>> => {
+): Array<EventComponent> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = queryEntities(world, {
@@ -153,7 +158,10 @@ export const getPendingEvents = <
     with: ['event'] as const
   });
 
-  return entities;
+  return entities.map(e => ({
+    ...e.event!,
+    payload: JSON.parse(e.event!.payload)
+  }));
 };
 
 // Build a WHERE clause (and args) that supports:
