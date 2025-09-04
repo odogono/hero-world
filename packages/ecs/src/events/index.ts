@@ -32,6 +32,7 @@ type EventExecProps<
   event: EntityWithComponents<TComponents, 'event'>;
   payload: unknown;
   type: string;
+  world: World<TComponents>;
 };
 
 // Helper function to create event system
@@ -39,7 +40,7 @@ export const createEventSystem = <
   TComponents extends Components & { event: EventComponent }
 >(
   type: string | string[],
-  exec: (props: EventExecProps<TComponents>) => void
+  exec: (props: EventExecProps<TComponents>) => boolean | void
 ) => {
   const { args, clause } = buildTypeWhereClause(type);
 
@@ -47,15 +48,19 @@ export const createEventSystem = <
     TComponents,
     EntityExecProps<EntityWithComponents<TComponents, 'event'>, TComponents>
   >(
-    ({ entity }) => {
+    ({ entity, world }) => {
       const payload = JSON.parse(entity.event.payload);
-      exec({
-        event: entity as EntityWithComponents<TComponents, 'event'>,
-        payload,
-        type: entity.event.type
-      });
+      const shouldDelete =
+        exec({
+          event: entity as EntityWithComponents<TComponents, 'event'>,
+          payload,
+          type: entity.event.type,
+          world
+        }) ?? true;
 
-      deleteEntity(entity);
+      if (shouldDelete) {
+        deleteEntity(entity);
+      }
     },
     {
       args,

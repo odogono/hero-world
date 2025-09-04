@@ -13,6 +13,7 @@ import type {
 const log = createLog('game-loop');
 
 type GameLoopOptions = {
+  execAdditional?: object;
   logErrors?: boolean;
 };
 
@@ -46,7 +47,7 @@ export const createGameLoop = <TComponents extends Components>(
   world: World<TComponents>,
   options: GameLoopOptions = {}
 ): GameLoop<TComponents> => {
-  const { logErrors = false } = options;
+  const { execAdditional = {}, logErrors = false } = options;
   const systems = new Map<string, SystemRegistration<TComponents>>();
   const perfMap = new Map<string, SystemPerformance>();
   let frameCount = 0;
@@ -157,7 +158,12 @@ export const createGameLoop = <TComponents extends Components>(
 
       try {
         // Execute system with events, disabling flush to prevent double flushing
-        system.system.exec({ deltaTime, flushOnExec: false, world });
+        system.system.exec({
+          ...execAdditional,
+          deltaTime,
+          flushOnExec: false,
+          world
+        });
 
         const perf = perfMap.get(system.id);
 
@@ -178,12 +184,6 @@ export const createGameLoop = <TComponents extends Components>(
 
     // Perform deletions once per frame and flush once
     try {
-      // if (toDelete.length > 0) {
-      //   for (const id of toDelete) {
-      //     // Delete in the same world
-      //     deleteEntity({ id, world });
-      //   }
-      // }
       // Flush to persist any changes made by systems or event deletions
       world.flush();
     } catch (error) {
