@@ -1,41 +1,45 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/`: TypeScript React app code.
-  - `components/`, `contexts/`, `helpers/`, `hooks/`, `screens/`, `types.ts`.
-  - Entry: `main.tsx`; styles: `index.css`.
-- `index.html`: App shell (Vite).
-- `vite.config.js` and `vitest.config.ts`: Aliases like `@components`, `@helpers`, etc.
-- Build output: `dist/` (Vite default).
+- Monorepo (Bun/TypeScript):
+  - `packages/ecs`: TypeScript ECS library; tests in `src/__test__`.
+  - `packages/helpers`: Shared helpers (`log`, `string`, `try-catch`).
+  - `packages/tank-world`: Vite + React app and Bun server (`src/server`); tests in `src/**/__test__`.
+  - `docs/`: Design and integration notes.
+- Tank World app code lives under `src/` (`components/`, `contexts/`, `helpers/`, `hooks/`, `screens/`, `types.ts`). Entry: `main.tsx`, styles: `index.css`, shell: `index.html`. Config: `vite.config.js`, `vitest.config.ts`.
 
 ## Build, Test, and Development Commands
-- `bun run dev`: Start Vite dev server on `http://localhost:5173`.
-- `bun run build`: Production build to `dist/`.
-- `bun run preview`: Serve the production build locally.
-- `bun run test`: Run unit tests with Vitest.
-- `bun run coverage`: Run tests with coverage (V8; reports text/json/html).
-- `bun run lint` / `bun run lint:fix`: Lint code; autofix common issues.
-- `bun run format` / `bun run format:check`: Prettier formatting.
-- Optional E2E debug: `node test-app.js` (uses Playwright; start dev server first).
+- Install once at root: `bun install`.
+- ECS:
+  - `cd packages/ecs && bun test` (Bun tests) | `bun run test:coverage`.
+  - `bun run lint` | `bun run format`.
+- Tank World:
+  - `cd packages/tank-world && bun run dev` (Vite dev, http://localhost:5173).
+  - `bun run build` | `bun run preview`.
+  - `bun run dev:server` | `bun run start:server` (Bun server).
+  - `bun run test` | `bun run coverage` | `bun run lint` | `bun run format`.
+- Workspace utilities: `bunx npm-check-updates --interactive`.
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript + React; 2‑space indent, single quotes, semicolons.
+- TypeScript ESM; 2-space indent; semicolons; single quotes; trailing commas per Prettier.
 - Prefer arrow functions; `prefer-const`; no `var`.
-- Type style: use `type` aliases (enforced by ESLint).
-- Imports: use configured aliases (e.g., `@components/Button`); sorted via Prettier plugin.
-- Tailwind: utility classes allowed; plugin auto-sorts classes.
+- Types: use `type` aliases over `interface`.
+- Imports: sorted; use type-only imports where applicable.
+- Files: TS modules kebab-case (e.g., `game-loop.ts`); React components PascalCase (e.g., `SQLiteDemo.tsx`).
+- Naming: camelCase (vars/functions), PascalCase (types/enums), UPPER_SNAKE_CASE (constants).
 
 ## Testing Guidelines
-- Framework: Vitest (`environment: node`, `globals: true`).
-- Coverage: collected for `src/**/*.ts`; view HTML at `coverage/index.html`.
-- Test files: `*.test.ts` or `*.spec.ts(x)` near code.
-- Focus unit tests on helpers/logic; mock React where practical.
+- Frameworks: Bun test (ECS), Vitest (Tank World).
+- Location: colocate under `src/**/__test__` with `*.test.ts(x)` or `*.spec.ts(x)`.
+- Coverage: keep or improve; target ≥80%. View HTML at `coverage/index.html`.
+- Deterministic tests; prefer lightweight fakes over globals.
 
 ## Commit & Pull Request Guidelines
-- Prefer Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
-- PRs must include: concise description, linked issue (if any), screenshots for UI changes (e.g., update `app-screenshot.png` when relevant).
-- Before opening a PR: `bun run lint && bun run format:check && bun run test`.
+- Commits: Conventional Commits (e.g., `feat:`, `fix:`, `chore:`).
+- Before PR: `bun run lint && bun run format:check && bun run test` (root/package).
+- PRs: clear description, rationale, scope; link issues. Include screenshots for UI changes and failing/updated tests for logic changes. Limit to one package when possible; update affected package `CHANGELOG` if maintained.
 
 ## Security & Configuration Tips
-- SQLite WASM requires COOP/COEP headers; local dev is configured in `vite.config.js`. Ensure equivalent headers in production.
-- Keep aliases in `vite.config.js` and `vitest.config.ts` in sync.
+- Use environment variables; never commit `.env`.
+- SQLite WASM needs COOP/COEP; local dev is set in `vite.config.js`—ensure equivalent headers in production.
+- Keep Vite and Vitest aliases in sync.
