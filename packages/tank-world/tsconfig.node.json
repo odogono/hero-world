@@ -40,6 +40,9 @@
       "@screens/*": [
         "./src/screens/*"
       ],
+      "@server/*": [
+        "./src/server/*"
+      ],
       "@types": [
         "./src/types"
       ]

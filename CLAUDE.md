@@ -40,6 +40,8 @@ packages/
 #### Tank World Package (`packages/tank-world/`)
 - `bun run dev` - Start development server (uses `bunx --bun vite`)
 - `bun run build` - Build for production (uses `bunx --bun vite build`)
+- `bun run dev:server` - Start backend server in development mode with hot reload
+- `bun run start:server` - Start backend server in production mode
 - `bun run test` - Run tests with Vitest
 - `bun run coverage` - Run tests with coverage
 - `bun run preview` - Preview production build
@@ -94,6 +96,8 @@ The tank-world demo (`packages/tank-world/`) demonstrates:
 - Integration with the ECS system and SQLite WASM
 - Theme context and components with dark/light mode toggle
 - Vitest for testing with coverage support
+- Elysia-based backend server with WebSocket support and REST API
+- Cross-Origin-Embedder-Policy headers for SQLite WASM compatibility
 
 ## Development Guidelines
 
@@ -180,3 +184,27 @@ This approach was crucial for identifying and fixing:
 - TypeScript import issues with `import type` syntax
 - Vite path alias configuration problems
 - Runtime vs. build-time error differentiation
+
+## Server Architecture
+
+### Tank World Backend (`packages/tank-world/src/server/`)
+
+The backend uses Elysia framework with:
+- **REST API**: Routes grouped under `/api` with Zod validation
+- **WebSocket**: Real-time communication at `/ws` endpoint with chat broadcasting
+- **Health Check**: Simple `/health` endpoint for monitoring
+- **CORS Headers**: Configured for SQLite WASM compatibility
+
+Key server features:
+- In-memory client connection tracking for WebSocket broadcasting
+- Zod schema validation for API requests and WebSocket messages
+- Proxy configuration in Vite for development (port 3001)
+- Default port 3001 with environment override support
+
+### Vite Configuration
+
+Tank-world includes specialized Vite configuration:
+- Path aliases for clean imports (`@/`, `@components/`, etc.)
+- SQLite WASM optimization exclusions
+- COOP/COEP headers for SharedArrayBuffer support
+- WebSocket and API proxy to backend server
