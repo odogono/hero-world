@@ -14,6 +14,8 @@ import type {
   World
 } from '@types';
 
+import { SQLiteError } from './error';
+
 // Overloads for type inference
 type CreateEntityOverloads = {
   <TComponents extends Components, C extends Partial<TComponents>>(
@@ -382,7 +384,7 @@ export function queryEntitiesIterator<T extends Components>(
 
   // Use Bun's iterate capability for incremental results
   const iterator =
-    args && args.length > 0 ? stmt.iterate(...args) : stmt.iterate();
+    args && args.length > 0 ? stmt.iterate(args) : stmt.iterate();
 
   return {
     [Symbol.dispose]: () => {
@@ -397,6 +399,11 @@ export function queryEntitiesIterator<T extends Components>(
           }
           yield entity as any;
         }
+      } catch (error) {
+        throw SQLiteError.executionError(sql, error as Error, {
+          args,
+          context: options
+        });
       } finally {
         finalize();
       }

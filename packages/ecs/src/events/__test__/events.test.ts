@@ -29,7 +29,6 @@ describe('EventSystem', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem('test-event', () => {});
 
     // Schedule an event
     const eventEntity = scheduleEvent(world, 'test-event', {
@@ -45,7 +44,6 @@ describe('EventSystem', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem('future-event', () => {});
 
     // Schedule an event for 1 hour in the future
     const futureTime = Date.now() + 60 * 60 * 1000;
@@ -68,7 +66,6 @@ describe('EventSystem', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem('*', () => {});
 
     scheduleEvent(world, 'event1', { data: 1 });
     scheduleEvent(world, 'event2', { data: 2 });
@@ -82,7 +79,6 @@ describe('EventSystem', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem('*', () => {});
 
     scheduleEvent(world, 'type-a', { data: 1 });
     scheduleEvent(world, 'type-b', { data: 2 });
@@ -102,7 +98,6 @@ describe('EventSystem', () => {
     const world = (await createTestWorld())
       .registerComponent(eventComponent)
       .build();
-    const eventSystem = createEventSystem('*', () => {});
 
     scheduleEvent(world, 'event1', { value: 1 });
     scheduleEvent(world, 'event2', { value: 2 });
@@ -123,9 +118,20 @@ describe('EventSystem', () => {
       .registerComponent(eventComponent)
       .build();
 
+    let readReceivedCount = 0;
+    const readSystem = createEventSystem('*', () => {
+      readReceivedCount++;
+      return false;
+    });
+
     let receivedCount = 0;
     const eventSystem = createEventSystem('type-a', ({ type }) => {
       receivedCount++;
+    });
+
+    let allReceivedCount = 0;
+    const allSystem = createEventSystem(['type-a', 'type-b'], () => {
+      allReceivedCount++;
     });
 
     scheduleEvent(world, 'type-a', { value: 1 });
@@ -133,9 +139,13 @@ describe('EventSystem', () => {
     scheduleEvent(world, 'type-a', { value: 3 });
     flush(world);
 
+    readSystem.exec({ deltaTime: 16, world });
     eventSystem.exec({ deltaTime: 16, world });
+    allSystem.exec({ deltaTime: 16, world });
 
+    expect(readReceivedCount).toBe(3);
     expect(receivedCount).toBe(2);
+    expect(allReceivedCount).toBe(1);
 
     // should not process events again
     eventSystem.exec({ deltaTime: 16, world });

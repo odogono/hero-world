@@ -23,6 +23,7 @@ This is an Entity Component System (ECS) library built with TypeScript and Bun. 
 - `bun run format` - Format code with Prettier
 - `bun run format:check` - Check formatting
 - `bun run unused` - Find unused code with knip
+- `bun run outdated` - Check for outdated dependencies interactively
 
 ## Architecture
 
@@ -155,6 +156,30 @@ const statsComponent = defineComponent({
 const world = (await createWorld()).registerComponent(statsComponent).build();
 ```
 
+### Property Assignment Pattern (Recommended)
+
+The ECS supports intuitive property assignment for component management:
+
+```ts
+// Create entity without initial components
+const player = createEntity(world);
+
+// Add components via property assignment
+player.health = { current: 100, max: 100 };
+player.position = { x: 10, y: 20 };
+
+// Modify components directly
+player.health.current = 85;
+player.position.x = 15;
+
+// Remove components by assigning null/undefined
+player.health = null;        // Remove health component
+player.position = undefined; // Remove position component
+
+// Changes are persisted when you flush
+flush(world);
+```
+
 ### Testing Structure
 
 - Test files in `src/**/__test__/*.test.ts`
@@ -162,6 +187,7 @@ const world = (await createWorld()).registerComponent(statsComponent).build();
 - Main tests in `src/__test__/`: `entity.test.ts`, `component.test.ts`, `query.test.ts`, `system.test.ts`
 - Database tests in `src/db/__test__/`: `alasql.test.ts`, `json-functions.test.ts`
 - Schema tests in `src/schema/__test__/`: `schema-to-sql.test.ts`
+- **Note**: Database files (`*.db`, `*.db-shm`, `*.db-wal`) are generated during testing and development - these are temporary and should not be committed
 
 ## Key Implementation Details
 
@@ -185,7 +211,7 @@ Systems are functions that operate on world state:
 ```ts
 // Create a system that processes entities
 const movementSystem = createSystem(
-  (entity, world, deltaTime, events) => {
+  ({ entity, deltaTime, world }) => {
     // Process entity movement
     if (entity.position && entity.velocity) {
       entity.position.x += entity.velocity.x * deltaTime;
@@ -207,25 +233,27 @@ gameLoop.addSystem('movement', movementSystem, { priority: 100 });
 The library provides database-backed event scheduling and processing:
 
 ```ts
-// Create event system
-const eventSystem = createEventSystem(world);
+// Register the event component first
+const world = (await createWorld())
+  .registerComponent(eventComponent)
+  .build();
 
-// Schedule events for systems
-eventSystem.scheduleEvent(
-  'movement', // target system
-  'move:start',
-  { direction: 'north' },
+// Schedule events directly
+const event = scheduleEvent(world, 'move:start', 
+  { direction: 'north' }, 
   Date.now() + 1000 // delayed execution
 );
 
-// Systems receive events automatically
-const movementSystem: SystemFunction = (world, deltaTime, events) => {
-  for (const { type, payload } of events) {
-    if (type === 'move:start') {
-      // Handle movement event
-    }
+// Create event-handling systems for specific event types
+const movementEventSystem = createEventSystem('move:*', ({ type, payload }) => {
+  if (type === 'move:start') {
+    // Handle movement event
+    console.log('Starting movement:', payload);
   }
-};
+});
+
+// Add to game loop
+gameLoop.addSystem('movement-events', movementEventSystem);
 ```
 
 ### Game Loop System
