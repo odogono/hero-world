@@ -78,7 +78,7 @@ export const createDatabase = async (
     }
 
     case DatabaseType.BUN: {
-      const { createBunDatabaseInstance } = await import('./bun-sqlite');
+      const { createBunDatabaseInstance } = await import('./bun');
       return createBunDatabaseInstance(options);
     }
 
