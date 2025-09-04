@@ -6,7 +6,12 @@ import {
   ClientMessageSchema,
   WelcomeSchema
 } from '../shared/messages';
-import { createWorld, issueMoveOrder, spawnTank } from './game/world';
+import {
+  createWorld,
+  issueMoveOrder,
+  spawnTank,
+  type TankWorld
+} from './game/world';
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -21,6 +26,9 @@ const tankWorldPromise = createWorld();
 let broadcastTimer: ReturnType<typeof setInterval> | null = null;
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 
+// Game world instance
+let gameWorld: TankWorld | null = null;
+
 // Schemas (Zod)
 const EchoSchema = z.object({
   text: z.string().min(1),
@@ -32,6 +40,162 @@ const ChatMessage = z.object({
   text: z.string().min(1).max(500),
   type: z.literal('chat').default('chat')
 });
+
+// Game message schemas
+const GameMoveCommand = z.object({
+  tankId: z.number(),
+  targetX: z.number(),
+  targetY: z.number(),
+  type: z.literal('game:move')
+});
+
+const GameSpawnCommand = z.object({
+  team: z.enum(['red', 'blue']),
+  type: z.literal('game:spawn'),
+  x: z.number().optional(),
+  y: z.number().optional()
+});
+
+const GameStateRequest = z.object({
+  requestId: z.string(),
+  type: z.literal('game:world_state')
+});
+
+const GameMessage = z.union([
+  GameMoveCommand,
+  GameSpawnCommand,
+  GameStateRequest
+]);
+
+// Game loop management
+let gameLoopInterval: Timer | null = null;
+const GAME_TICK_RATE = 60; // 60 FPS
+const GAME_TICK_INTERVAL = 1000 / GAME_TICK_RATE;
+
+// Initialize game world
+const initializeGameWorld = async () => {
+  if (gameWorld) {
+    return gameWorld;
+  }
+
+  console.log('Initializing game world...');
+  gameWorld = await createWorld();
+
+  // Connect notification system to WebSocket broadcasting
+  setBroadcastCallback(broadcastToClients);
+
+  // Spawn some initial tanks for testing
+  spawnTank(gameWorld, 'red', 100, 100);
+  spawnTank(gameWorld, 'blue', 300, 300);
+
+  console.log('Game world initialized with sample tanks');
+  return gameWorld;
+};
+
+// Start game loop
+const startGameLoop = () => {
+  if (gameLoopInterval || !gameWorld) {
+    return;
+  }
+
+  console.log(`Starting game loop at ${GAME_TICK_RATE} FPS`);
+  gameLoopInterval = setInterval(() => {
+    gameWorld!.loop.update(GAME_TICK_INTERVAL);
+  }, GAME_TICK_INTERVAL);
+};
+
+// Stop game loop
+const stopGameLoop = () => {
+  if (gameLoopInterval) {
+    clearInterval(gameLoopInterval);
+    gameLoopInterval = null;
+    console.log('Game loop stopped');
+  }
+};
+
+// Broadcast message to all connected clients
+const broadcastToClients = (message: any) => {
+  const json = JSON.stringify(message);
+  for (const client of clients) {
+    client.send(json);
+  }
+};
+
+// Handle game messages from WebSocket
+const handleGameMessage = (ws: any, message: z.infer<typeof GameMessage>) => {
+  if (!gameWorld) {
+    ws.send(
+      JSON.stringify({
+        message: 'Game world not initialized',
+        ts: Date.now(),
+        type: 'error'
+      })
+    );
+    return;
+  }
+
+  switch (message.type) {
+    case 'game:move':
+      handleMoveCommand(message.tankId, message.targetX, message.targetY);
+      break;
+    case 'game:spawn':
+      handleSpawnCommand(message.team, message.x, message.y);
+      break;
+    case 'game:world_state':
+      handleWorldStateRequest(ws, message.requestId);
+      break;
+  }
+};
+
+// Handle tank move command
+const handleMoveCommand = (
+  tankId: number,
+  targetX: number,
+  targetY: number
+) => {
+  if (!gameWorld) {
+    return;
+  }
+
+  console.log(`Moving tank ${tankId} to (${targetX}, ${targetY})`);
+  gameWorld.scheduleEvent('cmd:move', { id: tankId, targetX, targetY });
+};
+
+// Handle tank spawn command
+const handleSpawnCommand = (team: 'red' | 'blue', x?: number, y?: number) => {
+  if (!gameWorld) {
+    return;
+  }
+
+  const spawnX = x ?? Math.random() * 400;
+  const spawnY = y ?? Math.random() * 300;
+
+  console.log(`Spawning ${team} tank at (${spawnX}, ${spawnY})`);
+  const tank = spawnTank(gameWorld, team, spawnX, spawnY);
+
+  // Broadcast spawn event to all clients
+  broadcastToClients({
+    tankId: tank.id,
+    team,
+    ts: Date.now(),
+    type: 'game:tank_spawned',
+    x: spawnX,
+    y: spawnY
+  });
+};
+
+// Handle world state request
+const handleWorldStateRequest = (ws: any, requestId: string) => {
+  if (!gameWorld) {
+    return;
+  }
+
+  console.log(`Requesting world state with ID: ${requestId}`);
+  // Use the ECS event system to query world state
+  gameWorld.scheduleEvent('query:world_state', {
+    requestId: Number(requestId)
+  });
+};
 
 const app = new Elysia()
   // Basic health check
@@ -136,14 +300,30 @@ const app = new Elysia()
     }
   });
 
-app.listen(PORT);
+// Initialize game world and start server
+const startServer = async () => {
+  try {
+    await initializeGameWorld();
+    startGameLoop();
+
+    app.listen(PORT);
+
+    console.log(`API listening on http://localhost:${PORT}`);
+    console.log(`HTTP:  GET  /health, /api/hello, /api/time`);
+    console.log(`WS:    ws://localhost:${PORT}/ws`);
+    console.log('Game server ready!');
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
 console.log(`API listening on http://localhost:${PORT}`);
 console.log(`HTTP:  GET  /health, /api/hello, /api/time`);
 console.log(`WS:    ws://localhost:${PORT}/ws`);
 
 // Game loop and broadcaster
-async function startGameLoops() {
+const startGameLoops = async () => {
   const world = await tankWorldPromise;
   if (!stepTimer) {
     const stepMs = 16; // ~60 Hz
@@ -161,9 +341,9 @@ async function startGameLoops() {
       }
     }, rateMs);
   }
-}
+};
 
-function stopGameLoops() {
+const stopGameLoops = () => {
   if (stepTimer) {
     clearInterval(stepTimer);
     stepTimer = null;
@@ -172,4 +352,16 @@ function stopGameLoops() {
     clearInterval(broadcastTimer);
     broadcastTimer = null;
   }
-}
+};
+
+process.on('SIGINT', () => {
+  console.log('\nShutting down server...');
+  stopGameLoop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\nShutting down server...');
+  stopGameLoop();
+  process.exit(0);
+});
