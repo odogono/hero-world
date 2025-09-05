@@ -22,15 +22,15 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true
       },
       '/health': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true
       },
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: 'ws://127.0.0.1:3001',
         ws: true
       }
     }

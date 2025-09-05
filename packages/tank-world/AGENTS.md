@@ -17,7 +17,8 @@
   - `cd packages/tank-world && bun run dev` (Vite dev, http://localhost:5173).
   - `bun run build` | `bun run preview`.
   - `bun run dev:server` | `bun run start:server` (Bun server).
-  - `bun run test` | `bun run coverage` | `bun run lint` | `bun run format`.
+  - `bun run test` (Bun test) | `bun run coverage` | `bun run lint` | `bun run format`.
+  - E2E: `bun run test:e2e` (Playwright; start dev server first).
 - Workspace utilities: `bunx npm-check-updates --interactive`.
 
 ## Coding Style & Naming Conventions
@@ -29,9 +30,9 @@
 - Naming: camelCase (vars/functions), PascalCase (types/enums), UPPER_SNAKE_CASE (constants).
 
 ## Testing Guidelines
-- Frameworks: Bun test (ECS), Vitest (Tank World).
+- Framework: Bun test for ECS and Tank World; Playwright for E2E.
 - Location: colocate under `src/**/__test__` with `*.test.ts(x)` or `*.spec.ts(x)`.
-- Coverage: keep or improve; target ≥80%. View HTML at `coverage/index.html`.
+- Coverage: keep or improve; target ≥80%.
 - Deterministic tests; prefer lightweight fakes over globals.
 
 ## Commit & Pull Request Guidelines
@@ -43,3 +44,4 @@
 - Use environment variables; never commit `.env`.
 - SQLite WASM needs COOP/COEP; local dev is set in `vite.config.js`—ensure equivalent headers in production.
 - Keep Vite and Vitest aliases in sync.
+ - WebSocket URL can be overridden via `VITE_WS_URL` (e.g., `VITE_WS_URL=ws://127.0.0.1:3001/ws bun run dev`). The client will also try fallbacks: current origin and then `ws://127.0.0.1:3001/ws`.

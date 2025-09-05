@@ -1,8 +1,8 @@
-import { createLog } from 'odgn-helpers';
+import { createLog } from 'odgn-helpers/log';
 
-import { ThemeTogglePortal } from '@components/theme/toggle-portal';
+import { GameDemo } from '@components/GameDemo';
 import { SQLiteDemo } from '@components/SQLiteDemo';
-import { WSDemo } from '@components/WSDemo';
+import { ThemeTogglePortal } from '@components/theme/toggle-portal';
 
 const log = createLog('Main');
 
@@ -16,8 +16,8 @@ const Main = () => {
       <div className="bg-background min-h-screen w-screen">
         <div className="flex flex-col items-center justify-center gap-8 py-8">
           <h1 className="text-text text-4xl">{message}</h1>
+          <GameDemo />
           <SQLiteDemo />
-          <WSDemo />
         </div>
       </div>
       <ThemeTogglePortal />
