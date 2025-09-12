@@ -3,3 +3,4 @@ node_modules
 packages/tank-world/app-screenshot.png
 *.db
 .vscode/settings.json
+packages/helpers/.vscode/settings.json
