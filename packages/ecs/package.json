@@ -15,7 +15,9 @@
     "odgn-helpers": "workspace:*"
   },
   "peerDependencies": {
-    "typescript": "^5.9.2"
+    "eslint": "^9",
+    "prettier": "^3",
+    "typescript": "^5"
   },
   "scripts": {
     "format": "prettier --write .",
