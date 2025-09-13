@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { defineComponent } from '@component';
 
 import { parseEDL } from '../edl';
+import { withEntityId } from '../schema';
 
 const describedComponent = defineComponent({
   name: 'described',
@@ -35,6 +36,13 @@ const lockableComponent = defineComponent({
   schema: {
     isLocked: z.boolean(),
     key: z.string()
+  }
+});
+
+const containedComponent = defineComponent({
+  name: 'contained',
+  schema: {
+    id: withEntityId()
   }
 });
 
@@ -74,6 +82,30 @@ describe('Entity Definition Language', () => {
           id: 'unknown thing',
           components: {},
           extends: ['mysterious thing']
+        }
+      ]);
+    });
+
+    it('should parse entity references', () => {
+      const edl = `
+      entity parent {
+        thing { size: 10 weight: 20 }
+      }
+      entity child {
+        parent { id: $parent }
+      }
+      `;
+
+      expect(parseEDL(edl)).toEqual([
+        {
+          type: 'entity',
+          id: 'parent',
+          components: { thing: { size: 10, weight: 20 } }
+        },
+        {
+          type: 'entity',
+          id: 'child',
+          components: { parent: { id: '$parent' } }
         }
       ]);
     });

@@ -28,6 +28,9 @@ export const pkWithAutoIncrement = () =>
 export const componentId = () =>
   z.int().optional().meta({ autoIncrement: true, primaryKey: true });
 
+export const withEntityId = () =>
+  z.int().optional().meta({ foreignKey: 'tbl_entity' });
+
 export const dateTimeWithDefault = () =>
   z.iso.datetime().default('CURRENT_TIMESTAMP');
 
