@@ -30,38 +30,88 @@ const parseSingleLineEDL = (edl: string): EDLDefinition[] => {
     }
 
     // Parse atom definition
-    const atomMatch = edl.slice(i).match(/^atom\s+(\w+)\s*{/);
+    const atomMatch = edl.slice(i).match(/^atom\s+("([^"]*)"|(\w+))\s*{/);
     if (atomMatch) {
       if (currentDefinition) {
         definitions.push(currentDefinition);
       }
+      const atomId = atomMatch[2] || atomMatch[3]!; // Use quoted string or unquoted identifier
       currentDefinition = {
         components: {},
-        id: atomMatch[1]!,
+        id: atomId,
         type: 'atom'
       };
-      stack.push({ name: atomMatch[1]!, type: 'definition' });
+      stack.push({ name: atomId, type: 'definition' });
       i += atomMatch[0]!.length;
       continue;
     }
 
-    // Parse entity definition
-    const entityMatch = edl.slice(i).match(/^entity\s+(\w+)(?::\s*(\w+))?\s*{/);
-    const emptyEntityMatch = edl.slice(i).match(/^entity\s*{/);
-    if (entityMatch) {
+    // Parse entity definition - handle quoted names separately
+    const quotedEntityWithInheritanceMatch = edl
+      .slice(i)
+      .match(/^entity\s+"([^"]*)"\s*:\s*"([^"]*)"\s*{\s*}/);
+    const quotedEntityMatch = edl.slice(i).match(/^entity\s+"([^"]*)"\s*{\s*}/);
+    const unquotedEntityWithInheritanceMatch = edl
+      .slice(i)
+      .match(/^entity\s+(\w+)\s*:\s*(\w+)\s*{\s*}/);
+    const unquotedEntityMatch = edl.slice(i).match(/^entity\s+(\w+)\s*{\s*}/);
+    const emptyEntityMatch = edl.slice(i).match(/^entity\s*{\s*}/);
+
+    if (quotedEntityWithInheritanceMatch) {
       if (currentDefinition) {
         definitions.push(currentDefinition);
       }
+      const entityId = quotedEntityWithInheritanceMatch[1]!;
+      const extendsId = quotedEntityWithInheritanceMatch[2]!;
       currentDefinition = {
         components: {},
-        id: entityMatch[1]!,
+        id: entityId,
         type: 'entity'
       };
-      if (entityMatch[2]) {
-        currentDefinition.extends = [entityMatch[2]];
+      currentDefinition.extends = [extendsId];
+      stack.push({ name: entityId, type: 'definition' });
+      i += quotedEntityWithInheritanceMatch[0]!.length;
+      continue;
+    } else if (quotedEntityMatch) {
+      if (currentDefinition) {
+        definitions.push(currentDefinition);
       }
-      stack.push({ name: entityMatch[1]!, type: 'definition' });
-      i += entityMatch[0]!.length;
+      const entityId = quotedEntityMatch[1]!;
+      currentDefinition = {
+        components: {},
+        id: entityId,
+        type: 'entity'
+      };
+      stack.push({ name: entityId, type: 'definition' });
+      i += quotedEntityMatch[0]!.length;
+      continue;
+    } else if (unquotedEntityWithInheritanceMatch) {
+      if (currentDefinition) {
+        definitions.push(currentDefinition);
+      }
+      const entityId = unquotedEntityWithInheritanceMatch[1]!;
+      const extendsId = unquotedEntityWithInheritanceMatch[2]!;
+      currentDefinition = {
+        components: {},
+        id: entityId,
+        type: 'entity'
+      };
+      currentDefinition.extends = [extendsId];
+      stack.push({ name: entityId, type: 'definition' });
+      i += unquotedEntityWithInheritanceMatch[0]!.length;
+      continue;
+    } else if (unquotedEntityMatch) {
+      if (currentDefinition) {
+        definitions.push(currentDefinition);
+      }
+      const entityId = unquotedEntityMatch[1]!;
+      currentDefinition = {
+        components: {},
+        id: entityId,
+        type: 'entity'
+      };
+      stack.push({ name: entityId, type: 'definition' });
+      i += unquotedEntityMatch[0]!.length;
       continue;
     } else if (emptyEntityMatch) {
       if (currentDefinition) {
@@ -184,7 +234,21 @@ export const parseEDL = (edl: string): EDLDefinition[] => {
     // Handle single-line EDL by parsing it as a single line
     const line = edl.trim();
     if (line && !line.startsWith('#')) {
-      return parseSingleLineEDL(line);
+      // Check if this line contains multiple definitions (contains both 'atom' and 'entity')
+      if (line.includes('atom') && line.includes('entity')) {
+        // Split by 'entity' to separate the definitions
+        const parts = line.split(/(?=entity\s)/);
+        const allDefinitions: EDLDefinition[] = [];
+        for (const part of parts) {
+          if (part.trim()) {
+            const partDefinitions = parseSingleLineEDL(part.trim());
+            allDefinitions.push(...partDefinitions);
+          }
+        }
+        return allDefinitions;
+      } else {
+        return parseSingleLineEDL(line);
+      }
     }
     return [];
   }
@@ -201,7 +265,7 @@ export const parseEDL = (edl: string): EDLDefinition[] => {
     }
 
     // Parse atom definition
-    const atomMatch = line.match(/^atom\s+(\w+)\s*{/);
+    const atomMatch = line.match(/^atom\s+("([^"]*)"|(\w+))\s*{/);
     if (atomMatch) {
       if (currentDefinition) {
         definitions.push(currentDefinition);
@@ -218,33 +282,38 @@ export const parseEDL = (edl: string): EDLDefinition[] => {
         continue;
       }
 
+      const atomId = atomMatch[2] || atomMatch[3]!; // Use quoted string or unquoted identifier
       currentDefinition = {
         components: {},
-        id: atomMatch[1]!,
+        id: atomId,
         type: 'atom'
       };
-      stack.push({ name: atomMatch[1]!, type: 'definition' });
+      stack.push({ name: atomId, type: 'definition' });
       continue;
     }
 
     // Parse entity definition
-    const entityMatch = line.match(/^entity\s+(\w+)(?::\s*(\w+))?\s*{/);
+    const entityMatch = line.match(
+      /^entity\s+("([^"]*)"|(\w+))(?::\s*("([^"]*)"|(\w+)))?\s*{/
+    );
     const emptyEntityMatch = line.match(/^entity\s*{/);
-    const multiLineEntityMatch = line.match(/^entity\s+(\w+):\s*$/);
+    const multiLineEntityMatch = line.match(/^entity\s+("([^"]*)"|(\w+)):\s*$/);
 
     if (entityMatch) {
       if (currentDefinition) {
         definitions.push(currentDefinition);
       }
+      const entityId = entityMatch[2] || entityMatch[3]!; // Use quoted string or unquoted identifier
+      const extendsId = entityMatch[5] || entityMatch[6]; // Use quoted string or unquoted identifier
       currentDefinition = {
         components: {},
-        id: entityMatch[1]!,
+        id: entityId,
         type: 'entity'
       };
-      if (entityMatch[2]) {
-        currentDefinition.extends = [entityMatch[2]];
+      if (extendsId) {
+        currentDefinition.extends = [extendsId];
       }
-      stack.push({ name: entityMatch[1]!, type: 'definition' });
+      stack.push({ name: entityId, type: 'definition' });
       continue;
     } else if (emptyEntityMatch) {
       if (currentDefinition) {
@@ -261,13 +330,14 @@ export const parseEDL = (edl: string): EDLDefinition[] => {
       if (currentDefinition) {
         definitions.push(currentDefinition);
       }
+      const entityId = multiLineEntityMatch[2] || multiLineEntityMatch[3]!; // Use quoted string or unquoted identifier
       currentDefinition = {
         components: {},
         extends: [],
-        id: multiLineEntityMatch[1]!,
+        id: entityId,
         type: 'entity'
       };
-      stack.push({ name: multiLineEntityMatch[1]!, type: 'definition' });
+      stack.push({ name: entityId, type: 'definition' });
       continue;
     }
 
@@ -278,13 +348,18 @@ export const parseEDL = (edl: string): EDLDefinition[] => {
       currentDefinition.extends &&
       stack.length === 1
     ) {
-      const inheritanceMatch = line.match(/^\s*(\w+)\s*$/);
-      const inheritanceWithBraceMatch = line.match(/^\s*(\w+)\s*{\s*}\s*$/);
+      const inheritanceMatch = line.match(/^\s*("([^"]*)"|(\w+))\s*$/);
+      const inheritanceWithBraceMatch = line.match(
+        /^\s*("([^"]*)"|(\w+))\s*{\s*}\s*$/
+      );
       if (inheritanceMatch) {
-        currentDefinition.extends.push(inheritanceMatch[1]!);
+        const inheritanceId = inheritanceMatch[2] || inheritanceMatch[3]!;
+        currentDefinition.extends.push(inheritanceId);
         continue;
       } else if (inheritanceWithBraceMatch) {
-        currentDefinition.extends.push(inheritanceWithBraceMatch[1]!);
+        const inheritanceId =
+          inheritanceWithBraceMatch[2] || inheritanceWithBraceMatch[3]!;
+        currentDefinition.extends.push(inheritanceId);
         continue;
       }
     }

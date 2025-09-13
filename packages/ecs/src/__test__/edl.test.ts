@@ -63,6 +63,21 @@ describe('Entity Definition Language', () => {
       ]);
     });
 
+    it('should parse a named entity', () => {
+      const edl =
+        'atom "mysterious thing" {} entity "unknown thing" : "mysterious thing" {}';
+      const parsed = parseEDL(edl);
+      expect(parsed).toEqual([
+        { type: 'atom', id: 'mysterious thing', components: {} },
+        {
+          type: 'entity',
+          id: 'unknown thing',
+          components: {},
+          extends: ['mysterious thing']
+        }
+      ]);
+    });
+
     it('should parse EDL', async () => {
       // const world = await createWorld([
       //   describedComponent,
@@ -132,8 +147,7 @@ entity lockable_chest: chest {
       entity chest: 
         chest_described 
         chest_thing 
-        {
-        }
+        {}
       `;
 
       const parsed = parseEDL(edl);
