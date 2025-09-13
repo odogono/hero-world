@@ -223,16 +223,37 @@ const app = new Elysia()
         stopGameLoops();
       }
     },
-    async message(ws, message) {
-      const world = await tankWorldPromise;
-      const raw = typeof message === 'string' ? message : String(message);
+    message(ws, message) {
+      console.log('WebSocket message received (typeof):', typeof message);
+      console.log('WebSocket message received (raw):', message);
 
-      let json: unknown;
-      try {
-        json = JSON.parse(raw);
-      } catch {
-        // allow plain chat text as a convenience
-        json = { text: raw, type: 'chat' };
+      let candidate: any;
+
+      // Handle different message types
+      if (typeof message === 'string') {
+        // String message - try to parse as JSON
+        try {
+          candidate = JSON.parse(message);
+        } catch {
+          candidate = { text: message, type: 'chat' };
+        }
+      } else if (typeof message === 'object' && message !== null) {
+        // Already an object - use directly
+        candidate = message;
+      } else {
+        // Other types - convert to string and treat as chat
+        const raw = String(message);
+        candidate = { text: raw, type: 'chat' };
+      }
+
+      console.log('Parsed message:', candidate);
+
+      // Try to parse as game message first
+      const gameMessageResult = GameMessage.safeParse(candidate);
+      if (gameMessageResult.success) {
+        console.log('Valid game message:', gameMessageResult.data);
+        handleGameMessage(ws, gameMessageResult.data);
+        return;
       }
 
       const parsed = ClientMessageSchema.safeParse(json);
