@@ -253,13 +253,35 @@ const flush = <T extends Components>(world: StaticWorld<T>) => {
           continue;
         }
 
+        const serializeValues = (obj: Record<string, unknown>) => {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            if (v === null || v === undefined) {
+              out[k] = v as any;
+              continue;
+            }
+            if (v instanceof Date) {
+              out[k] = v.toISOString();
+              continue;
+            }
+            if (typeof v === 'object') {
+              out[k] = JSON.stringify(v);
+              continue;
+            }
+            out[k] = v as any;
+          }
+          return out;
+        };
+
         if (entry.exists) {
           // update
           const { id, ...dataWithoutId } = entry.data as Record<
             string,
             unknown
           >;
-          const updateData = convertKeysToSnakeCase({ ...dataWithoutId, eid });
+          const updateData = serializeValues(
+            convertKeysToSnakeCase({ ...dataWithoutId, eid })
+          );
           def!.stmtUpdate.run(updateData);
         } else {
           // insert
@@ -267,7 +289,9 @@ const flush = <T extends Components>(world: StaticWorld<T>) => {
             string,
             unknown
           >;
-          const insertData = convertKeysToSnakeCase({ ...dataWithoutId, eid });
+          const insertData = serializeValues(
+            convertKeysToSnakeCase({ ...dataWithoutId, eid })
+          );
           def!.stmtInsert.run(insertData);
           entry.exists = true;
         }

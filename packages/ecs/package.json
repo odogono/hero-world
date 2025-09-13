@@ -24,6 +24,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "bun run scripts/generate-schemas.ts",
+    "generate:edl": "bun run scripts/generate-edl-parser.ts",
     "generate:help": "bun run scripts/generate-schemas.ts --help",
     "lint": "eslint --cache .",
     "lint:fix": "eslint --fix .",
@@ -35,6 +36,8 @@
   "dependencies": {
     "alasql": "^4.6.6",
     "mitt": "^3.0.1",
-    "odgn-helpers": "workspace:*"
+    "odgn-helpers": "workspace:*",
+    "peggy": "^5.0.6",
+    "ts-pegjs": "^4.2.1"
   }
 }
