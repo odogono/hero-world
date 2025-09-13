@@ -27,7 +27,12 @@ export const commandSystem = createEventSystem(
         issueMoveOrder(world, moveCmd.id, moveCmd.targetX, moveCmd.targetY);
         break;
       case 'query:world_state':
-        handleWorldStateQuery(world, queryCmd.requestId, execAdditional.scheduleEvent);
+        // Use the scheduleEvent from execAdditional if available, otherwise skip
+        if (execAdditional?.scheduleEvent) {
+          handleWorldStateQuery(world, queryCmd.requestId, execAdditional.scheduleEvent);
+        } else {
+          console.warn('scheduleEvent not available in execAdditional');
+        }
         break;
     }
   }
