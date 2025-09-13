@@ -10,11 +10,11 @@ import { createGameLoop, logSystemPerformance } from '../game-loop';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const createTestWorld = async () => await createWorld([], { dbType });
 
 describe('GameLoop', () => {
   test('should create empty game loop', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     expect(gameLoop).toBeDefined();
@@ -23,7 +23,7 @@ describe('GameLoop', () => {
   });
 
   test('should add system with default options', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(({ deltaTime, world }) => {
@@ -42,7 +42,7 @@ describe('GameLoop', () => {
   });
 
   test('should add system with custom options', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(({ deltaTime, world }) => {});
@@ -61,7 +61,7 @@ describe('GameLoop', () => {
   });
 
   test('should sort systems by priority (highest first)', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const system1 = createSystem(() => {});
@@ -81,7 +81,7 @@ describe('GameLoop', () => {
   });
 
   test('should remove system', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -97,7 +97,7 @@ describe('GameLoop', () => {
   });
 
   test('should enable and disable systems', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -113,7 +113,7 @@ describe('GameLoop', () => {
   });
 
   test('should execute systems in priority order', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const executionOrder: string[] = [];
@@ -139,7 +139,7 @@ describe('GameLoop', () => {
   });
 
   test('should pass world and deltaTime to systems', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     type C = ExtractWorldComponents<typeof world>;
     const gameLoop = createGameLoop(world);
 
@@ -159,7 +159,7 @@ describe('GameLoop', () => {
   });
 
   test('should not execute disabled systems', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let systemExecuted = false;
@@ -175,7 +175,7 @@ describe('GameLoop', () => {
   });
 
   test('should respect system frequency', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -210,7 +210,7 @@ describe('GameLoop', () => {
   });
 
   test('should track system performance', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const slowSystem = createSystem(() => {
@@ -243,7 +243,7 @@ describe('GameLoop', () => {
   });
 
   test('should continue executing other systems if one throws error', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let system1Executed = false;
@@ -274,7 +274,7 @@ describe('GameLoop', () => {
   });
 
   test('should replace existing system with same id', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let system1Executed = false;
@@ -300,7 +300,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle non-existent system operations gracefully', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     // Should not throw errors
@@ -310,7 +310,7 @@ describe('GameLoop', () => {
   });
 
   test('should return performance sorted by last execution time', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const fastSystem = createSystem(() => {
@@ -341,7 +341,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle frequency of 0 gracefully', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -361,7 +361,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle negative frequency gracefully', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -381,7 +381,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle very high frequency values', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -401,7 +401,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle multiple system replacements', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -429,7 +429,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle empty update call', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     // Should not throw when no systems are registered
@@ -437,7 +437,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle zero deltaTime', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let receivedDeltaTime: number;
@@ -453,7 +453,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle negative deltaTime', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let receivedDeltaTime: number;
@@ -469,7 +469,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle system that throws different error types', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let otherSystemExecuted = false;
@@ -491,7 +491,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle system that throws string error', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let otherSystemExecuted = false;
@@ -513,7 +513,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle system that throws undefined', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let otherSystemExecuted = false;
@@ -535,7 +535,7 @@ describe('GameLoop', () => {
   });
 
   test('should handle chained method calls', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -556,9 +556,7 @@ describe('GameLoop', () => {
 
 describe('createGameLoop', () => {
   test('should delete event entities after processing', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createWorld([eventComponent], { dbType });
     const gameLoop = createGameLoop(world);
 
     let systemExecuted = false;
@@ -579,7 +577,7 @@ describe('createGameLoop', () => {
 
 describe('logSystemPerformance', () => {
   test('should log slow systems', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const slowSystem = createSystem(() => {
@@ -597,7 +595,7 @@ describe('logSystemPerformance', () => {
   });
 
   test('should handle empty performance data', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     // Should not throw with no systems
@@ -605,7 +603,7 @@ describe('logSystemPerformance', () => {
   });
 
   test('should handle custom threshold', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const fastSystem = createSystem(() => {
@@ -620,7 +618,7 @@ describe('logSystemPerformance', () => {
   });
 
   test('should handle zero threshold', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const slowSystem = createSystem(() => {
@@ -638,7 +636,7 @@ describe('logSystemPerformance', () => {
   });
 
   test('should handle negative threshold', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const fastSystem = createSystem(() => {
@@ -653,7 +651,7 @@ describe('logSystemPerformance', () => {
   });
 
   test('should handle multiple slow systems', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const slowSystem1 = createSystem(() => {
@@ -683,7 +681,7 @@ describe('logSystemPerformance', () => {
 
 describe('Edge Cases and Error Handling', () => {
   test('should handle system with null function', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     // This should not throw, but the system won't execute properly
@@ -696,7 +694,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle system with undefined function', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     // This should not throw, but the system won't execute properly
@@ -709,7 +707,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle empty system id', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -723,7 +721,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle system id with special characters', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const testSystem = createSystem(() => {});
@@ -739,7 +737,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle very large priority values', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     const system1 = createSystem(() => {});
@@ -755,7 +753,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle very large frequency values', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -774,7 +772,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle floating point frequency values', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -797,7 +795,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle system that modifies its own registration', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;
@@ -816,7 +814,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle system that adds new systems during execution', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let newSystemExecuted = false;
@@ -837,7 +835,7 @@ describe('Edge Cases and Error Handling', () => {
   });
 
   test('should handle system that removes itself during execution', async () => {
-    const world = (await createTestWorld()).build();
+    const world = await createTestWorld();
     const gameLoop = createGameLoop(world);
 
     let executionCount = 0;

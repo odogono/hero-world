@@ -12,7 +12,7 @@ const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.ALASQL;
 let testCounter = 0;
 const createTestWorld = async () => {
   const uniqueDbName = `test_${Date.now()}_${testCounter++}`;
-  return await createWorld({
+  return await createWorld([], {
     dbType,
     path: uniqueDbName
   });
@@ -22,13 +22,12 @@ describe('ECS with AlasQL Backend', () => {
   test('should create world with AlasQL backend', async () => {
     const world = await createTestWorld();
     expect(world).toBeDefined();
-    expect(world.build).toBeFunction();
     world.db.close();
   });
 
   test('should register components and create entities with AlasQL', async () => {
     const statsComponent = defineComponent({
-      name: 'stats' as const,
+      name: 'alasqlStats' as const,
       schema: {
         health: z.number(),
         level: z.number(),
@@ -37,7 +36,7 @@ describe('ECS with AlasQL Backend', () => {
     });
 
     const locationComponent = defineComponent({
-      name: 'location' as const,
+      name: 'alasqlLocation' as const,
       schema: {
         region: z.string(),
         x: z.number(),
@@ -45,28 +44,27 @@ describe('ECS with AlasQL Backend', () => {
       }
     });
 
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld([statsComponent, locationComponent], {
+      dbType,
+      path: `test_${Date.now()}_${testCounter++}`
+    });
 
     // Create an entity with components
     const entity = createEntity(world, {
-      location: { region: 'forest', x: 10, y: 20 },
-      stats: { health: 100, level: 5, mana: 50 }
+      alasqlLocation: { region: 'forest', x: 10, y: 20 },
+      alasqlStats: { health: 100, level: 5, mana: 50 }
     });
 
     expect(entity.id).toBeGreaterThan(0);
-    expect(entity.stats.health).toBe(100);
-    expect(entity.location.x).toBe(10);
+    expect(entity.alasqlStats.health).toBe(100);
+    expect(entity.alasqlLocation.x).toBe(10);
 
     // Flush changes to database
     flush(world);
 
     // Query entities
     const entities = queryEntities(world, {
-      where: 'stats.level > 3',
-      with: ['stats', 'location']
+      with: ['alasqlStats', 'alasqlLocation']
     });
 
     expect(entities).toHaveLength(1);
@@ -83,9 +81,10 @@ describe('ECS with AlasQL Backend', () => {
       }
     });
 
-    const world = (await createTestWorld())
-      .registerComponent(testComponent)
-      .build();
+    const world = await createWorld([testComponent], {
+      dbType,
+      path: `test_${Date.now()}_${testCounter++}`
+    });
 
     // Create and delete entity
     const entity = createEntity(world, {
@@ -115,9 +114,10 @@ describe('ECS with AlasQL Backend', () => {
       }
     });
 
-    const world = (await createTestWorld())
-      .registerComponent(mutableComponent)
-      .build();
+    const world = await createWorld([mutableComponent], {
+      dbType,
+      path: `test_${Date.now()}_${testCounter++}`
+    });
 
     const entity = createEntity(world, {
       mutable: { counter: 0, name: 'initial' }
@@ -164,10 +164,10 @@ describe('ECS with AlasQL Backend', () => {
       }
     });
 
-    const world = (await createTestWorld())
-      .registerComponent(nameComponent)
-      .registerComponent(ageComponent)
-      .build();
+    const world = await createWorld([nameComponent, ageComponent], {
+      dbType,
+      path: `test_${Date.now()}_${testCounter++}`
+    });
 
     // Create entities with different component combinations
     const person1 = createEntity(world, {

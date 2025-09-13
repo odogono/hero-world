@@ -19,14 +19,11 @@ const testComponent = defineComponent({
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const createTestWorld = async () => await createWorld([eventComponent, testComponent], { dbType });
 
 describe('System Events Integration', () => {
   test('should work with entity systems', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .registerComponent(testComponent)
-      .build();
+    const world = await createTestWorld();
 
     const gameLoop = createGameLoop(world);
 

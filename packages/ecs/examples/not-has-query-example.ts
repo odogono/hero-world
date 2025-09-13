@@ -30,15 +30,15 @@ const playerComponent = defineComponent({
   }
 });
 
-export const notHasQueryExample = () => {
+export const notHasQueryExample = async () => {
   console.log('=== Not Has Query Example ===\n');
 
   // Create a world with all our components
-  const world = createWorld()
-    .registerComponent(healthComponent)
-    .registerComponent(inventoryComponent)
-    .registerComponent(playerComponent)
-    .build();
+  const world = await createWorld([
+    healthComponent,
+    inventoryComponent,
+    playerComponent
+  ]);
 
   // Create various entities with different component combinations
   const player1 = createEntity(world, {

@@ -97,13 +97,13 @@ type TankGameEvents = {
 // World Setup
 // ============================================================================
 
-const world = (await createWorld())
-  .registerComponent(positionComponent)
-  .registerComponent(velocityComponent)
-  .registerComponent(tankComponent)
-  .registerComponent(moveOrderComponent)
-  .registerComponent(eventComponent)
-  .build();
+const world = await createWorld([
+  positionComponent,
+  velocityComponent,
+  tankComponent,
+  moveOrderComponent,
+  eventComponent
+]);
 
 const eventSystem = createEventSystem(world);
 

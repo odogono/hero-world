@@ -13,22 +13,18 @@ import {
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const createTestWorld = async () => await createWorld([eventComponent], { dbType });
 
 describe('EventSystem', () => {
   test('should create event system', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
     const eventSystem = createEventSystem('*', () => {});
 
     expect(eventSystem).toBeDefined();
   });
 
   test('should schedule events', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     // Schedule an event
     const eventEntity = scheduleEvent(world, 'test-event', {
@@ -41,9 +37,7 @@ describe('EventSystem', () => {
   });
 
   test('should schedule future events', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     // Schedule an event for 1 hour in the future
     const futureTime = Date.now() + 60 * 60 * 1000;
@@ -63,9 +57,7 @@ describe('EventSystem', () => {
   });
 
   test('should get pending events', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     scheduleEvent(world, 'event1', { data: 1 });
     scheduleEvent(world, 'event2', { data: 2 });
@@ -76,9 +68,7 @@ describe('EventSystem', () => {
   });
 
   test('should get events by type', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     scheduleEvent(world, 'type-a', { data: 1 });
     scheduleEvent(world, 'type-b', { data: 2 });
@@ -95,9 +85,7 @@ describe('EventSystem', () => {
   });
 
   test('should collect events by type', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     scheduleEvent(world, 'event1', { value: 1 });
     scheduleEvent(world, 'event2', { value: 2 });
@@ -114,9 +102,7 @@ describe('EventSystem', () => {
   });
 
   test('event system processing events', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     let readReceivedCount = 0;
     const readSystem = createEventSystem('*', () => {

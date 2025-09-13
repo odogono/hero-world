@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 import { createLog } from 'odgn-helpers/log';
 import z from 'zod';
 
 import { defineComponent } from '../component';
 import { DatabaseType } from '../db';
 import { createEntity, deleteEntity, getEntity } from '../entity';
-import type { WorldBuilderGeneric } from '../types';
 import { createWorld, flush } from '../world';
 
 const log = createLog('test-entity');
@@ -49,23 +48,13 @@ const locationComponent = defineComponent({
   tableName: 'tbl_te_location'
 });
 
-const createTestWorld = async () => {
-  const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
-  // return await createWorld({ dbType });
-  return await createWorld({ clearExisting: true, dbType, path: ':memory:' });
+const worldOpts = {
+  clearExisting: true,
+  dbType: (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN,
+  path: ':memory:'
 };
 
 describe('createEntity', () => {
-  let builder: WorldBuilderGeneric<any>;
-
-  beforeEach(async () => {
-    builder = await createTestWorld();
-  });
-
-  afterEach(() => {
-    builder.close();
-  });
-
   test('create entity with components', async () => {
     const stats = defineComponent({
       name: 'specialStats',
@@ -75,7 +64,7 @@ describe('createEntity', () => {
       }
     });
 
-    const world = builder.registerComponent(stats).build();
+    const world = await createWorld([stats], worldOpts);
 
     const entity = createEntity(world, {
       specialStats: {
@@ -88,7 +77,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create entity without components', async () => {
-    const world = builder.build();
+    const world = await createWorld([], worldOpts);
 
     const entity = createEntity(world);
 
@@ -101,7 +90,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create multiple entities with unique IDs', async () => {
-    const world = builder.build();
+    const world = await createWorld([], worldOpts);
 
     const entity1 = createEntity(world);
     const entity2 = createEntity(world);
@@ -116,7 +105,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create entity with location component', async () => {
-    const world = builder.registerComponent(locationComponent).build();
+    const world = await createWorld([locationComponent], worldOpts);
 
     const entity = createEntity(world, {
       teLocation: { name: 'Forest', region: 'North' }
@@ -130,7 +119,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create entity with stats component', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 5, mana: 50 }
@@ -144,7 +133,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create entity with inventory component', async () => {
-    const world = builder.registerComponent(inventoryComponent).build();
+    const world = await createWorld([inventoryComponent], worldOpts);
 
     const items = JSON.stringify(['sword', 'potion', 'key']);
     const entity = createEntity(world, {
@@ -158,10 +147,10 @@ describe('createEntity', () => {
   });
 
   test('createEntity should create entity with multiple components', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent],
+      worldOpts
+    );
 
     const entity = createEntity(world, {
       teLocation: { name: 'City', region: 'Central' },
@@ -179,7 +168,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should track component changes', async () => {
-    const world = builder.registerComponent(locationComponent).build();
+    const world = await createWorld([locationComponent], worldOpts);
 
     const entity = createEntity(world, {
       teLocation: { name: 'Forest', region: 'North' }
@@ -202,10 +191,10 @@ describe('createEntity', () => {
   });
 
   test('createEntity should track changes across multiple components', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent],
+      worldOpts
+    );
 
     const entity = createEntity(world, {
       teLocation: { name: 'Village', region: 'East' },
@@ -230,7 +219,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should cache components in entityCache', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 75, level: 4, mana: 25 }
@@ -249,7 +238,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should persist components after flush', async () => {
-    const world = builder.registerComponent(inventoryComponent).build();
+    const world = await createWorld([inventoryComponent], worldOpts);
 
     const entity = createEntity(world, {
       teInventory: { capacity: 5, items: '["apple", "bread"]' }
@@ -271,7 +260,7 @@ describe('createEntity', () => {
   });
 
   test('createEntity should work with component modifications through proxy', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 10, mana: 100 }
@@ -305,7 +294,7 @@ describe('createEntity', () => {
       }
     });
 
-    const world = builder.registerComponent(nameComponent).build();
+    const world = await createWorld([nameComponent], worldOpts);
 
     const entity = createEntity(world, {
       testName: { firstName: 'John', lastName: 'Doe', title: 'Sir' }
@@ -324,18 +313,17 @@ describe('createEntity', () => {
   });
 
   test('should create world with builder pattern and single component', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     expect(world).toBeDefined();
     expect(world.defs.has('teStats')).toBe(true);
   });
 
   test('should create world with multiple components using builder pattern', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .registerComponent(inventoryComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent, inventoryComponent],
+      worldOpts
+    );
 
     expect(world.defs.has('teLocation')).toBe(true);
     expect(world.defs.has('teStats')).toBe(true);
@@ -343,7 +331,7 @@ describe('createEntity', () => {
   });
 
   test('should create typed entity with single component', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -358,10 +346,10 @@ describe('createEntity', () => {
   });
 
   test('should create typed entity with multiple components', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent],
+      worldOpts
+    );
 
     const entity = createEntity(world, {
       teLocation: { name: 'Forest', region: 'North' },
@@ -376,7 +364,7 @@ describe('createEntity', () => {
   });
 
   test('should create typed entity without initial components', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world);
 
@@ -386,7 +374,7 @@ describe('createEntity', () => {
   });
 
   test('should track component changes in typed entities', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -407,7 +395,7 @@ describe('createEntity', () => {
   });
 
   test('should persist typed entity components after flush', async () => {
-    const world = builder.registerComponent(inventoryComponent).build();
+    const world = await createWorld([inventoryComponent], worldOpts);
 
     const entity = createEntity(world, {
       teInventory: { capacity: 10, items: '["sword", "shield"]' }
@@ -426,7 +414,7 @@ describe('createEntity', () => {
   });
 
   it('should work with custom component statements', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     createEntity(world, {
       teStats: { health: 75, level: 5, mana: 25 }
@@ -449,11 +437,10 @@ describe('createEntity', () => {
   });
 
   test('should handle complex multi-component scenarios', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .registerComponent(inventoryComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent, inventoryComponent],
+      worldOpts
+    );
 
     // Create multiple entities
     const warrior = createEntity(world, {
@@ -489,18 +476,8 @@ describe('createEntity', () => {
 });
 
 describe('deleteEntity', () => {
-  let builder: WorldBuilderGeneric<any>;
-
-  beforeEach(async () => {
-    builder = await createTestWorld();
-  });
-
-  afterEach(() => {
-    builder.close();
-  });
-
   test('deleteEntity should remove entity from database', async () => {
-    const world = builder.build();
+    const world = await createWorld([], worldOpts);
 
     const entity = createEntity(world);
 
@@ -524,7 +501,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should remove entity with components', async () => {
-    const world = builder.registerComponent(locationComponent).build();
+    const world = await createWorld([locationComponent], worldOpts);
 
     const entity = createEntity(world, {
       teLocation: { name: 'Forest', region: 'North' }
@@ -549,7 +526,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should clean up entity cache', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -566,7 +543,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should clean up dirty entities tracking', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -583,10 +560,10 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should cascade delete components from database', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent],
+      worldOpts
+    );
 
     const entity = createEntity(world, {
       teLocation: { name: 'Village', region: 'East' },
@@ -623,7 +600,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should handle multiple entities independently', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity1 = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -664,7 +641,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should return null', async () => {
-    const world = builder.build();
+    const world = await createWorld([], worldOpts);
 
     const entity = createEntity(world);
 
@@ -674,7 +651,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should work with unflushed entities', async () => {
-    const world = builder.registerComponent(inventoryComponent).build();
+    const world = await createWorld([inventoryComponent], worldOpts);
 
     const entity = createEntity(world, {
       teInventory: { capacity: 10, items: '["sword", "potion"]' }
@@ -702,7 +679,7 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should work after component modifications', async () => {
-    const world = builder.registerComponent(statsComponent).build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       teStats: { health: 100, level: 1, mana: 50 }
@@ -733,11 +710,10 @@ describe('deleteEntity', () => {
   });
 
   test('deleteEntity should handle entity with all component types and cascade delete', async () => {
-    const world = builder
-      .registerComponent(locationComponent)
-      .registerComponent(statsComponent)
-      .registerComponent(inventoryComponent)
-      .build();
+    const world = await createWorld(
+      [locationComponent, statsComponent, inventoryComponent],
+      worldOpts
+    );
 
     const entity = createEntity(world, {
       teInventory: { capacity: 20, items: '["crown", "scepter", "gold"]' },

@@ -66,22 +66,6 @@ export type World<TComponents extends Components> = {
   stmts: Record<string, Statement>;
 };
 
-export type WorldBuilder<TComponents extends Components> =
-  World<TComponents> & {
-    build: () => World<TComponents>;
-    registerComponent: <Name extends string, Schema extends SchemaType>(
-      def: ComponentDefinition<Name, Schema>
-    ) => WorldBuilder<TComponents & { [K in Name]: z.infer<Schema> }>;
-  };
-
-// Alternative approach: make build generic to preserve type information
-export type WorldBuilderGeneric<TComponents extends Components> =
-  World<TComponents> & {
-    build: <U extends Components = TComponents>() => World<U>;
-    registerComponent: <Name extends string, Schema extends SchemaType>(
-      def: ComponentDefinition<Name, Schema>
-    ) => WorldBuilderGeneric<TComponents & { [K in Name]: z.infer<Schema> }>;
-  };
 
 // Helper type to extract component types from a World instance
 export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;

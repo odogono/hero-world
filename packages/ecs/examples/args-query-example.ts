@@ -24,14 +24,11 @@ const enemyComponent = defineComponent({
 });
 
 // Example demonstrating args functionality in where clauses
-export const argsQueryExample = () => {
+export const argsQueryExample = async () => {
   console.log('=== Args Query Example ===\n');
 
   // Create a world with components
-  const world = createWorld()
-    .registerComponent(playerComponent)
-    .registerComponent(enemyComponent)
-    .build();
+  const world = await createWorld([playerComponent, enemyComponent]);
 
   // Create some players
   createEntity(world, { player: { health: 100, level: 5, name: 'Alice' } });

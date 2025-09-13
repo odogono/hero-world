@@ -24,10 +24,7 @@ const locationComponent = defineComponent({
 });
 
 const createTestWorld = async () =>
-  (await createWorld())
-    .registerComponent(statsComponent)
-    .registerComponent(locationComponent)
-    .build();
+  await createWorld([statsComponent, locationComponent]);
 
 describe('queryEntity proxied option', () => {
   test('default snapshot: add via assignment does not persist', async () => {

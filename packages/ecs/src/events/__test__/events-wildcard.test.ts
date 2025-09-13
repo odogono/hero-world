@@ -6,13 +6,11 @@ import { eventComponent, getEvents, scheduleEvent } from '@events';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const createTestWorld = async () => await createWorld([eventComponent], { dbType });
 
 describe('EventSystem wildcards', () => {
   test('should get events by wildcard type patterns', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     // Schedule various event types
     scheduleEvent(world, 'enemy-spawn', { id: 1 });
@@ -38,9 +36,7 @@ describe('EventSystem wildcards', () => {
   });
 
   test('should collect events by wildcard type patterns', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(eventComponent)
-      .build();
+    const world = await createTestWorld();
 
     scheduleEvent(world, 'warn-1', { level: 1 });
     scheduleEvent(world, 'warn-2', { level: 2 });

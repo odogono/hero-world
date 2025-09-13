@@ -44,7 +44,7 @@
         "./src/types"
       ],
       "@world": [
-        "./src/world-static"
+        "./src/world"
       ]
     }
   }

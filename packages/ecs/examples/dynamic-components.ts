@@ -26,12 +26,9 @@ export const manaComponent = defineComponent({
 });
 
 // Usage example with full type safety and no declare module!
-export const exampleUsage = () => {
+export const exampleUsage = async () => {
   // Create world with components using builder pattern
-  const world = createWorld()
-    .registerComponent(healthComponent)
-    .registerComponent(manaComponent)
-    .build();
+  const world = await createWorld([healthComponent, manaComponent]);
 
   // Create entity with components - TypeScript knows about 'health' and 'mana'!
   const entity = createEntity(world, {

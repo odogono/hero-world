@@ -25,6 +25,9 @@ export const withForeignKey = <T extends z.ZodTypeAny>(
 export const pkWithAutoIncrement = () =>
   z.int().optional().meta({ autoIncrement: true, primaryKey: true });
 
+export const componentId = () =>
+  z.int().optional().meta({ autoIncrement: true, primaryKey: true });
+
 export const dateTimeWithDefault = () =>
   z.iso.datetime().default('CURRENT_TIMESTAMP');
 

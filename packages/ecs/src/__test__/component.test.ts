@@ -40,15 +40,16 @@ const inventoryComponent = defineComponent({
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const worldOpts = {
+  clearExisting: true,
+  dbType: (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN,
+  path: ':memory:'
+};
 
 describe('component', () => {
   describe('addComponent', () => {
     test('should add a component to an entity', async () => {
-      const worldBuilder = (await createTestWorld()).registerComponent(
-        statsComponent
-      );
-      const world = worldBuilder.build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'statsTest', {
@@ -64,9 +65,7 @@ describe('component', () => {
     });
 
     test('should mark entity as dirty when adding component', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       addComponent(entity, 'statsTest', { health: 100, level: 1, mana: 50 });
@@ -76,9 +75,7 @@ describe('component', () => {
     });
 
     test('should cache component data in entityCache', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       addComponent(entity, 'statsTest', { health: 100, level: 1, mana: 50 });
@@ -93,9 +90,7 @@ describe('component', () => {
     });
 
     test('should create tracked component with proxy', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       addComponent(entity, 'statsTest', { health: 100, level: 1, mana: 50 });
@@ -113,10 +108,10 @@ describe('component', () => {
     });
 
     test('should add multiple components to same entity', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent],
+        worldOpts
+      );
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'statsTest', {
@@ -142,9 +137,7 @@ describe('component', () => {
     });
 
     test('should persist component after flush', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       addComponent(entity, 'statsTest', { health: 100, level: 1, mana: 50 });
@@ -163,11 +156,10 @@ describe('component', () => {
     });
 
     test('should work with different component types', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .registerComponent(inventoryComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent, inventoryComponent],
+        worldOpts
+      );
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'statsTest', {
@@ -194,9 +186,7 @@ describe('component', () => {
     });
 
     test('should handle component modifications after adding', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       const entityWithStats = addComponent(entity, 'statsTest', {
@@ -219,10 +209,10 @@ describe('component', () => {
     });
 
     test('should work with entity that already has components', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent],
+        worldOpts
+      );
 
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
@@ -244,10 +234,10 @@ describe('component', () => {
     });
 
     test('should add multiple components to same entity with different names', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent],
+        worldOpts
+      );
       const entity = createEntity(world);
 
       const entityWithComponents = addComponents(entity, {
@@ -263,10 +253,10 @@ describe('component', () => {
 
     describe('addComponent via object', () => {
       test('should add a component to an entity', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
         const entity = createEntity(world);
 
         entity.locationTest = {
@@ -283,10 +273,10 @@ describe('component', () => {
       });
 
       test('should add component via direct property assignment', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
         const entity = createEntity(world);
 
         // Direct property assignment - this should automatically add the component
@@ -304,10 +294,10 @@ describe('component', () => {
       });
 
       test('should add multiple components via direct property assignment', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
         const entity = createEntity(world);
 
         // Add multiple components via direct assignment
@@ -333,10 +323,10 @@ describe('component', () => {
       });
 
       test('should delete component via direct property assignment with null', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
         const entity = createEntity(world);
 
         // Add components first
@@ -372,10 +362,10 @@ describe('component', () => {
       });
 
       test('should delete component via direct property assignment with undefined', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
         const entity = createEntity(world);
 
         // Add components first
@@ -411,10 +401,10 @@ describe('component', () => {
       });
 
       test('should handle mixed add and delete operations via property assignment', async () => {
-        const world = (await createTestWorld())
-          .registerComponent(statsComponent)
-          .registerComponent(locationComponent)
-          .build();
+        const world = await createWorld(
+          [statsComponent, locationComponent],
+          worldOpts
+        );
 
         const entity = createEntity(world);
 
@@ -463,9 +453,7 @@ describe('component', () => {
 
   describe('removeComponent', () => {
     test('should remove a component from an entity', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -477,9 +465,7 @@ describe('component', () => {
     });
 
     test('should remove component from database', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -503,9 +489,7 @@ describe('component', () => {
     });
 
     test('should remove component from entityCache', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -524,9 +508,7 @@ describe('component', () => {
     });
 
     test('should remove component from dirtyEntities tracking', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -545,9 +527,7 @@ describe('component', () => {
     });
 
     test('should clean up dirtyEntities entry when no components remain', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -565,10 +545,10 @@ describe('component', () => {
     });
 
     test('should remove one component while keeping others', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent],
+        worldOpts
+      );
 
       const entity = createEntity(world, {
         locationTest: { name: 'Forest', region: 'North' },
@@ -593,7 +573,7 @@ describe('component', () => {
     });
 
     test('should throw error for non-existent component definition', async () => {
-      const world = (await createTestWorld()).build();
+      const world = await createWorld([], worldOpts);
       const entity = createEntity(world);
 
       // removeComponent doesn't throw for non-existent components
@@ -603,9 +583,7 @@ describe('component', () => {
     });
 
     test('should handle removing component that was never added', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world);
 
       // Entity has no stats component
@@ -621,9 +599,7 @@ describe('component', () => {
     });
 
     test('should work with multiple entities independently', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
 
       const entity1 = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
@@ -645,9 +621,7 @@ describe('component', () => {
     });
 
     test('should handle removing component with pending changes', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .build();
+      const world = await createWorld([statsComponent], worldOpts);
       const entity = createEntity(world, {
         statsTest: { health: 100, level: 1, mana: 50 }
       });
@@ -666,9 +640,7 @@ describe('component', () => {
     });
 
     test('should work with complex component data', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(inventoryComponent)
-        .build();
+      const world = await createWorld([inventoryComponent], worldOpts);
       const entity = createEntity(world, {
         inventoryTest: {
           capacity: 20,
@@ -706,11 +678,10 @@ describe('component', () => {
     });
 
     test('should handle removing component from entity with multiple components', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .registerComponent(inventoryComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent, inventoryComponent],
+        worldOpts
+      );
 
       const entity = createEntity(world, {
         inventoryTest: { capacity: 10, items: '["sword"]' },
@@ -732,11 +703,10 @@ describe('component', () => {
     });
 
     test('should handle removing several named components at once', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .registerComponent(inventoryComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent, inventoryComponent],
+        worldOpts
+      );
 
       const entity = createEntity(world, {
         inventoryTest: { capacity: 10, items: '["sword"]' },
@@ -756,11 +726,10 @@ describe('component', () => {
     });
 
     test('should handle removing all components at once', async () => {
-      const world = (await createTestWorld())
-        .registerComponent(statsComponent)
-        .registerComponent(locationComponent)
-        .registerComponent(inventoryComponent)
-        .build();
+      const world = await createWorld(
+        [statsComponent, locationComponent, inventoryComponent],
+        worldOpts
+      );
 
       const entity = createEntity(world, {
         inventoryTest: { capacity: 10, items: '["sword"]' },

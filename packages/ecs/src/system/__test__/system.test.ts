@@ -12,7 +12,7 @@ import type { ExtractWorldComponents } from '@types';
 import type { EntityExecProps } from '../types';
 
 const createTestWorld = async () =>
-  await createWorld({ dbType: DatabaseType.BUN });
+  await createWorld([], { dbType: DatabaseType.BUN });
 
 describe('Systems', () => {
   const locationComponent = defineComponent({
@@ -25,9 +25,7 @@ describe('Systems', () => {
 
   test('should create a system that processes all entities', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -62,10 +60,7 @@ describe('Systems', () => {
 
   test('should create a system that processes entities with specific components', async () => {
     // Create a world with both health and location components
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different component combinations
@@ -106,9 +101,7 @@ describe('Systems', () => {
 
   test('should create a system that processes entities with WHERE clause', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -152,9 +145,7 @@ describe('Systems', () => {
 
   test('should create a system that respects LIMIT option', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -192,9 +183,7 @@ describe('Systems', () => {
 
   test('should create a system that respects OFFSET option', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -234,10 +223,7 @@ describe('Systems', () => {
 
   test('should create a system that processes entities without specific components', async () => {
     // Create a world with both health and location components
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -282,9 +268,7 @@ describe('Systems', () => {
 
   test('should create a system that can modify entity components', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
     type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
@@ -325,9 +309,7 @@ describe('Systems', () => {
 
   test('should create a system that processes no entities when query returns empty', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -353,9 +335,7 @@ describe('Systems', () => {
 
   test('should create a system that can be called multiple times', async () => {
     // Create a world with health component
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .build();
+    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -388,10 +368,7 @@ describe('Systems', () => {
 
   test('should create a system that works with complex query options', async () => {
     // Create a world with both health and location components
-    const world = (await createTestWorld())
-      .registerComponent(healthComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
 
     type C = ExtractWorldComponents<typeof world>;
 

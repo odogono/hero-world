@@ -5,7 +5,6 @@ import {
   createWorld,
   flush,
   loadWorldFromJSON,
-  saveWorld,
   saveWorldToJSON
 } from '@/world';
 import { defineComponent } from '@component';
@@ -32,15 +31,18 @@ const locationComponent = defineComponent({
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.WASM;
 
-const createTestWorld = async () => await createWorld({ dbType });
+const worldOpts = {
+  dbType,
+  path: ':memory:'
+};
 
 describe('Database JSON functions', () => {
   test('should save and load data as entities format', async () => {
     // Create world and entities with components
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld(
+      [statsComponent, locationComponent],
+      worldOpts
+    );
 
     const entity1 = createEntity(world, {
       characterStats: { health: 100, level: 5, mana: 50 },
@@ -76,10 +78,10 @@ describe('Database JSON functions', () => {
     });
 
     // Create new world and load data
-    const newWorld = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const newWorld = await createWorld(
+      [statsComponent, locationComponent],
+      worldOpts
+    );
 
     // console.debug('entitiesData', entitiesData);
     loadWorldFromJSON(newWorld, entitiesData, { asComponents: false });
@@ -105,10 +107,10 @@ describe('Database JSON functions', () => {
 
   test('should save and load data as components format', async () => {
     // Create world and entities with components
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .registerComponent(locationComponent)
-      .build();
+    const world = await createWorld(
+      [statsComponent, locationComponent],
+      worldOpts
+    );
 
     const entity1 = createEntity(world, {
       characterStats: { health: 100, level: 5, mana: 50 },
@@ -153,10 +155,10 @@ describe('Database JSON functions', () => {
     const componentsData = originalComponentsData;
 
     // Create new world and load data
-    const newWorld = await createTestWorld()
-      .then(w => w.registerComponent(statsComponent))
-      .then(w => w.registerComponent(locationComponent))
-      .then(w => w.build());
+    const newWorld = await createWorld(
+      [statsComponent, locationComponent],
+      worldOpts
+    );
 
     newWorld.db.loadFromJSON(componentsData, { asComponents: true });
 
@@ -175,9 +177,7 @@ describe('Database JSON functions', () => {
 
   test('should work with WASM database', async () => {
     // Create world with WASM database
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entity = createEntity(world, {
       characterStats: { health: 75, level: 2, mana: 25 }
@@ -193,9 +193,7 @@ describe('Database JSON functions', () => {
     expect(Array.isArray(componentsData)).toBe(true);
 
     // Create new WASM world and test loading
-    const newWorld = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .build();
+    const newWorld = await createWorld([statsComponent], worldOpts);
 
     newWorld.db.loadFromJSON(entitiesData, { asComponents: false });
 
@@ -204,9 +202,7 @@ describe('Database JSON functions', () => {
   });
 
   test('should handle empty database', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     const entitiesData = world.db.saveToJSON({ asComponents: false });
     const componentsData = world.db.saveToJSON({ asComponents: true });
@@ -216,9 +212,7 @@ describe('Database JSON functions', () => {
   });
 
   test('should validate input data format', async () => {
-    const world = (await createTestWorld())
-      .registerComponent(statsComponent)
-      .build();
+    const world = await createWorld([statsComponent], worldOpts);
 
     // Test invalid input for entities format
     expect(() => {

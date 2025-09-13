@@ -19,9 +19,7 @@ export const iteratorExample = async () => {
   console.log('=== Query Entities Iterator Example ===\n');
 
   // Create a world with the health component
-  const world = (await createWorld())
-    .registerComponent(healthComponent)
-    .build();
+  const world = await createWorld([healthComponent]);
 
   // Create some entities
   createEntity(world, { health: { current: 100, max: 100 } });

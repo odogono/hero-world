@@ -7,11 +7,6 @@ import { createEntity } from '@entity';
 import { createSystem, createWorldSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
 
-const createTestWorld = async () => {
-  const world = await createWorld();
-  return world;
-};
-
 // Define game components
 const positionComponent = defineComponent({
   name: 'position' as const,
@@ -48,13 +43,18 @@ const playerComponent = defineComponent({
   }
 });
 
+const createTestWorld = async () => {
+  const world = await createWorld([
+    positionComponent,
+    velocityComponent,
+    healthComponent,
+    playerComponent
+  ]);
+  return world;
+};
+
 // Create world and register components
-const world = (await createTestWorld())
-  .registerComponent(positionComponent)
-  .registerComponent(velocityComponent)
-  .registerComponent(healthComponent)
-  .registerComponent(playerComponent)
-  .build();
+const world = await createTestWorld();
 
 // Create entities
 const player = createEntity(world, {
