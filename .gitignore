@@ -4,3 +4,5 @@ packages/tank-world/app-screenshot.png
 *.db
 .vscode/settings.json
 packages/helpers/.vscode/settings.json
+packages/tank-world/test-results
+packages/tank-world/playwright-report
