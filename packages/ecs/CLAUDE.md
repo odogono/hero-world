@@ -111,7 +111,7 @@ The library supports multiple database backends:
 ### Database Abstraction
 
 - `src/db/index.ts` - Unified database interface and factory functions
-- `src/db/bun-sqlite.ts` - Bun SQLite implementation
+- `src/db/bun.ts` - Bun SQLite implementation
 - `src/db/sqlite-wasm.ts` - SQLite WASM implementation
 - `src/db/alasql.ts` - AlaSQL implementation
 - `src/db/helpers.ts` - Database utility functions

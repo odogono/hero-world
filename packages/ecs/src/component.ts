@@ -11,6 +11,8 @@ import {
 
 import { extractDefaults } from './schema';
 
+export { z };
+
 type DefineComponentExOptions<
   Name extends string,
   Shape extends z.ZodRawShape
@@ -32,7 +34,9 @@ type ComponentSchemaBase = z.infer<typeof componentSchema>;
 export const defineComponent = <
   Name extends string,
   Shape extends z.ZodRawShape
->(options: DefineComponentExOptions<Name, Shape>) => {
+>(
+  options: DefineComponentExOptions<Name, Shape>
+) => {
   const name = toCamelCase(options.name);
   const { statements } = options;
   const tableName = options.tableName || `tbl_${toSnakeCase(name)}`;
@@ -164,10 +168,7 @@ export const addComponents = <
     world.dirtyEntities.get(id)!.add(componentName);
   }
 
-  return entity as EntityWithComponents<
-    TWorldComponents,
-    keyof TComponentData
-  >;
+  return entity as EntityWithComponents<TWorldComponents, keyof TComponentData>;
 };
 
 /**

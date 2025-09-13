@@ -1,0 +1,68 @@
+# ECS Package Justfile
+# Commands for managing the ECS library
+
+# Default recipe - show available commands
+default:
+    @just --list
+
+# Generate TypeScript types and SQLite schema from component definitions
+# Usage: just generate-schemas [path]
+# Examples:
+#   just generate-schemas
+#   just generate-schemas src/components.ts
+#   just generate-schemas ../tank-world/src/components.ts
+generate-schemas path="__test__/definitions.ts":
+    bun run scripts/generate-schemas.ts {{path}}
+
+# Show help for the schema generator
+generate-schemas-help:
+    bun run scripts/generate-schemas.ts --help
+
+# Run tests
+test:
+    bun test
+
+# Run tests with coverage
+test-coverage:
+    bun test --coverage
+
+# Run linting
+lint:
+    bun run lint
+
+# Fix linting issues
+lint-fix:
+    bun run lint:fix
+
+# Format code
+format:
+    bun run format
+
+# Check code formatting
+format-check:
+    bun run format:check
+
+# Check for unused code
+unused:
+    bun run unused
+
+# Check for outdated dependencies
+outdated:
+    bun run outdated
+
+# Clean generated files
+clean:
+    rm -rf generated/
+    @echo "🧹 Cleaned generated files"
+
+# Install dependencies
+install:
+    bun install
+
+# Show project info
+info:
+    @echo "📦 ECS Package (odgn-ecs)"
+    @echo "🔧 Built with Bun + TypeScript + SQLite"
+    @echo "📁 Generated files: generated/"
+    @echo "🧪 Tests: src/**/__test__/*.test.ts"
+    @echo "📄 Component definitions: __test__/definitions.ts"

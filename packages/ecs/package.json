@@ -17,11 +17,14 @@
   "peerDependencies": {
     "eslint": "^9",
     "prettier": "^3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "zod": "^4"
   },
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate": "bun run scripts/generate-schemas.ts",
+    "generate:help": "bun run scripts/generate-schemas.ts --help",
     "lint": "eslint --cache .",
     "lint:fix": "eslint --fix .",
     "outdated": "bunx npm-check-updates --interactive --format group",
