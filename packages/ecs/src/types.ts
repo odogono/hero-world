@@ -139,3 +139,30 @@ export type RegisterComponent<
 > = {
   [K in Name]: z.infer<Schema>;
 };
+
+// Static World Types
+export type StaticWorld<TComponents extends Components> = Omit<
+  World<TComponents>,
+  'registerComponent'
+> & {
+  readonly componentTypes: keyof TComponents;
+};
+
+// Helper type to infer component types from an array of component definitions
+export type InferComponentsFromDefs<
+  T extends readonly ComponentDefinition<string, SchemaType>[]
+> = {
+  [K in T[number] as K['name']]: z.infer<K['schema']>;
+};
+
+// Tuple type for component definitions
+export type ComponentDefinitionTuple<T extends Components> = {
+  [K in keyof T]: ComponentDefinition<K & string, SchemaType>;
+}[keyof T][];
+
+// Static world creation options
+export type CreateStaticWorldOptions<T extends Components> = {
+  components: ComponentDefinitionTuple<T>;
+} & Partial<CreateDatabaseOptions> & {
+  dbType?: DatabaseType;
+};

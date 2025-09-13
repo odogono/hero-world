@@ -226,7 +226,7 @@ const generateSQLiteSchema = (
 /**
  * Display usage information
  */
-function showUsage() {
+const showUsage = () => {
   console.log('Usage: bun run scripts/generate-schemas.ts [component-file]');
   console.log('');
   console.log('Arguments:');
@@ -241,7 +241,7 @@ function showUsage() {
   console.log(
     '  bun run scripts/generate-schemas.ts ../tank-world/src/components.ts'
   );
-}
+};
 
 /**
  * Main function to generate both files
