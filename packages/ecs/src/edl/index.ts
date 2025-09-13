@@ -1,4 +1,6 @@
-type ParsedDefinition = {
+import { toCamelCase } from 'odgn-helpers/string';
+
+type EDLDefinition = {
   components: Record<string, Record<string, unknown>>;
   extends?: string[];
   id: string | undefined;
@@ -11,10 +13,10 @@ type ParseState = {
   type: 'definition' | 'component' | 'property';
 };
 
-const parseSingleLineEDL = (edl: string): ParsedDefinition[] => {
-  const definitions: ParsedDefinition[] = [];
+const parseSingleLineEDL = (edl: string): EDLDefinition[] => {
+  const definitions: EDLDefinition[] = [];
   const stack: ParseState[] = [];
-  let currentDefinition: ParsedDefinition | null = null;
+  let currentDefinition: EDLDefinition | null = null;
   let i = 0;
 
   while (i < edl.length) {
@@ -113,9 +115,7 @@ const parseSingleLineEDL = (edl: string): ParsedDefinition[] => {
       stack[1]?.type === 'component'
     ) {
       const [, key, value] = propertyMatch;
-      const camelKey = key!.replaceAll(/_([a-z])/g, (_, letter) =>
-        letter.toUpperCase()
-      );
+      const camelKey = toCamelCase(key!);
       const componentName = stack[1]!.name!;
 
       // Parse value
@@ -151,7 +151,9 @@ const parseSingleLineEDL = (edl: string): ParsedDefinition[] => {
         parsedValue = parsedValue.slice(1, -1);
       }
 
-      currentDefinition.components[componentName]![camelKey] = parsedValue;
+      if (componentName && camelKey) {
+        currentDefinition.components[componentName]![camelKey] = parsedValue;
+      }
       i += propertyMatch[0]!.length;
       continue;
     }
@@ -168,11 +170,11 @@ const parseSingleLineEDL = (edl: string): ParsedDefinition[] => {
   return definitions;
 };
 
-export const parseEDL = (edl: string): ParsedDefinition[] => {
+export const parseEDL = (edl: string): EDLDefinition[] => {
   const lines = edl.split('\n');
-  const definitions: ParsedDefinition[] = [];
+  const definitions: EDLDefinition[] = [];
   const stack: ParseState[] = [];
-  let currentDefinition: ParsedDefinition | null = null;
+  let currentDefinition: EDLDefinition | null = null;
 
   // Check if this is single-line EDL (no newlines and contains both { and })
   const isSingleLine =
@@ -204,6 +206,18 @@ export const parseEDL = (edl: string): ParsedDefinition[] => {
       if (currentDefinition) {
         definitions.push(currentDefinition);
       }
+
+      // Check if this is a single-line atom (contains both { and } on the same line)
+      if (line.includes('}')) {
+        // This is a single-line atom, parse it directly
+        const singleLineResult = parseSingleLineEDL(line);
+        if (singleLineResult.length > 0) {
+          definitions.push(singleLineResult[0]!);
+        }
+        currentDefinition = null;
+        continue;
+      }
+
       currentDefinition = {
         components: {},
         id: atomMatch[1]!,
@@ -216,6 +230,8 @@ export const parseEDL = (edl: string): ParsedDefinition[] => {
     // Parse entity definition
     const entityMatch = line.match(/^entity\s+(\w+)(?::\s*(\w+))?\s*{/);
     const emptyEntityMatch = line.match(/^entity\s*{/);
+    const multiLineEntityMatch = line.match(/^entity\s+(\w+):\s*$/);
+
     if (entityMatch) {
       if (currentDefinition) {
         definitions.push(currentDefinition);
@@ -241,6 +257,36 @@ export const parseEDL = (edl: string): ParsedDefinition[] => {
       };
       stack.push({ name: undefined, type: 'definition' });
       continue;
+    } else if (multiLineEntityMatch) {
+      if (currentDefinition) {
+        definitions.push(currentDefinition);
+      }
+      currentDefinition = {
+        components: {},
+        extends: [],
+        id: multiLineEntityMatch[1]!,
+        type: 'entity'
+      };
+      stack.push({ name: multiLineEntityMatch[1]!, type: 'definition' });
+      continue;
+    }
+
+    // Handle inheritance lines (when we have a multi-line entity definition)
+    if (
+      currentDefinition &&
+      currentDefinition.type === 'entity' &&
+      currentDefinition.extends &&
+      stack.length === 1
+    ) {
+      const inheritanceMatch = line.match(/^\s*(\w+)\s*$/);
+      const inheritanceWithBraceMatch = line.match(/^\s*(\w+)\s*{\s*}\s*$/);
+      if (inheritanceMatch) {
+        currentDefinition.extends.push(inheritanceMatch[1]!);
+        continue;
+      } else if (inheritanceWithBraceMatch) {
+        currentDefinition.extends.push(inheritanceWithBraceMatch[1]!);
+        continue;
+      }
     }
 
     // Handle opening brace
@@ -276,9 +322,7 @@ export const parseEDL = (edl: string): ParsedDefinition[] => {
       stack[1]?.type === 'component'
     ) {
       const [, key, value] = propertyMatch;
-      const camelKey = key!.replaceAll(/_([a-z])/g, (_, letter) =>
-        letter.toUpperCase()
-      );
+      const camelKey = toCamelCase(key!)!;
       const componentName = stack[1]!.name!;
 
       // Parse value
@@ -314,7 +358,9 @@ export const parseEDL = (edl: string): ParsedDefinition[] => {
         parsedValue = parsedValue.slice(1, -1);
       }
 
-      currentDefinition.components[componentName]![camelKey] = parsedValue;
+      if (componentName && camelKey) {
+        currentDefinition.components[componentName]![camelKey] = parsedValue;
+      }
     }
   }
 

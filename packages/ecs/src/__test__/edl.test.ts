@@ -123,5 +123,41 @@ entity lockable_chest: chest {
         }
       ]);
     });
+
+    it('should handle multiple inheritance', () => {
+      const edl = `
+      atom chest_described { described { name: "Chest" description: "A simple wooden chest." } }
+      atom chest_thing { thing { size: 10 weight: 20 } }
+
+      entity chest: 
+        chest_described 
+        chest_thing 
+        {
+        }
+      `;
+
+      const parsed = parseEDL(edl);
+
+      expect(parsed).toEqual([
+        {
+          type: 'atom',
+          id: 'chest_described',
+          components: {
+            described: { name: 'Chest', description: 'A simple wooden chest.' }
+          }
+        },
+        {
+          type: 'atom',
+          id: 'chest_thing',
+          components: { thing: { size: 10, weight: 20 } }
+        },
+        {
+          type: 'entity',
+          id: 'chest',
+          extends: ['chest_described', 'chest_thing'],
+          components: {}
+        }
+      ]);
+    });
   });
 });
