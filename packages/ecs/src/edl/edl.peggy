@@ -56,7 +56,7 @@ Components
 
 Component
   = name:Identifier _ '{' _ props:Properties? _ '}' {
-      return [name, props ?? {}] as [string, Record<string, unknown>];
+      return [toCamelCase(name), props ?? {}] as [string, Record<string, unknown>];
     }
 
 Properties
@@ -92,6 +92,7 @@ Character
 
 Value
   = ref:Reference { return ref; }
+  / arr:Array { return arr; }
   / s:String { return s; }
   / 'true' { return true; }
   / 'false' { return false; }
@@ -103,9 +104,19 @@ Int = $('-'? [0-9]+)
 Float = $('-'? [0-9]+ '.' [0-9]+)
 
 Reference
-  = '$' head:Identifier tail:('.' Identifier)* {
-      return '$' + head + (tail.length ? tail.map(t => '.' + t[1]).join('') : '');
+  = '$' head:Identifier tail:('.' (Identifier / Int))* {
+      return (
+        '$' +
+        head +
+        (tail.length ? tail.map(t => '.' + (typeof t[1] === 'string' ? t[1] : t[1])).join('') : '')
+      );
     }
+
+Array
+  = '[' _ first:Value tail:(_ ',' _ Value)* _ ']' {
+      return [first, ...tail.map(t => t[3])];
+    }
+  / '[' _ ']' { return []; }
 
 _ "whitespace"
   = ( [ \t\r\n]+ / Comment )*
