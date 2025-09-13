@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 import z from 'zod';
 
+import { createWorld, flush } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity, queryEntitiesIterator } from '@entity';
-import { createWorld, flush } from '@world';
 
 // Define a component
 const healthComponent = defineComponent({

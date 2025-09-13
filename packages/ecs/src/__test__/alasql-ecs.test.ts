@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
+import { createWorld, flush } from '@/world';
 import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, deleteEntity, queryEntities } from '@entity';
-import { createWorld, flush } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.ALASQL;
 

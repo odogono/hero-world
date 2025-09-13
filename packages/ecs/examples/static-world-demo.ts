@@ -4,9 +4,7 @@ import { z } from 'zod';
 // Main function to handle async operations
 const main = async () => {
   // Import all needed functions
-  const { createEntity, createStaticWorld, defineComponent } = await import(
-    '../src'
-  );
+  const { createEntity, createWorld, defineComponent } = await import('../src');
 
   // Define some components
   const healthComponent = defineComponent({
@@ -35,7 +33,7 @@ const main = async () => {
 
   // Create a static world with all components defined upfront
   // Note: Types are automatically inferred from the component definitions!
-  const world = await createStaticWorld([
+  const world = await createWorld([
     healthComponent,
     positionComponent,
     inventoryComponent

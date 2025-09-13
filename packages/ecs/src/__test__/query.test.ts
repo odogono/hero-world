@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import z from 'zod';
 
+import { createWorld, flush } from '@/world';
 import { defineComponent, removeComponent } from '@component';
 import { DatabaseType } from '@db';
 import {
@@ -11,7 +12,6 @@ import {
 } from '@entity';
 import { dateTimeWithDefault } from '@schema';
 import type { Components, GenericEntity, WorldBuilder } from '@types';
-import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
   name: 'status' as const,

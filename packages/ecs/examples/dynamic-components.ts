@@ -9,9 +9,9 @@
 import { number } from 'zod';
 
 import { healthComponent } from '@/components/health';
+import { createWorld } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity } from '@entity';
-import { createWorld } from '@world';
 
 export const manaComponent = defineComponent({
   name: 'mana' as const,

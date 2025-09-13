@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
 import { healthComponent } from '@/components/health';
+import { createWorld, flush } from '@/world';
 import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntitiesIterator } from '@entity';
 import { createSystem } from '@system';
 import type { ExtractWorldComponents } from '@types';
-import { createWorld, flush } from '@world';
 
 import type { EntityExecProps } from '../types';
 

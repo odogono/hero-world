@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
-import { createEntity, createStaticWorld, defineComponent } from '..';
+import { defineComponent } from '@component';
+import { createEntity } from '@entity';
+import { createWorld } from '@world';
 
 describe('Static World', () => {
   test('should create static world with predefined components', async () => {
@@ -21,7 +23,7 @@ describe('Static World', () => {
       }
     });
 
-    const world = await createStaticWorld([healthComponent, positionComponent]);
+    const world = await createWorld([healthComponent, positionComponent]);
 
     expect(world.componentTypes).toContain('vitals');
     expect(world.componentTypes).toContain('coords');
@@ -49,7 +51,7 @@ describe('Static World', () => {
       }
     });
 
-    const world = await createStaticWorld([healthComponent, nameComponent]);
+    const world = await createWorld([healthComponent, nameComponent]);
     const entity = createEntity(world);
 
     // Test property assignment
@@ -88,7 +90,7 @@ describe('Static World', () => {
       }
     });
 
-    const world = await createStaticWorld([healthComponent]);
+    const world = await createWorld([healthComponent]);
 
     const player1 = createEntity(world);
     const player2 = createEntity(world);
@@ -116,7 +118,7 @@ describe('Static World', () => {
       }
     });
 
-    const world = await createStaticWorld([statsComponent]);
+    const world = await createWorld([statsComponent]);
 
     // Verify the statement was registered
     const def = world.defs.get('metrics');

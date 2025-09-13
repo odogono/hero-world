@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import type { Database, Statement } from '@db';
+import type {
+  CreateDatabaseOptions,
+  Database,
+  DatabaseType,
+  Statement
+} from '@db';
 
 import { pkWithAutoIncrement } from './schema';
 import type { ColumnInfo, SchemaType } from './schema/types';
@@ -46,10 +51,11 @@ export type ComponentDefinition<
 export type Components = Record<string, unknown>;
 
 /**
- * World type that includes component types
+ * World type that includes component types - now based on static world
  */
 export type World<TComponents extends Components> = {
   close: () => void;
+  readonly componentTypes: keyof TComponents;
   db: Database;
   defs: Map<string, ComponentDef>;
   dirtyEntities: Map<number, Set<keyof TComponents>>;
@@ -140,13 +146,8 @@ export type RegisterComponent<
   [K in Name]: z.infer<Schema>;
 };
 
-// Static World Types
-export type StaticWorld<TComponents extends Components> = Omit<
-  World<TComponents>,
-  'registerComponent'
-> & {
-  readonly componentTypes: keyof TComponents;
-};
+// Static World Types - now just an alias for World (since World is now static)
+export type StaticWorld<TComponents extends Components> = World<TComponents>;
 
 // Helper type to infer component types from an array of component definitions
 export type InferComponentsFromDefs<
@@ -164,5 +165,5 @@ export type ComponentDefinitionTuple<T extends Components> = {
 export type CreateStaticWorldOptions<T extends Components> = {
   components: ComponentDefinitionTuple<T>;
 } & Partial<CreateDatabaseOptions> & {
-  dbType?: DatabaseType;
-};
+    dbType?: DatabaseType;
+  };

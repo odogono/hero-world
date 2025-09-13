@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
+import { createWorld, flush } from '@/world';
 import { DatabaseType } from '@db';
 import {
   createEventSystem,
@@ -9,7 +10,6 @@ import {
   getPendingEvents,
   scheduleEvent
 } from '@events';
-import { createWorld, flush } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 

@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 import z from 'zod';
 
+import { createWorld, flush } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity, queryEntities } from '@entity';
-import { createWorld, flush } from '@world';
 
 // Define some example components
 const healthComponent = defineComponent({

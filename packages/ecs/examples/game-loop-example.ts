@@ -1,11 +1,11 @@
 /* eslint-disable no-console */
 import z from 'zod';
 
+import { createWorld } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity } from '@entity';
 import { createSystem, createWorldSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
-import { createWorld } from '@world';
 
 const createTestWorld = async () => {
   const world = await createWorld();

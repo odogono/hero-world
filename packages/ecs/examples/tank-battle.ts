@@ -1,11 +1,11 @@
 /* eslint-disable no-console */
 import z from 'zod';
 
+import { createWorld } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity, queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
 import { createGameLoop, createSystem, createWorldSystem } from '@system';
-import { createWorld } from '@world';
 
 // ============================================================================
 // Component Definitions

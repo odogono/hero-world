@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import z from 'zod';
 
-import { defineComponent } from '@component';
-import { createEntity } from '@entity';
 import {
   createWorld,
   flush,
   loadWorldFromJSON,
   saveWorld,
   saveWorldToJSON
-} from '@world';
+} from '@/world';
+import { defineComponent } from '@component';
+import { createEntity } from '@entity';
 
 import { DatabaseType } from '../index';
 

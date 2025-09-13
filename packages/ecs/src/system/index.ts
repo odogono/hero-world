@@ -1,6 +1,6 @@
+import { flush } from '@/world';
 import { queryEntitiesIterator, type QueryOptions } from '@entity';
 import type { Components, World } from '@types';
-import { flush } from '@world';
 
 import type { ExecProps, System, SystemFunction, SystemOptions } from './types';
 
