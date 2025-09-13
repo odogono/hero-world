@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
-import { healthComponent } from '@/components/health';
 import { createWorld, flush } from '@/world';
 import { defineComponent } from '@component';
 import { DatabaseType } from '@db';
@@ -11,9 +10,18 @@ import type { ExtractWorldComponents } from '@types';
 
 import type { EntityExecProps } from '../types';
 
-const createTestWorld = async () =>
-  await createWorld([], { dbType: DatabaseType.BUN });
+const constitutionComponent = defineComponent({
+  name: 'constitution',
+  schema: {
+    current: z.number(),
+    max: z.number()
+  }
+});
 
+const worldOpts = {
+  dbType: DatabaseType.BUN,
+  path: ':memory:'
+};
 describe('Systems', () => {
   const locationComponent = defineComponent({
     name: 'systemLocation',
@@ -25,14 +33,20 @@ describe('Systems', () => {
 
   test('should create a system that processes all entities', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
     // Create some entities
-    const entity1 = createEntity(world, { health: { current: 100, max: 100 } });
-    const entity2 = createEntity(world, { health: { current: 75, max: 100 } });
-    const entity3 = createEntity(world, { health: { current: 50, max: 100 } });
+    const entity1 = createEntity(world, {
+      constitution: { current: 100, max: 100 }
+    });
+    const entity2 = createEntity(world, {
+      constitution: { current: 75, max: 100 }
+    });
+    const entity3 = createEntity(world, {
+      constitution: { current: 50, max: 100 }
+    });
 
     // Flush to persist to database
     flush(world);
@@ -45,7 +59,7 @@ describe('Systems', () => {
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
-      { with: ['health'] }
+      { with: ['constitution'] }
     );
 
     // Run the system
@@ -60,18 +74,21 @@ describe('Systems', () => {
 
   test('should create a system that processes entities with specific components', async () => {
     // Create a world with both health and location components
-    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld(
+      [constitutionComponent, locationComponent],
+      worldOpts
+    );
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different component combinations
     const healthEntity = createEntity(world, {
-      health: { current: 100, max: 100 }
+      constitution: { current: 100, max: 100 }
     });
     const locationEntity = createEntity(world, {
       systemLocation: { name: 'Forest', region: 'North' }
     });
     const fullEntity = createEntity(world, {
-      health: { current: 75, max: 100 },
+      constitution: { current: 75, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
 
@@ -86,7 +103,7 @@ describe('Systems', () => {
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
-      { with: ['health'] }
+      { with: ['constitution'] }
     );
 
     // Run the system
@@ -101,19 +118,19 @@ describe('Systems', () => {
 
   test('should create a system that processes entities with WHERE clause', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different health values
     const healthyEntity = createEntity(world, {
-      health: { current: 100, max: 100 }
+      constitution: { current: 100, max: 100 }
     });
     const woundedEntity = createEntity(world, {
-      health: { current: 50, max: 100 }
+      constitution: { current: 50, max: 100 }
     });
     const criticalEntity = createEntity(world, {
-      health: { current: 10, max: 100 }
+      constitution: { current: 10, max: 100 }
     });
 
     // Flush to persist to database
@@ -128,8 +145,8 @@ describe('Systems', () => {
         processedEntities.push(entity.id);
       },
       {
-        where: 'health_current < 50',
-        with: ['health']
+        where: 'constitution_current < 50',
+        with: ['constitution']
       }
     );
 
@@ -145,7 +162,7 @@ describe('Systems', () => {
 
   test('should create a system that respects LIMIT option', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -153,7 +170,9 @@ describe('Systems', () => {
     const entities = [];
     for (let i = 0; i < 5; i++) {
       entities.push(
-        createEntity(world, { health: { current: 100 - i * 10, max: 100 } })
+        createEntity(world, {
+          constitution: { current: 100 - i * 10, max: 100 }
+        })
       );
     }
 
@@ -170,7 +189,7 @@ describe('Systems', () => {
       },
       {
         limit: 3,
-        with: ['health']
+        with: ['constitution']
       }
     );
 
@@ -183,7 +202,7 @@ describe('Systems', () => {
 
   test('should create a system that respects OFFSET option', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -191,7 +210,9 @@ describe('Systems', () => {
     const entities = [];
     for (let i = 0; i < 5; i++) {
       entities.push(
-        createEntity(world, { health: { current: 100 - i * 10, max: 100 } })
+        createEntity(world, {
+          constitution: { current: 100 - i * 10, max: 100 }
+        })
       );
     }
 
@@ -208,7 +229,7 @@ describe('Systems', () => {
       },
       {
         offset: 2,
-        with: ['health']
+        with: ['constitution']
       }
     );
 
@@ -223,19 +244,22 @@ describe('Systems', () => {
 
   test('should create a system that processes entities without specific components', async () => {
     // Create a world with both health and location components
-    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld(
+      [constitutionComponent, locationComponent],
+      worldOpts
+    );
 
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different component combinations
     const healthEntity = createEntity(world, {
-      health: { current: 100, max: 100 }
+      constitution: { current: 100, max: 100 }
     });
     const locationEntity = createEntity(world, {
       systemLocation: { name: 'Forest', region: 'North' }
     });
     const fullEntity = createEntity(world, {
-      health: { current: 75, max: 100 },
+      constitution: { current: 75, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
 
@@ -252,7 +276,7 @@ describe('Systems', () => {
       },
       {
         with: ['systemLocation'],
-        without: ['health']
+        without: ['constitution']
       }
     );
 
@@ -268,11 +292,13 @@ describe('Systems', () => {
 
   test('should create a system that can modify entity components', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
     type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
-    const entity = createEntity(world, { health: { current: 100, max: 100 } });
+    const entity = createEntity(world, {
+      constitution: { current: 100, max: 100 }
+    });
 
     // Flush to persist to database
     flush(world);
@@ -280,19 +306,19 @@ describe('Systems', () => {
     // Create a system that heals entities
     const system = createSystem<C, EntityExecProps<C['entity'], C>>(
       ({ entity }) => {
-        if (entity.health.current < entity.health.max) {
-          entity.health.current = Math.min(
-            entity.health.current + 25,
-            entity.health.max
+        if (entity.constitution.current < entity.constitution.max) {
+          entity.constitution.current = Math.min(
+            entity.constitution.current + 25,
+            entity.constitution.max
           );
         }
       },
-      { with: ['health'] }
+      { with: ['constitution'] }
     );
 
     // Damage the entity first
-    if (entity.health) {
-      entity.health.current = 50;
+    if (entity.constitution) {
+      entity.constitution.current = 50;
     }
     flush(world);
 
@@ -300,16 +326,18 @@ describe('Systems', () => {
     system.exec({ deltaTime: 16, world });
 
     // Verify the entity was healed by querying it again
-    const healedEntities = queryEntitiesIterator(world, { with: ['health'] });
+    const healedEntities = queryEntitiesIterator(world, {
+      with: ['constitution']
+    });
     const healedEntity = Array.from(healedEntities).find(
       e => e.id === entity.id
     );
-    expect(healedEntity?.health?.current).toBe(75);
+    expect(healedEntity?.constitution?.current).toBe(75);
   });
 
   test('should create a system that processes no entities when query returns empty', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
@@ -323,7 +351,7 @@ describe('Systems', () => {
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
-      { with: ['health'] }
+      { with: ['constitution'] }
     );
 
     // Run the system
@@ -335,12 +363,14 @@ describe('Systems', () => {
 
   test('should create a system that can be called multiple times', async () => {
     // Create a world with health component
-    const world = await createWorld([healthComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld([constitutionComponent], worldOpts);
 
     type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
-    const entity = createEntity(world, { health: { current: 100, max: 100 } });
+    const entity = createEntity(world, {
+      constitution: { current: 100, max: 100 }
+    });
 
     // Flush to persist to database
     flush(world);
@@ -353,7 +383,7 @@ describe('Systems', () => {
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
-      { with: ['health'] }
+      { with: ['constitution'] }
     );
 
     // Run the system multiple times
@@ -368,21 +398,24 @@ describe('Systems', () => {
 
   test('should create a system that works with complex query options', async () => {
     // Create a world with both health and location components
-    const world = await createWorld([healthComponent, locationComponent], { dbType: DatabaseType.BUN });
+    const world = await createWorld(
+      [constitutionComponent, locationComponent],
+      worldOpts
+    );
 
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different combinations
     const entity1 = createEntity(world, {
-      health: { current: 100, max: 100 },
+      constitution: { current: 100, max: 100 },
       systemLocation: { name: 'Forest', region: 'North' }
     });
     const entity2 = createEntity(world, {
-      health: { current: 50, max: 100 },
+      constitution: { current: 50, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
     const entity3 = createEntity(world, {
-      health: { current: 25, max: 100 },
+      constitution: { current: 25, max: 100 },
       systemLocation: { name: 'Mountain', region: 'North' }
     });
 
@@ -399,8 +432,8 @@ describe('Systems', () => {
       },
       {
         limit: 1,
-        where: `health_current < 75 AND system_location.region = 'North'`,
-        with: ['health', 'systemLocation']
+        where: `constitution_current < 75 AND system_location.region = 'North'`,
+        with: ['constitution', 'systemLocation']
       }
     );
 

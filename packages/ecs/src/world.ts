@@ -10,6 +10,11 @@ import {
 } from '@db';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
+  initializeComponentMetadataTable,
+  updateComponentMetadata,
+  validateComponentCompatibility
+} from '@schema/component-metadata';
+import {
   zodSchemaToSqliteInsert,
   zodSchemaToSqliteTable,
   zodSchemaToSqliteUpdate
@@ -54,6 +59,35 @@ const createStaticWorldInternal = async <T extends Components>(
   });
   db.exec(sql);
 
+  // Initialize component metadata table for compatibility checking
+  initializeComponentMetadataTable(db);
+
+  // Validate component compatibility
+
+  const validation = validateComponentCompatibility(db, componentDefs);
+
+  if (!validation.compatible) {
+    const errorMessage = [
+      'Component definition compatibility check failed:',
+      ...validation.errors,
+      '',
+      'This usually means the component definitions in your code have changed',
+      'in a way that is incompatible with the existing database.',
+      '',
+      'To resolve this:',
+      '1. Update your component definitions to match the existing schema, or',
+      '2. Create a new database file'
+    ].join('\n');
+
+    throw new Error(errorMessage);
+  }
+
+  // Log warnings if any
+  if (validation.warnings.length > 0) {
+    log.warn('Component definition warnings:');
+    validation.warnings.forEach(warning => log.warn(`  ${warning}`));
+  }
+
   // Register all components in a single transaction
   db.transaction(() => {
     for (const def of componentDefs) {
@@ -65,6 +99,10 @@ const createStaticWorldInternal = async <T extends Components>(
         def.statements || {}
       );
     }
+
+    // Update component metadata after successful registration
+
+    updateComponentMetadata(db, componentDefs);
   });
 
   const deleteEntity = db.prepare('DELETE FROM tbl_entity WHERE id = ?;');
@@ -83,7 +121,7 @@ const createStaticWorldInternal = async <T extends Components>(
     entitiesToDelete,
     entityCache,
     flush: () =>
-      flushStatic({
+      flush({
         db,
         defs,
         dirtyEntities,
@@ -97,7 +135,6 @@ const createStaticWorldInternal = async <T extends Components>(
     }
   };
 };
-
 
 // Create world with component definitions
 export async function createWorld<
@@ -177,7 +214,7 @@ const registerComponentDefStatic = (
   defs.set(name, def);
 };
 
-const flushStatic = <T extends Components>(world: StaticWorld<T>) => {
+const flush = <T extends Components>(world: StaticWorld<T>) => {
   const { db, defs, dirtyEntities, entitiesToDelete, entityCache } = world;
 
   db.transaction(() => {
@@ -269,8 +306,8 @@ const flushStatic = <T extends Components>(world: StaticWorld<T>) => {
 };
 
 // Export flush as the main flush function
-export const flush = flushStatic;
-export { flushStatic };
+
+export { flush };
 
 // World utility functions
 export const loadWorldFromJSON = <T extends Components>(
@@ -292,4 +329,26 @@ export const saveWorld = async <T extends Components>(
     await Bun.file(path).delete();
   }
   await world.db.saveToPath(path);
+};
+
+/**
+ * Loads an existing world database from a file path with component compatibility validation
+ */
+export const loadWorld = async <
+  T extends readonly ComponentDefinition<string, SchemaType>[]
+>(
+  componentDefs: T,
+  path: string,
+  options?: Omit<CreateStaticWorldOptionsInternal, 'path'>
+): Promise<StaticWorld<InferComponentsFromDefs<T>>> => {
+  // Check if the database file exists
+  if (!(await Bun.file(path).exists())) {
+    throw new Error(`Database file not found: ${path}`);
+  }
+
+  // Create world with the existing database file
+  return createWorld(componentDefs, {
+    ...options,
+    path
+  });
 };

@@ -70,6 +70,11 @@ const convertValueForSqlite = (value: unknown): unknown => {
   return String(value);
 };
 
+const queryTables = (db: Database): { name: string }[] =>
+  db.query(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' AND name NOT IN ('tbl_entity', 'tbl_component_metadata')"
+  ) as { name: string }[];
+
 /**
  * Save database content as components format
  */
@@ -77,9 +82,7 @@ export const saveAsComponents = (db: Database): unknown => {
   const result: any[] = [];
 
   // Get all table names that start with tbl_ except tbl_entity
-  const tables = db.query(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' AND name != 'tbl_entity'"
-  ) as { name: string }[];
+  const tables = queryTables(db);
 
   for (const { name: tableName } of tables) {
     // Extract component name from table name (remove tbl_ prefix)
@@ -111,9 +114,7 @@ export const saveAsEntities = (db: Database): unknown => {
   const entities = db.query('SELECT id FROM tbl_entity') as { id: number }[];
 
   // Get all component tables
-  const tables = db.query(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' AND name != 'tbl_entity'"
-  ) as { name: string }[];
+  const tables = queryTables(db);
 
   for (const entity of entities) {
     const entityData: any = { id: entity.id };

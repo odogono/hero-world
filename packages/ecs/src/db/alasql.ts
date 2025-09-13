@@ -82,9 +82,27 @@ class AlasqlStatementWrapper implements Statement {
     try {
       let lastInsertRowId = 0;
       
+      // Handle INSERT OR REPLACE by checking original SQL before conversion
+      const originalSql = this.sql;
+      const isInsertOrReplace = originalSql.toUpperCase().includes('INSERT OR REPLACE');
+      
       // Handle INSERT statements with auto-increment ID generation
       if (this.sql.trim().toUpperCase().startsWith('INSERT')) {
         const tableMatch = this.sql.match(/insert\s+into\s+(\w+)/i);
+        
+        // For INSERT OR REPLACE, implement the replace logic manually
+        if (isInsertOrReplace && args && typeof args === 'object' && tableMatch) {
+          const tableName = tableMatch[1];
+          
+          // For component metadata table, delete existing row with same tbl_name
+          if (tableName === 'tbl_component_metadata' && 'tbl_name' in args) {
+            try {
+              this.db.exec(`DELETE FROM ${tableName} WHERE tbl_name = ?`, [args.tbl_name]);
+            } catch {
+              // Ignore delete errors (row might not exist)
+            }
+          }
+        }
         if (tableMatch) {
           const tableName = tableMatch[1];
           
@@ -312,8 +330,10 @@ export class AlasqlDatabaseWrapper implements Database {
   private convertSqliteToAlasql(sql: string): string {
     let convertedSql = sql;
 
-    // Debug logging
-    // console.log('Original SQL:', sql);
+    // Debug logging for CREATE INDEX
+    if (convertedSql.toUpperCase().includes('CREATE INDEX')) {
+      console.log('DEBUG: Original CREATE INDEX SQL:', sql);
+    }
 
     // Convert SQLite-specific features to AlasQL compatible ones
 
@@ -322,34 +342,38 @@ export class AlasqlDatabaseWrapper implements Database {
       return ''; // Return empty string for pragma statements
     }
 
-    // Handle CREATE TABLE column definitions first
-    convertedSql = convertedSql.replaceAll(
-      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+text)/gi,
-      '$1[$2]$3'
-    );
-    convertedSql = convertedSql.replaceAll(
-      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+integer)/gi,
-      '$1[$2]$3'
-    );
-    convertedSql = convertedSql.replaceAll(
-      /(\s)(value|counter|name|order|group|user|date|time|index)(\s+real)/gi,
-      '$1[$2]$3'
-    );
+    // Handle CREATE TABLE column definitions first (but not in CREATE INDEX statements)
+    if (!convertedSql.toUpperCase().includes('CREATE INDEX')) {
+      convertedSql = convertedSql.replaceAll(
+        /(\s)(value|counter|name|order|group|user|date|time)(\s+text)/gi,
+        '$1[$2]$3'
+      );
+      convertedSql = convertedSql.replaceAll(
+        /(\s)(value|counter|name|order|group|user|date|time)(\s+integer)/gi,
+        '$1[$2]$3'
+      );
+      convertedSql = convertedSql.replaceAll(
+        /(\s)(value|counter|name|order|group|user|date|time)(\s+real)/gi,
+        '$1[$2]$3'
+      );
+    }
 
-    // Handle reserved words in column lists and SELECT column references (but not in CREATE TABLE or UPDATE)
+    // Handle reserved words in column lists and SELECT column references (but not in CREATE TABLE, UPDATE, CREATE INDEX, or ORDER BY)
     if (
       !convertedSql.includes('CREATE TABLE') &&
-      !convertedSql.includes('UPDATE ')
+      !convertedSql.includes('UPDATE ') &&
+      !convertedSql.toUpperCase().includes('CREATE INDEX') &&
+      !convertedSql.toUpperCase().includes('ORDER BY')
     ) {
       // Replace reserved words in column lists (but not parameter names starting with :)
       convertedSql = convertedSql.replaceAll(
-        /(?<!:)\b(value|counter|name|order|group|user|date|time|index)\b(?=\s*[),])/gi,
+        /(?<!:)\b(value|counter|name|order|group|user|date|time)\b(?=\s*[),])/gi,
         '[$1]'
       );
 
       // Also replace reserved words in SELECT column references like table.column
       convertedSql = convertedSql.replaceAll(
-        /(\w+)\.(value|counter|name|order|group|user|date|time|index)\b/gi,
+        /(\w+)\.(value|counter|name|order|group|user|date|time)\b/gi,
         '$1.[$2]'
       );
     }
@@ -357,16 +381,19 @@ export class AlasqlDatabaseWrapper implements Database {
     // Handle reserved words in UPDATE SET clauses
     if (convertedSql.includes('UPDATE ')) {
       convertedSql = convertedSql.replaceAll(
-        /\bset\s+([^=]+)\b(value|counter|name|order|group|user|date|time|index)\b/gi,
+        /\bset\s+([^=]+)\b(value|counter|name|order|group|user|date|time)\b/gi,
         (match, before, reservedWord) => `SET ${before}[${reservedWord}]`
       );
     }
 
-    // Handle reserved words in WHERE clauses and other expressions
-    convertedSql = convertedSql.replaceAll(
-      /(\s|\w+\.)(value|counter|name|order|group|user|date|time|index)(\s*[\s!),<=>])/gi,
-      '$1[$2]$3'
-    );
+    // Handle reserved words in WHERE clauses and other expressions (but not in CREATE INDEX or ORDER BY)
+    if (!convertedSql.toUpperCase().includes('CREATE INDEX') && 
+        !convertedSql.toUpperCase().includes('ORDER BY')) {
+      convertedSql = convertedSql.replaceAll(
+        /(\s|\w+\.)(value|counter|name|order|group|user|date|time)(\s*[\s!),<=>])/gi,
+        '$1[$2]$3'
+      );
+    }
 
     // AlasQL's IDENTITY doesn't work reliably, remove it from all tables
     // We'll handle ID generation manually in the statement run method
@@ -389,6 +416,17 @@ export class AlasqlDatabaseWrapper implements Database {
 
     // Convert AUTOINCREMENT to AlasQL's compatible syntax
     convertedSql = convertedSql.replaceAll(/\bautoincrement\b/gi, 'IDENTITY');
+
+    // Handle CREATE INDEX IF NOT EXISTS - AlasQL doesn't support this syntax
+    if (convertedSql.match(/create\s+.*index.*if\s+not\s+exists/gi)) {
+      // For CREATE INDEX, just remove IF NOT EXISTS since AlasQL doesn't support it
+      // and will just overwrite existing indexes anyway
+      convertedSql = convertedSql.replaceAll(/if\s+not\s+exists\s+/gi, '');
+    }
+
+    // Handle INSERT OR REPLACE - AlasQL doesn't support this syntax well, convert to regular INSERT
+    // We'll handle the replacement logic manually in our wrapper
+    convertedSql = convertedSql.replaceAll(/insert\s+or\s+replace\s+into/gi, 'INSERT INTO');
 
     // Handle IF NOT EXISTS by checking table existence first
     if (convertedSql.match(/create\s+table\s+if\s+not\s+exists/gi)) {
@@ -457,7 +495,10 @@ export class AlasqlDatabaseWrapper implements Database {
       convertedSql = convertedSql.replace(/([^)]\s*)$/, '$1);');
     }
 
-    // console.log('Converted SQL:', convertedSql);
+    // Debug logging for CREATE INDEX
+    if (sql.toUpperCase().includes('CREATE INDEX')) {
+      console.log('DEBUG: Converted CREATE INDEX SQL:', convertedSql);
+    }
     return convertedSql;
   }
 

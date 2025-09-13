@@ -5,8 +5,8 @@ import { defineComponent } from '@component';
 import { createEntity } from '@entity';
 import { createWorld } from '@world';
 
-describe('Static World', () => {
-  test('should create static world with predefined components', async () => {
+describe('World', () => {
+  test('should create world with predefined components', async () => {
     const healthComponent = defineComponent({
       name: 'vitals',
       schema: {
@@ -126,5 +126,61 @@ describe('Static World', () => {
     expect(def?.byLevel).toBeDefined();
 
     world.close();
+  });
+
+  test('component compatibility validation works', async () => {
+    const health = defineComponent({
+      name: 'health',
+      schema: {
+        current: z.number(),
+        max: z.number()
+      }
+    });
+
+    // create a temp file path
+    const tempFile = Bun.file(`test-compatibility.db`);
+
+    if (await tempFile.exists()) {
+      tempFile.delete();
+    }
+
+    // Create initial world
+    const world = await createWorld([health], { path: tempFile.name });
+
+    const entity = createEntity(world);
+    entity.health = { current: 100, max: 100 };
+    world.flush();
+    world.close();
+
+    // Try to load with a different component that uses the same table name
+    const health2 = defineComponent({
+      name: 'health2',
+      schema: {
+        bonus: z.number(),
+        current: z.number(),
+        max: z.number()
+      },
+      tableName: 'tbl_health'
+    });
+
+    // This should fail because the table structure is incompatible
+    await expect(
+      createWorld([health2], { path: tempFile.name })
+    ).rejects.toThrow(/Component definition compatibility check failed/);
+
+    // Loading with the same original component should work
+    const world2 = await createWorld([health], { path: tempFile.name });
+    expect(world2).toBeTruthy();
+
+    // Verify data is still there
+    const results = world2.db.query('SELECT * FROM tbl_health');
+    expect(results.length).toBeGreaterThan(0);
+
+    world2.close();
+
+    // Clean up
+    if (await tempFile.exists()) {
+      tempFile.delete();
+    }
   });
 });

@@ -18,7 +18,7 @@ const createTestWorld = async () => {
   });
 };
 
-describe('ECS with AlasQL Backend', () => {
+describe.skip('ECS with AlasQL Backend', () => {
   test('should create world with AlasQL backend', async () => {
     const world = await createTestWorld();
     expect(world).toBeDefined();

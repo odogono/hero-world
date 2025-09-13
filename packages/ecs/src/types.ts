@@ -66,7 +66,6 @@ export type World<TComponents extends Components> = {
   stmts: Record<string, Statement>;
 };
 
-
 // Helper type to extract component types from a World instance
 export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;
 

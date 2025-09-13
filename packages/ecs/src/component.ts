@@ -10,6 +10,7 @@ import {
 } from '@types';
 
 import { extractDefaults } from './schema';
+import type { SchemaType } from './schema/types';
 
 export { z };
 
@@ -47,6 +48,9 @@ export const defineComponent = <
     name: tableName
   };
 
+  // console.debug('[defineComponent] name', options.name, name);
+  // console.debug('[defineComponent]', meta);
+
   const schema = componentSchema.extend(options.schema).meta(meta);
 
   return {
@@ -55,6 +59,10 @@ export const defineComponent = <
     statements
   } as ComponentDefinition<Name, typeof schema>;
 };
+
+export const getComponentTableName = (
+  def: ComponentDefinition<string, SchemaType>
+) => def.schema.meta()?.name as string;
 
 export const makeTrackedComponent = <
   TWorldComponents extends Components,
