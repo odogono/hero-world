@@ -34,6 +34,7 @@ This is an Entity Component System (ECS) library built with TypeScript and Bun. 
 ### Alternative Commands (Just)
 
 The package also includes a `justfile` for convenience:
+
 - `just` - Show all available commands
 - `just generate-schemas [path]` - Generate schemas with optional path
 - `just test` - Run tests
@@ -70,6 +71,7 @@ saveWorld(world, 'game.db'); // Save to file
 ### Multi-Database Support
 
 The library supports multiple database backends:
+
 - **Bun SQLite** (`DatabaseType.BUN`) - Primary, high-performance option using `bun:sqlite`
 - **SQLite WASM** (`DatabaseType.WASM`) - Browser-compatible using `@sqlite.org/sqlite-wasm`
 - **AlaSQL** (`DatabaseType.ALASQL`) - Alternative implementation for development/testing
@@ -202,7 +204,7 @@ player.health.current = 85;
 player.position.x = 15;
 
 // Remove components by assigning null/undefined
-player.health = null;        // Remove health component
+player.health = null; // Remove health component
 player.position = undefined; // Remove position component
 
 // Changes are persisted when you flush
@@ -263,13 +265,13 @@ The library provides database-backed event scheduling and processing:
 
 ```ts
 // Register the event component first
-const world = (await createWorld())
-  .registerComponent(eventComponent)
-  .build();
+const world = (await createWorld()).registerComponent(eventComponent).build();
 
 // Schedule events directly
-const event = scheduleEvent(world, 'move:start', 
-  { direction: 'north' }, 
+const event = scheduleEvent(
+  world,
+  'move:start',
+  { direction: 'north' },
   Date.now() + 1000 // delayed execution
 );
 
@@ -305,7 +307,10 @@ gameLoop.update(deltaTime);
 
 ```ts
 // Add component to existing entity
-const entityWithComponent = addComponent(entity, 'health', { hp: 100, max: 100 });
+const entityWithComponent = addComponent(entity, 'health', {
+  hp: 100,
+  max: 100
+});
 
 // Add multiple components
 const entityWithComponents = addComponents(entity, {
@@ -325,7 +330,7 @@ removeComponent(entity);
 The library includes a domain-specific language for describing entities and their relationships:
 
 ```ts
-import { parseEdl, executeEdl } from '@/edl';
+import { executeEdl, parseEdl } from '@edl';
 
 // Parse EDL code
 const parsed = parseEdl(`
@@ -340,6 +345,7 @@ executeEdl(world, parsed);
 ```
 
 The EDL system uses Peggy parser generator and supports:
+
 - Entity definitions with component data
 - Type-safe parsing and execution
 - Integration with the ECS world system

@@ -16,6 +16,12 @@
       "@db/*": [
         "./src/db/*"
       ],
+      "@edl": [
+        "./src/edl/index.ts"
+      ],
+      "@edl/*": [
+        "./src/edl/*"
+      ],
       "@entity": [
         "./src/entity"
       ],

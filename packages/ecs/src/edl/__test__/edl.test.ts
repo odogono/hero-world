@@ -3,7 +3,6 @@ import { describe, expect, it, mock } from 'bun:test';
 import { z } from 'zod';
 
 import { defineComponent } from '@component';
-
 import {
   EDLErrorCodes,
   EDLExecutionError,
@@ -11,10 +10,10 @@ import {
   EDLUnknownEntityReferenceError,
   executeEDL,
   parseEDL
-} from '../edl';
-import { queryEntity } from '../entity';
-import { withEntityId } from '../schema';
-import { createWorld } from '../world';
+} from '@edl';
+import { queryEntity } from '@entity';
+import { withEntityId } from '@schema';
+import { createWorld } from '@world';
 
 const describedComponent = defineComponent({
   name: 'described',
@@ -225,6 +224,42 @@ entity lockable_chest: chest {
           id: 'chest',
           extends: ['chest_described', 'chest_thing'],
           components: {}
+        }
+      ]);
+    });
+
+    it('should parse a component defition', () => {
+      const edl = `
+        def user {
+          _tbl: tbl_user
+          name: string null
+          email: email not null is_unique
+          age: int default 0
+          height: float default 0.0
+          is_active: boolean default true
+          created_at: datetime default current_timestamp
+        }
+      `;
+
+      const parsed = parseEDL(edl);
+
+      expect(parsed).toEqual([
+        {
+          type: 'component',
+          id: 'user',
+          tableName: 'tbl_user',
+          columns: [
+            { name: 'name', type: 'string' },
+            { name: 'email', type: 'email', optional: false, isUnique: true },
+            { name: 'age', type: 'int', default: '0' },
+            { name: 'height', type: 'float', default: '0.0' },
+            { name: 'is_active', type: 'boolean', default: 'true' },
+            {
+              name: 'created_at',
+              type: 'datetime',
+              default: 'current_timestamp'
+            }
+          ]
         }
       ]);
     });

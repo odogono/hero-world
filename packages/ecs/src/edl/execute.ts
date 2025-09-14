@@ -1,9 +1,11 @@
 import { toCamelCase } from 'odgn-helpers/string';
-
-import { addComponents } from '../component';
 import { z } from 'zod';
-import { createEntity } from '../entity';
-import type { Components, World } from '../types';
+
+import { addComponents } from '@component';
+import { parseEDL } from '@edl';
+import { createEntity } from '@entity';
+import type { Components, World } from '@types';
+
 import {
   EDLCircularReferenceError,
   EDLExecutionError,
@@ -11,7 +13,6 @@ import {
   EDLMissingPropertyError,
   EDLUnknownEntityReferenceError
 } from './errors';
-import { parseEDL } from './parser';
 
 type ComponentData = Record<string, Record<string, unknown>>;
 
@@ -44,8 +45,12 @@ const parseCommands = (edl: string) => {
     let inQuotes = false;
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
-      if (ch === '"' && line[i - 1] !== '\\') inQuotes = !inQuotes;
-      if (ch === '#' && !inQuotes) return line.slice(0, i);
+      if (ch === '"' && line[i - 1] !== '\\') {
+        inQuotes = !inQuotes;
+      }
+      if (ch === '#' && !inQuotes) {
+        return line.slice(0, i);
+      }
     }
     return line;
   };
@@ -59,21 +64,23 @@ const parseCommands = (edl: string) => {
       if (tok.startsWith('"')) {
         // Unquote + unescape
         const inner = tok.slice(1, -1);
-        tokens.push(inner.replace(/\\(["nrt\\])/g, (_m, c) => {
-          switch (c) {
-            case 'n':
-              return '\n';
-            case 'r':
-              return '\r';
-            case 't':
-              return '\t';
-            case '"':
-              return '"';
-            case '\\':
-            default:
-              return '\\';
-          }
-        }));
+        tokens.push(
+          inner.replaceAll(/\\(["\\nrt])/g, (_m, c) => {
+            switch (c) {
+              case 'n':
+                return '\n';
+              case 'r':
+                return '\r';
+              case 't':
+                return '\t';
+              case '"':
+                return '"';
+              case '\\':
+              default:
+                return '\\';
+            }
+          })
+        );
       } else {
         tokens.push(tok);
       }
@@ -83,9 +90,13 @@ const parseCommands = (edl: string) => {
 
   for (let raw of lines) {
     raw = stripComments(raw).trim();
-    if (!raw || raw[0] !== '!') continue;
+    if (!raw || raw[0] !== '!') {
+      continue;
+    }
     const toks = tokenize(raw);
-    if (toks.length === 0) continue;
+    if (toks.length === 0) {
+      continue;
+    }
     const name = toks[0];
     const rawArgs = toks.slice(1);
     commands.push({ name, rawArgs });
@@ -105,8 +116,12 @@ export const executeEDL = <T extends Components>(
     let inQuotes = false;
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
-      if (ch === '"' && line[i - 1] !== '\\') inQuotes = !inQuotes;
-      if (ch === '#' && !inQuotes) return line.slice(0, i);
+      if (ch === '"' && line[i - 1] !== '\\') {
+        inQuotes = !inQuotes;
+      }
+      if (ch === '#' && !inQuotes) {
+        return line.slice(0, i);
+      }
     }
     return line;
   };
@@ -289,8 +304,13 @@ export const executeEDL = <T extends Components>(
   world.flush();
 
   // Command-time resolver that can fetch component row ids from DB
-  const resolveRefForCommands = (ref: string, seen: Set<string> = new Set()): unknown => {
-    if (!ref.startsWith('$')) return ref;
+  const resolveRefForCommands = (
+    ref: string,
+    seen: Set<string> = new Set()
+  ): unknown => {
+    if (!ref.startsWith('$')) {
+      return ref;
+    }
     if (seen.has(ref)) {
       errors.push(new EDLCircularReferenceError(ref));
       return undefined;
@@ -303,10 +323,15 @@ export const executeEDL = <T extends Components>(
       errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
       return undefined;
     }
-    if (!componentName) return targetId;
+    if (!componentName) {
+      return targetId;
+    }
 
     // Special entity meta props
-    if ((componentName === 'id' || componentName === 'eid') && propPath.length === 0) {
+    if (
+      (componentName === 'id' || componentName === 'eid') &&
+      propPath.length === 0
+    ) {
       return targetId;
     }
 
@@ -316,9 +341,13 @@ export const executeEDL = <T extends Components>(
       for (const def of (world as any).defs.values()) {
         try {
           const row = world.db
-            .prepare(`SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
+            .prepare(
+              `SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`
+            )
             .get(targetId) as any;
-          if (row) count++;
+          if (row) {
+            count++;
+          }
         } catch {
           // ignore table issues
         }
@@ -332,7 +361,9 @@ export const executeEDL = <T extends Components>(
 
     // Walk the path if available in planned components
     for (const key of propPath) {
-      if (value == null) break;
+      if (value == null) {
+        break;
+      }
       value = (value as any)[key];
     }
 
@@ -340,7 +371,9 @@ export const executeEDL = <T extends Components>(
     if (
       (value === undefined || value === null) &&
       propPath.length === 1 &&
-      (propPath[0] === 'id' || propPath[0] === 'rowId' || propPath[0] === '_row_id')
+      (propPath[0] === 'id' ||
+        propPath[0] === 'rowId' ||
+        propPath[0] === '_row_id')
     ) {
       const def = (world as any).defs.get(compKey);
       if (def) {
@@ -348,7 +381,7 @@ export const executeEDL = <T extends Components>(
           const row = world.db
             .prepare(`SELECT id FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
             .get(targetId) as any;
-          if (row && typeof row.id !== 'undefined') {
+          if (row && row.id !== undefined) {
             return row.id;
           }
         } catch {
@@ -367,7 +400,9 @@ export const executeEDL = <T extends Components>(
       if (def) {
         try {
           const row = world.db
-            .prepare(`SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
+            .prepare(
+              `SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`
+            )
             .get(targetId) as any;
           return !!row;
         } catch {
@@ -394,27 +429,45 @@ export const executeEDL = <T extends Components>(
 
   // Execute commands in order
   const toValue = (raw: string): any => {
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
-    if (raw === 'null') return null;
-    if (/^-?\d+$/.test(raw)) return parseInt(raw, 10);
-    if (/^-?\d+\.\d+$/.test(raw)) return parseFloat(raw);
-    if (raw.startsWith('$')) return resolveRefForCommands(raw);
+    if (raw === 'true') {
+      return true;
+    }
+    if (raw === 'false') {
+      return false;
+    }
+    if (raw === 'null') {
+      return null;
+    }
+    if (/^-?\d+$/.test(raw)) {
+      return Number.parseInt(raw, 10);
+    }
+    if (/^-?\d+\.\d+$/.test(raw)) {
+      return Number.parseFloat(raw);
+    }
+    if (raw.startsWith('$')) {
+      return resolveRefForCommands(raw);
+    }
     return raw;
   };
 
   for (const cmd of commands) {
     if (cmd.name === '!set') {
       // !set $entity.component.prop value
-      if (cmd.rawArgs.length < 2) continue;
+      if (cmd.rawArgs.length < 2) {
+        continue;
+      }
       const target = cmd.rawArgs[0];
       const value = toValue(cmd.rawArgs[1]);
-      if (!target.startsWith('$')) continue;
+      if (!target.startsWith('$')) {
+        continue;
+      }
       const path = target.slice(1).split('.');
       const [entityName, componentName, ...propPath] = path;
       const eid = entityIdsByName.get(entityName ?? '');
       if (eid === undefined) {
-        errors.push(new EDLUnknownEntityReferenceError(entityName ?? '', { ref: target }));
+        errors.push(
+          new EDLUnknownEntityReferenceError(entityName ?? '', { ref: target })
+        );
         continue;
       }
       const entity = entitiesById.get(eid)! as any;
@@ -422,7 +475,9 @@ export const executeEDL = <T extends Components>(
       // Prepare property key (only first-level used in tests)
       const propKey = propPath[0] ? toCamelCase(propPath[0]) : undefined;
 
-      if (!propKey) continue;
+      if (!propKey) {
+        continue;
+      }
 
       if (entity[compKey]) {
         // Component exists, set property directly
@@ -430,24 +485,38 @@ export const executeEDL = <T extends Components>(
       } else {
         // Build minimal defaults for required fields from schema
         const def = (entity.world as any).defs.get(compKey);
-        let defaults: Record<string, unknown> = {};
+        const defaults: Record<string, unknown> = {};
         if (def && def.schema && (def.schema as any).shape) {
-          const shape = (def.schema as any).shape as Record<string, z.ZodTypeAny>;
+          const shape = (def.schema as any).shape as Record<
+            string,
+            z.ZodTypeAny
+          >;
           for (const [k, s] of Object.entries(shape)) {
             const meta = (s as any).meta?.();
-            if (meta?.primaryKey || meta?.foreignKey) continue; // id/eid handled elsewhere
+            if (meta?.primaryKey || meta?.foreignKey) {
+              continue;
+            } // id/eid handled elsewhere
             // Skip optional fields and those with defaults
             const isOptional = s instanceof z.ZodOptional;
             const isDefault = s instanceof z.ZodDefault;
-            if (isOptional || isDefault) continue;
+            if (isOptional || isDefault) {
+              continue;
+            }
 
             // Provide minimal non-null defaults
-            if (s instanceof z.ZodNumber) defaults[k] = 0;
-            else if (s instanceof z.ZodBoolean) defaults[k] = false;
-            else if (s instanceof z.ZodString) defaults[k] = '';
-            else if (s instanceof z.ZodArray) defaults[k] = [];
-            else if (s instanceof z.ZodObject) defaults[k] = {};
-            else defaults[k] = null;
+            if (s instanceof z.ZodNumber) {
+              defaults[k] = 0;
+            } else if (s instanceof z.ZodBoolean) {
+              defaults[k] = false;
+            } else if (s instanceof z.ZodString) {
+              defaults[k] = '';
+            } else if (s instanceof z.ZodArray) {
+              defaults[k] = [];
+            } else if (s instanceof z.ZodObject) {
+              defaults[k] = {};
+            } else {
+              defaults[k] = null;
+            }
           }
         }
         // Override with the provided property

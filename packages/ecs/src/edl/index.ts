@@ -1,4 +1,4 @@
-export { parseEDL } from './parser';
+export { parse as parseEDL } from './parser';
 export { executeEDL, type ExecuteOptions } from './execute';
 export {
   EDLError,

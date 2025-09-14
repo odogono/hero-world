@@ -7,8 +7,21 @@
     components: Record<string, Record<string, unknown>>;
   };
 
-  const toCamelCase = (s: string): string =>
-    s.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+  // Component definition types
+  type EDLComponentColumn = {
+    name: string;
+    type: string;
+    optional?: boolean;
+    isUnique?: boolean;
+    default?: string;
+  };
+
+  type EDLComponentDef = {
+    type: 'component';
+    id: string;
+    tableName?: string;
+    columns: EDLComponentColumn[];
+  };
 
   const componentsFromEntries = (
     entries: Array<[string, Record<string, unknown>]>
@@ -27,6 +40,7 @@ Start
 Definition
   = AtomDef
   / EntityDef
+  / ComponentDef
 
 AtomDef
   = 'atom' __ id:IdentifierOrString _ '{' _ comps:Components? _ '}' {
@@ -43,6 +57,69 @@ EntityDef
   / 'entity' _ '{' _ '}' {
       return { type: 'entity', id: undefined, components: {} } as EDLDefinition;
     }
+
+// Component definition grammar
+ComponentDef
+  = 'def' __ id:Identifier _ '{' _ body:ComponentBody? _ '}' {
+      const tableName = body?.tableName;
+      const columns = body?.columns ?? [];
+      return { type: 'component', id, tableName, columns } as EDLComponentDef;
+    }
+
+ComponentBody
+  = lines:(ComponentLine _)* {
+      const columns: EDLComponentColumn[] = [];
+      let tableName: string | undefined;
+      for (const [line] of lines) {
+        if ((line as any).kind === 'table') tableName = (line as any).name;
+        else if ((line as any).kind === 'column') columns.push((line as any).col);
+      }
+      return { tableName, columns };
+    }
+
+ComponentLine
+  = TableLine
+  / ColumnLine
+
+TableLine
+  = '_tbl' _ ':' _ name:Identifier {
+      return { kind: 'table', name };
+    }
+
+ColumnLine
+  = name:Identifier _ ':' _ type:Identifier rest:RestOfLine {
+      // Parse flags in the remainder of the line
+      const restStr = rest?.trim?.() ?? '';
+      // Strip inline comments while respecting quoted strings
+      let tail = restStr;
+      {
+        let inQuotes = false;
+        for (let i = 0; i < restStr.length; i++) {
+          const ch = restStr[i];
+          if (ch === '"' && restStr[i - 1] !== '\\') inQuotes = !inQuotes;
+          if (ch === '#' && !inQuotes) { tail = restStr.slice(0, i).trim(); break; }
+        }
+      }
+      const col: EDLComponentColumn = { name, type };
+      if (tail.length) {
+        const tokens = tail.split(/\s+/);
+        for (let i = 0; i < tokens.length; i++) {
+          const tok = tokens[i];
+          if (tok === 'not' && tokens[i + 1] === 'null') { col.optional = false; i++; continue; }
+          if (tok === 'null') { continue; }
+          if (tok === 'is_unique') { col.isUnique = true; continue; }
+          if (tok === 'default') {
+            const value = tokens.slice(i + 1).join(' ').trim();
+            if (value.length > 0) col.default = value;
+            break;
+          }
+        }
+      }
+      return { kind: 'column', col };
+    }
+
+RestOfLine
+  = s:$([^\n\r}]*) { return s; }
 
 ExtendsList
   = head:IdentifierOrString tail:(_ IdentifierOrString)* {
