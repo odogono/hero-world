@@ -31,7 +31,7 @@ const mergeComponents = (
   return out;
 };
 
-type ExecuteOptions = {
+export type ExecuteOptions = {
   commands?: Record<string, (...args: any[]) => void>;
 };
 
@@ -305,6 +305,27 @@ export const executeEDL = <T extends Components>(
     }
     if (!componentName) return targetId;
 
+    // Special entity meta props
+    if ((componentName === 'id' || componentName === 'eid') && propPath.length === 0) {
+      return targetId;
+    }
+
+    // Entity-level helper: $name._count -> number of components attached
+    if (componentName === '_count' && propPath.length === 0) {
+      let count = 0;
+      for (const def of (world as any).defs.values()) {
+        try {
+          const row = world.db
+            .prepare(`SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
+            .get(targetId) as any;
+          if (row) count++;
+        } catch {
+          // ignore table issues
+        }
+      }
+      return count;
+    }
+
     const plan = plannedComponentsById.get(targetId);
     const compKey = toCamelCase(componentName);
     let value: any = plan ? (plan as any)[compKey] : undefined;
@@ -315,8 +336,12 @@ export const executeEDL = <T extends Components>(
       value = (value as any)[key];
     }
 
-    // If specifically asking for '.id' and not present in plan, query DB for row id
-    if ((value === undefined || value === null) && propPath.length === 1 && propPath[0] === 'id') {
+    // If specifically asking for '.id' (or alias 'rowId' / '_row_id') and not present in plan, query DB for row id
+    if (
+      (value === undefined || value === null) &&
+      propPath.length === 1 &&
+      (propPath[0] === 'id' || propPath[0] === 'rowId' || propPath[0] === '_row_id')
+    ) {
       const def = (world as any).defs.get(compKey);
       if (def) {
         try {
@@ -330,6 +355,26 @@ export const executeEDL = <T extends Components>(
           // ignore, fall through to error handling
         }
       }
+    }
+
+    // Ask for existence: returns boolean if a component row exists for eid
+    if (
+      (value === undefined || value === null) &&
+      propPath.length === 1 &&
+      (propPath[0] === 'exists' || propPath[0] === '_exists')
+    ) {
+      const def = (world as any).defs.get(compKey);
+      if (def) {
+        try {
+          const row = world.db
+            .prepare(`SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
+            .get(targetId) as any;
+          return !!row;
+        } catch {
+          return false;
+        }
+      }
+      return false;
     }
 
     if (typeof value === 'string' && value.startsWith('$')) {

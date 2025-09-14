@@ -1,5 +1,5 @@
 export { parseEDL } from './parser';
-export { executeEDL } from './execute';
+export { executeEDL, type ExecuteOptions } from './execute';
 export {
   EDLError,
   EDLExecutionError,
