@@ -1,0 +1,120 @@
+# Zork-like Adventure EDL Example
+﻿#
+# This EDL defines core components, atoms, and a small set of rooms/items.
+# Note: The EDL grammar supports inheritance for entities (via ": base"),
+# but not for atoms. To model "room inherits container", room entities extend
+# both the `room` atom and the `container` atom.
+
+# =====================
+# Component Definitions
+# =====================
+
+# Simple descriptive text for things and places
+def described {
+  name: string not null
+  description: string not null
+}
+
+# Holds other entities; closed containers cannot be opened by default
+def container {
+  capacity: int not null default 10
+  is_closed: boolean not null default false
+}
+
+# Exits from a room; directions point to other room entity ids
+def exits {
+  north: int null
+  south: int null
+  east: int null
+  west: int null
+  up: int null
+  down: int null
+}
+
+# Generic item properties
+def item {
+  weight: int null
+  is_takeable: boolean not null default true
+}
+
+# Optional location link (place an entity inside a container or room)
+def location {
+  in: int null
+}
+
+# ======
+# Atoms
+# ======
+
+# Base container atom (reusable defaults)
+atom container {
+  container { capacity: 10 is_closed: false }
+}
+
+# Room atom (conceptually inherits container via entity-level extension)
+atom room {
+  # Provide defaults; entities will override name/description
+  described { name: "Room" description: "An unremarkable room." }
+}
+
+# Generic item atom
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+# ==========
+# World Map
+# ==========
+
+# Rooms (each extends both room and container)
+entity outside: room container {
+  described {
+    name: "West of House"
+    description: "You are standing in an open field west of a white house, with a boarded front door."
+  }
+  exits { east: $foyer }
+}
+
+entity foyer: room container {
+  described {
+    name: "The Foyer"
+    description: "A small foyer with a dusty rug. A staircase leads up."
+  }
+  exits { west: $outside north: $kitchen up: $attic }
+}
+
+entity kitchen: room container {
+  described {
+    name: "Kitchen"
+    description: "The kitchen smells of old bread. There is a table here."
+  }
+  exits { south: $foyer }
+}
+
+entity attic: room container {
+  described {
+    name: "Attic"
+    description: "A dark, musty attic with low rafters."
+  }
+  exits { down: $foyer }
+}
+
+# Items
+entity brass_lantern: item {
+  described { name: "Brass Lantern" description: "A brass lantern with a flickering flame." }
+  item { weight: 2 }
+  location { in: $foyer }
+}
+
+entity mailbox: container {
+  described { name: "Mailbox" description: "A small mailbox on a wooden post." }
+  container { capacity: 5 is_closed: true }
+  location { in: $outside }
+}
+
+entity leaflet: item {
+  described { name: "Leaflet" description: "A leaflet with bold letters: 'WELCOME TO ZORK'" }
+  item { weight: 1 }
+  location { in: $mailbox }
+}
+
