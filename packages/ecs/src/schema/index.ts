@@ -34,6 +34,10 @@ export const withEntityId = () =>
 export const dateTimeWithDefault = () =>
   z.iso.datetime().default('CURRENT_TIMESTAMP');
 
+export { cdefToSql } from './cdef-to-sql';
+export { cdefToZod } from './cdef-to-zod';
+export { cdefToTypes } from './cdef-to-types';
+
 /**
  * Extract default values from a Zod schema
  * This function recursively traverses the schema and extracts all default values

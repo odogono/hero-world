@@ -104,3 +104,31 @@ The script automatically discovers all exported components - no manual configura
 - **Automatic Field Mapping**: Handles camelCase ↔ snake_case conversion
 - **Foreign Keys**: Proper entity relationships with cascade delete
 - **Default Values**: Preserves default values from component definitions
+
+## CDef JSON Generation Script
+
+Generate SQL and Zod schema text directly from JSON component definitions in the CDef format used by the ECS package.
+
+### Usage
+
+```bash
+# From a JSON file containing a CDef, CDef[] or nested arrays
+bun run scripts/generate-from-cdef.ts --input path/to/cdefs.json \
+  --sql-out generated/schema.sql \
+  --zod-out generated/schemas.ts \
+  --include-entity \
+  --down
+
+# Omit imports in Zod output (useful for embedding into existing files)
+bun run scripts/generate-from-cdef.ts --input cdefs.json --zod-no-imports
+```
+
+Options:
+- `--input <path>` JSON file with a single CDef, `CDef[]`, or nested array
+- `--sql-out <path>` Write SQL output to file
+- `--zod-out <path>` Write Zod schemas TS to file
+- `--include-entity` Include `tbl_entity` in SQL output
+- `--down` Append DROP statements after CREATE
+- `--zod-no-imports` Omit `import { z } from 'zod'` in Zod output
+
+This script uses the same conversion logic as the library functions `cdefToSql` and `cdefToZod`.

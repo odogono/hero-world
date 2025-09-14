@@ -62,7 +62,7 @@ describe('Component Definitions to SQL', () => {
     expect(result.sql).toContain('age INTEGER NULL');
     expect(result.sql).toContain('height REAL NOT NULL DEFAULT 1.0');
     expect(result.sql).toContain('is_active INTEGER NOT NULL DEFAULT 1');
-    expect(result.sql).toContain('favourites TEXT NOT NULL');
+    expect(result.sql).toContain('favourites INTEGER NOT NULL');
     expect(result.sql).toContain(
       'FOREIGN KEY (favourites) REFERENCES tbl_favourites (id) ON DELETE CASCADE'
     );
