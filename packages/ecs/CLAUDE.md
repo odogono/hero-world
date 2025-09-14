@@ -25,6 +25,21 @@ This is an Entity Component System (ECS) library built with TypeScript and Bun. 
 - `bun run unused` - Find unused code with knip
 - `bun run outdated` - Check for outdated dependencies interactively
 
+### Code Generation
+
+- `bun run generate` - Generate TypeScript types and SQLite schema from component definitions
+- `bun run generate:edl` - Generate EDL (Entity Description Language) parser
+- `bun run generate:help` - Show help for the schema generator
+
+### Alternative Commands (Just)
+
+The package also includes a `justfile` for convenience:
+- `just` - Show all available commands
+- `just generate-schemas [path]` - Generate schemas with optional path
+- `just test` - Run tests
+- `just lint` - Run linting
+- `just clean` - Remove generated files
+
 ## Architecture
 
 ### Entity Component System (ECS) Pattern
@@ -121,6 +136,14 @@ The library supports multiple database backends:
 - `src/events/index.ts` - Simple event system with database persistence
 - `src/system/game-loop.ts` - Event-aware game loop with priority-based system execution
 
+### EDL (Entity Description Language)
+
+- `src/edl/index.ts` - Main EDL interface and exports
+- `src/edl/parser.ts` - Generated parser from Peggy grammar
+- `src/edl/edl.peggy` - Peggy grammar definition for EDL
+- `src/edl/execute.ts` - EDL execution engine
+- `src/edl/errors.ts` - EDL-specific error handling
+
 ### Utility Files
 
 - `src/helpers/convert-keys.ts` - Key conversion utilities (camelCase ↔ snake_case)
@@ -135,6 +158,12 @@ The library supports multiple database backends:
 - Use `bun test` with built-in test/expect functions
 - Prefer `Bun.file` over Node.js fs operations
 - Use `bun` commands instead of `node`, `npm`, `yarn`, or `pnpm`
+
+### Code Quality Configuration
+
+- **ESLint**: Configured with `@nkzw/eslint-config` and custom rules preferring arrow functions and TypeScript `type` definitions
+- **Prettier**: Configured with single quotes, semicolons, and import sorting via `@ianvs/prettier-plugin-sort-imports`
+- **Import Order**: Third-party modules → @-prefixed modules → relative imports
 
 ### Component Creation Pattern
 
@@ -290,3 +319,27 @@ removeComponent(entity, 'health', 'position');
 // Remove all components
 removeComponent(entity);
 ```
+
+### EDL (Entity Description Language)
+
+The library includes a domain-specific language for describing entities and their relationships:
+
+```ts
+import { parseEdl, executeEdl } from '@/edl';
+
+// Parse EDL code
+const parsed = parseEdl(`
+  entity player {
+    health: 100,
+    position: { x: 0, y: 0 }
+  }
+`);
+
+// Execute EDL within a world context
+executeEdl(world, parsed);
+```
+
+The EDL system uses Peggy parser generator and supports:
+- Entity definitions with component data
+- Type-safe parsing and execution
+- Integration with the ECS world system

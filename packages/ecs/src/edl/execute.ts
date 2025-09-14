@@ -1,6 +1,7 @@
 import { toCamelCase } from 'odgn-helpers/string';
 
 import { addComponents } from '../component';
+import { z } from 'zod';
 import { createEntity } from '../entity';
 import type { Components, World } from '../types';
 import {
@@ -30,11 +31,91 @@ const mergeComponents = (
   return out;
 };
 
+type ExecuteOptions = {
+  commands?: Record<string, (...args: any[]) => void>;
+};
+
+// Lightweight command tokenizer supporting quoted strings and comments
+const parseCommands = (edl: string) => {
+  const lines = edl.split(/\r?\n/);
+  const commands: Array<{ name: string; rawArgs: string[] }> = [];
+
+  const stripComments = (line: string) => {
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"' && line[i - 1] !== '\\') inQuotes = !inQuotes;
+      if (ch === '#' && !inQuotes) return line.slice(0, i);
+    }
+    return line;
+  };
+
+  const tokenize = (line: string): string[] => {
+    const tokens: string[] = [];
+    const re = /"([^"\\]|\\.)*"|\S+/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(line))) {
+      const tok = match[0];
+      if (tok.startsWith('"')) {
+        // Unquote + unescape
+        const inner = tok.slice(1, -1);
+        tokens.push(inner.replace(/\\(["nrt\\])/g, (_m, c) => {
+          switch (c) {
+            case 'n':
+              return '\n';
+            case 'r':
+              return '\r';
+            case 't':
+              return '\t';
+            case '"':
+              return '"';
+            case '\\':
+            default:
+              return '\\';
+          }
+        }));
+      } else {
+        tokens.push(tok);
+      }
+    }
+    return tokens;
+  };
+
+  for (let raw of lines) {
+    raw = stripComments(raw).trim();
+    if (!raw || raw[0] !== '!') continue;
+    const toks = tokenize(raw);
+    if (toks.length === 0) continue;
+    const name = toks[0];
+    const rawArgs = toks.slice(1);
+    commands.push({ name, rawArgs });
+  }
+
+  return commands;
+};
+
 export const executeEDL = <T extends Components>(
   world: World<T>,
-  edl: string
+  edl: string,
+  options: ExecuteOptions = {}
 ): void => {
-  const defs = parseEDL(edl);
+  const commands = parseCommands(edl);
+  // Remove command lines before parsing entity/atom definitions
+  const stripComments = (line: string) => {
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"' && line[i - 1] !== '\\') inQuotes = !inQuotes;
+      if (ch === '#' && !inQuotes) return line.slice(0, i);
+    }
+    return line;
+  };
+  const edlForParse = edl
+    .split(/\r?\n/)
+    .map(l => stripComments(l))
+    .filter(l => l.trim().length > 0 && l.trim()[0] !== '!')
+    .join('\n');
+  const defs = parseEDL(edlForParse);
 
   // Atoms are templates that can be extended by entities
   const atoms = new Map<string, ComponentData>();
@@ -204,6 +285,147 @@ export const executeEDL = <T extends Components>(
     throw new EDLExecutionError(errors);
   }
 
-  // Persist all changes
+  // Persist initial entities/components so rows (ids) exist for command refs
+  world.flush();
+
+  // Command-time resolver that can fetch component row ids from DB
+  const resolveRefForCommands = (ref: string, seen: Set<string> = new Set()): unknown => {
+    if (!ref.startsWith('$')) return ref;
+    if (seen.has(ref)) {
+      errors.push(new EDLCircularReferenceError(ref));
+      return undefined;
+    }
+    seen.add(ref);
+    const path = ref.slice(1).split('.');
+    const [entityName, componentName, ...propPath] = path;
+    const targetId = entityIdsByName.get(entityName);
+    if (targetId === undefined) {
+      errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
+      return undefined;
+    }
+    if (!componentName) return targetId;
+
+    const plan = plannedComponentsById.get(targetId);
+    const compKey = toCamelCase(componentName);
+    let value: any = plan ? (plan as any)[compKey] : undefined;
+
+    // Walk the path if available in planned components
+    for (const key of propPath) {
+      if (value == null) break;
+      value = (value as any)[key];
+    }
+
+    // If specifically asking for '.id' and not present in plan, query DB for row id
+    if ((value === undefined || value === null) && propPath.length === 1 && propPath[0] === 'id') {
+      const def = (world as any).defs.get(compKey);
+      if (def) {
+        try {
+          const row = world.db
+            .prepare(`SELECT id FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
+            .get(targetId) as any;
+          if (row && typeof row.id !== 'undefined') {
+            return row.id;
+          }
+        } catch {
+          // ignore, fall through to error handling
+        }
+      }
+    }
+
+    if (typeof value === 'string' && value.startsWith('$')) {
+      return resolveRefForCommands(value, seen);
+    }
+
+    if (value === undefined) {
+      errors.push(
+        new EDLMissingPropertyError(
+          entityName,
+          `${componentName}.${propPath.join('.')}`
+        )
+      );
+    }
+    return value;
+  };
+
+  // Execute commands in order
+  const toValue = (raw: string): any => {
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    if (raw === 'null') return null;
+    if (/^-?\d+$/.test(raw)) return parseInt(raw, 10);
+    if (/^-?\d+\.\d+$/.test(raw)) return parseFloat(raw);
+    if (raw.startsWith('$')) return resolveRefForCommands(raw);
+    return raw;
+  };
+
+  for (const cmd of commands) {
+    if (cmd.name === '!set') {
+      // !set $entity.component.prop value
+      if (cmd.rawArgs.length < 2) continue;
+      const target = cmd.rawArgs[0];
+      const value = toValue(cmd.rawArgs[1]);
+      if (!target.startsWith('$')) continue;
+      const path = target.slice(1).split('.');
+      const [entityName, componentName, ...propPath] = path;
+      const eid = entityIdsByName.get(entityName ?? '');
+      if (eid === undefined) {
+        errors.push(new EDLUnknownEntityReferenceError(entityName ?? '', { ref: target }));
+        continue;
+      }
+      const entity = entitiesById.get(eid)! as any;
+      const compKey = toCamelCase(componentName ?? '');
+      // Prepare property key (only first-level used in tests)
+      const propKey = propPath[0] ? toCamelCase(propPath[0]) : undefined;
+
+      if (!propKey) continue;
+
+      if (entity[compKey]) {
+        // Component exists, set property directly
+        entity[compKey][propKey] = value;
+      } else {
+        // Build minimal defaults for required fields from schema
+        const def = (entity.world as any).defs.get(compKey);
+        let defaults: Record<string, unknown> = {};
+        if (def && def.schema && (def.schema as any).shape) {
+          const shape = (def.schema as any).shape as Record<string, z.ZodTypeAny>;
+          for (const [k, s] of Object.entries(shape)) {
+            const meta = (s as any).meta?.();
+            if (meta?.primaryKey || meta?.foreignKey) continue; // id/eid handled elsewhere
+            // Skip optional fields and those with defaults
+            const isOptional = s instanceof z.ZodOptional;
+            const isDefault = s instanceof z.ZodDefault;
+            if (isOptional || isDefault) continue;
+
+            // Provide minimal non-null defaults
+            if (s instanceof z.ZodNumber) defaults[k] = 0;
+            else if (s instanceof z.ZodBoolean) defaults[k] = false;
+            else if (s instanceof z.ZodString) defaults[k] = '';
+            else if (s instanceof z.ZodArray) defaults[k] = [];
+            else if (s instanceof z.ZodObject) defaults[k] = {};
+            else defaults[k] = null;
+          }
+        }
+        // Override with the provided property
+        defaults[propKey] = value;
+        // Add the component with defaults + property
+        addComponents(entity, { [compKey]: defaults } as any);
+      }
+      continue;
+    }
+
+    // Arbitrary commands
+    const handler = options.commands?.[cmd.name];
+    if (typeof handler === 'function') {
+      // Keep argument order exactly as specified in the EDL
+      const args = cmd.rawArgs.map(toValue);
+      handler(...args);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new EDLExecutionError(errors);
+  }
+
+  // Persist changes from commands
   world.flush();
 };

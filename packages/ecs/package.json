@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./component": "./src/component.ts",
+    "./edl": "./src/edl/index.ts",
     "./entity": "./src/entity.ts",
     "./events": "./src/events/index.ts",
     "./system": "./src/system/index.ts",

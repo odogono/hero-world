@@ -1,16 +1,16 @@
 /* eslint-disable perfectionist/sort-objects */
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
 import { z } from 'zod';
 
 import { defineComponent } from '@component';
 
-import { executeEDL, parseEDL } from '../edl';
 import {
   EDLErrorCodes,
   EDLExecutionError,
-  EDLMissingComponentError,
   EDLMissingPropertyError,
-  EDLUnknownEntityReferenceError
+  EDLUnknownEntityReferenceError,
+  executeEDL,
+  parseEDL
 } from '../edl';
 import { queryEntity } from '../entity';
 import { withEntityId } from '../schema';
@@ -283,8 +283,14 @@ entity lockable_chest: chest {
 
       executeEDL(world, edl);
 
-      const parent = queryEntity(world, { with: ['thing'], where: 'thing_weight = 20' })!;
-      const child = queryEntity(world, { with: ['thing'], where: 'thing_weight = 5' })!;
+      const parent = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_weight = 20'
+      })!;
+      const child = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_weight = 5'
+      })!;
 
       expect(child.thing.size).toBe(parent.thing.size);
       expect(child.thing.weight).toBe(5);
@@ -320,10 +326,12 @@ entity lockable_chest: chest {
       try {
         executeEDL(world, edl);
         throw new Error('Expected executeEDL to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EDLExecutionError);
-        const e = err as EDLExecutionError;
-        expect(e.errors.some(x => x instanceof EDLUnknownEntityReferenceError)).toBe(true);
+      } catch (error) {
+        expect(error).toBeInstanceOf(EDLExecutionError);
+        const e = error as EDLExecutionError;
+        expect(
+          e.errors.some(x => x instanceof EDLUnknownEntityReferenceError)
+        ).toBe(true);
         expect(e.code).toBe(EDLErrorCodes.EDL_EXECUTION_ERROR);
       }
     });
@@ -339,10 +347,12 @@ entity lockable_chest: chest {
       try {
         executeEDL(world, edl);
         throw new Error('Expected executeEDL to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EDLExecutionError);
-        const e = err as EDLExecutionError;
-        expect(e.errors.some(x => x instanceof EDLMissingPropertyError)).toBe(true);
+      } catch (error) {
+        expect(error).toBeInstanceOf(EDLExecutionError);
+        const e = error as EDLExecutionError;
+        expect(e.errors.some(x => x instanceof EDLMissingPropertyError)).toBe(
+          true
+        );
         expect(e.code).toBe(EDLErrorCodes.EDL_EXECUTION_ERROR);
       }
     });
@@ -356,7 +366,10 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent, statsArrayComponent]);
       executeEDL(world, edl);
 
-      const child = queryEntity(world, { with: ['thing'], where: 'thing_weight = 5' })!;
+      const child = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_weight = 5'
+      })!;
       expect(child.thing.size).toBe(20);
       expect(child.thing.weight).toBe(5);
     });
@@ -435,12 +448,84 @@ entity lockable_chest: chest {
       try {
         executeEDL(world, edl);
         throw new Error('Expected executeEDL to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EDLExecutionError);
-        const e = err as EDLExecutionError;
+      } catch (error) {
+        expect(error).toBeInstanceOf(EDLExecutionError);
+        const e = error as EDLExecutionError;
         expect(e.errors.length).toBeGreaterThan(0);
         expect(e.code).toBe(EDLErrorCodes.EDL_EXECUTION_ERROR);
       }
+    });
+  });
+
+  describe('commands', () => {
+    it('should set component properties', async () => {
+      const edl = `
+      entity chest {
+        thing { size: 10 weight: 20 }
+      }
+      !set $chest.thing.size 30
+      `;
+
+      const world = await createWorld([thingComponent]);
+      executeEDL(world, edl);
+
+      const chest = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_size = 30'
+      })!;
+      expect(chest.thing.size).toBe(30);
+      expect(chest.thing.weight).toBe(20);
+    });
+
+    it('should add a component with !set', async () => {
+      const edl = `
+      entity chest {}
+
+      # the !set command adds the thing component to the chest entity
+      # and sets the weight property to 40
+      !set $chest.thing.weight 40
+      `;
+
+      const world = await createWorld([thingComponent]);
+      executeEDL(world, edl);
+
+      const chest = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_weight = 40'
+      })!;
+      expect(chest.thing.weight).toBe(40);
+    });
+
+    it('should allow arbitrary commands', async () => {
+      const edl = `
+      entity chest {
+        thing { size: 10 weight: 20 }
+      }
+      #commands start with a ! and are executed in the order they appear
+      !examine $chest.thing.weight $chest arg_1 13 true "a medium sized chest" $chest.thing.id
+      `;
+
+      const examine = mock(() => {});
+
+      const world = await createWorld([thingComponent]);
+      executeEDL(world, edl, { commands: { '!examine': examine } });
+
+      const chest = queryEntity(world, {
+        with: ['thing'],
+        where: 'thing_weight = 20'
+      })!;
+
+      expect(examine.mock.calls).toEqual([
+        [
+          20,
+          chest.id,
+          'arg_1',
+          13,
+          true,
+          'a medium sized chest',
+          chest.thing.id!
+        ]
+      ]);
     });
   });
 });
