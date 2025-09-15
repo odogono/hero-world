@@ -44,7 +44,7 @@ export type CDefColumnType =
   | 'array';
 
 export type CDefColumnInfo = {
-  default?: string | number | boolean;
+  default?: string | number | boolean | Date;
   foreignKey?: string;
   isIndexed?: boolean;
   isUnique?: boolean;
