@@ -9,8 +9,8 @@ import {
   type World
 } from '@types';
 
-import { extractDefaults } from './schema';
-import type { SchemaType } from './schema/types';
+import { extractDefaults } from '../schema';
+import type { SchemaType } from '../schema/types';
 
 export { z };
 

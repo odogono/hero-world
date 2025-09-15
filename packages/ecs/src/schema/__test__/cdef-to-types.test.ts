@@ -1,8 +1,9 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, test } from 'bun:test';
 
+import type { CDef } from '@types';
+
 import { cdefToTypes } from '../cdef-to-types';
-import type { CDef } from '../types';
 
 describe('CDef to TypeScript types (text output)', () => {
   test('generates pasteable TS types with auto fields', () => {
@@ -134,4 +135,3 @@ describe('CDef to TypeScript types (text output)', () => {
     expect(result).toContain('describable: DescribableComponent;');
   });
 });
-

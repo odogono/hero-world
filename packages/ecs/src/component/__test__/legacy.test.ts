@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import z from 'zod';
 
+import { DatabaseType } from '@db';
+import { createEntity, queryEntity } from '@entity';
+import { createWorld, flush } from '@world';
+
 import {
   addComponent,
   addComponents,
   defineComponent,
   removeComponent
-} from '@component';
-import { DatabaseType } from '@db';
-import { createEntity, queryEntity } from '@entity';
-
-import { createWorld, flush } from '../world';
+} from '../legacy';
 
 // Component definitions for testing - using unique names to avoid Zod registry conflicts
 const statsComponent = defineComponent({

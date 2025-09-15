@@ -10,6 +10,9 @@
       "@component": [
         "./src/component"
       ],
+      "@component/*": [
+        "./src/component/*"
+      ],
       "@db": [
         "./src/db"
       ],

@@ -3,8 +3,7 @@ import { z } from 'zod';
 
 import { defineComponent } from '@component';
 import { createEntity, queryEntity } from '@entity';
-
-import { createWorld, flush } from '../world';
+import { createWorld, flush } from '@world';
 
 const statsComponent = defineComponent({
   name: 'statsProxyTest',

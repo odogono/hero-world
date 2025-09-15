@@ -24,6 +24,46 @@ export type EntityCache<TWorldComponents extends Components> = Map<
   }>
 >;
 
+// //////////////////////////////////////////////////////////////
+// New Component Definition types
+// //////////////////////////////////////////////////////////////
+
+export type CDefColumnType =
+  | 'string'
+  | 'email'
+  | 'enum'
+  | 'int'
+  | 'float'
+  | 'boolean'
+  | 'datetime'
+  | 'date'
+  | 'pk'
+  | 'time'
+  | 'timestamp'
+  | 'json'
+  | 'array';
+
+export type CDefColumnInfo = {
+  default?: string | number | boolean;
+  foreignKey?: string;
+  isIndexed?: boolean;
+  isUnique?: boolean;
+  name: string;
+  optional?: boolean;
+  type: CDefColumnType;
+  values?: string[];
+};
+
+export type CDef = {
+  columns: CDefColumnInfo[];
+  id: string;
+  tableName?: string;
+};
+
+// //////////////////////////////////////////////////////////////
+// Old Component Definition types
+// //////////////////////////////////////////////////////////////
+
 export type ComponentDef = {
   columns: ColumnInfo[];
   name: string;

@@ -1,6 +1,6 @@
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef, CDefColumnInfo, CDefColumnType } from './types';
+import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
 
 const pascalCase = (str: string): string =>
   (toSnakeCase(str) || str)
@@ -30,7 +30,9 @@ const tsTypeFor = (t: CDefColumnType, values?: string[]): string => {
     case 'array':
       return 'unknown[]';
     case 'enum': {
-      if (!values || values.length === 0) return 'string';
+      if (!values || values.length === 0) {
+        return 'string';
+      }
       const lit = values
         .map(v => `'${v.replaceAll("'", String.raw`\'`)}'`)
         .join(' | ');
@@ -70,13 +72,17 @@ const buildSingleType = (cdef: CDef): { name: string; typeBlock: string } => {
   const lines: string[] = [];
   for (const l of autoFieldLines()) {
     const k = l.trim().split(':')[0]?.replace('?', '').trim();
-    if (k) seen.add(k);
+    if (k) {
+      seen.add(k);
+    }
     lines.push(l);
   }
 
   for (const col of cdef.columns) {
     const key = toCamelCase(col.name);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      continue;
+    }
     lines.push(buildFieldLine(col));
     seen.add(key);
   }
@@ -102,11 +108,12 @@ export const cdefToTypes = (input: CDefToTypesInput): string => {
   // Union type for all components
   if (names.length > 0) {
     parts.push('// Union type for all components');
-    parts.push(`export type AllComponents =\n  | ${names.join('\n  | ')};`);
-
-    // Components mapping for ECS world inference
-    parts.push('', '// Components type for ECS World type inference');
-    parts.push('export type Components = {');
+    parts.push(
+      `export type AllComponents =\n  | ${names.join('\n  | ')};`,
+      '',
+      '// Components type for ECS World type inference',
+      'export type Components = {'
+    );
     for (const d of defs) {
       const camel = toCamelCase(d.id);
       const pascal = pascalCase(d.id);
@@ -117,4 +124,3 @@ export const cdefToTypes = (input: CDefToTypesInput): string => {
 
   return parts.join('\n');
 };
-

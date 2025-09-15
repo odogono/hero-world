@@ -1,6 +1,6 @@
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef, CDefColumnInfo, CDefColumnType } from './types';
+import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
 
 const pascalCase = (str: string): string =>
   (toSnakeCase(str) || str)
@@ -134,7 +134,9 @@ const buildSingleSchema = (cdef: CDef): string => {
   const fields: Record<string, string> = { ...autoFields() };
   for (const col of cdef.columns) {
     const key = toCamelCase(col.name);
-    if (fields[key]) continue;
+    if (fields[key]) {
+      continue;
+    }
     fields[key] = buildField(col);
   }
 
@@ -155,7 +157,9 @@ export const cdefToZod = (
     : [input];
 
   const parts: string[] = [];
-  if (includeImports) parts.push("import { z } from 'zod';\n");
+  if (includeImports) {
+    parts.push("import { z } from 'zod';\n");
+  }
   for (const d of defs) {
     parts.push(buildSingleSchema(d));
   }

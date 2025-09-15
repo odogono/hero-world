@@ -1,6 +1,6 @@
 import { toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef, CDefColumnInfo } from './types';
+import type { CDef, CDefColumnInfo } from '@types';
 
 export type CDefToSqlInput = CDef | CDef[] | CDef[][];
 

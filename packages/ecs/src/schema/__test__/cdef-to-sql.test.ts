@@ -1,8 +1,9 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, test } from 'bun:test';
 
+import type { CDef } from '@types';
+
 import { cdefToSql } from '../cdef-to-sql';
-import type { CDef } from '../types';
 
 describe('Component Definitions to SQL', () => {
   test('should convert a component definition to a SQL table', () => {

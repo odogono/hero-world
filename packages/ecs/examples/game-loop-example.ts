@@ -4,7 +4,7 @@ import z from 'zod';
 import { createWorld } from '@/world';
 import { defineComponent } from '@component';
 import { createEntity } from '@entity';
-import { createSystem, createWorldSystem } from '@system';
+import { createSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
 
 // Define game components
