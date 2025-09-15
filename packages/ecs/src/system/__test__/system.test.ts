@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
 import { createEntity, queryEntitiesIterator } from '@entity';
 import { createSystem } from '@system';
@@ -11,10 +10,10 @@ import { createWorld, flush } from '@world';
 import type { EntityExecProps } from '../types';
 
 const constitutionComponent = defineComponent({
-  name: 'constitution',
+  id: 'constitution',
   schema: {
-    current: z.number(),
-    max: z.number()
+    current: s.number(),
+    max: s.number()
   }
 });
 
@@ -24,10 +23,10 @@ const worldOpts = {
 };
 describe('Systems', () => {
   const locationComponent = defineComponent({
-    name: 'systemLocation',
+    id: 'systemLocation',
     schema: {
-      name: z.string(),
-      region: z.string()
+      name: s.string(),
+      region: s.string()
     }
   });
 

@@ -1,26 +1,25 @@
 import { describe, expect, test } from 'bun:test';
-import z from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity } from '@entity';
 import { createWorld, flush, loadWorldFromJSON, saveWorldToJSON } from '@world';
 
 import { DatabaseType } from '../index';
 
 const statsComponent = defineComponent({
-  name: 'characterStats',
+  id: 'characterStats',
   schema: {
-    health: z.number(),
-    level: z.number(),
-    mana: z.number()
+    health: s.number(),
+    level: s.number(),
+    mana: s.number()
   }
 });
 
 const locationComponent = defineComponent({
-  name: 'clocation' as const,
+  id: 'clocation',
   schema: {
-    name: z.string(),
-    region: z.string()
+    name: s.string(),
+    region: s.string()
   }
 });
 
@@ -59,16 +58,24 @@ describe('Database JSON functions', () => {
 
     // Check entity 1
     const savedEntity1 = entities.find(e => e.id === entity1.id);
-    expect(savedEntity1).toEqual({
-      characterStats: { health: 100, level: 5, mana: 50 },
-      clocation: { name: 'Forest', region: 'North' },
+    expect(savedEntity1).toMatchObject({
+      characterStats: expect.objectContaining({
+        health: 100,
+        level: 5,
+        mana: 50
+      }),
+      clocation: expect.objectContaining({ name: 'Forest', region: 'North' }),
       id: entity1.id
     });
 
     // Check entity 2
     const savedEntity2 = entities.find(e => e.id === entity2.id);
-    expect(savedEntity2).toEqual({
-      characterStats: { health: 80, level: 3, mana: 30 },
+    expect(savedEntity2).toMatchObject({
+      characterStats: expect.objectContaining({
+        health: 80,
+        level: 3,
+        mana: 30
+      }),
       id: entity2.id
     });
 

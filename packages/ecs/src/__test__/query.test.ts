@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import z from 'zod';
 
-import { defineComponent, removeComponent } from '@component';
+import { defineComponent, removeComponent, s } from '@component';
 import { DatabaseType } from '@db';
 import {
   createEntity,
@@ -9,46 +8,45 @@ import {
   queryEntitiesIterator,
   queryEntity
 } from '@entity';
-import { dateTimeWithDefault } from '@schema';
 import type { Components, GenericEntity } from '@types';
 import { createWorld, flush } from '@world';
 
 const statusComponent = defineComponent({
-  name: 'status' as const,
+  id: 'status' as const,
   schema: {
-    status: z.enum(['idle', 'walking', 'fighting', 'dead'])
+    status: s.enum(['idle', 'walking', 'fighting', 'dead'])
   }
 });
 
 const positionComponent = defineComponent({
-  name: 'position' as const,
+  id: 'position' as const,
   schema: {
-    x: z.number(),
+    x: s.number(),
     y: z.number()
   }
 });
 
 const velocityComponent = defineComponent({
-  name: 'velocity' as const,
+  id: 'velocity' as const,
   schema: {
-    x: z.number(),
+    x: s.number(),
     y: z.number()
   }
 });
 
 const nameComponent = defineComponent({
-  name: 'name' as const,
+  id: 'name' as const,
   schema: {
-    fullName: z.string()
+    fullName: s.string()
   }
 });
 
 const testStateComponent = defineComponent({
-  name: 'testState',
+  id: 'testState',
   schema: {
-    createdAt: dateTimeWithDefault(),
-    isComplete: z.boolean().default(false),
-    status: z.enum(['pending', 'in_progress', 'completed']).default('pending')
+    createdAt: s.datetime().default(),
+    isComplete: s.boolean().default(false),
+    status: s.enum(['pending', 'in_progress', 'completed']).default('pending')
   }
 });
 

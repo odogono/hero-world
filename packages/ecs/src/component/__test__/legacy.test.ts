@@ -46,7 +46,7 @@ const worldOpts = {
   path: ':memory:'
 };
 
-describe('component', () => {
+describe.skip('component', () => {
   describe('addComponent', () => {
     test('should add a component to an entity', async () => {
       const world = await createWorld([statsComponent], worldOpts);

@@ -1,49 +1,66 @@
-import { z } from 'zod';
-
+/* eslint-disable perfectionist/sort-objects */
 import type { Database } from '@db';
-import type { SchemaType } from '@schema/types';
-import type { ComponentDefinition } from '@types';
+import type { CDef } from '@types';
 
-import { pkWithAutoIncrement } from '../schema';
-import {
-  compareComponentHashes,
-  hashComponentDefinition
-} from './component-hash';
-import { zodSchemaToSqliteTable } from './schema-to-sql';
+import { defineComponent, s, type InferComponentType } from '../component/next';
+import { cdefToSql } from './cdef-to-sql';
+import { hashComponentDefinition } from './component-hash';
 
 /**
  * Schema for storing component definition metadata in the database
  */
-export const componentMetadataSchema = z
-  .object({
-    created_at: z.string().default('CURRENT_TIMESTAMP'),
-    hash: z.string(),
-    id: pkWithAutoIncrement(),
-    tbl_name: z.string(),
-    version: z.number().default(1)
-  })
-  .meta({
-    description:
-      'Stores component definition hashes for compatibility checking',
-    name: 'tbl_component_metadata'
-  });
+// export const componentMetadataSchema = z
+//   .object({
+//     created_at: z.string().default('CURRENT_TIMESTAMP'),
+//     hash: z.string(),
+//     id: pkWithAutoIncrement(),
+//     tbl_name: z.string(),
+//     version: z.number().default(1)
+//   })
+//   .meta({
+//     description:
+//       'Stores component definition hashes for compatibility checking',
+//     name: 'tbl_component_metadata'
+//   });
 
-export type ComponentMetadata = z.infer<typeof componentMetadataSchema>;
+// export type ComponentMetadata = z.infer<typeof componentMetadataSchema>;
+
+export const componentMetadata = defineComponent({
+  id: 'component_metadata',
+  schema: {
+    id: s.pk(),
+    tblName: s.string().indexed(),
+    hash: s.string(),
+    version: s.int().default(1),
+    createdAt: s.datetime().default()
+  }
+});
+
+// export const componentMetadata: CDef = {
+//   columns: [
+//     { name: 'id', type: 'pk' },
+//     { isIndexed: true, name: 'tblName', type: 'string' },
+//     { name: 'hash', type: 'string' },
+//     { default: 1, name: 'version', optional: false, type: 'int' },
+//     {
+//       default: 'current_timestamp',
+//       name: 'created_at',
+//       optional: false,
+//       type: 'datetime'
+//     }
+//   ],
+//   id: 'component_metadata',
+//   tableName: 'tbl_component_metadata'
+// };
+
+export type ComponentMetadata = InferComponentType<typeof componentMetadata>;
 
 /**
  * Initializes the component metadata table in the database
  */
 export const initializeComponentMetadataTable = (db: Database): void => {
-  const { sql } = zodSchemaToSqliteTable(componentMetadataSchema, {
-    ifNotExists: true
-  });
+  const { sql } = cdefToSql(componentMetadata, {});
   db.exec(sql);
-
-  // Create unique index on table name
-  db.exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_component_metadata_tbl_name 
-    ON tbl_component_metadata (tbl_name)
-  `);
 };
 
 /**
@@ -54,24 +71,20 @@ export const initializeComponentMetadataTable = (db: Database): void => {
  */
 export const storeComponentMetadata = (
   db: Database,
-  definitions: ComponentDefinition<string, SchemaType>[],
+  definitions: CDef[],
   useTransaction: boolean = true
 ): void => {
   const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO tbl_component_metadata (tbl_name, hash, created_at, version)
-    VALUES (:tbl_name, :hash, :created_at, :version)
+    INSERT OR REPLACE INTO tbl_component_metadata (tbl_name, hash, version)
+    VALUES (:tbl_name, :hash, :version)
   `);
 
   const storeData = () => {
     for (const def of definitions) {
       const hash = hashComponentDefinition(def);
-      const tableResult = zodSchemaToSqliteTable(def.schema, {
-        ifNotExists: false
-      });
       insertStmt.run({
-        created_at: new Date().toISOString(),
         hash,
-        tbl_name: tableResult.tableName,
+        tbl_name: def.tableName!,
         version: 1
       });
     }
@@ -96,7 +109,20 @@ export const getStoredComponentMetadata = (
     ORDER BY tbl_name
   `);
 
-  return selectStmt.all() as ComponentMetadata[];
+  const result: ComponentMetadata[] = [];
+  const query = selectStmt.all();
+
+  for (const row of query) {
+    result.push({
+      id: row.id,
+      tblName: row.tbl_name,
+      hash: row.hash,
+      version: row.version,
+      createdAt: row.created_at
+    });
+  }
+
+  return result;
 };
 
 /**
@@ -104,7 +130,7 @@ export const getStoredComponentMetadata = (
  */
 export const validateComponentCompatibility = (
   db: Database,
-  currentDefinitions: ComponentDefinition<string, SchemaType>[]
+  currentDefinitions: CDef[]
 ): {
   compatible: boolean;
   errors: string[];
@@ -116,23 +142,18 @@ export const validateComponentCompatibility = (
   try {
     const storedMetadata = getStoredComponentMetadata(db);
     const storedByTableName = new Map(
-      storedMetadata.map(meta => [meta.tbl_name, meta])
+      storedMetadata.map(meta => [meta.tblName, meta])
     );
 
     const currentByTableName = new Map(
-      currentDefinitions.map(def => {
-        const tableResult = zodSchemaToSqliteTable(def.schema, {
-          ifNotExists: false
-        });
-        return [
-          tableResult.tableName,
-          {
-            definition: def,
-            hash: hashComponentDefinition(def),
-            tbl_name: tableResult.tableName
-          }
-        ];
-      })
+      currentDefinitions.map(def => [
+        def.tableName,
+        {
+          definition: def,
+          hash: hashComponentDefinition(def),
+          tableName: def.tableName
+        }
+      ])
     );
 
     // Check for removed components (tables)
@@ -146,22 +167,26 @@ export const validateComponentCompatibility = (
 
     // Check for new or modified components
     for (const [tableName, current] of currentByTableName) {
-      const stored = storedByTableName.get(tableName);
+      const stored = storedByTableName.get(tableName!);
 
       if (!stored) {
         // New component table - this is usually fine
-        warnings.push(
-          `New component table '${tableName}' added to the world definition`
-        );
+        // warnings.push(
+        //   `New component table '${tableName}' added to the world definition`
+        // );
         continue;
       }
 
+      const storedHash = stored?.hash;
+      const currentHash = current.hash;
+
       // Check compatibility
-      const comparison = compareComponentHashes(stored, current);
-      if (!comparison.compatible) {
+      // const comparison = compareComponentHashes({ hash: storedHash, tbl_name: tableName! }, { hash: currentHash, tbl_name: tableName! });
+      if (storedHash !== currentHash) {
         errors.push(
           `Component table definition mismatch for '${tableName}':`,
-          ...(comparison.differences || [])
+          `Stored hash: ${storedHash}`,
+          `Current hash: ${currentHash}`
         );
       }
     }
@@ -186,15 +211,10 @@ export const validateComponentCompatibility = (
  */
 export const updateComponentMetadata = (
   db: Database,
-  definitions: ComponentDefinition<string, SchemaType>[]
+  definitions: CDef[]
 ): void => {
   // First, remove metadata for component tables that no longer exist
-  const currentTableNames = definitions.map(def => {
-    const tableResult = zodSchemaToSqliteTable(def.schema, {
-      ifNotExists: false
-    });
-    return tableResult.tableName;
-  });
+  const currentTableNames = definitions.map(def => def.tableName);
   const placeholders = currentTableNames.map((_, i) => `?${i + 1}`).join(',');
 
   if (currentTableNames.length > 0) {

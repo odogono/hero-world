@@ -31,6 +31,7 @@ export type SaveToJSONOptions = {
 export type Database = {
   addEntity: () => number;
   close: () => void;
+  dump: () => string;
   exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
   loadFromJSON: (json: unknown, options?: LoadFromJSONOptions) => void;
   // lastInsertRowId: () => number;

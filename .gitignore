@@ -6,3 +6,4 @@ packages/tank-world/app-screenshot.png
 packages/helpers/.vscode/settings.json
 packages/tank-world/test-results
 packages/tank-world/playwright-report
+packages/ecs/generated

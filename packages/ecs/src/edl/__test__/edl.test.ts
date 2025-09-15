@@ -1,8 +1,7 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, it, mock } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import {
   EDLErrorCodes,
   EDLExecutionError,
@@ -12,59 +11,58 @@ import {
   parseEDL
 } from '@edl';
 import { queryEntity } from '@entity';
-import { withEntityId } from '@schema';
 import { createWorld } from '@world';
 
 const describedComponent = defineComponent({
-  name: 'described',
+  id: 'described',
   schema: {
-    name: z.string(),
-    description: z.string()
+    name: s.string(),
+    description: s.string()
   }
 });
 
 const thingComponent = defineComponent({
-  name: 'thing',
+  id: 'thing',
   schema: {
-    size: z.number(),
-    weight: z.number()
+    size: s.number(),
+    weight: s.number()
   }
 });
 
 const containerComponent = defineComponent({
-  name: 'container',
+  id: 'container',
   schema: {
-    capacity: z.number(),
-    isClosed: z.boolean()
+    capacity: s.number(),
+    isClosed: s.boolean()
   }
 });
 
 const lockableComponent = defineComponent({
-  name: 'lockable',
+  id: 'lockable',
   schema: {
-    isLocked: z.boolean(),
-    key: z.string()
+    isLocked: s.boolean(),
+    key: s.string()
   }
 });
 
 const containedComponent = defineComponent({
-  name: 'contained',
+  id: 'contained',
   schema: {
-    id: withEntityId()
+    id: s.entityId()
   }
 });
 
 const linkComponent = defineComponent({
-  name: 'link',
+  id: 'link',
   schema: {
-    targetId: withEntityId()
+    targetId: s.entityId()
   }
 });
 
 const statsArrayComponent = defineComponent({
-  name: 'stats_array_test',
+  id: 'stats_array_test',
   schema: {
-    items: z.array(z.number())
+    items: s.array('int')
   }
 });
 

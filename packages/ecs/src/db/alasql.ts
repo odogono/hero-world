@@ -81,23 +81,32 @@ class AlasqlStatementWrapper implements Statement {
 
     try {
       let lastInsertRowId = 0;
-      
+
       // Handle INSERT OR REPLACE by checking original SQL before conversion
       const originalSql = this.sql;
-      const isInsertOrReplace = originalSql.toUpperCase().includes('INSERT OR REPLACE');
-      
+      const isInsertOrReplace = originalSql
+        .toUpperCase()
+        .includes('INSERT OR REPLACE');
+
       // Handle INSERT statements with auto-increment ID generation
       if (this.sql.trim().toUpperCase().startsWith('INSERT')) {
         const tableMatch = this.sql.match(/insert\s+into\s+(\w+)/i);
-        
+
         // For INSERT OR REPLACE, implement the replace logic manually
-        if (isInsertOrReplace && args && typeof args === 'object' && tableMatch) {
+        if (
+          isInsertOrReplace &&
+          args &&
+          typeof args === 'object' &&
+          tableMatch
+        ) {
           const tableName = tableMatch[1];
-          
+
           // For component metadata table, delete existing row with same tbl_name
           if (tableName === 'tbl_component_metadata' && 'tbl_name' in args) {
             try {
-              this.db.exec(`DELETE FROM ${tableName} WHERE tbl_name = ?`, [args.tbl_name]);
+              this.db.exec(`DELETE FROM ${tableName} WHERE tbl_name = ?`, [
+                args.tbl_name
+              ]);
             } catch {
               // Ignore delete errors (row might not exist)
             }
@@ -105,25 +114,30 @@ class AlasqlStatementWrapper implements Statement {
         }
         if (tableMatch) {
           const tableName = tableMatch[1];
-          
+
           // Generate the next ID for this table
           const nextId = this.db.generateNextId(tableName, 'id');
           lastInsertRowId = nextId;
-          
+
           // If the INSERT doesn't include an ID column, add it
-          if (!this.sql.toLowerCase().includes('(id,') && !this.sql.toLowerCase().includes('(id ')) {
+          if (
+            !this.sql.toLowerCase().includes('(id,') &&
+            !this.sql.toLowerCase().includes('(id ')
+          ) {
             // Modify the SQL to include the generated ID
             let modifiedSql = this.sql;
-            const valuesMatch = modifiedSql.match(/\(([^)]+)\)\s+VALUES\s+\(([^)]+)\)/i);
+            const valuesMatch = modifiedSql.match(
+              /\(([^)]+)\)\s+values\s+\(([^)]+)\)/i
+            );
             if (valuesMatch) {
               const [, columns, values] = valuesMatch;
               const newColumns = `id, ${columns}`;
               const newValues = `${nextId}, ${values}`;
               modifiedSql = modifiedSql.replace(
-                /\(([^)]+)\)\s+VALUES\s+\(([^)]+)\)/i,
+                /\(([^)]+)\)\s+values\s+\(([^)]+)\)/i,
                 `(${newColumns}) VALUES (${newValues})`
               );
-              
+
               // Execute the modified SQL
               this.db.exec(modifiedSql, args);
             } else {
@@ -181,7 +195,7 @@ export class AlasqlDatabaseWrapper implements Database {
 
   addEntity(): number {
     const nextId = this.generateNextId('tbl_entity', 'id');
-    
+
     // Insert with explicit ID since IDENTITY doesn't work reliably
     alasql(`INSERT INTO tbl_entity (id) VALUES (${nextId})`);
 
@@ -194,7 +208,8 @@ export class AlasqlDatabaseWrapper implements Database {
       const existingRows = alasql(
         `SELECT ${idColumn} FROM ${tableName} ORDER BY ${idColumn} DESC LIMIT 1`
       ) as { [key: string]: number }[];
-      const nextId = existingRows.length > 0 ? (existingRows[0]?.[idColumn] ?? 0) + 1 : 1;
+      const nextId =
+        existingRows.length > 0 ? (existingRows[0]?.[idColumn] ?? 0) + 1 : 1;
 
       return nextId;
     } catch {
@@ -387,8 +402,10 @@ export class AlasqlDatabaseWrapper implements Database {
     }
 
     // Handle reserved words in WHERE clauses and other expressions (but not in CREATE INDEX or ORDER BY)
-    if (!convertedSql.toUpperCase().includes('CREATE INDEX') && 
-        !convertedSql.toUpperCase().includes('ORDER BY')) {
+    if (
+      !convertedSql.toUpperCase().includes('CREATE INDEX') &&
+      !convertedSql.toUpperCase().includes('ORDER BY')
+    ) {
       convertedSql = convertedSql.replaceAll(
         /(\s|\w+\.)(value|counter|name|order|group|user|date|time)(\s*[\s!),<=>])/gi,
         '$1[$2]$3'
@@ -426,7 +443,10 @@ export class AlasqlDatabaseWrapper implements Database {
 
     // Handle INSERT OR REPLACE - AlasQL doesn't support this syntax well, convert to regular INSERT
     // We'll handle the replacement logic manually in our wrapper
-    convertedSql = convertedSql.replaceAll(/insert\s+or\s+replace\s+into/gi, 'INSERT INTO');
+    convertedSql = convertedSql.replaceAll(
+      /insert\s+or\s+replace\s+into/gi,
+      'INSERT INTO'
+    );
 
     // Handle IF NOT EXISTS by checking table existence first
     if (convertedSql.match(/create\s+table\s+if\s+not\s+exists/gi)) {
@@ -531,6 +551,10 @@ export class AlasqlDatabaseWrapper implements Database {
 
   loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
     sharedLoadFromJSON(this, json, options);
+  }
+
+  dump(): string {
+    return '# not implemented';
   }
 }
 

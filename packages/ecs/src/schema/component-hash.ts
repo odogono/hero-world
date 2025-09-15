@@ -1,38 +1,33 @@
 import { createHash } from 'node:crypto';
 
-import type { SchemaType } from '@schema/types';
-import type { ComponentDefinition } from '@types';
+import type { CDef } from '@types';
 
-import { zodSchemaToSqliteTable } from './schema-to-sql';
+import { cdefToSqlCreate } from './cdef-to-sql';
 
 /**
  * Creates a deterministic hash for a component definition
  * This hash uses the generated SQL table structure and statements
  */
-export const hashComponentDefinition = (
-  def: ComponentDefinition<string, SchemaType>
-): string => {
-  const { schema, statements } = def;
-
+export const hashComponentDefinition = (def: CDef): string => {
   // Generate the SQL table structure
-  const tableResult = zodSchemaToSqliteTable(schema, { ifNotExists: false });
+  const tableResult = cdefToSqlCreate(def);
 
   // Create a canonical representation using SQL and statements
-  const canonical = {
-    columns: tableResult.columns.sort((a, b) => a.name.localeCompare(b.name)), // Sort for consistency
-    sql: tableResult.sql,
-    statements: statements || {},
-    tableName: tableResult.tableName
-  };
+  // const canonical = {
+  //   columns: tableResult.columns.sort((a, b) => a.name.localeCompare(b.name)), // Sort for consistency
+  //   sql: tableResult.sql,
+  //   statements: statements || {},
+  //   tableName: tableResult.tableName
+  // };
 
-  // Sort keys to ensure consistent ordering
-  const sortedCanonical = JSON.stringify(
-    canonical,
-    Object.keys(canonical).sort()
-  );
+  // // Sort keys to ensure consistent ordering
+  // const sortedCanonical = JSON.stringify(
+  //   canonical,
+  //   Object.keys(canonical).sort()
+  // );
 
   // Create SHA-256 hash
-  return createHash('sha256').update(sortedCanonical).digest('hex');
+  return createHash('sha256').update(tableResult.sql).digest('hex');
 };
 
 /**
@@ -41,7 +36,7 @@ export const hashComponentDefinition = (
 export const compareComponentHashes = (
   existing: { hash: string; tbl_name: string },
   current: {
-    definition: ComponentDefinition<string, SchemaType>;
+    definition: CDef;
     hash: string;
     tbl_name: string;
   }
@@ -68,11 +63,8 @@ export const compareComponentHashes = (
 /**
  * Creates a readable summary of a component definition for error messages
  */
-export const summarizeComponentDefinition = (
-  def: ComponentDefinition<string, SchemaType>
-): string => {
-  const { schema } = def;
-  const tableResult = zodSchemaToSqliteTable(schema, { ifNotExists: false });
+export const summarizeComponentDefinition = (def: CDef): string => {
+  const tableResult = cdefToSqlCreate(def);
   const fields = tableResult.columns
     .map(col => `${col.name}:${col.type}`)
     .join(', ');

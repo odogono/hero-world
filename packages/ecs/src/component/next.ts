@@ -1,6 +1,173 @@
-import { toSnakeCase } from 'odgn-helpers/string';
+import type {
+  CDef,
+  CDefColumnInfo,
+  CDefColumnType,
+  Components,
+  EntityWithComponents,
+  GenericEntity,
+  World
+} from '@types';
 
-import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
+import { makeTrackedComponent } from './helpers/make-tracked';
+import { toTableName } from './helpers/to-table-name';
+
+export const addComponent = <
+  TWorldComponents extends Components,
+  TComponentName extends keyof TWorldComponents
+>(
+  entity: GenericEntity<TWorldComponents>,
+  componentName: TComponentName,
+  data: TWorldComponents[TComponentName]
+): EntityWithComponents<TWorldComponents, TComponentName> => {
+  const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
+  // Check if component already exists and has been persisted
+  const existingComponent =
+    world.entityCache.get(id)?.[componentName as string];
+  const isUpdate = existingComponent !== undefined && existingComponent.exists;
+
+  // Apply default values from the component schema
+  const dataWithDefaults = applyComponentDefaults(
+    world,
+    componentName as string,
+    data
+  );
+
+  (entity as any)[componentName] = makeTrackedComponent(
+    entity,
+    componentName,
+    dataWithDefaults,
+    isUpdate // mark as existing if updating, new if adding
+  ) as TWorldComponents[TComponentName];
+
+  if (!world.dirtyEntities.has(id)) {
+    world.dirtyEntities.set(id, new Set());
+  }
+  world.dirtyEntities.get(id)!.add(componentName);
+
+  return entity as EntityWithComponents<TWorldComponents, TComponentName>;
+};
+
+export const addComponents = <
+  TWorldComponents extends Components,
+  TComponentData extends Partial<{
+    [K in keyof TWorldComponents]: TWorldComponents[K];
+  }>
+>(
+  entity: GenericEntity<TWorldComponents>,
+  components: TComponentData
+): EntityWithComponents<TWorldComponents, keyof TComponentData> => {
+  const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
+  for (const [componentName, data] of Object.entries(components)) {
+    // Apply default values from the component schema
+    const dataWithDefaults = applyComponentDefaults(world, componentName, data);
+
+    (entity as any)[componentName] = makeTrackedComponent(
+      entity,
+      componentName,
+      dataWithDefaults,
+      false // mark as new
+    );
+
+    if (!world.dirtyEntities.has(id)) {
+      world.dirtyEntities.set(id, new Set());
+    }
+    world.dirtyEntities.get(id)!.add(componentName);
+  }
+
+  return entity as EntityWithComponents<TWorldComponents, keyof TComponentData>;
+};
+
+/**
+ * Mark a component for deferred deletion (will be deleted on next flush)
+ * This follows the same pattern as addComponent
+ */
+export const removeComponent = <
+  TWorldComponents extends Components,
+  TComponentName extends keyof TWorldComponents
+>(
+  entity: GenericEntity<TWorldComponents>,
+  componentName: TComponentName
+): void => {
+  const { id, world } = entity;
+
+  // Ensure id is defined
+  if (id === undefined) {
+    throw new Error('Entity ID is required');
+  }
+
+  // Mark component for deletion in cache
+  const cache = world.entityCache.get(id);
+  if (cache && cache[componentName as string]) {
+    const cacheEntry = cache[componentName as string];
+    cacheEntry.exists = false; // Mark as deleted
+    cacheEntry.data = null; // Clear the data
+  }
+
+  // Remove from entity object
+  delete (entity as any)[componentName];
+
+  // Mark entity as dirty for this component
+  if (!world.dirtyEntities.has(id)) {
+    world.dirtyEntities.set(id, new Set());
+  }
+  world.dirtyEntities.get(id)!.add(componentName);
+};
+
+/**
+ * Apply default values from a Zod schema to component data
+ * This function merges the provided data with default values from the schema
+ */
+export const applyDefaults = <T>(
+  schema: CDef,
+  data: Partial<T>
+): InferComponentType<typeof schema> => {
+  const defaults = getDefaults(schema);
+
+  // Merge defaults with provided data, with provided data taking precedence
+  const merged = { ...defaults, ...data };
+
+  // Validate the merged data against the schema
+  return merged;
+};
+
+/**
+ * Apply default values to component data using the world's component definitions
+ * This function looks up the component schema and applies defaults
+ */
+export const applyComponentDefaults = <T extends Components>(
+  world: World<T>,
+  componentName: string,
+  data: InferComponentType<T>
+): InferComponentType<T> => {
+  const def = world.defs.get(componentName);
+  if (!def || !def.schema) {
+    // If no schema found, return data as-is
+    return data;
+  }
+
+  try {
+    return applyDefaults(def.schema, data);
+  } catch (error) {
+    // If validation fails, log error and return data as-is
+    console.warn(
+      `Failed to apply defaults for component ${componentName}:`,
+      error
+    );
+    return data;
+  }
+};
 
 type ColumnBuilder<
   TType extends CDefColumnType,
@@ -13,6 +180,7 @@ type ColumnBuilder<
   default: (
     value?: string | number | boolean | undefined
   ) => ColumnBuilder<TType, TOptional>;
+  foreignKey: (foreignKey: string) => ColumnBuilder<TType, TOptional>;
   indexed: () => ColumnBuilder<TType, TOptional>;
   optional: () => ColumnBuilder<TType, true>;
   unique: () => ColumnBuilder<TType, TOptional>;
@@ -27,6 +195,7 @@ type DefineComponentProps<
 > = {
   id: string;
   schema: S;
+  statements?: Record<string, string>;
   tableName?: string;
 };
 
@@ -93,7 +262,7 @@ export type InferComponentType<T> = T extends { __schema: infer S }
 export const defineComponent = <S extends DefineComponentSchema>(
   props: DefineComponentProps<S>
 ): CDefWithSchema<S> => {
-  const { id, schema, tableName: tableNameProp } = props;
+  const { id, schema, statements, tableName: tableNameProp } = props;
   const tableName = toTableName(tableNameProp ?? id);
 
   const columns = Object.entries(schema).map(([name, schema]) =>
@@ -103,6 +272,7 @@ export const defineComponent = <S extends DefineComponentSchema>(
   return {
     columns,
     id,
+    statements,
     tableName
   } as CDefWithSchema<S>;
 };
@@ -167,8 +337,19 @@ const columnBuilder = <TType extends CDefColumnType>(
       column.name = props.name;
       return column;
     },
-    default: (value?: string | number | boolean | undefined) => {
+    default: (
+      value?:
+        | string
+        | number
+        | boolean
+        | Array<string | number | boolean>
+        | undefined
+    ) => {
       column.default = value === undefined ? getDefault(column.type) : value;
+      return builder;
+    },
+    foreignKey: (foreignKey: string) => {
+      column.foreignKey = foreignKey;
       return builder;
     },
     indexed: () => {
@@ -188,21 +369,48 @@ const columnBuilder = <TType extends CDefColumnType>(
   return builder;
 };
 
-export const email = () => columnBuilder('email');
-export const string = () => columnBuilder('string');
-export const int = () => columnBuilder('int');
-export const float = () => columnBuilder('float');
-export const boolean = () => columnBuilder('boolean');
-export const datetime = () => columnBuilder('datetime');
-export const date = () => columnBuilder('date');
-export const time = () => columnBuilder('time');
-export const timestamp = () => columnBuilder('timestamp');
-export const json = () => columnBuilder('json');
-export const array = () => columnBuilder('array');
-export const now = () => 'current_timestamp';
+const array = (type: CDefColumnType) => columnBuilder('array');
+const boolean = () => columnBuilder('boolean');
+const date = () => columnBuilder('date');
+const datetime = () => columnBuilder('datetime');
+const email = () => columnBuilder('email');
+const entityId = () => columnBuilder('int').optional().foreignKey('tbl_entity');
+const enumBuilder = (values: string[]) => columnBuilder('enum');
+const float = () => columnBuilder('float');
+const int = () => columnBuilder('int');
+const json = () => columnBuilder('json');
+const now = () => 'current_timestamp';
+const number = () => columnBuilder('float');
+const pk = () => columnBuilder('pk');
+const string = () => columnBuilder('string');
+const time = () => columnBuilder('time');
+const timestamp = () => columnBuilder('timestamp');
+
+export const s = {
+  array,
+  boolean,
+  date,
+  datetime,
+  email,
+  entityId,
+  enum: enumBuilder,
+  float,
+  int,
+  json,
+  now,
+  number,
+  pk,
+  string,
+  time,
+  timestamp
+};
 
 const getDefault = (type: CDefColumnType, forObject: boolean = false) => {
   switch (type) {
+    case 'array':
+      return [];
+    case 'enum':
+      return '';
     case 'string':
     case 'email':
       return '';
@@ -223,11 +431,4 @@ const getDefault = (type: CDefColumnType, forObject: boolean = false) => {
     default:
       return '';
   }
-};
-
-const toTableName = (id: string) => {
-  if (id.startsWith('tbl_')) {
-    id = id.slice(4);
-  }
-  return `tbl_${toSnakeCase(id)}`;
 };

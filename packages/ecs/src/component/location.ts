@@ -1,22 +1,20 @@
 import { createLog } from 'odgn-helpers';
-import * as z from 'zod';
 
-import { defineComponent } from '../component';
+import { InferComponentType, defineComponent, s } from '../component';
 import { createEntity } from '../entity';
 import { isEntity, type Entity, type World } from '../types';
 
 const log = createLog('location');
 
 export const locationComponent = defineComponent({
-  name: 'location' as const,
+  id: 'location',
   schema: {
-    name: z.string(),
-    region: z.string()
+    name: s.string(),
+    region: s.string()
   }
 });
 
-export type Location = z.infer<typeof locationSchema>;
-const locationSchema = locationComponent.schema;
+export type Location = InferComponentType<typeof locationComponent>;
 
 export const createLocation = (world: World<any>, location: Location) => {
   const e = createEntity(world, {

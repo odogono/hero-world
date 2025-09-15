@@ -1,12 +1,13 @@
 import { createLog } from 'odgn-helpers/log';
-import z from 'zod';
 
 import {
   DatabaseType,
   createDatabase,
   type CreateDatabaseOptions,
+  type Database,
   type LoadFromJSONOptions,
-  type SaveToJSONOptions
+  type SaveToJSONOptions,
+  type Statement
 } from '@db';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
@@ -15,13 +16,7 @@ import {
   validateComponentCompatibility
 } from '@schema/component-metadata';
 import {
-  zodSchemaToSqliteInsert,
-  zodSchemaToSqliteTable,
-  zodSchemaToSqliteUpdate
-} from '@schema/schema-to-sql';
-import type { SchemaType } from '@schema/types';
-import {
-  entitySchema,
+  type CDef,
   type ComponentDef,
   type ComponentDefinition,
   type Components,
@@ -30,6 +25,12 @@ import {
   type StaticWorld
 } from '@types';
 
+import {
+  cdefToSqlCreate,
+  cdefToSqlInsert,
+  cdefToSqlUpdate
+} from './schema/cdef-to-sql';
+
 const log = createLog('world');
 
 type CreateStaticWorldOptionsInternal = Partial<CreateDatabaseOptions> & {
@@ -37,10 +38,9 @@ type CreateStaticWorldOptionsInternal = Partial<CreateDatabaseOptions> & {
 };
 
 const createStaticWorldInternal = async <T extends Components>(
-  componentDefs: ComponentDefinition<string, SchemaType>[],
+  componentDefs: CDef[],
   options: CreateStaticWorldOptionsInternal = {}
 ): Promise<StaticWorld<T>> => {
-  const registry = z.registry();
   const dirtyEntities = new Map<number, Set<keyof Components>>();
   const entitiesToDelete = new Set<number>();
   const entityCache: EntityCache<T> = new Map();
@@ -54,9 +54,8 @@ const createStaticWorldInternal = async <T extends Components>(
   db.exec('PRAGMA foreign_keys = ON');
 
   // Create entity table
-  const { sql } = zodSchemaToSqliteTable(entitySchema, {
-    ifNotExists: true
-  });
+  const sql =
+    'CREATE TABLE IF NOT EXISTS tbl_entity (id INTEGER PRIMARY KEY AUTOINCREMENT)';
   db.exec(sql);
 
   // Initialize component metadata table for compatibility checking
@@ -91,13 +90,7 @@ const createStaticWorldInternal = async <T extends Components>(
   // Register all components in a single transaction
   db.transaction(() => {
     for (const def of componentDefs) {
-      registerComponentDefStatic(
-        registry,
-        db,
-        defs,
-        def.schema,
-        def.statements || {}
-      );
+      registerComponentDefStatic(db, defs, def, def.statements);
     }
 
     // Update component metadata after successful registration
@@ -110,7 +103,7 @@ const createStaticWorldInternal = async <T extends Components>(
     'SELECT id FROM tbl_entity WHERE id = ?;'
   );
 
-  const componentTypes = componentDefs.map(def => def.name) as (keyof T)[];
+  const componentTypes = componentDefs.map(def => def.id) as (keyof T)[];
 
   return {
     close: () => db.close(),
@@ -128,7 +121,6 @@ const createStaticWorldInternal = async <T extends Components>(
         entitiesToDelete,
         entityCache
       } as StaticWorld<T>),
-    registry,
     stmts: {
       deleteEntity,
       selectEntityById
@@ -137,58 +129,26 @@ const createStaticWorldInternal = async <T extends Components>(
 };
 
 // Create world with component definitions
-export async function createWorld<
-  T extends readonly ComponentDefinition<string, SchemaType>[]
->(
-  componentDefs: T,
+export const createWorld = async (
+  componentDefs: CDef[],
   options?: CreateStaticWorldOptionsInternal
-): Promise<StaticWorld<InferComponentsFromDefs<T>>> {
-  return createStaticWorldInternal<InferComponentsFromDefs<T>>(
-    componentDefs as ComponentDefinition<string, SchemaType>[],
-    options || {}
-  );
-}
-
-// Legacy alias for backward compatibility
-export const createStaticWorld = createWorld;
-
-// Alternative overload for when you want to provide explicit types
-export const createStaticWorldTyped = async <T extends Components>(
-  componentDefs: ComponentDefinition<string, SchemaType>[],
-  options: CreateStaticWorldOptionsInternal = {}
-): Promise<StaticWorld<T>> =>
-  createStaticWorldInternal<T>(componentDefs, options);
+) => createStaticWorldInternal(componentDefs, options || {});
 
 const registerComponentDefStatic = (
-  registry: ReturnType<typeof z.registry>,
-  db: any,
+  db: Database,
   defs: Map<string, ComponentDef>,
-  componentDef: SchemaType,
+  componentDef: CDef,
   statements: Record<string, string> = {}
 ): void => {
-  const meta = componentDef.meta();
+  const name = componentDef.id;
 
-  if (!meta?.id) {
-    throw new Error('componentDef must have an id');
-  }
-
-  if (registry.get(componentDef)) {
-    return;
-  }
-
-  registry.add(componentDef, {
-    description: meta.description ?? meta.id
-  });
-
-  const name = meta.id;
-
-  const result = zodSchemaToSqliteTable(componentDef, { ifNotExists: true });
+  const result = cdefToSqlCreate(componentDef);
   db.exec(result.sql);
 
-  const sqlInsert = zodSchemaToSqliteInsert(componentDef, {
+  const sqlInsert = cdefToSqlInsert(componentDef, {
     namedParams: true
   });
-  const sqlUpdate = zodSchemaToSqliteUpdate(componentDef, {
+  const sqlUpdate = cdefToSqlUpdate(componentDef, {
     namedParams: true
   });
 
@@ -197,7 +157,7 @@ const registerComponentDefStatic = (
       acc[key] = db.prepare(sql);
       return acc;
     },
-    {} as Record<string, any>
+    {} as Record<string, Statement>
   );
 
   const def = {
@@ -207,7 +167,7 @@ const registerComponentDefStatic = (
     stmtInsert: db.prepare(sqlInsert),
     stmtUpdate: db.prepare(sqlUpdate),
     tableName: result.tableName,
-    url: meta.id!,
+    url: componentDef.id!,
     ...additionalStmts
   } as ComponentDef;
 
@@ -358,10 +318,8 @@ export const saveWorld = async <T extends Components>(
 /**
  * Loads an existing world database from a file path with component compatibility validation
  */
-export const loadWorld = async <
-  T extends readonly ComponentDefinition<string, SchemaType>[]
->(
-  componentDefs: T,
+export const loadWorld = async <T extends readonly ComponentDefinition[]>(
+  componentDefs: CDef[],
   path: string,
   options?: Omit<CreateStaticWorldOptionsInternal, 'path'>
 ): Promise<StaticWorld<InferComponentsFromDefs<T>>> => {

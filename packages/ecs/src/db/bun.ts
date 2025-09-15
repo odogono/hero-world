@@ -141,6 +141,68 @@ export class BunDatabaseWrapper implements Database {
   loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
     sharedLoadFromJSON(this, json, options);
   }
+
+  dump(): string {
+    const dump: string[] = [];
+    dump.push('PRAGMA foreign_keys=OFF;', 'BEGIN TRANSACTION;');
+
+    // --- Schema (tables, indexes, triggers, views)
+    const schema = this.db
+      .query(
+        `SELECT sql FROM sqlite_master 
+      WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
+      ORDER BY type='table' DESC, type, name;`
+      )
+      .all();
+
+    for (const { sql } of schema) {
+      dump.push(sql + ';');
+    }
+
+    // --- Tables data
+    const tables = this.db
+      .query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      )
+      .all();
+
+    for (const { name } of tables) {
+      const rows = this.db.query(`SELECT * FROM ${name}`).all();
+      if (rows.length === 0) {
+        continue;
+      }
+
+      const cols = Object.keys(rows[0]);
+
+      for (const row of rows) {
+        const values = cols
+          .map(col => {
+            const val = (row as Record<string, unknown>)[col];
+            if (val === null) {
+              return 'NULL';
+            }
+            if (typeof val === 'number') {
+              return val.toString();
+            }
+            if (val instanceof Uint8Array) {
+              // BLOB → hex literal
+              return `X'${Buffer.from(val).toString('hex')}'`;
+            }
+            // Text → single-quoted and escaped
+            return `'${String(val).replaceAll("'", "''")}'`;
+          })
+          .join(', ');
+        dump.push(
+          `INSERT INTO ${name} (${cols
+            .map(c => `"${c}"`)
+            .join(', ')}) VALUES (${values});`
+        );
+      }
+    }
+
+    dump.push('COMMIT;');
+    return dump.join('\n');
+  }
 }
 
 // Factory function for Bun SQLite

@@ -1,8 +1,10 @@
 export {
   addComponent,
   addComponents,
+  defineComponent,
   applyComponentDefaults,
-  makeTrackedComponent,
   removeComponent,
-  defineComponent
-} from './legacy';
+  s
+} from './next';
+
+export { makeTrackedComponent } from './helpers/make-tracked';

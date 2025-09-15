@@ -1,8 +1,8 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent, getComponentTableName } from '../component';
+import { defineComponent, s } from '@component';
+
 import {
   compareComponentHashes,
   hashComponentDefinition
@@ -29,11 +29,11 @@ describe('Component Compatibility System', () => {
 
   test('should hash component definitions consistently', () => {
     const playerComponent = defineComponent({
-      name: 'player',
+      id: 'player',
       schema: {
-        name: z.string(),
-        level: z.number(),
-        health: z.number().default(100)
+        name: s.string(),
+        level: s.number(),
+        health: s.number().default(100)
       }
     });
 
@@ -44,11 +44,11 @@ describe('Component Compatibility System', () => {
 
     // Different component should produce different hash
     const enemyComponent = defineComponent({
-      name: 'enemy',
+      id: 'enemy',
       schema: {
-        name: z.string(),
-        level: z.number(),
-        health: z.number().default(50)
+        name: s.string(),
+        level: s.number(),
+        health: s.number().default(50)
       }
     });
 
@@ -58,25 +58,25 @@ describe('Component Compatibility System', () => {
 
   test('should detect compatible vs incompatible component changes', () => {
     const originalComponent = defineComponent({
-      name: 'stats1',
+      id: 'stats1',
       tableName: 'tbl_stats',
       schema: {
-        health: z.number(),
-        mana: z.number()
+        health: s.number(),
+        mana: s.number()
       }
     });
 
     const modifiedComponent = defineComponent({
-      name: 'stats2',
+      id: 'stats2',
       tableName: 'tbl_stats',
       schema: {
-        health: z.number(),
-        mana: z.number(),
-        stamina: z.number().optional() // Adding optional field
+        health: s.number(),
+        mana: s.number(),
+        stamina: s.number().optional() // Adding optional field
       }
     });
 
-    expect(getComponentTableName(modifiedComponent)).toBe('tbl_stats');
+    expect(modifiedComponent.tableName).toBe('tbl_stats');
 
     const originalHash = hashComponentDefinition(originalComponent);
     const modifiedHash = hashComponentDefinition(modifiedComponent);
@@ -100,10 +100,10 @@ describe('Component Compatibility System', () => {
     await cleanup();
 
     const playerComponent = defineComponent({
-      name: 'player1',
+      id: 'player1',
       schema: {
-        name: z.string(),
-        level: z.number()
+        name: s.string(),
+        level: s.number()
       }
     });
 
@@ -115,7 +115,7 @@ describe('Component Compatibility System', () => {
     const metadata = getStoredComponentMetadata(world.db);
 
     expect(metadata).toHaveLength(1);
-    expect(metadata[0]!.tbl_name).toBe('tbl_player_1');
+    expect(metadata[0]!.tblName).toBe('tbl_player_1');
     expect(metadata[0]!.hash).toBeTruthy();
 
     world.close();
@@ -126,10 +126,10 @@ describe('Component Compatibility System', () => {
     await cleanup();
 
     const playerComponent = defineComponent({
-      name: 'player2',
+      id: 'player2',
       schema: {
-        name: z.string(),
-        level: z.number()
+        name: s.string(),
+        level: s.number()
       }
     });
 
@@ -151,10 +151,10 @@ describe('Component Compatibility System', () => {
     await cleanup();
 
     const originalComponent = defineComponent({
-      name: 'player3',
+      id: 'player3',
       schema: {
-        name: z.string(),
-        level: z.number()
+        name: s.string(),
+        level: s.number()
       }
     });
 
@@ -165,12 +165,12 @@ describe('Component Compatibility System', () => {
     world1.close();
 
     const modifiedComponent = defineComponent({
-      name: 'player3modified',
+      id: 'player3modified',
       tableName: 'tbl_player_3',
       schema: {
-        name: z.string(),
-        level: z.number(),
-        experience: z.number()
+        name: s.string(),
+        level: s.number(),
+        experience: s.number()
       }
     });
 
@@ -185,18 +185,18 @@ describe('Component Compatibility System', () => {
     await cleanup();
 
     const playerComponent = defineComponent({
-      name: 'player5',
+      id: 'player5',
       schema: {
-        name: z.string(),
-        level: z.number()
+        name: s.string(),
+        level: s.number()
       }
     });
 
     const inventoryComponent = defineComponent({
-      name: 'inventory1',
+      id: 'inventory1',
       schema: {
-        capacity: z.number(),
-        items: z.array(z.string()).default([])
+        capacity: s.number(),
+        items: s.array('string').default([])
       }
     });
 
@@ -226,11 +226,11 @@ describe('Component Compatibility System', () => {
     await cleanup();
 
     const originalComponent = defineComponent({
-      name: 'stats3',
+      id: 'stats3',
       tableName: 'tbl_stats',
       schema: {
-        health: z.number(),
-        mana: z.number()
+        health: s.number(),
+        mana: s.number()
       }
     });
 
@@ -241,11 +241,11 @@ describe('Component Compatibility System', () => {
 
     // Test validation directly
     const modifiedComponent = defineComponent({
-      name: 'stats3modified',
+      id: 'stats3modified',
       tableName: 'tbl_stats',
       schema: {
-        health: z.number(),
-        power: z.number() // Changed mana to power
+        health: s.number(),
+        power: s.number() // Changed mana to power
       }
     });
 

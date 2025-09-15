@@ -166,6 +166,10 @@ export class WasmDatabaseWrapper implements Database {
   loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
     sharedLoadFromJSON(this, json, options);
   }
+
+  dump(): string {
+    return '# not implemented';
+  }
 }
 
 // Factory function for SQLite WASM

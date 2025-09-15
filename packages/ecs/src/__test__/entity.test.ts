@@ -1,24 +1,17 @@
 import { describe, expect, it, test } from 'bun:test';
-import { createLog } from 'odgn-helpers/log';
-import z from 'zod';
 
-import { defineComponent } from '../component';
-import { DatabaseType } from '../db';
-import { createEntity, deleteEntity, getEntity } from '../entity';
-import { createWorld, flush } from '../world';
-
-const log = createLog('test-entity');
-
-// NOTE currently breaks earlier registration of entity schema
-// z.globalRegistry.clear();
+import { defineComponent, s } from '@component';
+import { DatabaseType } from '@db';
+import { createEntity, deleteEntity, getEntity } from '@entity';
+import { createWorld, flush } from '@world';
 
 // Component definitions using new system
 const statsComponent = defineComponent({
-  name: 'teStats',
+  id: 'teStats',
   schema: {
-    health: z.number(),
-    level: z.number(),
-    mana: z.number()
+    health: s.number(),
+    level: s.number(),
+    mana: s.number()
   },
   statements: {
     statsByLevel: 'SELECT * FROM tbl_te_stats WHERE level = ?'
@@ -26,10 +19,10 @@ const statsComponent = defineComponent({
 });
 
 const inventoryComponent = defineComponent({
-  name: 'teInventory',
+  id: 'teInventory',
   schema: {
-    capacity: z.number(),
-    items: z.string() // JSON string for simplicity
+    capacity: s.number(),
+    items: s.string() // JSON string for simplicity
   },
   statements: {
     inventoryByCapacity: 'SELECT * FROM tbl_te_inventory WHERE capacity = ?'
@@ -37,10 +30,10 @@ const inventoryComponent = defineComponent({
 });
 
 const locationComponent = defineComponent({
-  name: 'teLocation',
+  id: 'teLocation',
   schema: {
-    name: z.string(),
-    region: z.string()
+    name: s.string(),
+    region: s.string()
   },
   statements: {
     locationSelectByName: 'SELECT eid as id FROM tbl_te_location WHERE name = ?'
@@ -57,10 +50,10 @@ const worldOpts = {
 describe('createEntity', () => {
   test('create entity with components', async () => {
     const stats = defineComponent({
-      name: 'specialStats',
+      id: 'specialStats',
       schema: {
-        agility: z.number(),
-        strength: z.number()
+        agility: s.number(),
+        strength: s.number()
       }
     });
 
@@ -286,11 +279,11 @@ describe('createEntity', () => {
     // Test with string component
 
     const nameComponent = defineComponent({
-      name: 'testName',
+      id: 'testName',
       schema: {
-        firstName: z.string(),
-        lastName: z.string(),
-        title: z.string().optional()
+        firstName: s.string(),
+        lastName: s.string(),
+        title: s.string().optional()
       }
     });
 

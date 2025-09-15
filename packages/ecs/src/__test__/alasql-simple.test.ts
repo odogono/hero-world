@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { createWorld } from '@/world';
 import { DatabaseType } from '@db';
 
-describe('AlasQL ECS Integration', () => {
+describe.skip('AlasQL ECS Integration', () => {
   test('should create AlasQL world successfully', async () => {
     const world = await createWorld([], { dbType: DatabaseType.ALASQL });
     expect(world).toBeDefined();

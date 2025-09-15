@@ -3,7 +3,12 @@ import { describe, expect, test } from 'bun:test';
 
 import type { CDef } from '@types';
 
-import { cdefToSql } from '../cdef-to-sql';
+import {
+  cdefToSql,
+  cdefToSqlInsert,
+  cdefToSqlSelect,
+  cdefToSqlSelectWhere
+} from '../cdef-to-sql';
 
 describe('Component Definitions to SQL', () => {
   test('should convert a component definition to a SQL table', () => {
@@ -124,5 +129,52 @@ describe('Component Definitions to SQL', () => {
     expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_entity');
     expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_user');
     expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_describable');
+  });
+
+  describe('cdefToSqlInsert', () => {
+    test('should convert a component definition to a SQL insert', () => {
+      const cdef: CDef = {
+        id: 'user',
+        columns: [
+          { name: 'id', type: 'pk' },
+          { name: 'name', type: 'string' },
+          { name: 'age', type: 'int', optional: true },
+          { name: 'email', type: 'email' }
+        ]
+      };
+
+      const sql = cdefToSqlInsert(cdef);
+
+      expect(sql).toBe(
+        'INSERT INTO tbl_user (eid, name, age, email) VALUES (?1, ?2, ?3, ?4)'
+      );
+
+      const selectSql = cdefToSqlSelect(cdef);
+      expect(selectSql).toBe('SELECT id, eid, name, age, email FROM tbl_user');
+    });
+  });
+
+  describe('query', () => {
+    test('should query data from a table', () => {
+      const cdef: CDef = {
+        id: 'user',
+        columns: [
+          { name: 'age', type: 'int', optional: true },
+          { name: 'email', type: 'email' },
+          { name: 'id', type: 'pk' },
+          { name: 'name', type: 'string' }
+        ]
+      };
+
+      const sql = cdefToSqlSelectWhere(cdef, 'id', 'name');
+
+      expect(sql).toEqual('SELECT id FROM tbl_user WHERE name = ?1');
+
+      const sqlAnd = cdefToSqlSelectWhere(cdef, 'name', ['email', 'age']);
+
+      expect(sqlAnd).toEqual(
+        'SELECT name FROM tbl_user WHERE email = ?1 AND age = ?2'
+      );
+    });
   });
 });

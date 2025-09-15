@@ -1,25 +1,24 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity } from '@entity';
 import { createWorld } from '@world';
 
 describe('World', () => {
   test('should create world with predefined components', async () => {
     const healthComponent = defineComponent({
-      name: 'vitals',
+      id: 'vitals',
       schema: {
-        current: z.number(),
-        max: z.number()
+        current: s.number(),
+        max: s.number()
       }
     });
 
     const positionComponent = defineComponent({
-      name: 'coords',
+      id: 'coords',
       schema: {
-        x: z.number(),
-        y: z.number()
+        x: s.number(),
+        y: s.number()
       }
     });
 
@@ -36,18 +35,18 @@ describe('World', () => {
 
   test('should create entities and add components', async () => {
     const healthComponent = defineComponent({
-      name: 'stats',
+      id: 'stats',
       schema: {
-        current: z.number(),
-        max: z.number()
+        current: s.number(),
+        max: s.number()
       }
     });
 
     const nameComponent = defineComponent({
-      name: 'identity',
+      id: 'identity',
       schema: {
-        first: z.string(),
-        last: z.string()
+        first: s.string(),
+        last: s.string()
       }
     });
 
@@ -83,10 +82,10 @@ describe('World', () => {
 
   test('should handle multiple entities', async () => {
     const healthComponent = defineComponent({
-      name: 'attributes',
+      id: 'attributes',
       schema: {
-        current: z.number(),
-        max: z.number()
+        current: s.number(),
+        max: s.number()
       }
     });
 
@@ -108,10 +107,10 @@ describe('World', () => {
 
   test('should work with statements in component definitions', async () => {
     const statsComponent = defineComponent({
-      name: 'metrics',
+      id: 'metrics',
       schema: {
-        level: z.number(),
-        xp: z.number()
+        level: s.number(),
+        xp: s.number()
       },
       statements: {
         byLevel: 'SELECT * FROM tbl_metrics WHERE level = ?1'
@@ -130,10 +129,10 @@ describe('World', () => {
 
   test('component compatibility validation works', async () => {
     const health = defineComponent({
-      name: 'health',
+      id: 'health',
       schema: {
-        current: z.number(),
-        max: z.number()
+        current: s.number(),
+        max: s.number()
       }
     });
 
@@ -154,11 +153,11 @@ describe('World', () => {
 
     // Try to load with a different component that uses the same table name
     const health2 = defineComponent({
-      name: 'health2',
+      id: 'health2',
       schema: {
-        bonus: z.number(),
-        current: z.number(),
-        max: z.number()
+        bonus: s.number(),
+        current: s.number(),
+        max: s.number()
       },
       tableName: 'tbl_health'
     });

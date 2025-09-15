@@ -1,9 +1,7 @@
 import { getUnixTime } from 'odgn-helpers/time';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, deleteEntity, queryEntities } from '@entity';
-import { dateTimeWithDefault, withIndex } from '@schema';
 import { createSystem } from '@system';
 import type { Components, EntityWithComponents, World } from '@types';
 
@@ -11,13 +9,13 @@ import type { EntityExecProps } from '../system/types';
 
 // Event component definition
 export const eventComponent = defineComponent({
-  name: 'event' as const,
+  id: 'event' as const,
   schema: {
-    payload: z.string(), //object().default({}).meta({ type: 'json' }), // JSON stringified payload
-    scheduledAt: z.number(), // timestamp in seconds (float)
-    type: withIndex(z.string()),
+    payload: s.string(), //object().default({}).meta({ type: 'json' }), // JSON stringified payload
+    scheduledAt: s.number(), // timestamp in seconds (float)
+    type: s.string().indexed(),
     // eslint-disable-next-line perfectionist/sort-objects
-    createdAt: dateTimeWithDefault()
+    createdAt: s.datetime()
   }
 });
 

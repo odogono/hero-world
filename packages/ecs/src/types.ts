@@ -7,8 +7,9 @@ import type {
   Statement
 } from '@db';
 
+import type { InferComponentType } from './component/next';
 import { pkWithAutoIncrement } from './schema';
-import type { ColumnInfo, SchemaType } from './schema/types';
+import type { ColumnInfo } from './schema/types';
 
 export type EntityId = number;
 
@@ -67,7 +68,7 @@ export type CDef = {
 export type ComponentDef = {
   columns: ColumnInfo[];
   name: string;
-  schema: SchemaType; // Add schema to access defaults
+  schema: CDef; // Add schema to access defaults
   stmtInsert: Statement;
   stmtUpdate: Statement;
   tableName: string;
@@ -79,12 +80,9 @@ export type ComponentDef = {
 /**
  * Component definition
  */
-export type ComponentDefinition<
-  Name extends string,
-  Schema extends SchemaType
-> = {
-  name: Name;
-  schema: Schema;
+export type ComponentDefinition = {
+  name: string;
+  schema: CDef;
   statements?: Record<string, string>;
 };
 
@@ -102,7 +100,6 @@ export type World<TComponents extends Components> = {
   entitiesToDelete: Set<number>;
   entityCache: EntityCache<TComponents>;
   flush: () => World<TComponents>;
-  registry: ReturnType<typeof z.registry>;
   stmts: Record<string, Statement>;
 };
 
@@ -162,26 +159,22 @@ export const isEntity = (val: unknown): val is Entity => {
 };
 
 // Type helper for registering components dynamically
-export type RegisterComponent<
-  Name extends string,
-  Schema extends z.ZodTypeAny
-> = {
-  [K in Name]: z.infer<Schema>;
+export type RegisterComponent<Name extends string, Schema extends CDef> = {
+  [K in Name]: InferComponentType<Schema>;
 };
 
 // Static World Types - now just an alias for World (since World is now static)
 export type StaticWorld<TComponents extends Components> = World<TComponents>;
 
 // Helper type to infer component types from an array of component definitions
-export type InferComponentsFromDefs<
-  T extends readonly ComponentDefinition<string, SchemaType>[]
-> = {
-  [K in T[number] as K['name']]: z.infer<K['schema']>;
-};
+export type InferComponentsFromDefs<T extends readonly ComponentDefinition[]> =
+  {
+    [K in T[number] as K['name']]: InferComponentType<K['schema']>;
+  };
 
 // Tuple type for component definitions
 export type ComponentDefinitionTuple<T extends Components> = {
-  [K in keyof T]: ComponentDefinition<K & string, SchemaType>;
+  [K in keyof T]: ComponentDefinition;
 }[keyof T][];
 
 // Static world creation options
