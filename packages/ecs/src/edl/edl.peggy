@@ -7,15 +7,33 @@
     components: Record<string, Record<string, unknown>>;
   };
 
+  export type EDLColumnType =
+  | 'string'
+  | 'email'
+  | 'enum'
+  | 'int'
+  | 'float'
+  | 'boolean'
+  | 'datetime'
+  | 'date'
+  | 'pk'
+  | 'time'
+  | 'timestamp'
+  | 'json'
+  | 'array';
+
   // Component definition types
   type EDLComponentColumn = {
     name: string;
-    type: string;
+    type: EDLColumnType;
     optional?: boolean;
+    foreignKey?: string;
+    isIndexed?: boolean;
     isUnique?: boolean;
     default?: string;
+    values?: string[];
   };
-
+  
   type EDLComponentDef = {
     type: 'component';
     id: string;

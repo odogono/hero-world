@@ -132,3 +132,35 @@ Options:
 - `--zod-no-imports` Omit `import { z } from 'zod'` in Zod output
 
 This script uses the same conversion logic as the library functions `cdefToSql` and `cdefToZod`.
+
+## EDL Generation Script
+
+Generate SQL (including INSERTs for entities), TypeScript types, and Zod schemas directly from an EDL file.
+
+### Usage
+
+```bash
+# From an EDL file
+bun run scripts/generate-from-edl.ts --input examples/zork.edl \
+  --sql-out generated/zork.sql \
+  --types-out generated/components.d.ts \
+  --zod-out generated/schemas.ts \
+  --include-entity
+
+# Print to stdout (no outputs specified)
+bun run scripts/generate-from-edl.ts --input examples/zork.edl --include-entity
+```
+
+Options:
+- `--input <path>` EDL file path
+- `--sql-out <path>` Write SQL (DDL + entity/component INSERTs) to file
+- `--types-out <path>` Write TypeScript component types to file
+- `--zod-out <path>` Write Zod schemas TS to file
+- `--include-entity` Include `tbl_entity` in SQL up/down
+- `--down` Append DROP statements after CREATE
+- `--zod-no-imports` Omit `import { z } from 'zod'` in Zod output
+
+Notes:
+- Entity IDs are assigned deterministically in order of appearance starting at 1, and `$name` references are resolved to these IDs.
+- Inherited components via `extends` are merged (atoms and entities supported); entity-local component values override inherited values.
+- Component columns are matched via camelCase ↔ snake_case mapping.
