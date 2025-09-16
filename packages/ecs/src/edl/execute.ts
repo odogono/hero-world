@@ -1,5 +1,4 @@
 import { toCamelCase } from 'odgn-helpers/string';
-import { z } from 'zod';
 
 import { addComponents } from '@component';
 import { parseEDL } from '@edl';
@@ -483,42 +482,8 @@ export const executeEDL = <T extends Components>(
         // Component exists, set property directly
         entity[compKey][propKey] = value;
       } else {
-        // Build minimal defaults for required fields from schema
-        const def = (entity.world as any).defs.get(compKey);
         const defaults: Record<string, unknown> = {};
-        if (def && def.schema && (def.schema as any).shape) {
-          const shape = (def.schema as any).shape as Record<
-            string,
-            z.ZodTypeAny
-          >;
-          for (const [k, s] of Object.entries(shape)) {
-            const meta = (s as any).meta?.();
-            if (meta?.primaryKey || meta?.foreignKey) {
-              continue;
-            } // id/eid handled elsewhere
-            // Skip optional fields and those with defaults
-            const isOptional = s instanceof z.ZodOptional;
-            const isDefault = s instanceof z.ZodDefault;
-            if (isOptional || isDefault) {
-              continue;
-            }
 
-            // Provide minimal non-null defaults
-            if (s instanceof z.ZodNumber) {
-              defaults[k] = 0;
-            } else if (s instanceof z.ZodBoolean) {
-              defaults[k] = false;
-            } else if (s instanceof z.ZodString) {
-              defaults[k] = '';
-            } else if (s instanceof z.ZodArray) {
-              defaults[k] = [];
-            } else if (s instanceof z.ZodObject) {
-              defaults[k] = {};
-            } else {
-              defaults[k] = null;
-            }
-          }
-        }
         // Override with the provided property
         defaults[propKey] = value;
         // Add the component with defaults + property

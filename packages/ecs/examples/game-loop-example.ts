@@ -1,45 +1,44 @@
 /* eslint-disable no-console */
-import z from 'zod';
 
 import { createWorld } from '@/world';
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity } from '@entity';
 import { createSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
 
 // Define game components
 const positionComponent = defineComponent({
-  name: 'position' as const,
+  id: 'position',
   schema: {
-    x: z.number(),
-    y: z.number(),
-    z: z.number().default(0)
+    x: s.number(),
+    y: s.number(),
+    z: s.number().default(0)
   }
 });
 
 const velocityComponent = defineComponent({
-  name: 'velocity' as const,
+  id: 'velocity',
   schema: {
-    x: z.number(),
-    y: z.number(),
-    z: z.number().default(0)
+    x: s.number(),
+    y: s.number(),
+    z: s.number().default(0)
   }
 });
 
 const healthComponent = defineComponent({
-  name: 'health' as const,
+  id: 'health',
   schema: {
-    current: z.number(),
-    max: z.number(),
-    regenerationRate: z.number().default(0)
+    current: s.number(),
+    max: s.number(),
+    regenerationRate: s.number().default(0)
   }
 });
 
 const playerComponent = defineComponent({
-  name: 'player' as const,
+  id: 'player',
   schema: {
-    level: z.number().default(1),
-    name: z.string()
+    level: s.number().default(1),
+    name: s.string()
   }
 });
 
@@ -149,7 +148,7 @@ const cleanupSystem = createSystem(
 
 // Debug system - logs game state periodically
 let debugTimer = 0;
-const debugSystem = createWorldSystem((world, deltaTime) => {
+const debugSystem = createSystem((world, deltaTime) => {
   debugTimer += deltaTime;
 
   // Log debug info every 2 seconds

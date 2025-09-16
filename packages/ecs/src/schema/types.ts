@@ -1,7 +1,3 @@
-import { z } from 'zod';
-
-export type SchemaType = z.ZodTypeAny;
-
 /**
  * Column information for SQLite table generation
  */
@@ -37,11 +33,6 @@ export type TableGenerationResult = {
 export type IndexGenerationResult = {
   indexes: IndexInfo[];
   sql: string[];
-};
-
-export type ZodSchemaToSqliteTableOptions = {
-  ifNotExists?: boolean;
-  tableName?: string;
 };
 
 export type StatementOptions = {

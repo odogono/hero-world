@@ -1,8 +1,8 @@
 /* eslint-disable perfectionist/sort-objects */
+import { defineComponent, s, type InferComponentType } from '@component';
 import type { Database } from '@db';
 import type { CDef } from '@types';
 
-import { defineComponent, s, type InferComponentType } from '../component/next';
 import { cdefToSql } from './cdef-to-sql';
 import { hashComponentDefinition } from './component-hash';
 
@@ -215,7 +215,7 @@ export const updateComponentMetadata = (
 ): void => {
   // First, remove metadata for component tables that no longer exist
   const currentTableNames = definitions.map(def => def.tableName);
-  
+
   if (currentTableNames.length > 0) {
     const placeholders = currentTableNames.map(() => '?').join(',');
     const deleteStmt = db.prepare(

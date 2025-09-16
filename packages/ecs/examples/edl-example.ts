@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
-import { z } from 'zod';
+
+import { s } from '../src/component';
 
 // Complete EDL example demonstrating atoms, inheritance, references, arrays, and errors
 const main = async () => {
@@ -10,50 +11,50 @@ const main = async () => {
 
   // Define components used by the EDL script
   const described = defineComponent({
-    name: 'described',
+    id: 'described',
     schema: {
-      description: z.string(),
-      name: z.string()
+      description: s.string(),
+      name: s.string()
     }
   });
 
   const thing = defineComponent({
-    name: 'thing',
+    id: 'thing',
     schema: {
-      size: z.number(),
-      weight: z.number()
+      size: s.number(),
+      weight: s.number()
     }
   });
 
   const container = defineComponent({
-    name: 'container',
+    id: 'container',
     schema: {
-      capacity: z.number(),
-      isClosed: z.boolean()
+      capacity: s.number(),
+      isClosed: s.boolean()
     }
   });
 
   const lockable = defineComponent({
-    name: 'lockable',
+    id: 'lockable',
     schema: {
-      isLocked: z.boolean(),
-      key: z.string()
+      isLocked: s.boolean(),
+      key: s.string()
     }
   });
 
   // Link component to demonstrate $name reference to entity id
   const link = defineComponent({
-    name: 'link',
+    id: 'link',
     schema: {
-      targetId: z.int().optional().meta({ foreignKey: 'tbl_entity' })
+      targetId: s.int().optional().foreignKey('tbl_entity')
     }
   });
 
   // Array component for $name.comp.list.1 style references
   const stats = defineComponent({
-    name: 'stats_array_example',
+    id: 'stats_array_example',
     schema: {
-      items: z.array(z.number())
+      items: s.array('int')
     }
   });
 

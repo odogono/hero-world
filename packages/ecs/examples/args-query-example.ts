@@ -1,25 +1,24 @@
 /* eslint-disable no-console */
-import z from 'zod';
 
-import { createWorld, flush } from '@/world';
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, queryEntities } from '@entity';
+import { createWorld, flush } from '@world';
 
 // Define components
 const playerComponent = defineComponent({
-  name: 'player' as const,
+  id: 'player',
   schema: {
-    health: z.number(),
-    level: z.number(),
-    name: z.string()
+    health: s.number(),
+    level: s.number(),
+    name: s.string()
   }
 });
 
 const enemyComponent = defineComponent({
-  name: 'enemy' as const,
+  id: 'enemy',
   schema: {
-    difficulty: z.number(),
-    type: z.enum(['goblin', 'orc', 'dragon'])
+    difficulty: s.number(),
+    type: s.enum(['goblin', 'orc', 'dragon'])
   }
 });
 

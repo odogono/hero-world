@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
-import { z } from 'zod';
+
+import { s } from '../src';
 
 // Main function to handle async operations
 const main = async () => {
@@ -9,26 +10,26 @@ const main = async () => {
 
   // Define some components
   const healthComponent = defineComponent({
-    name: 'health',
+    id: 'health',
     schema: {
-      current: z.number(),
-      max: z.number()
+      current: s.number(),
+      max: s.number()
     }
   });
 
   const positionComponent = defineComponent({
-    name: 'position',
+    id: 'position',
     schema: {
-      x: z.number(),
-      y: z.number()
+      x: s.number(),
+      y: s.number()
     }
   });
 
   const inventoryComponent = defineComponent({
-    name: 'inventory',
+    id: 'inventory',
     schema: {
-      gold: z.number(),
-      items: z.array(z.string())
+      gold: s.number(),
+      items: s.array('string')
     }
   });
 

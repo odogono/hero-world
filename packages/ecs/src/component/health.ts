@@ -1,21 +1,18 @@
-import { z } from 'zod';
+import { s } from './builder';
+import { defineComponent } from './define';
+import type { InferComponentType } from './types';
 
-import { defineComponent } from '../component';
-
-export type Health = z.infer<typeof healthSchema>;
+export type Health = InferComponentType<typeof healthComponent>;
 
 // Create the component definition
 export const healthComponent = defineComponent({
-  name: 'health' as const,
+  id: 'health',
   schema: {
-    current: z.number(),
-    max: z.number()
+    current: s.number(),
+    max: s.number()
   },
   statements: {
     // Optional: custom SQL statements
     selectByCurrentHealth: 'SELECT * FROM tbl_health WHERE current = ?'
   }
 });
-
-// Define the component schema for type inference
-const healthSchema = healthComponent.schema;

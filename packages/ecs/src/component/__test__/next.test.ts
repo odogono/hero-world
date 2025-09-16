@@ -6,15 +6,12 @@ import { DatabaseType } from '@db';
 import { createEntity, queryEntity } from '@entity';
 import { createWorld, flush } from '@world';
 
-import {
-  addComponent,
-  addComponents,
-  createComponent,
-  defineComponent,
-  removeComponent,
-  s,
-  type InferComponentType
-} from '../next';
+import { addComponent, addComponents } from '../add';
+import { s } from '../builder';
+import { createComponent } from '../create';
+import { defineComponent } from '../define';
+import { removeComponent } from '../remove';
+import type { InferComponentType } from '../types';
 
 const worldOpts = {
   clearExisting: true,

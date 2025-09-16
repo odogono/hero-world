@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
-import z from 'zod';
 
 import { createWorld } from '@/world';
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
 import { createGameLoop, createSystem, createWorldSystem } from '@system';
@@ -12,39 +11,39 @@ import { createGameLoop, createSystem, createWorldSystem } from '@system';
 // ============================================================================
 
 const positionComponent = defineComponent({
-  name: 'position' as const,
+  id: 'position',
   schema: {
-    x: z.number(),
-    y: z.number()
+    x: s.number(),
+    y: s.number()
   }
 });
 
 const velocityComponent = defineComponent({
-  name: 'velocity' as const,
+  id: 'velocity',
   schema: {
-    x: z.number(),
-    y: z.number()
+    x: s.number(),
+    y: s.number()
   }
 });
 
 const tankComponent = defineComponent({
-  name: 'tank' as const,
+  id: 'tank',
   schema: {
-    health: z.number().default(100),
-    id: z.string(), // Unique tank identifier
-    maxHealth: z.number().default(100),
-    speed: z.number().default(50), // units per second
-    team: z.enum(['red', 'blue'])
+    health: s.number().default(100),
+    id: s.string(), // Unique tank identifier
+    maxHealth: s.number().default(100),
+    speed: s.number().default(50), // units per second
+    team: s.enum(['red', 'blue'])
   }
 });
 
 const moveOrderComponent = defineComponent({
-  name: 'move_order' as const,
+  id: 'move_order',
   schema: {
-    completed: z.boolean().default(false),
-    timestamp: z.number(), // timestamp when order was issued
-    xCoord: z.number(),
-    yCoord: z.number()
+    completed: s.boolean().default(false),
+    timestamp: s.number(), // timestamp when order was issued
+    xCoord: s.number(),
+    yCoord: s.number()
   }
 });
 

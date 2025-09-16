@@ -6,19 +6,17 @@
  * Components are registered at compile-time using a builder pattern.
  */
 
-import { number } from 'zod';
-
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { healthComponent } from '@component/health';
 import { createEntity } from '@entity';
 import { createWorld } from '@world';
 
 export const manaComponent = defineComponent({
-  name: 'mana' as const,
+  id: 'mana',
   schema: {
-    current: number(),
-    max: number(),
-    regen: number()
+    current: s.number(),
+    max: s.number(),
+    regen: s.number()
   },
   statements: {
     selectLowMana: 'SELECT * FROM tbl_mana WHERE current < max * 0.2'

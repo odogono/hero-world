@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import type {
   CreateDatabaseOptions,
   Database,
@@ -7,8 +5,7 @@ import type {
   Statement
 } from '@db';
 
-import type { InferComponentType } from './component/next';
-import { pkWithAutoIncrement } from './schema';
+import type { InferComponentType } from './component/types';
 import type { ColumnInfo } from './schema/types';
 
 export type EntityId = number;
@@ -111,7 +108,7 @@ export type GenericEntity<T extends Components> = {
   world: World<T>;
 };
 
-export type Entity<C extends keyof Components = never> = EntitySchema & {
+export type Entity<C extends keyof Components = never> = {
   world: World<Components>;
 } & {
   [K in C]-?: NonNullable<Components[K]>;
@@ -135,20 +132,6 @@ export type EntityWithComponents<
   // Components in C are known-present and therefore required
   [K in C]-?: ComponentData<TComponents[K]>;
 };
-
-export type EntitySchema = z.infer<typeof entitySchema>;
-export const entitySchema = z
-  .object({
-    id: pkWithAutoIncrement()
-  })
-  .meta({ name: 'tbl_entity' });
-
-export const getEntitySchema = () =>
-  z
-    .object({
-      id: pkWithAutoIncrement()
-    })
-    .meta({ name: 'tbl_entity' });
 
 export const isEntity = (val: unknown): val is Entity => {
   if (typeof val !== 'object' || val === null) {

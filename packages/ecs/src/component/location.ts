@@ -1,8 +1,11 @@
-import { createLog } from 'odgn-helpers';
+import { createLog } from 'odgn-helpers/log';
 
-import { InferComponentType, defineComponent, s } from '../component';
-import { createEntity } from '../entity';
-import { isEntity, type Entity, type World } from '../types';
+import { createEntity } from '@entity';
+import { isEntity, type Entity, type World } from '@types';
+
+import { s } from './builder';
+import { defineComponent } from './define';
+import type { InferComponentType } from './types';
 
 const log = createLog('location');
 

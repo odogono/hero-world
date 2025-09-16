@@ -1,16 +1,15 @@
 /* eslint-disable no-console */
-import z from 'zod';
 
 import { createWorld, flush } from '@/world';
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, queryEntitiesIterator } from '@entity';
 
 // Define a component
 const healthComponent = defineComponent({
-  name: 'health' as const,
+  id: 'health',
   schema: {
-    current: z.number(),
-    max: z.number()
+    current: s.number(),
+    max: s.number()
   }
 });
 

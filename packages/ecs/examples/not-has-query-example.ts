@@ -1,32 +1,31 @@
 /* eslint-disable no-console */
-import z from 'zod';
 
 import { createWorld, flush } from '@/world';
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, queryEntities } from '@entity';
 
 // Define some example components
 const healthComponent = defineComponent({
-  name: 'health' as const,
+  id: 'health',
   schema: {
-    current: z.number(),
-    max: z.number()
+    current: s.number(),
+    max: s.number()
   }
 });
 
 const inventoryComponent = defineComponent({
-  name: 'inventory' as const,
+  id: 'inventory',
   schema: {
-    capacity: z.number(),
-    itemCount: z.number()
+    capacity: s.number(),
+    itemCount: s.number()
   }
 });
 
 const playerComponent = defineComponent({
-  name: 'player' as const,
+  id: 'player',
   schema: {
-    level: z.number(),
-    name: z.string()
+    level: s.number(),
+    name: s.string()
   }
 });
 
