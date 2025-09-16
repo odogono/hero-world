@@ -29,7 +29,7 @@ export const componentMetadata = defineComponent({
   id: 'component_metadata',
   schema: {
     id: s.pk(),
-    tblName: s.string().indexed(),
+    tblName: s.string().unique(),
     hash: s.string(),
     version: s.int().default(1),
     createdAt: s.datetime().default()
@@ -171,9 +171,9 @@ export const validateComponentCompatibility = (
 
       if (!stored) {
         // New component table - this is usually fine
-        // warnings.push(
-        //   `New component table '${tableName}' added to the world definition`
-        // );
+        warnings.push(
+          `New component table '${tableName}' added to the world definition`
+        );
         continue;
       }
 
@@ -215,13 +215,13 @@ export const updateComponentMetadata = (
 ): void => {
   // First, remove metadata for component tables that no longer exist
   const currentTableNames = definitions.map(def => def.tableName);
-  const placeholders = currentTableNames.map((_, i) => `?${i + 1}`).join(',');
-
+  
   if (currentTableNames.length > 0) {
-    db.exec(
-      `DELETE FROM tbl_component_metadata WHERE tbl_name NOT IN (${placeholders})`,
-      currentTableNames
+    const placeholders = currentTableNames.map(() => '?').join(',');
+    const deleteStmt = db.prepare(
+      `DELETE FROM tbl_component_metadata WHERE tbl_name NOT IN (${placeholders})`
     );
+    deleteStmt.run(...currentTableNames);
   } else {
     db.exec('DELETE FROM tbl_component_metadata');
   }

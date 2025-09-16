@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '../component';
+import { defineComponent, s } from '../component';
 import { createWorld, loadWorld } from '../world';
 
 describe('Component Compatibility Integration Tests', () => {
@@ -22,19 +21,19 @@ describe('Component Compatibility Integration Tests', () => {
 
     // Define original components
     const playerComponent = defineComponent({
-      name: 'realPlayer',
+      id: 'realPlayer',
       schema: {
-        experience: z.number().default(0),
-        level: z.number(),
-        name: z.string()
+        experience: s.number().default(0),
+        level: s.number(),
+        name: s.string()
       }
     });
 
     const inventoryComponent = defineComponent({
-      name: 'realInventory',
+      id: 'realInventory',
       schema: {
-        capacity: z.number().default(10),
-        items: z.array(z.string()).default([])
+        capacity: s.number().default(10),
+        items: s.array('string').default([])
       }
     });
 
@@ -62,18 +61,18 @@ describe('Component Compatibility Integration Tests', () => {
     await cleanup();
 
     const playerComponent = defineComponent({
-      name: 'realPlayer2',
+      id: 'realPlayer2',
       schema: {
-        level: z.number(),
-        name: z.string()
+        level: s.number(),
+        name: s.string()
       }
     });
 
     const inventoryComponent = defineComponent({
-      name: 'realInventory2',
+      id: 'realInventory2',
       schema: {
-        capacity: z.number(),
-        items: z.array(z.string()).default([])
+        capacity: s.number(),
+        items: s.array('string').default([])
       }
     });
 
@@ -96,18 +95,18 @@ describe('Component Compatibility Integration Tests', () => {
     await cleanup();
 
     const playerComponent = defineComponent({
-      name: 'realPlayer3',
+      id: 'realPlayer3',
       schema: {
-        level: z.number(),
-        name: z.string()
+        level: s.number(),
+        name: s.string()
       }
     });
 
     const questComponent = defineComponent({
-      name: 'realQuest3',
+      id: 'realQuest3',
       schema: {
-        completed: z.boolean().default(false),
-        id: z.string()
+        completed: s.boolean().default(false),
+        id: s.string()
       }
     });
 

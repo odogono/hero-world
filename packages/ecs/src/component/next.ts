@@ -270,7 +270,7 @@ export const defineComponent = <S extends DefineComponentSchema>(
   } = props;
 
   if (!componentId) {
-    throw new Error('Either id or name must be provided to defineComponent');
+    throw new Error('id must be provided to defineComponent');
   }
 
   const tableName = toTableName(tableNameProp ?? componentId);
@@ -292,7 +292,21 @@ export const createComponent = <T extends CDef>(
   data: Partial<InferComponentType<T>> = {}
 ): InferComponentType<T> => {
   const defaults = getDefaults(def);
-  return { ...defaults, ...data } as InferComponentType<T>;
+  const result = { ...defaults, ...data };
+  
+  // Validate that all required fields are provided
+  for (const column of def.columns) {
+    if (!column.optional && column.default === undefined) {
+      const value = result[column.name];
+      if (value === undefined || value === null || 
+          (typeof value === 'string' && value === '') ||
+          (typeof value === 'number' && value === 0)) {
+        throw new Error(`Required field '${column.name}' is missing or has default value`);
+      }
+    }
+  }
+  
+  return result as InferComponentType<T>;
 };
 
 /**

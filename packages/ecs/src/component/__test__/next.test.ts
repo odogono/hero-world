@@ -896,7 +896,7 @@ describe('Component (next)', () => {
 
       type defType = InferComponentType<typeof def>;
 
-      const com = createComponent(def, { status: 'active' });
+      const com = createComponent(def, { name: 'John Doe', status: 'active' });
 
       expectTypeOf(com).toEqualTypeOf<{
         name: string;
@@ -905,9 +905,20 @@ describe('Component (next)', () => {
       expectTypeOf(com).toEqualTypeOf<defType>();
 
       expect(com).toMatchObject({
-        name: '',
+        name: 'John Doe',
         status: 'active'
       });
+    });
+
+    test('createComponent throws error if non-optional field is not provided', () => {
+      const def = defineComponent({
+        id: 'user',
+        schema: {
+          name: s.string()
+        }
+      });
+
+      expect(() => createComponent(def)).toThrow();
     });
   });
 });

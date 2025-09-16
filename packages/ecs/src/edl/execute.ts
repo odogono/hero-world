@@ -244,7 +244,7 @@ export const executeEDL = <T extends Components>(
       errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
       return undefined;
     }
-    const compKey = toCamelCase(componentName);
+    const compKey = componentName;
     if (!(compKey in plan)) {
       errors.push(new EDLMissingComponentError(entityName, componentName));
       return undefined;
@@ -356,7 +356,7 @@ export const executeEDL = <T extends Components>(
     }
 
     const plan = plannedComponentsById.get(targetId);
-    const compKey = toCamelCase(componentName);
+    const compKey = componentName;
     let value: any = plan ? (plan as any)[compKey] : undefined;
 
     // Walk the path if available in planned components
@@ -471,7 +471,7 @@ export const executeEDL = <T extends Components>(
         continue;
       }
       const entity = entitiesById.get(eid)! as any;
-      const compKey = toCamelCase(componentName ?? '');
+      const compKey = componentName ?? '';
       // Prepare property key (only first-level used in tests)
       const propKey = propPath[0] ? toCamelCase(propPath[0]) : undefined;
 

@@ -249,7 +249,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     updateComponentMetadata(testDb, [component2]);
     metadata = getStoredComponentMetadata(testDb);
     expect(metadata).toHaveLength(1);
-    expect(metadata[0].tbl_name).toBe('tbl_player_test_11');
+    expect(metadata[0].tblName).toBe('tbl_player_test_11');
 
     await cleanupDb();
   });

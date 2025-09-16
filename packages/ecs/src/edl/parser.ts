@@ -472,7 +472,7 @@ function peg$parse(input, options) {
 
   function peg$f12(name, props) {
 // @ts-ignore
-    return [toCamelCase(name), props ?? {}] as [string, Record<string, unknown>];
+    return [name, props ?? {}] as [string, Record<string, unknown>];
   }// @ts-ignore
 
   function peg$f13(head, tail) {
@@ -3597,21 +3597,56 @@ peg$parseComment() {
     components: Record<string, Record<string, unknown>>;
   };
 
+// @ts-ignore
+  type EDLColumnType =
+// @ts-ignore
+  | 'string'
+// @ts-ignore
+  | 'email'
+// @ts-ignore
+  | 'enum'
+// @ts-ignore
+  | 'int'
+// @ts-ignore
+  | 'float'
+// @ts-ignore
+  | 'boolean'
+// @ts-ignore
+  | 'datetime'
+// @ts-ignore
+  | 'date'
+// @ts-ignore
+  | 'pk'
+// @ts-ignore
+  | 'time'
+// @ts-ignore
+  | 'timestamp'
+// @ts-ignore
+  | 'json'
+// @ts-ignore
+  | 'array';
+
   // Component definition types
 // @ts-ignore
   type EDLComponentColumn = {
 // @ts-ignore
     name: string;
 // @ts-ignore
-    type: string;
+    type: EDLColumnType;
 // @ts-ignore
     optional?: boolean;
+// @ts-ignore
+    foreignKey?: string;
+// @ts-ignore
+    isIndexed?: boolean;
 // @ts-ignore
     isUnique?: boolean;
 // @ts-ignore
     default?: string;
+// @ts-ignore
+    values?: string[];
   };
-
+  
 // @ts-ignore
   type EDLComponentDef = {
 // @ts-ignore
@@ -3623,9 +3658,6 @@ peg$parseComment() {
 // @ts-ignore
     columns: EDLComponentColumn[];
   };
-
-  // const toCamelCase = (s: string): string =>
-  //  s.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
 
 // @ts-ignore
   const componentsFromEntries = (

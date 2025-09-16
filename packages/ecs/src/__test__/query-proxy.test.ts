@@ -1,24 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { createEntity, queryEntity } from '@entity';
 import { createWorld, flush } from '@world';
 
 const statsComponent = defineComponent({
-  name: 'statsProxyTest',
+  id: 'statsProxyTest',
   schema: {
-    health: z.number(),
-    level: z.number(),
-    mana: z.number()
+    health: s.number(),
+    level: s.number(),
+    mana: s.number()
   }
 });
 
 const locationComponent = defineComponent({
-  name: 'locationProxyTest',
+  id: 'locationProxyTest',
   schema: {
-    name: z.string(),
-    region: z.string()
+    name: s.string(),
+    region: s.string()
   }
 });
 

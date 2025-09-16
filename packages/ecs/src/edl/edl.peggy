@@ -7,7 +7,7 @@
     components: Record<string, Record<string, unknown>>;
   };
 
-  export type EDLColumnType =
+  type EDLColumnType =
   | 'string'
   | 'email'
   | 'enum'
@@ -151,7 +151,7 @@ Components
 
 Component
   = name:Identifier _ '{' _ props:Properties? _ '}' {
-      return [toCamelCase(name), props ?? {}] as [string, Record<string, unknown>];
+      return [name, props ?? {}] as [string, Record<string, unknown>];
     }
 
 Properties
