@@ -19,6 +19,7 @@
 - Imports: Sorted (Prettier + sort-imports); use type-only imports when possible.
 - Formatting: 2-space indent, semicolons on, trailing commas (Prettier).
 - Files: TS modules kebab-case (e.g., `game-loop.ts`); React components PascalCase (e.g., `SQLiteDemo.tsx`).
+- Naming: camelCase (vars/functions), PascalCase (types/enums), UPPER_SNAKE_CASE (constants).
 
 ## Testing Guidelines
 - Frameworks: Bun test (ECS) and Vitest (Tank World).
@@ -39,4 +40,3 @@
 - Use environment variables; do not commit `.env`.
 - SQLite WASM setup for ECS: see `packages/ecs/SQLITE_WASM_SETUP.md`.
 - Lint/format must pass before merge; CI may enforce.
-

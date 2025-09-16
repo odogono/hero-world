@@ -29,6 +29,7 @@ This is an Entity Component System (ECS) library built with TypeScript and Bun. 
 
 - `bun run generate` - Generate TypeScript types and SQLite schema from component definitions
 - `bun run generate:edl` - Generate EDL (Entity Description Language) parser
+- `bun run generate:cdef` - Generate component definitions from cdef files
 - `bun run generate:help` - Show help for the schema generator
 
 ### Alternative Commands (Just)
