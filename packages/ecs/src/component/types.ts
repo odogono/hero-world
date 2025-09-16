@@ -22,15 +22,20 @@ export type DefineComponentSchema = {
 };
 
 export type DefineComponentProps<
-  S extends DefineComponentSchema = DefineComponentSchema
+  S extends DefineComponentSchema = DefineComponentSchema,
+  Name extends string = string
 > = {
-  id?: string;
+  id?: Name;
   schema: S;
   statements?: Record<string, string>;
   tableName?: string;
 };
 
-export type CDefWithSchema<S extends DefineComponentSchema> = CDef & {
+export type CDefWithSchema<
+  S extends DefineComponentSchema,
+  Name extends string = string
+> = Omit<CDef, 'id'> & {
+  id: Name;
   __schema: S;
 };
 

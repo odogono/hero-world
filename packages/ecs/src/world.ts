@@ -1,4 +1,5 @@
 import { createLog } from 'odgn-helpers/log';
+import { toSnakeCase } from 'odgn-helpers/string';
 
 import {
   DatabaseType,
@@ -9,6 +10,7 @@ import {
   type SaveToJSONOptions,
   type Statement
 } from '@db';
+import { executeEDL, parseEDL } from '@edl';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
   initializeComponentMetadataTable,
@@ -18,10 +20,9 @@ import {
 import {
   type CDef,
   type ComponentDef,
-  type ComponentDefinition,
   type Components,
   type EntityCache,
-  type InferComponentsFromDefs,
+  type InferComponentsFromCDefs,
   type StaticWorld
 } from '@types';
 
@@ -129,10 +130,82 @@ const createStaticWorldInternal = async <T extends Components>(
 };
 
 // Create world with component definitions
-export const createWorld = async (
+// Typed overloads for better component inference
+export async function createWorld<const TDefs extends readonly CDef[]>(
+  componentDefs: TDefs,
+  options?: CreateStaticWorldOptionsInternal
+): Promise<StaticWorld<InferComponentsFromCDefs<TDefs>>>;
+export async function createWorld(
   componentDefs: CDef[],
   options?: CreateStaticWorldOptionsInternal
-) => createStaticWorldInternal(componentDefs, options || {});
+): Promise<StaticWorld<Components>>;
+export async function createWorld<
+  TComponents extends Record<string, any> = Record<string, any>
+>(
+  edl: string,
+  options?: CreateStaticWorldOptionsInternal
+): Promise<StaticWorld<TComponents>>;
+export async function createWorld(
+  componentDefs: CDef[] | string,
+  options?: CreateStaticWorldOptionsInternal
+) {
+  // Support creating a world from an EDL string by parsing component defs
+  if (typeof componentDefs === 'string') {
+    const edl = componentDefs;
+    const defs = parseEDL(edl)
+      .filter((d: any) => d && d.type === 'component')
+      .map((d: any) => ({
+        id: d.id,
+        tableName: d.tableName || `tbl_${toSnakeCase(d.id) || d.id}`,
+        columns: (d.columns || []).map((c: any) => ({
+          name: c.name,
+          type: c.type,
+          optional: c.optional,
+          foreignKey: c.foreignKey,
+          isIndexed: c.isIndexed,
+          isUnique: c.isUnique,
+          values: c.values,
+          // Convert simple literal defaults into typed values where possible
+          default:
+            typeof c.default === 'string'
+              ? parseEDLDefault(c.default)
+              : c.default
+        }))
+      })) as CDef[];
+    const world = (await createStaticWorldInternal(defs, options || {})) as any;
+    // Execute entity/atom definitions and commands to populate initial data
+    executeEDL(world, edl);
+    return world as any;
+  }
+
+  return createStaticWorldInternal(componentDefs, options || {}) as any;
+}
+
+// Helper to parse an EDL default literal from a line-tail token into a typed value
+const parseEDLDefault = (val: string): string | number | boolean | Date => {
+  const s = String(val).trim();
+  if (s.length === 0) return s;
+  // Preserve timestamp/date/time sentinels for downstream handling
+  if (
+    s === 'current_timestamp' ||
+    s === 'current_date' ||
+    s === 'current_time'
+  ) {
+    return s;
+  }
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+  if (/^-?\d*\.\d+$/.test(s)) return parseFloat(s);
+  // Strip surrounding quotes if present
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    return s.slice(1, -1);
+  }
+  return s;
+};
 
 const registerComponentDefStatic = (
   db: Database,
@@ -318,11 +391,11 @@ export const saveWorld = async <T extends Components>(
 /**
  * Loads an existing world database from a file path with component compatibility validation
  */
-export const loadWorld = async <T extends readonly ComponentDefinition[]>(
-  componentDefs: CDef[],
+export const loadWorld = async <TDefs extends readonly CDef[]>(
+  componentDefs: TDefs,
   path: string,
   options?: Omit<CreateStaticWorldOptionsInternal, 'path'>
-): Promise<StaticWorld<InferComponentsFromDefs<T>>> => {
+): Promise<StaticWorld<InferComponentsFromCDefs<TDefs>>> => {
   // Check if the database file exists
   if (!(await Bun.file(path).exists())) {
     throw new Error(`Database file not found: ${path}`);
@@ -332,5 +405,5 @@ export const loadWorld = async <T extends readonly ComponentDefinition[]>(
   return createWorld(componentDefs, {
     ...options,
     path
-  });
+  }) as any;
 };

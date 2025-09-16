@@ -155,6 +155,11 @@ export type InferComponentsFromDefs<T extends readonly ComponentDefinition[]> =
     [K in T[number] as K['name']]: InferComponentType<K['schema']>;
   };
 
+// Helper type to infer component types directly from CDef arrays
+export type InferComponentsFromCDefs<T extends readonly CDef[]> = {
+  [K in T[number] as K['id']]: InferComponentType<K>;
+};
+
 // Tuple type for component definitions
 export type ComponentDefinitionTuple<T extends Components> = {
   [K in keyof T]: ComponentDefinition;

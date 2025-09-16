@@ -12,28 +12,28 @@ import type { InferComponentType } from './types';
  * Apply default values from a Zod schema to component data
  * This function merges the provided data with default values from the schema
  */
-export const applyDefaults = <T>(
-  schema: CDef,
-  data: Partial<T>
-): InferComponentType<typeof schema> => {
+export const applyDefaults = <T>(schema: CDef, data: Partial<T>): T => {
   const defaults = getDefaults(schema);
 
   // Merge defaults with provided data, with provided data taking precedence
   const merged = { ...defaults, ...data };
 
   // Validate the merged data against the schema
-  return merged;
+  return merged as T;
 };
 
 /**
  * Apply default values to component data using the world's component definitions
  * This function looks up the component schema and applies defaults
  */
-export const applyComponentDefaults = <T extends Components>(
+export const applyComponentDefaults = <
+  T extends Components,
+  D extends Record<string, unknown>
+>(
   world: World<T>,
   componentName: string,
-  data: InferComponentType<T>
-): InferComponentType<T> => {
+  data: D
+): D => {
   const def = world.defs.get(componentName);
   if (!def || !def.schema) {
     // If no schema found, return data as-is
@@ -41,7 +41,7 @@ export const applyComponentDefaults = <T extends Components>(
   }
 
   try {
-    return applyDefaults(def.schema, data);
+    return applyDefaults(def.schema, data as Partial<D>);
   } catch (error) {
     // If validation fails, log error and return data as-is
     console.warn(

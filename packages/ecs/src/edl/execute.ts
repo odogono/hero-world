@@ -154,6 +154,10 @@ export const executeEDL = <T extends Components>(
       }
       continue;
     }
+    if (def.type !== 'entity') {
+      // Ignore component definitions
+      continue;
+    }
 
     // Create entity without components to avoid schema validation before resolving refs
     const entity = createEntity(world as unknown as World<Components>);

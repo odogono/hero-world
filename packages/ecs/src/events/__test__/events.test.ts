@@ -13,7 +13,8 @@ import {
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
-const createTestWorld = async () => await createWorld([eventComponent], { dbType });
+const createTestWorld = async () =>
+  await createWorld([eventComponent], { dbType });
 
 describe('EventSystem', () => {
   test('should create event system', async () => {

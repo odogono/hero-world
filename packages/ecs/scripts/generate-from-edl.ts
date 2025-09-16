@@ -14,12 +14,13 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { parseEDL } from '../src/edl';
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
-import type { CDef, CDefColumnInfo, CDefColumnType } from '../src/schema/types';
+
+import { parseEDL } from '../src/edl';
 import { cdefToSql } from '../src/schema/cdef-to-sql';
 import { cdefToTypes } from '../src/schema/cdef-to-types';
 import { cdefToZod } from '../src/schema/cdef-to-zod';
+import type { CDef, CDefColumnInfo, CDefColumnType } from '../src/schema/types';
 
 type Flags = {
   down: boolean;
@@ -36,10 +37,25 @@ type EDLParsed = Array<
       type: 'component';
       id: string;
       tableName?: string;
-      columns: Array<{ name: string; type: string; optional?: boolean; isUnique?: boolean; default?: string }>;
+      columns: Array<{
+        name: string;
+        type: string;
+        optional?: boolean;
+        isUnique?: boolean;
+        default?: string;
+      }>;
     }
-  | { type: 'atom'; id?: string; components: Record<string, Record<string, unknown>> }
-  | { type: 'entity'; id?: string; extends?: string[]; components: Record<string, Record<string, unknown>> }
+  | {
+      type: 'atom';
+      id?: string;
+      components: Record<string, Record<string, unknown>>;
+    }
+  | {
+      type: 'entity';
+      id?: string;
+      extends?: string[];
+      components: Record<string, Record<string, unknown>>;
+    }
 >;
 
 const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
@@ -65,7 +81,9 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
 };
 
 const showHelp = () => {
-  console.log(`Usage: bun run scripts/generate-from-edl.ts --input file.edl [options]\n\nOptions:\n  --input <path>          EDL file path\n  --sql-out <path>        Write SQL (DDL + inserts) to file\n  --types-out <path>      Write TypeScript component types to file\n  --zod-out <path>        Write Zod schemas TS to file\n  --include-entity        Include tbl_entity in SQL up/down\n  --down                  Include DROP statements after CREATE\n  --zod-no-imports        Omit import line in Zod output (multi-embed)\n  -h, --help              Show this help\n`);
+  console.log(
+    `Usage: bun run scripts/generate-from-edl.ts --input file.edl [options]\n\nOptions:\n  --input <path>          EDL file path\n  --sql-out <path>        Write SQL (DDL + inserts) to file\n  --types-out <path>      Write TypeScript component types to file\n  --zod-out <path>        Write Zod schemas TS to file\n  --include-entity        Include tbl_entity in SQL up/down\n  --down                  Include DROP statements after CREATE\n  --zod-no-imports        Omit import line in Zod output (multi-embed)\n  -h, --help              Show this help\n`
+  );
 };
 
 const toCDefType = (t: string): CDefColumnType => {
@@ -103,19 +121,20 @@ const mapComponentsToCDefs = (defs: EDLParsed): CDef[] => {
         col.default === undefined
           ? undefined
           : col.default === 'true'
-          ? (true as any)
-          : col.default === 'false'
-          ? (false as any)
-          : isFinite(Number(col.default)) && col.default.trim() !== ''
-          ? (Number(col.default) as any)
-          : (col.default as any)
+            ? (true as any)
+            : col.default === 'false'
+              ? (false as any)
+              : isFinite(Number(col.default)) && col.default.trim() !== ''
+                ? (Number(col.default) as any)
+                : (col.default as any)
     }));
     cdefs.push({ id: d.id, tableName: d.tableName, columns });
   }
   return cdefs;
 };
 
-const toTableName = (cdef: CDef): string => cdef.tableName || `tbl_${toSnakeCase(cdef.id) || cdef.id}`;
+const toTableName = (cdef: CDef): string =>
+  cdef.tableName || `tbl_${toSnakeCase(cdef.id) || cdef.id}`;
 
 const sqlValue = (v: unknown): string => {
   if (v === null || v === undefined) return 'NULL';
@@ -125,10 +144,7 @@ const sqlValue = (v: unknown): string => {
   return `'${s.replaceAll("'", "''")}'`;
 };
 
-const buildInsertSQL = (
-  edl: EDLParsed,
-  cdefs: CDef[]
-): string => {
+const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
   const entities = edl.filter(d => d.type === 'entity') as Array<{
     type: 'entity';
     id?: string;
@@ -152,13 +168,18 @@ const buildInsertSQL = (
 
   // Resolve extends components recursively
   const getEffectiveComponents = (
-    e: { id?: string; extends?: string[]; components: Record<string, Record<string, unknown>> },
+    e: {
+      id?: string;
+      extends?: string[];
+      components: Record<string, Record<string, unknown>>;
+    },
     seen: Set<string> = new Set()
   ): Record<string, Record<string, unknown>> => {
     const merged: Record<string, Record<string, unknown>> = {};
     const mergeInto = (src?: Record<string, Record<string, unknown>>) => {
       if (!src) return;
-      for (const [k, v] of Object.entries(src)) merged[k] = { ...(merged[k] || {}), ...v };
+      for (const [k, v] of Object.entries(src))
+        merged[k] = { ...(merged[k] || {}), ...v };
     };
     if (e.extends && e.extends.length) {
       for (const ext of e.extends) {
@@ -177,9 +198,15 @@ const buildInsertSQL = (
   };
 
   // Map component column names from schema to camelCase for matching
-  const compColumnMap = new Map<string, Array<{ camel: string; snake: string }>>();
+  const compColumnMap = new Map<
+    string,
+    Array<{ camel: string; snake: string }>
+  >();
   for (const c of cdefs) {
-    const cols = c.columns.map(col => ({ camel: toCamelCase(col.name), snake: toSnakeCase(col.name) || col.name }));
+    const cols = c.columns.map(col => ({
+      camel: toCamelCase(col.name),
+      snake: toSnakeCase(col.name) || col.name
+    }));
     compColumnMap.set(c.id, cols);
   }
 
@@ -260,9 +287,12 @@ const main = () => {
   const zod = cdefToZod(cdefs, { includeImports: !parsed.zodNoImports });
 
   // Output
-  if (parsed.sqlOut) writeFileSync(resolve(process.cwd(), parsed.sqlOut), fullSql, 'utf8');
-  if (parsed.typesOut) writeFileSync(resolve(process.cwd(), parsed.typesOut), types, 'utf8');
-  if (parsed.zodOut) writeFileSync(resolve(process.cwd(), parsed.zodOut), zod, 'utf8');
+  if (parsed.sqlOut)
+    writeFileSync(resolve(process.cwd(), parsed.sqlOut), fullSql, 'utf8');
+  if (parsed.typesOut)
+    writeFileSync(resolve(process.cwd(), parsed.typesOut), types, 'utf8');
+  if (parsed.zodOut)
+    writeFileSync(resolve(process.cwd(), parsed.zodOut), zod, 'utf8');
 
   if (!parsed.sqlOut && !parsed.typesOut && !parsed.zodOut) {
     console.log('-- SQL --');

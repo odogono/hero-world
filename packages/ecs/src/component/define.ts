@@ -5,9 +5,12 @@ import type {
   DefineComponentSchema
 } from './types';
 
-export const defineComponent = <S extends DefineComponentSchema>(
-  props: DefineComponentProps<S>
-): CDefWithSchema<S> => {
+export const defineComponent = <
+  S extends DefineComponentSchema,
+  Name extends string
+>(
+  props: DefineComponentProps<S, Name>
+): CDefWithSchema<S, Name> => {
   const {
     id: componentId,
     schema,
@@ -27,8 +30,8 @@ export const defineComponent = <S extends DefineComponentSchema>(
 
   return {
     columns,
-    id: componentId,
+    id: componentId as Name,
     statements,
     tableName
-  } as CDefWithSchema<S>;
+  } as CDefWithSchema<S, Name>;
 };

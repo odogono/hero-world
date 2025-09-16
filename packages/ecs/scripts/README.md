@@ -7,6 +7,7 @@ This directory contains scripts for generating TypeScript types and SQLite schem
 ### Usage
 
 #### Using npm scripts:
+
 ```bash
 # Run with default component file (__test__/definitions.ts)
 bun run generate
@@ -19,6 +20,7 @@ bun run generate:help
 ```
 
 #### Using Justfile (recommended):
+
 ```bash
 # Run with default component file
 just generate-schemas
@@ -63,6 +65,7 @@ generated/
 ### Example Output
 
 **TypeScript Types:**
+
 ```typescript
 export type PositionComponent = z.infer<typeof positionComponentSchema>;
 export const positionComponentSchema = z.object({
@@ -78,6 +81,7 @@ export interface Components {
 ```
 
 **SQLite Schema:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS tbl_position (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,6 +128,7 @@ bun run scripts/generate-from-cdef.ts --input cdefs.json --zod-no-imports
 ```
 
 Options:
+
 - `--input <path>` JSON file with a single CDef, `CDef[]`, or nested array
 - `--sql-out <path>` Write SQL output to file
 - `--zod-out <path>` Write Zod schemas TS to file
@@ -152,6 +157,7 @@ bun run scripts/generate-from-edl.ts --input examples/zork.edl --include-entity
 ```
 
 Options:
+
 - `--input <path>` EDL file path
 - `--sql-out <path>` Write SQL (DDL + entity/component INSERTs) to file
 - `--types-out <path>` Write TypeScript component types to file
@@ -161,6 +167,7 @@ Options:
 - `--zod-no-imports` Omit `import { z } from 'zod'` in Zod output
 
 Notes:
+
 - Entity IDs are assigned deterministically in order of appearance starting at 1, and `$name` references are resolved to these IDs.
 - Inherited components via `extends` are merged (atoms and entities supported); entity-local component values override inherited values.
 - Component columns are matched via camelCase ↔ snake_case mapping.

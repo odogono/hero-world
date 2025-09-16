@@ -127,8 +127,18 @@ const buildQuery = <T extends Components>(
   const withoutConditions: string[] = [];
 
   // Determine which components to include in the query
+  // Determine default join behavior:
+  // - If explicit `with` is provided, join only those.
+  // - Else, if filtering via `where` or `without`, join all component tables so unqualified
+  //   column names in WHERE can resolve.
+  // - Else (no `with`/`where`/`without`), return all entities without joins.
+  const needsJoins =
+    Boolean(options?.where) || (options?.without?.length ?? 0) > 0;
   const componentsToInclude =
-    options?.with ?? (Array.from(world.defs.keys()) as (keyof T)[]);
+    options?.with ??
+    (needsJoins
+      ? (Array.from(world.defs.keys()) as (keyof T)[])
+      : ([] as (keyof T)[]));
 
   // Handle components that entities must have
   componentsToInclude.forEach(c => {
@@ -191,7 +201,8 @@ const buildQuery = <T extends Components>(
   }
 
   // TODO cache sql against components
-  const sql = `${base}, ${fields.join(', ')}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
+  const selectFields = fields.length > 0 ? `, ${fields.join(', ')}` : '';
+  const sql = `${base}${selectFields}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
 
   return {
     args: options?.args,

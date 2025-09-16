@@ -45,7 +45,9 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
 };
 
 const showHelp = () => {
-  console.log(`Usage: bun run scripts/generate-from-cdef.ts --input cdefs.json [options]\n\nOptions:\n  --input <path>          JSON file with CDef(s)\n  --sql-out <path>        Write SQL output to file\n  --zod-out <path>        Write Zod schemas TS to file\n  --include-entity        Include tbl_entity in SQL up/down\n  --down                  Include DROP statements after CREATE\n  --zod-no-imports        Omit import line in Zod output (multi-embed)\n  -h, --help              Show this help\n`);
+  console.log(
+    `Usage: bun run scripts/generate-from-cdef.ts --input cdefs.json [options]\n\nOptions:\n  --input <path>          JSON file with CDef(s)\n  --sql-out <path>        Write SQL output to file\n  --zod-out <path>        Write Zod schemas TS to file\n  --include-entity        Include tbl_entity in SQL up/down\n  --down                  Include DROP statements after CREATE\n  --zod-no-imports        Omit import line in Zod output (multi-embed)\n  -h, --help              Show this help\n`
+  );
 };
 
 const main = () => {
@@ -92,4 +94,3 @@ const main = () => {
 };
 
 main();
-
