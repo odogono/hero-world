@@ -131,6 +131,29 @@ describe('Component Definitions to SQL', () => {
     expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_describable');
   });
 
+  test('should convert an enum component definition to a SQL table', () => {
+    const cdef: CDef = {
+      id: 'user',
+      columns: [
+        { name: 'id', type: 'pk' },
+        { name: 'name', type: 'string' },
+        {
+          name: 'status',
+          type: 'enum',
+          optional: false,
+          values: ['active', 'inactive']
+        }
+      ]
+    };
+
+    const result = cdefToSql(cdef);
+
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user');
+    expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
+    expect(result.sql).toContain('name TEXT NULL');
+    expect(result.sql).toContain('status TEXT NOT NULL');
+  });
+
   describe('cdefToSqlInsert', () => {
     test('should convert a component definition to a SQL insert', () => {
       const cdef: CDef = {

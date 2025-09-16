@@ -23,7 +23,7 @@ const locationComponent = defineComponent({
   }
 });
 
-const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.WASM;
+const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
 const worldOpts = {
   dbType,
@@ -56,6 +56,9 @@ describe('Database JSON functions', () => {
     const entities = entitiesData as any[];
     expect(entities).toHaveLength(2);
 
+    // Make a deep copy of the data to avoid any test framework interference
+    const entitiesDataCopy = JSON.parse(JSON.stringify(entitiesData));
+
     // Check entity 1
     const savedEntity1 = entities.find(e => e.id === entity1.id);
     expect(savedEntity1).toMatchObject({
@@ -85,8 +88,7 @@ describe('Database JSON functions', () => {
       worldOpts
     );
 
-    // console.debug('entitiesData', entitiesData);
-    loadWorldFromJSON(newWorld, entitiesData, { asComponents: false });
+    loadWorldFromJSON(newWorld, entitiesDataCopy, { asComponents: false });
 
     // saveWorld(newWorld, 'loaded.world.db');
     // Verify data was loaded correctly

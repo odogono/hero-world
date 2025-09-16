@@ -140,6 +140,7 @@ export const saveAsEntities = (db: Database): unknown => {
           },
           {} as Record<string, unknown>
         );
+
         entityData[componentName] = correctedComponentData;
       }
     }

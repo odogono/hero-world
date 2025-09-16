@@ -869,5 +869,45 @@ describe('Component (next)', () => {
       expectTypeOf(com).toEqualTypeOf<defTypeNew>();
       setSystemTime();
     });
+
+    test('component enum properties', () => {
+      const def = defineComponent({
+        id: 'user',
+        schema: {
+          name: s.string(),
+          status: s.enum(['active', 'inactive']).default('active')
+        }
+      });
+
+      expect(def).toMatchObject({
+        columns: [
+          { name: 'name', optional: false, type: 'string' },
+          {
+            default: 'active',
+            name: 'status',
+            optional: false,
+            type: 'string',
+            enum: ['active', 'inactive']
+          }
+        ],
+        id: 'user',
+        tableName: 'tbl_user'
+      });
+
+      type defType = InferComponentType<typeof def>;
+
+      const com = createComponent(def, { status: 'active' });
+
+      expectTypeOf(com).toEqualTypeOf<{
+        name: string;
+        status: 'active' | 'inactive';
+      }>();
+      expectTypeOf(com).toEqualTypeOf<defType>();
+
+      expect(com).toMatchObject({
+        name: '',
+        status: 'active'
+      });
+    });
   });
 });

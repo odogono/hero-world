@@ -22,7 +22,7 @@ const positionComponent = defineComponent({
   id: 'position' as const,
   schema: {
     x: s.number(),
-    y: z.number()
+    y: s.number()
   }
 });
 
@@ -30,7 +30,7 @@ const velocityComponent = defineComponent({
   id: 'velocity' as const,
   schema: {
     x: s.number(),
-    y: z.number()
+    y: s.number()
   }
 });
 

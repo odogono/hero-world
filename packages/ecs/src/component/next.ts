@@ -193,7 +193,7 @@ type DefineComponentSchema = {
 type DefineComponentProps<
   S extends DefineComponentSchema = DefineComponentSchema
 > = {
-  id: string;
+  id?: string;
   schema: S;
   statements?: Record<string, string>;
   tableName?: string;
@@ -262,8 +262,18 @@ export type InferComponentType<T> = T extends { __schema: infer S }
 export const defineComponent = <S extends DefineComponentSchema>(
   props: DefineComponentProps<S>
 ): CDefWithSchema<S> => {
-  const { id, schema, statements, tableName: tableNameProp } = props;
-  const tableName = toTableName(tableNameProp ?? id);
+  const {
+    id: componentId,
+    schema,
+    statements,
+    tableName: tableNameProp
+  } = props;
+
+  if (!componentId) {
+    throw new Error('Either id or name must be provided to defineComponent');
+  }
+
+  const tableName = toTableName(tableNameProp ?? componentId);
 
   const columns = Object.entries(schema).map(([name, schema]) =>
     schema.build({ name })
@@ -271,7 +281,7 @@ export const defineComponent = <S extends DefineComponentSchema>(
 
   return {
     columns,
-    id,
+    id: componentId,
     statements,
     tableName
   } as CDefWithSchema<S>;
@@ -375,7 +385,21 @@ const date = () => columnBuilder('date');
 const datetime = () => columnBuilder('datetime');
 const email = () => columnBuilder('email');
 const entityId = () => columnBuilder('int').optional().foreignKey('tbl_entity');
-const enumBuilder = (values: string[]) => columnBuilder('enum');
+const enumBuilder = (values: string[]) => {
+  const builder = columnBuilder('string');
+  const column = builder.build({ name: 'temp' });
+  column.enum = values;
+
+  const modifiedBuilder = {
+    ...builder,
+    build: (props: { name: string }) => {
+      column.name = props.name;
+      return column;
+    }
+  };
+
+  return modifiedBuilder;
+};
 const float = () => columnBuilder('float');
 const int = () => columnBuilder('int');
 const json = () => columnBuilder('json');
