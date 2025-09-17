@@ -58,16 +58,25 @@ describe('World EDL', () => {
       z: float default 0
     }
 
+    def container {
+      capacity: int default 10
+      is_closed: boolean default false
+    }
+
     def measured {
       area: float default 0
       weight: float default 0
+    }
+
+    atom container {
+      container { capacity: 10 is_closed: false }
     }
 
     entity thing {
       measured { area: 10 weight: 20 }
     }
 
-    entity box: thing {
+    entity box: thing container {
       position { x: 10 y: 20 z: 30 }
     }
     `;
@@ -84,6 +93,7 @@ describe('World EDL', () => {
     expect(box.measured.area).toBe(10);
     expect(box.measured.weight).toBe(20);
 
+    // NOTE atoms are not saved as entities
     const data = world.db.saveToJSON({ asComponents: false });
     expect(data).toHaveLength(2);
 

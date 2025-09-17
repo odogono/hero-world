@@ -234,6 +234,7 @@ entity lockable_chest: chest {
           email: email not null is_unique
           age: int default 0
           height: float default 0.0
+          linked: eid
           is_active: boolean default true
           created_at: datetime default current_timestamp
         }
@@ -251,6 +252,7 @@ entity lockable_chest: chest {
             { name: 'email', type: 'email', optional: false, isUnique: true },
             { name: 'age', type: 'int', default: '0' },
             { name: 'height', type: 'float', default: '0.0' },
+            { name: 'linked', type: 'eid' },
             { name: 'is_active', type: 'boolean', default: 'true' },
             {
               name: 'created_at',

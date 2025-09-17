@@ -1,5 +1,5 @@
 # Zork-like Adventure EDL Example
-﻿#
+#
 # This EDL defines core components, atoms, and a small set of rooms/items.
 # Note: The EDL grammar supports inheritance for entities (via ": base"),
 # but not for atoms. To model "room inherits container", room entities extend
@@ -21,15 +21,6 @@ def container {
   is_closed: boolean not null default false
 }
 
-# Exits from a room; directions point to other room entity ids
-def exits {
-  north: int null
-  south: int null
-  east: int null
-  west: int null
-  up: int null
-  down: int null
-}
 
 # Generic item properties
 def item {
@@ -39,7 +30,16 @@ def item {
 
 # Optional location link (place an entity inside a container or room)
 def location {
-  in: int null
+  in: eid null
+}
+
+# Defines a portal to another container
+# Combine with a door for gating
+def portal {
+  # which container this portal leads to
+  to: eid null
+  # the direction which this portal leads
+  dir: string not null
 }
 
 # ======
@@ -57,6 +57,11 @@ atom room {
   described { name: "Room" description: "An unremarkable room." }
 }
 
+# Exit atom
+atom exit {
+  
+}
+
 # Generic item atom
 atom item {
   item { weight: 1 is_takeable: true }
@@ -72,7 +77,11 @@ entity outside: room container {
     name: "West of House"
     description: "You are standing in an open field west of a white house, with a boarded front door."
   }
-  exits { east: $foyer }
+}
+
+entity outside_east : exit { 
+  location { in: $outside }
+  portal { dir: east to: $foyer }
 }
 
 entity foyer: room container {
@@ -80,7 +89,15 @@ entity foyer: room container {
     name: "The Foyer"
     description: "A small foyer with a dusty rug. A staircase leads up."
   }
-  exits { west: $outside north: $kitchen up: $attic }
+}
+
+entity foyer_west : exit { 
+  location { in: $foyer }
+  portal{ dir: west to: $outside }
+}
+entity foyer_up : exit { 
+  location { in: $foyer }
+  portal{ dir: up to: $attic }
 }
 
 entity kitchen: room container {
@@ -88,7 +105,11 @@ entity kitchen: room container {
     name: "Kitchen"
     description: "The kitchen smells of old bread. There is a table here."
   }
-  exits { south: $foyer }
+}
+
+entity kitchen_south : exit { 
+  location { in: $kitchen }
+  portal{ dir: south to: $foyer }
 }
 
 entity attic: room container {
@@ -96,7 +117,11 @@ entity attic: room container {
     name: "Attic"
     description: "A dark, musty attic with low rafters."
   }
-  exits { down: $foyer }
+}
+
+entity attic_down : exit { 
+  location { in: $attic }
+  portal{ dir: down to: $foyer }
 }
 
 # Items
