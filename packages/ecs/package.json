@@ -22,6 +22,7 @@
     "zod": "^4"
   },
   "scripts": {
+    "coverage": "bun test --coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "bun run scripts/generate-schemas.ts",
