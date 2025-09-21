@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createWorld, flush } from '@/world';
 import { DatabaseType } from '@db';
 import { eventComponent, getEvents, scheduleEvent } from '@events';
+import { createWorld } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
@@ -18,7 +18,7 @@ describe('EventSystem wildcards', () => {
     scheduleEvent(world, 'enemy-die', { id: 2 });
     scheduleEvent(world, 'boss1', { phase: 1 });
     scheduleEvent(world, 'boss12', { phase: 2 });
-    flush(world);
+    world.flush();
 
     // '*' should match all types (no type filter)
     const all = getEvents(world, '*');
@@ -43,7 +43,7 @@ describe('EventSystem wildcards', () => {
     scheduleEvent(world, 'warn-2', { level: 2 });
     scheduleEvent(world, 'error-a', { code: 'A' });
     scheduleEvent(world, 'info', {});
-    flush(world);
+    world.flush();
 
     // Collect with wildcard pattern
     const collectedWarns = getEvents(world, 'warn-*');
@@ -51,7 +51,7 @@ describe('EventSystem wildcards', () => {
     expect(collectedWarns.every(e => e.type.startsWith('warn-'))).toBe(true);
 
     // Flush to persist processed marks
-    flush(world);
+    world.flush();
 
     // Collect with list including '?' single-char pattern
     const collectedMixed = getEvents(world, ['error-?', 'info']);

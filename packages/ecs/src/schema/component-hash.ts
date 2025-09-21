@@ -1,33 +1,31 @@
-import { createHash } from 'node:crypto';
+import { murmurHash } from 'odgn-helpers/hash';
+import { toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef } from '@types';
+import type { CDef, CDefColumnInfo } from '@types';
 
 import { cdefToSqlCreate } from './cdef-to-sql';
+
+export type HashComponentDefinitionInput = Partial<CDef> & {
+  columns: CDefColumnInfo[];
+  id: string;
+};
 
 /**
  * Creates a deterministic hash for a component definition
  * This hash uses the generated SQL table structure and statements
  */
-export const hashComponentDefinition = (def: CDef): string => {
+export const hashComponentDefinition = (
+  def: HashComponentDefinitionInput
+): string => {
   // Generate the SQL table structure
-  const tableResult = cdefToSqlCreate(def);
-
-  // Create a canonical representation using SQL and statements
-  // const canonical = {
-  //   columns: tableResult.columns.sort((a, b) => a.name.localeCompare(b.name)), // Sort for consistency
-  //   sql: tableResult.sql,
-  //   statements: statements || {},
-  //   tableName: tableResult.tableName
-  // };
-
-  // // Sort keys to ensure consistent ordering
-  // const sortedCanonical = JSON.stringify(
-  //   canonical,
-  //   Object.keys(canonical).sort()
-  // );
+  const tableResult = cdefToSqlCreate(
+    { ...def, hash: 'hash' },
+    { tableName: `tbl_${toSnakeCase(def.id)}` }
+  );
 
   // Create SHA-256 hash
-  return createHash('sha256').update(tableResult.sql).digest('hex');
+  // return createHash('sha256').update(tableResult.sql).digest('hex');
+  return murmurHash(tableResult.sql);
 };
 
 /**

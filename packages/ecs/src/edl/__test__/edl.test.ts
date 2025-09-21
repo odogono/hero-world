@@ -10,7 +10,6 @@ import {
   executeEDL,
   parseEDL
 } from '@edl';
-import { queryEntity } from '@entity';
 import { createWorld } from '@world';
 
 const describedComponent = defineComponent({
@@ -277,7 +276,7 @@ entity lockable_chest: chest {
 
       executeEDL(world, edl);
 
-      const entity = queryEntity(world, { with: ['thing'] })!;
+      const entity = world.query({ with: ['thing'] })!;
 
       expect(entity).toBeDefined();
       expect(entity.thing.size).toBe(10);
@@ -298,8 +297,8 @@ entity lockable_chest: chest {
 
       executeEDL(world, edl);
 
-      const parent = queryEntity(world, { with: ['thing'] })!;
-      const child = queryEntity(world, { with: ['link'] })!;
+      const parent = world.query({ with: ['thing'] })!;
+      const child = world.query({ with: ['link'] })!;
 
       expect(child.link.targetId).toBe(parent.id);
     });
@@ -318,11 +317,11 @@ entity lockable_chest: chest {
 
       executeEDL(world, edl);
 
-      const parent = queryEntity(world, {
+      const parent = world.query({
         with: ['thing'],
         where: 'thing_weight = 20'
       })!;
-      const child = queryEntity(world, {
+      const child = world.query({
         with: ['thing'],
         where: 'thing_weight = 5'
       })!;
@@ -345,8 +344,8 @@ entity lockable_chest: chest {
 
       executeEDL(world, edl);
 
-      const parent = queryEntity(world, { with: ['thing'] })!;
-      const child = queryEntity(world, { with: ['link'] })!;
+      const parent = world.query({ with: ['thing'] })!;
+      const child = world.query({ with: ['link'] })!;
 
       expect(child.link.targetId).toBe(parent.id);
     });
@@ -401,7 +400,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent, statsArrayComponent]);
       executeEDL(world, edl);
 
-      const child = queryEntity(world, {
+      const child = world.query({
         with: ['thing'],
         where: 'thing_weight = 5'
       })!;
@@ -418,7 +417,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const inherited = queryEntity(world, {
+      const inherited = world.query({
         with: ['thing'],
         where: 'thing_size = 7 AND thing_weight = 9'
       });
@@ -436,7 +435,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const e = queryEntity(world, {
+      const e = world.query({
         with: ['thing'],
         where: 'thing_size = 10 AND thing_weight = 2'
       });
@@ -453,7 +452,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const child = queryEntity(world, {
+      const child = world.query({
         with: ['thing'],
         where: 'thing_weight = 8'
       })!;
@@ -504,7 +503,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const chest = queryEntity(world, {
+      const chest = world.query({
         with: ['thing'],
         where: 'thing_size = 30'
       })!;
@@ -524,7 +523,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const chest = queryEntity(world, {
+      const chest = world.query({
         with: ['thing'],
         where: 'thing_weight = 40'
       })!;
@@ -545,7 +544,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl, { commands: { '!examine': examine } });
 
-      const chest = queryEntity(world, {
+      const chest = world.query({
         with: ['thing'],
         where: 'thing_weight = 20'
       })!;
@@ -586,7 +585,7 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl, { commands: { '!examine': examine } });
 
-      const chest = queryEntity(world, { with: ['thing'] })!;
+      const chest = world.query({ with: ['thing'] })!;
       expect(chest).toBeDefined();
       const rowId = chest.thing.id!;
 

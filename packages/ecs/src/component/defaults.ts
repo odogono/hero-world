@@ -6,8 +6,6 @@ import type {
   World
 } from '@types';
 
-import type { InferComponentType } from './types';
-
 /**
  * Apply default values from a Zod schema to component data
  * This function merges the provided data with default values from the schema
@@ -116,6 +114,8 @@ export const getDefault = (
       return forObject ? new Date() : 'current_time';
     case 'timestamp':
       return forObject ? new Date() : 'current_timestamp';
+    case 'uuid':
+      return Bun.randomUUIDv7();
     default:
       return '';
   }

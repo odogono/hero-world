@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntity } from '@entity';
-import { createWorld, flush } from '@world';
+import { createWorld } from '@world';
 
 const statsComponent = defineComponent({
   id: 'statsProxyTest',
@@ -27,19 +26,19 @@ const createTestWorld = async () =>
 describe('queryEntity proxied option', () => {
   test('default snapshot: add via assignment does not persist', async () => {
     const world = await createTestWorld();
-    const e = createEntity(world, {
+    const e = world.create({
       statsProxyTest: { health: 100, level: 1, mana: 50 }
     });
-    flush(world);
+    world.flush();
 
-    const snap = queryEntity(world, { with: ['statsProxyTest'] });
+    const snap = world.query({ with: ['statsProxyTest'] });
     expect(snap).toBeDefined();
 
     // Assigning a new component on a snapshot should not persist
-    (snap as any).locationProxyTest = { name: 'Forest', region: 'North' };
-    flush(world);
+    snap!.locationProxyTest = { name: 'Forest', region: 'North' };
+    world.flush();
 
-    const shouldBeNull = queryEntity(world, {
+    const shouldBeNull = world.query({
       with: ['statsProxyTest', 'locationProxyTest']
     });
     expect(shouldBeNull).toBeNull();
@@ -47,30 +46,30 @@ describe('queryEntity proxied option', () => {
 
   test('proxied: add/remove via assignment persists', async () => {
     const world = await createTestWorld();
-    const e = createEntity(world, {
+    const e = world.create({
       statsProxyTest: { health: 100, level: 1, mana: 50 }
     });
-    flush(world);
+    world.flush();
 
     // Opt in to proxied result
-    const proxy = queryEntity(world, {
+    const proxy = world.query({
       asProxy: true,
       with: ['statsProxyTest']
     })!;
-    (proxy as any).locationProxyTest = { name: 'Forest', region: 'North' };
-    flush(world);
+    proxy.locationProxyTest = { name: 'Forest', region: 'North' };
+    world.flush();
 
-    const persisted = queryEntity(world, {
+    const persisted = world.query({
       with: ['statsProxyTest', 'locationProxyTest']
     });
     expect(persisted).toBeDefined();
     expect(persisted!.locationProxyTest).toBeDefined();
 
     // Removing via null should also persist deletion
-    (proxy as any).locationProxyTest = null;
-    flush(world);
+    proxy.locationProxyTest = null;
+    world.flush();
 
-    const removed = queryEntity(world, {
+    const removed = world.query({
       with: ['statsProxyTest', 'locationProxyTest']
     });
     expect(removed).toBeNull();

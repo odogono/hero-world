@@ -2,8 +2,8 @@ import { toCamelCase } from 'odgn-helpers/string';
 
 import { addComponents } from '@component';
 import { parseEDL } from '@edl';
-import { createEntity } from '@entity';
-import type { Components, World } from '@types';
+import type { Components } from '@types';
+import { World } from '@world';
 
 import {
   EDLCircularReferenceError,
@@ -35,24 +35,24 @@ export type ExecuteOptions = {
   commands?: Record<string, (...args: any[]) => void>;
 };
 
+const stripComments = (line: string) => {
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"' && line[i - 1] !== '\\') {
+      inQuotes = !inQuotes;
+    }
+    if (ch === '#' && !inQuotes) {
+      return line.slice(0, i);
+    }
+  }
+  return line;
+};
+
 // Lightweight command tokenizer supporting quoted strings and comments
 const parseCommands = (edl: string) => {
   const lines = edl.split(/\r?\n/);
   const commands: Array<{ name: string; rawArgs: string[] }> = [];
-
-  const stripComments = (line: string) => {
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"' && line[i - 1] !== '\\') {
-        inQuotes = !inQuotes;
-      }
-      if (ch === '#' && !inQuotes) {
-        return line.slice(0, i);
-      }
-    }
-    return line;
-  };
 
   const tokenize = (line: string): string[] => {
     const tokens: string[] = [];
@@ -111,19 +111,7 @@ export const executeEDL = <T extends Components>(
 ): void => {
   const commands = parseCommands(edl);
   // Remove command lines before parsing entity/atom definitions
-  const stripComments = (line: string) => {
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"' && line[i - 1] !== '\\') {
-        inQuotes = !inQuotes;
-      }
-      if (ch === '#' && !inQuotes) {
-        return line.slice(0, i);
-      }
-    }
-    return line;
-  };
+
   const edlForParse = edl
     .split(/\r?\n/)
     .map(l => stripComments(l))
@@ -160,7 +148,7 @@ export const executeEDL = <T extends Components>(
     }
 
     // Create entity without components to avoid schema validation before resolving refs
-    const entity = createEntity(world as unknown as World<Components>);
+    const entity = world.create();
     entitiesById.set(entity.id, entity as any);
     if (def.id) {
       entityIdsByName.set(def.id, entity.id);

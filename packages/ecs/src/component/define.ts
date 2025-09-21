@@ -1,4 +1,7 @@
-import { toTableName } from './helpers/to-table-name';
+import {
+  hashComponentDefinition,
+  type HashComponentDefinitionInput
+} from '../schema/component-hash';
 import type {
   CDefWithSchema,
   DefineComponentProps,
@@ -22,16 +25,25 @@ export const defineComponent = <
     throw new Error('id must be provided to defineComponent');
   }
 
-  const tableName = toTableName(tableNameProp ?? componentId);
-
   const columns = Object.entries(schema).map(([name, schema]) =>
     schema.build({ name })
   );
 
-  return {
+  // hash the definition using its SQL create statement
+  // but without the table name
+
+  const partialDef: HashComponentDefinitionInput = {
     columns,
+    id: componentId
+  };
+
+  const hash = hashComponentDefinition(partialDef);
+
+  return {
+    __schema: schema,
+    columns,
+    hash,
     id: componentId as Name,
-    statements,
-    tableName
+    statements
   } as CDefWithSchema<S, Name>;
 };

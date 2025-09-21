@@ -2,8 +2,7 @@ import { describe, expect, it, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
-import { createEntity, deleteEntity, getEntity } from '@entity';
-import { createWorld, flush } from '@world';
+import { createWorld } from '@world';
 
 // Component definitions using new system
 const statsComponent = defineComponent({
@@ -59,7 +58,7 @@ describe('createEntity', () => {
 
     const world = await createWorld([stats], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       specialStats: {
         agility: 10,
         strength: 20
@@ -72,7 +71,7 @@ describe('createEntity', () => {
   test('createEntity should create entity without components', async () => {
     const world = await createWorld([], worldOpts);
 
-    const entity = createEntity(world);
+    const entity = world.create();
 
     expect(entity).toBeDefined();
     expect(entity.id).toBeTypeOf('number');
@@ -85,9 +84,9 @@ describe('createEntity', () => {
   test('createEntity should create multiple entities with unique IDs', async () => {
     const world = await createWorld([], worldOpts);
 
-    const entity1 = createEntity(world);
-    const entity2 = createEntity(world);
-    const entity3 = createEntity(world);
+    const entity1 = world.create();
+    const entity2 = world.create();
+    const entity3 = world.create();
 
     expect(entity1.id).not.toBe(entity2.id);
     expect(entity2.id).not.toBe(entity3.id);
@@ -100,7 +99,7 @@ describe('createEntity', () => {
   test('createEntity should create entity with location component', async () => {
     const world = await createWorld([locationComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Forest', region: 'North' }
     });
 
@@ -114,7 +113,7 @@ describe('createEntity', () => {
   test('createEntity should create entity with stats component', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 5, mana: 50 }
     });
 
@@ -129,7 +128,7 @@ describe('createEntity', () => {
     const world = await createWorld([inventoryComponent], worldOpts);
 
     const items = JSON.stringify(['sword', 'potion', 'key']);
-    const entity = createEntity(world, {
+    const entity = world.create({
       teInventory: { capacity: 10, items }
     });
 
@@ -145,7 +144,7 @@ describe('createEntity', () => {
       worldOpts
     );
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'City', region: 'Central' },
       teStats: { health: 80, level: 3, mana: 30 }
     });
@@ -163,7 +162,7 @@ describe('createEntity', () => {
   test('createEntity should track component changes', async () => {
     const world = await createWorld([locationComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Forest', region: 'North' }
     });
 
@@ -172,7 +171,7 @@ describe('createEntity', () => {
     expect(world.dirtyEntities.get(entity.id)?.has('teLocation')).toBe(true);
 
     // Clear dirty state by flushing
-    flush(world);
+    world.flush();
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify component - should mark as dirty again
@@ -189,13 +188,13 @@ describe('createEntity', () => {
       worldOpts
     );
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Village', region: 'East' },
       teStats: { health: 100, level: 1, mana: 50 }
     });
 
     // Clear dirty state
-    flush(world);
+    world.flush();
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify location component
@@ -214,7 +213,7 @@ describe('createEntity', () => {
   test('createEntity should cache components in entityCache', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 75, level: 4, mana: 25 }
     });
 
@@ -233,7 +232,7 @@ describe('createEntity', () => {
   test('createEntity should persist components after flush', async () => {
     const world = await createWorld([inventoryComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teInventory: { capacity: 5, items: '["apple", "bread"]' }
     });
 
@@ -242,7 +241,7 @@ describe('createEntity', () => {
     expect(cacheBefore.exists).toBe(false);
 
     // Flush to persist
-    flush(world);
+    world.flush();
 
     // await world.db.saveToPath('world.db');
 
@@ -255,12 +254,12 @@ describe('createEntity', () => {
   test('createEntity should work with component modifications through proxy', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 10, mana: 100 }
     });
 
     // Clear dirty state
-    flush(world);
+    world.flush();
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify multiple properties
@@ -289,7 +288,7 @@ describe('createEntity', () => {
 
     const world = await createWorld([nameComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       testName: { firstName: 'John', lastName: 'Doe', title: 'Sir' }
     });
 
@@ -299,7 +298,7 @@ describe('createEntity', () => {
     expect(entity.testName.title).toBe('Sir');
 
     // Test modifications
-    flush(world);
+    world.flush();
     entity.testName.title = 'Lord';
     expect(entity.testName.title).toBe('Lord');
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
@@ -326,7 +325,7 @@ describe('createEntity', () => {
   test('should create typed entity with single component', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
 
@@ -344,7 +343,7 @@ describe('createEntity', () => {
       worldOpts
     );
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Forest', region: 'North' },
       teStats: { health: 80, level: 3, mana: 30 }
     });
@@ -359,7 +358,7 @@ describe('createEntity', () => {
   test('should create typed entity without initial components', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world);
+    const entity = world.create();
 
     expect(entity).toBeDefined();
     expect(entity.id).toBeTypeOf('number');
@@ -369,12 +368,12 @@ describe('createEntity', () => {
   test('should track component changes in typed entities', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
 
     // Clear initial dirty state
-    flush(world);
+    world.flush();
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Modify component
@@ -390,7 +389,7 @@ describe('createEntity', () => {
   test('should persist typed entity components after flush', async () => {
     const world = await createWorld([inventoryComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teInventory: { capacity: 10, items: '["sword", "shield"]' }
     });
 
@@ -399,7 +398,7 @@ describe('createEntity', () => {
     expect(cacheBefore.exists).toBe(false);
 
     // Flush and check
-    flush(world);
+    world.flush();
 
     const cacheAfter = world.entityCache.get(entity.id)!.teInventory!;
     expect(cacheAfter.exists).toBe(true);
@@ -409,11 +408,11 @@ describe('createEntity', () => {
   it('should work with custom component statements', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    createEntity(world, {
+    world.create({
       teStats: { health: 75, level: 5, mana: 25 }
     });
 
-    flush(world);
+    world.flush();
 
     // Test custom statement from component definition
     const def = world.defs.get('teStats');
@@ -436,19 +435,19 @@ describe('createEntity', () => {
     );
 
     // Create multiple entities
-    const warrior = createEntity(world, {
+    const warrior = world.create({
       teInventory: { capacity: 15, items: '["sword", "armor", "potion"]' },
       teLocation: { name: 'Battlefield', region: 'War Zone' },
       teStats: { health: 120, level: 8, mana: 10 }
     });
 
-    const mage = createEntity(world, {
+    const mage = world.create({
       teInventory: { capacity: 8, items: '["staff", "spellbook", "robe"]' },
       teLocation: { name: 'Tower', region: 'Magic District' },
       teStats: { health: 60, level: 10, mana: 200 }
     });
 
-    flush(world);
+    world.flush();
 
     // Verify both entities exist and have correct data
     expect(warrior.teLocation.name).toBe('Battlefield');
@@ -468,60 +467,60 @@ describe('createEntity', () => {
   });
 });
 
-describe('deleteEntity', () => {
-  test('deleteEntity should remove entity from database', async () => {
+describe('delete entity', () => {
+  test('delete should remove entity from database', async () => {
     const world = await createWorld([], worldOpts);
 
-    const entity = createEntity(world);
+    const entity = world.create();
 
     // Verify entity exists
-    const e = getEntity(world, entity.id);
+    const e = world.get(entity.id);
     expect(e!.id).toEqual(entity.id);
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify entity is marked for deletion but not yet removed from database
-    const e2 = getEntity(world, entity.id);
+    const e2 = world.get(entity.id);
     expect(e2).toBeDefined(); // Entity still exists until flush
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    const e3 = getEntity(world, entity.id);
+    const e3 = world.get(entity.id);
     expect(e3).toBeNull();
   });
 
-  test('deleteEntity should remove entity with components', async () => {
+  test('delete should remove entity with components', async () => {
     const world = await createWorld([locationComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Forest', region: 'North' }
     });
-    flush(world);
+    world.flush();
 
     // Verify entity and component exist
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
     expect(entity.teLocation.name).toBe('Forest');
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify entity is marked for deletion but not yet removed from database
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    expect(world.get(entity.id)).toBeNull();
   });
 
-  test('deleteEntity should clean up entity cache', async () => {
+  test('delete should clean up entity cache', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
 
@@ -529,16 +528,16 @@ describe('deleteEntity', () => {
     expect(world.entityCache.has(entity.id)).toBe(true);
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify entity is removed from cache
     expect(world.entityCache.has(entity.id)).toBe(false);
   });
 
-  test('deleteEntity should clean up dirty entities tracking', async () => {
+  test('delete should clean up dirty entities tracking', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
 
@@ -546,107 +545,107 @@ describe('deleteEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify entity is removed from dirty tracking
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
   });
 
-  test('deleteEntity should cascade delete components from database', async () => {
+  test('delete should cascade delete components from database', async () => {
     const world = await createWorld(
       [locationComponent, statsComponent],
       worldOpts
     );
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teLocation: { name: 'Village', region: 'East' },
       teStats: { health: 80, level: 3, mana: 30 }
     });
-    flush(world);
+    world.flush();
 
     // Verify components exist in database
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_location WHERE eid = ?'
+      'SELECT * FROM tbl_te_location_1stfrln WHERE eid = ?'
     );
     const statsStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_stats WHERE eid = ?'
+      'SELECT * FROM tbl_te_stats_j940n6 WHERE eid = ?'
     );
 
     expect(locationStmt.get(entity.id)).toBeDefined();
     expect(statsStmt.get(entity.id)).toBeDefined();
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify entity is marked for deletion but not yet removed from database
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    expect(world.get(entity.id)).toBeNull();
 
     // Verify components are cascade deleted from database
     expect(locationStmt.get(entity.id)).toBeNull();
     expect(statsStmt.get(entity.id)).toBeNull();
   });
 
-  test('deleteEntity should handle multiple entities independently', async () => {
+  test('delete should handle multiple entities independently', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity1 = createEntity(world, {
+    const entity1 = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
-    const entity2 = createEntity(world, {
+    const entity2 = world.create({
       teStats: { health: 80, level: 2, mana: 40 }
     });
-    const entity3 = createEntity(world, {
+    const entity3 = world.create({
       teStats: { health: 120, level: 3, mana: 60 }
     });
 
-    flush(world);
+    world.flush();
 
     // Verify all entities exist
-    expect(getEntity(world, entity1.id)).toBeDefined();
-    expect(getEntity(world, entity2.id)).toBeDefined();
-    expect(getEntity(world, entity3.id)).toBeDefined();
+    expect(world.get(entity1.id)).toBeDefined();
+    expect(world.get(entity2.id)).toBeDefined();
+    expect(world.get(entity3.id)).toBeDefined();
 
     // Delete middle entity
-    deleteEntity(entity2);
+    world.delete(entity2);
 
     // Verify middle entity is marked for deletion but not yet removed from database
-    expect(getEntity(world, entity1.id)).toBeDefined();
-    expect(getEntity(world, entity2.id)).toBeDefined();
-    expect(getEntity(world, entity3.id)).toBeDefined();
+    expect(world.get(entity1.id)).toBeDefined();
+    expect(world.get(entity2.id)).toBeDefined();
+    expect(world.get(entity3.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify only middle entity is now removed
-    expect(getEntity(world, entity1.id)).toBeDefined();
-    expect(getEntity(world, entity2.id)).toBeNull();
-    expect(getEntity(world, entity3.id)).toBeDefined();
+    expect(world.get(entity1.id)).toBeDefined();
+    expect(world.get(entity2.id)).toBeNull();
+    expect(world.get(entity3.id)).toBeDefined();
 
     // Verify other entities still work
     expect(entity1.teStats.health).toBe(100);
     expect(entity3.teStats.health).toBe(120);
   });
 
-  test('deleteEntity should return null', async () => {
+  test('delete should return null', async () => {
     const world = await createWorld([], worldOpts);
 
-    const entity = createEntity(world);
+    const entity = world.create();
 
-    const result = deleteEntity(entity);
+    const result = world.delete(entity);
 
     expect(result).toBeNull();
   });
 
-  test('deleteEntity should work with unflushed entities', async () => {
+  test('delete should work with unflushed entities', async () => {
     const world = await createWorld([inventoryComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teInventory: { capacity: 10, items: '["sword", "potion"]' }
     });
 
@@ -655,29 +654,29 @@ describe('deleteEntity', () => {
     expect(world.entityCache.has(entity.id)).toBe(true);
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify cleanup of caches
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Entity should still exist in database until flush
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    expect(world.get(entity.id)).toBeNull();
   });
 
-  test('deleteEntity should work after component modifications', async () => {
+  test('delete should work after component modifications', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teStats: { health: 100, level: 1, mana: 50 }
     });
-    flush(world);
+    world.flush();
 
     // Modify component
     entity.teStats.health = 90;
@@ -686,34 +685,37 @@ describe('deleteEntity', () => {
     expect(world.dirtyEntities.has(entity.id)).toBe(true);
 
     // Delete entity with pending changes
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify cache cleanup
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Entity should still exist in database until flush
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    expect(world.get(entity.id)).toBeNull();
   });
 
-  test('deleteEntity should handle entity with all component types and cascade delete', async () => {
+  test('delete should handle entity with all component types and cascade delete', async () => {
     const world = await createWorld(
       [locationComponent, statsComponent, inventoryComponent],
       worldOpts
     );
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       teInventory: { capacity: 20, items: '["crown", "scepter", "gold"]' },
       teLocation: { name: 'Castle', region: 'Kingdom' },
       teStats: { health: 150, level: 5, mana: 75 }
     });
-    flush(world);
+    world.flush();
+
+    // const json = world.saveToJSON({ asComponents: true });
+    // console.log(json);
 
     // Verify all components exist
     expect(entity.teLocation.name).toBe('Castle');
@@ -721,30 +723,31 @@ describe('deleteEntity', () => {
     expect(entity.teInventory.capacity).toBe(20);
 
     // Delete entity
-    deleteEntity(entity);
+    world.delete(entity);
 
     // Verify cache cleanup
     expect(world.entityCache.has(entity.id)).toBe(false);
     expect(world.dirtyEntities.has(entity.id)).toBe(false);
 
     // Entity should still exist in database until flush
-    expect(getEntity(world, entity.id)).toBeDefined();
+    expect(world.get(entity.id)).toBeDefined();
 
     // Flush to actually delete from database
-    flush(world);
+    world.flush();
 
     // Verify entity is now removed
-    expect(getEntity(world, entity.id)).toBeNull();
+    expect(world.get(entity.id)).toBeNull();
 
     // Verify database cascade delete worked
+
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_location WHERE eid = ?'
+      'SELECT * FROM tbl_te_location_1stfrln WHERE eid = ?'
     );
     const statsStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_stats WHERE eid = ?'
+      'SELECT * FROM tbl_te_stats_j940n6 WHERE eid = ?'
     );
     const inventoryStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_inventory WHERE eid = ?'
+      'SELECT * FROM tbl_te_inventory_18a10gf WHERE eid = ?'
     );
 
     expect(locationStmt.get(entity.id)).toBeNull();

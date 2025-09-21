@@ -6,15 +6,14 @@ This library infers component types end‑to‑end so that worlds, entities, and
 
 - `defineComponent` builds a `CDef` with a typed schema.
 - `createWorld([c1, c2, ...] as const)` uses a typed overload to infer the component map from the provided `CDef` tuple.
-- `createEntity(world, { ... })` produces an entity whose component properties are strongly typed.
-- `queryEntity(world, { with: [...] as const })` narrows the returned entity type to require the listed components; without `with`, components are optional.
+- `world.create({ ... })` produces an entity whose component properties are strongly typed.
+- `world.query({ with: [...] as const })` narrows the returned entity type to require the listed components; without `with`, components are optional.
 - `asProxy: true` allows component add/remove via property assignment; call `world.flush()` to persist.
 
 ## Minimal Example
 
 ```ts
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntity } from '@entity';
 import { createWorld } from '@world';
 
 const position = defineComponent({
@@ -31,17 +30,17 @@ const velocity = defineComponent({
 const world = await createWorld([position, velocity] as const);
 
 // Fully typed: entity.position.{x,y} are numbers
-const entity = createEntity(world, { position: { x: 10, y: 20 } });
+const entity = world.create({ position: { x: 10, y: 20 } });
 
 // Query with type narrowing via `with`: result has required `position`
-const found = queryEntity(world, { with: ['position'] as const });
+const found = world.query({ with: ['position'] as const });
 if (found) {
   // `position` is guaranteed here
   found.position.x; // number
 }
 
 // Proxy query enables add/remove via property assignment
-const proxied = queryEntity(world, {
+const proxied = world.query({
   with: ['position'] as const,
   asProxy: true
 });
@@ -74,7 +73,7 @@ const status = defineComponent({
 
 // Good: const tuple keeps IDs literal → world/components are precisely typed
 const world = await createWorld([position, status] as const);
-const e = createEntity(world, { position: { x: 1, y: 2, z: 3 } });
+const e = world.create({ position: { x: 1, y: 2, z: 3 } });
 e.position.x; // number
 
 // If you omit `as const`, the list widens to CDef[] and loses correlation,

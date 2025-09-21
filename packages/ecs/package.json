@@ -4,12 +4,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./component": "./src/component.ts",
+    "./component": "./src/index.ts",
     "./edl": "./src/edl/index.ts",
     "./entity": "./src/entity.ts",
     "./events": "./src/events/index.ts",
     "./system": "./src/system/index.ts",
-    "./world": "./src/world.ts"
+    "./world": "./src/world/index.ts"
   },
   "devDependencies": {
     "vite-tsconfig-paths": "^5.1.4",

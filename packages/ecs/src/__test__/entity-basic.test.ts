@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
 
-import { createEntity } from '../entity';
 import { createWorld } from '../world';
 
 describe('Entity Basic', () => {
@@ -25,7 +24,7 @@ describe('Entity Basic', () => {
 
     const world = await createWorld([positionDef, statusDef] as const);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       position: {
         x: 10,
         y: 20,

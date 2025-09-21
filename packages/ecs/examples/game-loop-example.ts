@@ -1,10 +1,9 @@
 /* eslint-disable no-console */
 
-import { createWorld } from '@/world';
 import { defineComponent, s } from '@component';
-import { createEntity } from '@entity';
 import { createSystem } from '@system';
 import { createGameLoop } from '@system/game-loop';
+import { createWorld } from '@world';
 
 // Define game components
 const positionComponent = defineComponent({
@@ -56,20 +55,20 @@ const createTestWorld = async () => {
 const world = await createTestWorld();
 
 // Create entities
-const player = createEntity(world, {
+const player = world.create({
   health: { current: 100, max: 100, regenerationRate: 1 },
   player: { level: 1, name: 'Hero' },
   position: { x: 100, y: 100, z: 0 },
   velocity: { x: 0, y: 0, z: 0 }
 });
 
-const enemy1 = createEntity(world, {
+const enemy1 = world.create({
   health: { current: 50, max: 50, regenerationRate: 0 },
   position: { x: 200, y: 150, z: 0 },
   velocity: { x: -10, y: 0, z: 0 }
 });
 
-const enemy2 = createEntity(world, {
+const enemy2 = world.create({
   health: { current: 75, max: 75, regenerationRate: 0 },
   position: { x: 300, y: 120, z: 0 },
   velocity: { x: -5, y: 5, z: 0 }

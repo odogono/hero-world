@@ -4,16 +4,10 @@ import { parseArgs } from './helpers';
 import type {
   CreateDatabaseOptions,
   Database,
-  LoadFromJSONOptions,
-  SaveToJSONOptions,
   Statement,
   StatementArgs,
   StatementRunResult
 } from './index';
-import {
-  loadFromJSON as sharedLoadFromJSON,
-  saveToJSON as sharedSaveToJSON
-} from './json-functions';
 
 // AlasSQL Statement wrapper
 class AlasqlStatementWrapper implements Statement {
@@ -543,14 +537,6 @@ export class AlasqlDatabaseWrapper implements Database {
     // In a real implementation, you might want to implement rollback logic
 
     return fn();
-  }
-
-  saveToJSON(options: SaveToJSONOptions = {}): unknown {
-    return sharedSaveToJSON(this, options);
-  }
-
-  loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
-    sharedLoadFromJSON(this, json, options);
   }
 
   dump(): string {

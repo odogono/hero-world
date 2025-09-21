@@ -75,33 +75,12 @@ export const createEntity: CreateEntityOverloads = <
   >;
 };
 
-export const deleteEntity = (entity: {
-  id: number;
-  world: World<Components>;
-}) => {
-  const { id, world } = entity;
-
-  // Mark entity for deletion instead of immediate deletion
-  world.entitiesToDelete.add(id);
-
-  // Clean up caches
-  world.entityCache.delete(id);
-  world.dirtyEntities.delete(id);
-
-  return null;
-};
-
-export const getEntity = <T extends Components>(
-  world: World<T>,
-  id: number
-) => {
-  const stmt = world.stmts.selectEntityById;
-  if (!stmt) {
-    throw new Error('selectEntityById not found');
+export const isEntity = (val: unknown): val is Entity => {
+  if (typeof val !== 'object' || val === null) {
+    return false;
   }
-  const eid = stmt.get(id) as { id: number } | null;
-
-  return eid ? ({ id: eid.id, world } as GenericEntity<T>) : null;
+  const entity = val as Partial<Entity>;
+  return typeof entity.id === 'number';
 };
 
 export type QueryOptions<T extends Components> = {
@@ -139,6 +118,8 @@ const buildQuery = <T extends Components>(
     (needsJoins
       ? (Array.from(world.defs.keys()) as (keyof T)[])
       : ([] as (keyof T)[]));
+
+  // console.log('componentsToInclude', world.defs.keys());
 
   // Handle components that entities must have
   componentsToInclude.forEach(c => {
@@ -204,6 +185,7 @@ const buildQuery = <T extends Components>(
   const selectFields = fields.length > 0 ? `, ${fields.join(', ')}` : '';
   const sql = `${base}${selectFields}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
 
+  // console.log('sql', sql);
   return {
     args: options?.args,
     componentsToInclude,
@@ -341,8 +323,11 @@ export function queryEntities<T extends Components>(
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const asProxy = options?.asProxy ?? false;
 
+  // const pre = world.db.query('select * from tbl_character_stats_1vy2m63');
+  // console.debug('fuckit', pre.length);
+
   const rows = world.db.query(sql, args);
-  // console.debug('queryEntities', sql, args, rows.length);
+  // console.debug('queryEntities', sql, args, '😋', rows.length);
 
   const entities = rows.map((row: any) =>
     mapRowToEntity(world, componentsToInclude, row)

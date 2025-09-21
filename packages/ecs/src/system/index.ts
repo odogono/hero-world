@@ -1,6 +1,6 @@
-import { flush } from '@/world';
 import { queryEntitiesIterator, type QueryOptions } from '@entity';
-import type { Components, World } from '@types';
+import type { Components } from '@types';
+import type { World } from '@world';
 
 import type { ExecProps, System, SystemFunction, SystemOptions } from './types';
 
@@ -36,7 +36,7 @@ export const createSystem = <
     }
 
     if (flushOnExec) {
-      flush(world);
+      world.flush();
     }
   };
 

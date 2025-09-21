@@ -1,5 +1,9 @@
-import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
+import { toCamelCase } from 'odgn-helpers/string';
 
+import type { World } from '@world';
+
+import { isEntity } from '../entity';
+import type { Components } from '../types';
 import type { Database, LoadFromJSONOptions, SaveToJSONOptions } from './index';
 
 /**
@@ -72,22 +76,19 @@ const convertValueForSqlite = (value: unknown): unknown => {
 
 const queryTables = (db: Database): { name: string }[] =>
   db.query(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' AND name NOT IN ('tbl_entity', 'tbl_component_metadata')"
+    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' AND name NOT IN ('tbl_entity', 'tbl_component_metadata', 'tbl_ecs')"
   ) as { name: string }[];
 
 /**
  * Save database content as components format
  */
-export const saveAsComponents = (db: Database): unknown => {
+export const saveAsComponents = <TComponents extends Components>(
+  world: World<TComponents>
+): unknown => {
+  const db = world.db;
   const result: any[] = [];
 
-  // Get all table names that start with tbl_ except tbl_entity
-  const tables = queryTables(db);
-
-  for (const { name: tableName } of tables) {
-    // Extract component name from table name (remove tbl_ prefix)
-    const componentName = toCamelCase(tableName.replace(/^tbl_/, ''));
-
+  for (const [componentName, { tableName }] of world.defs) {
     // Get all records from this component table
     const records = db.query(`SELECT * FROM ${tableName}`);
 
@@ -95,7 +96,7 @@ export const saveAsComponents = (db: Database): unknown => {
       // Manually construct the object to avoid serialization issues
       const componentObj: any = { type: componentName };
       for (const [key, value] of Object.entries(record)) {
-        componentObj[toCamelCase(key)] = value;
+        componentObj[toCamelCase(key)!] = value;
       }
       result.push(componentObj);
     }
@@ -107,42 +108,43 @@ export const saveAsComponents = (db: Database): unknown => {
 /**
  * Save database content as entities format
  */
-export const saveAsEntities = (db: Database): unknown => {
+export const saveAsEntities = <TComponents extends Components>(
+  world: World<TComponents>
+): unknown => {
+  const db = world.db;
   const result: any[] = [];
 
   // Get all entities
   const entities = db.query('SELECT id FROM tbl_entity') as { id: number }[];
 
-  // Get all component tables
-  const tables = queryTables(db);
-
   for (const entity of entities) {
     const entityData: any = { id: entity.id };
 
     // For each component table, check if this entity has a record
-    for (const { name: tableName } of tables) {
-      const componentName = toCamelCase(tableName.replace(/^tbl_/, ''));
+    for (const [componentName, { tableName }] of world.defs) {
+      // const componentName = tableNameToDefId(tableName);
       const componentDataArray = db.query(
         `SELECT * FROM ${tableName} WHERE eid = ?`,
         [entity.id]
       ) as any[];
 
-      if (componentDataArray.length > 0) {
-        const componentData = componentDataArray[0];
-        // Remove the eid and id columns from component data
-        const { eid, id, ...cleanComponentData } = componentData as any;
-        const correctedComponentData = Object.entries(
-          cleanComponentData
-        ).reduce(
-          (acc, [key, value]) => {
-            acc[toCamelCase(key)] = value;
-            return acc;
-          },
-          {} as Record<string, unknown>
-        );
-
-        entityData[componentName] = correctedComponentData;
+      if (componentDataArray.length === 0) {
+        continue;
       }
+
+      const componentData = componentDataArray[0];
+      // Remove the eid and id columns from component data
+      const { createdAt, eid, id, updatedAt, ...cleanComponentData } =
+        componentData as any;
+      const correctedComponentData = Object.entries(cleanComponentData).reduce(
+        (acc, [key, value]) => {
+          acc[toCamelCase(key)!] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>
+      );
+
+      entityData[componentName] = correctedComponentData;
     }
 
     result.push(entityData);
@@ -154,7 +156,11 @@ export const saveAsEntities = (db: Database): unknown => {
 /**
  * Load data from components format
  */
-export const loadFromComponents = (db: Database, json: unknown): void => {
+export const loadFromComponents = <TComponents extends Components>(
+  world: World<TComponents>,
+  json: unknown
+): void => {
+  const db = world.db;
   if (!Array.isArray(json)) {
     throw new Error('Expected array of components');
   }
@@ -205,7 +211,13 @@ export const loadFromComponents = (db: Database, json: unknown): void => {
         continue;
       }
 
-      const tableName = `tbl_${toSnakeCase(type)}`;
+      const def = world.defs.get(type);
+      if (!def) {
+        continue;
+      }
+
+      // console.debug('loadFromComponents', type);
+      const tableName = def.tableName;
       // Get column names for this table - skip tables that don't exist
       let columns: { name: string }[];
       try {
@@ -248,20 +260,24 @@ export const loadFromComponents = (db: Database, json: unknown): void => {
 /**
  * Load data from entities format
  */
-export const loadFromEntities = (db: Database, json: unknown): void => {
+export const loadFromEntities = <TComponents extends Components>(
+  world: World<TComponents>,
+  json: unknown
+): void => {
+  const db = world.db;
   if (!Array.isArray(json)) {
     throw new Error('Expected array of entities');
   }
 
   db.transaction(() => {
     for (const entity of json) {
-      if (typeof entity !== 'object' || entity === null || !('id' in entity)) {
+      if (!isEntity(entity)) {
         throw new Error(
           'Invalid entity format: expected object with id property'
         );
       }
 
-      const { id, ...components } = entity as any;
+      const { id, ...components } = entity;
 
       // Insert or update entity
       db.exec('INSERT OR REPLACE INTO tbl_entity (id) VALUES (?)', [
@@ -270,47 +286,54 @@ export const loadFromEntities = (db: Database, json: unknown): void => {
 
       // Process each component
       for (const [componentName, componentData] of Object.entries(components)) {
-        if (typeof componentData === 'object' && componentData !== null) {
-          const tableName = `tbl_${toSnakeCase(componentName)}`;
+        if (!componentData || typeof componentData !== 'object') {
+          continue;
+        }
 
-          // Get column names for this table - skip tables that don't exist
-          let columns: { name: string }[];
-          try {
-            columns = db.query(`PRAGMA table_info(${tableName})`) as {
-              name: string;
-            }[];
-          } catch {
-            // Skip if table doesn't exist
-            continue;
+        const def = world.defs.get(componentName);
+        if (!def) {
+          continue;
+        }
+
+        const tableName = def.tableName;
+
+        // Get column names for this table - skip tables that don't exist
+        let columns: { name: string }[];
+        try {
+          columns = db.query(`PRAGMA table_info(${tableName})`) as {
+            name: string;
+          }[];
+        } catch {
+          // Skip if table doesn't exist
+          continue;
+        }
+
+        const validColumns = columns.map(col => col.name);
+
+        // Add eid to component data
+        const dataWithEid = { eid: id, ...(componentData as object) };
+
+        // Filter to only valid columns
+        const filteredData: any = {};
+        for (const col of validColumns) {
+          if (col in dataWithEid) {
+            filteredData[col] = dataWithEid[col];
           }
+        }
 
-          const validColumns = columns.map(col => col.name);
+        // Create placeholders and values for INSERT OR REPLACE
+        const columnNames = Object.keys(filteredData);
 
-          // Add eid to component data
-          const dataWithEid = { eid: id, ...(componentData as object) };
+        if (columnNames.length > 0) {
+          const placeholders = columnNames.map(() => '?').join(', ');
+          const values = columnNames.map(col =>
+            convertValueForSqlite(filteredData[col])
+          );
 
-          // Filter to only valid columns
-          const filteredData: any = {};
-          for (const col of validColumns) {
-            if (col in dataWithEid) {
-              filteredData[col] = dataWithEid[col];
-            }
-          }
-
-          // Create placeholders and values for INSERT OR REPLACE
-          const columnNames = Object.keys(filteredData);
-
-          if (columnNames.length > 0) {
-            const placeholders = columnNames.map(() => '?').join(', ');
-            const values = columnNames.map(col =>
-              convertValueForSqlite(filteredData[col])
-            );
-
-            db.exec(
-              `INSERT OR REPLACE INTO ${tableName} (${columnNames.join(', ')}) VALUES (${placeholders})`,
-              values
-            );
-          }
+          db.exec(
+            `INSERT OR REPLACE INTO ${tableName} (${columnNames.join(', ')}) VALUES (${placeholders})`,
+            values
+          );
         }
       }
     }
@@ -320,28 +343,27 @@ export const loadFromEntities = (db: Database, json: unknown): void => {
 /**
  * Save database content to JSON
  */
-export const saveToJSON = (
-  db: Database,
+export const saveToJSON = <TComponents extends Components>(
+  world: World<TComponents>,
   options: SaveToJSONOptions = {}
 ): unknown => {
   const { asComponents = false } = options;
 
-  return asComponents ? saveAsComponents(db) : saveAsEntities(db);
+  return asComponents ? saveAsComponents(world) : saveAsEntities(world);
 };
 
 /**
  * Load JSON data into database
  */
-export const loadFromJSON = (
-  db: Database,
+export const loadFromJSON = <TComponents extends Components>(
+  world: World<TComponents>,
   json: unknown,
   options: LoadFromJSONOptions = {}
 ): void => {
   const { asComponents = false } = options;
-
   if (asComponents) {
-    loadFromComponents(db, json);
+    loadFromComponents(world, json);
   } else {
-    loadFromEntities(db, json);
+    loadFromEntities(world, json);
   }
 };

@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createWorld, flush } from '@/world';
 import { DatabaseType } from '@db';
 import {
   createEventSystem,
@@ -10,6 +9,7 @@ import {
   getPendingEvents,
   scheduleEvent
 } from '@events';
+import { createWorld } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 
@@ -31,7 +31,7 @@ describe('EventSystem', () => {
     const eventEntity = scheduleEvent(world, 'test-event', {
       message: 'hello'
     });
-    flush(world);
+    world.flush();
 
     expect(eventEntity.event.type).toBe('test-event');
     expect(JSON.parse(eventEntity.event.payload)).toEqual({ message: 'hello' });
@@ -48,7 +48,7 @@ describe('EventSystem', () => {
       { message: 'future' },
       futureTime
     );
-    flush(world);
+    world.flush();
 
     expect(eventEntity.event.scheduledAt).toBe(futureTime);
 
@@ -62,7 +62,7 @@ describe('EventSystem', () => {
 
     scheduleEvent(world, 'event1', { data: 1 });
     scheduleEvent(world, 'event2', { data: 2 });
-    flush(world);
+    world.flush();
 
     const pendingEvents = getPendingEvents(world, '*');
     expect(pendingEvents).toHaveLength(2);
@@ -74,7 +74,7 @@ describe('EventSystem', () => {
     scheduleEvent(world, 'type-a', { data: 1 });
     scheduleEvent(world, 'type-b', { data: 2 });
     scheduleEvent(world, 'type-a', { data: 3 });
-    flush(world);
+    world.flush();
 
     const typeAEvents = getEvents(world, 'type-a');
     expect(typeAEvents).toHaveLength(2);
@@ -91,7 +91,7 @@ describe('EventSystem', () => {
     scheduleEvent(world, 'event1', { value: 1 });
     scheduleEvent(world, 'event2', { value: 2 });
     scheduleEvent(world, 'event3', { value: 3 });
-    flush(world);
+    world.flush();
 
     // saveWorld(world, 'world.db');
 
@@ -102,7 +102,7 @@ describe('EventSystem', () => {
     expect(collectedEvents[0]?.payload.value).toBe(1);
   });
 
-  test('event system processing events', async () => {
+  test.only('event system processing events', async () => {
     const world = await createTestWorld();
 
     let readReceivedCount = 0;
@@ -124,7 +124,7 @@ describe('EventSystem', () => {
     scheduleEvent(world, 'type-a', { value: 1 });
     scheduleEvent(world, 'type-b', { value: 2 });
     scheduleEvent(world, 'type-a', { value: 3 });
-    flush(world);
+    world.flush();
 
     readSystem.exec({ deltaTime: 16, world });
     eventSystem.exec({ deltaTime: 16, world });

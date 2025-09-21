@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
-import { createEntity } from '@entity';
-import { createWorld, flush, loadWorldFromJSON, saveWorldToJSON } from '@world';
+import { queryEntities } from '@entity';
+import { createWorld } from '@world';
 
 import { DatabaseType } from '../index';
 
@@ -38,29 +38,30 @@ describe('Database JSON functions', () => {
       worldOpts
     );
 
-    const entity1 = createEntity(world, {
+    const entity1 = world.create({
       characterStats: { health: 100, level: 5, mana: 50 },
       clocation: { name: 'Forest', region: 'North' }
     });
 
-    const entity2 = createEntity(world, {
+    const entity2 = world.create({
       characterStats: { health: 80, level: 3, mana: 30 }
     });
 
-    flush(world);
+    world.flush();
 
     // Save as entities format
-    const entitiesData = saveWorldToJSON(world, { asComponents: false });
+    const entitiesData = world.saveToJSON({ asComponents: false });
 
     expect(Array.isArray(entitiesData)).toBe(true);
-    const entities = entitiesData as any[];
+    const entities = entitiesData;
     expect(entities).toHaveLength(2);
 
     // Make a deep copy of the data to avoid any test framework interference
-    const entitiesDataCopy = JSON.parse(JSON.stringify(entitiesData));
+    const entitiesDataCopy = structuredClone(entitiesData);
 
     // Check entity 1
     const savedEntity1 = entities.find(e => e.id === entity1.id);
+
     expect(savedEntity1).toMatchObject({
       characterStats: expect.objectContaining({
         health: 100,
@@ -87,25 +88,23 @@ describe('Database JSON functions', () => {
       [statsComponent, locationComponent],
       worldOpts
     );
+    // console.log('newWorld', newWorld);
 
-    loadWorldFromJSON(newWorld, entitiesDataCopy, { asComponents: false });
+    newWorld.loadFromJSON(entitiesDataCopy, { asComponents: false });
 
-    // saveWorld(newWorld, 'loaded.world.db');
+    // world.saveToPath('loaded.world.db');
     // Verify data was loaded correctly
-    const loadedEntities = newWorld.db.query(
-      'SELECT id FROM tbl_entity ORDER BY id'
-    );
+    const loadedEntities = queryEntities(newWorld);
     expect(loadedEntities).toHaveLength(2);
 
-    const loadedStats = newWorld.db.query(
-      'SELECT * FROM tbl_character_stats ORDER BY eid'
-    );
+    // const out = newWorld.db.query('select * from tbl_character_stats');
+    // console.log('out', out);
+
+    const loadedStats = queryEntities(newWorld, { with: ['characterStats'] });
 
     expect(loadedStats).toHaveLength(2);
 
-    const loadedLocations = newWorld.db.query(
-      'SELECT * FROM tbl_clocation ORDER BY eid'
-    );
+    const loadedLocations = queryEntities(newWorld, { with: ['clocation'] });
     expect(loadedLocations).toHaveLength(1);
   });
 
@@ -116,19 +115,19 @@ describe('Database JSON functions', () => {
       worldOpts
     );
 
-    const entity1 = createEntity(world, {
+    const entity1 = world.create({
       characterStats: { health: 100, level: 5, mana: 50 },
       clocation: { name: 'Forest', region: 'North' }
     });
 
-    const entity2 = createEntity(world, {
+    const entity2 = world.create({
       characterStats: { health: 80, level: 3, mana: 30 }
     });
 
-    flush(world);
+    world.flush();
 
     // Save as components format
-    const originalComponentsData = world.db.saveToJSON({ asComponents: true });
+    const originalComponentsData = world.saveToJSON({ asComponents: true });
 
     expect(Array.isArray(originalComponentsData)).toBe(true);
     const originalComponents = originalComponentsData as any[];
@@ -164,18 +163,17 @@ describe('Database JSON functions', () => {
       worldOpts
     );
 
-    newWorld.db.loadFromJSON(componentsData, { asComponents: true });
+    newWorld.loadFromJSON(componentsData, { asComponents: true });
 
     // Verify data was loaded correctly
-    const loadedStats = newWorld.db.query(
-      'SELECT * FROM tbl_character_stats ORDER BY eid'
-    );
+    // const loadedStats = newWorld.db.query(
+    //   'SELECT * FROM tbl_character_stats ORDER BY eid'
+    // );
+    const loadedStats = queryEntities(newWorld, { with: ['characterStats'] });
     // Only expect 1 component since the other one has invalid eid
     expect(loadedStats).toHaveLength(1);
 
-    const loadedLocations = newWorld.db.query(
-      'SELECT * FROM tbl_clocation ORDER BY eid'
-    );
+    const loadedLocations = queryEntities(newWorld, { with: ['clocation'] });
     expect(loadedLocations).toHaveLength(1);
   });
 
@@ -183,15 +181,15 @@ describe('Database JSON functions', () => {
     // Create world with WASM database
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       characterStats: { health: 75, level: 2, mana: 25 }
     });
 
-    flush(world);
+    world.flush();
 
     // Test both formats
-    const entitiesData = world.db.saveToJSON({ asComponents: false });
-    const componentsData = world.db.saveToJSON({ asComponents: true });
+    const entitiesData = world.saveToJSON({ asComponents: false });
+    const componentsData = world.saveToJSON({ asComponents: true });
 
     expect(Array.isArray(entitiesData)).toBe(true);
     expect(Array.isArray(componentsData)).toBe(true);
@@ -199,17 +197,17 @@ describe('Database JSON functions', () => {
     // Create new WASM world and test loading
     const newWorld = await createWorld([statsComponent], worldOpts);
 
-    newWorld.db.loadFromJSON(entitiesData, { asComponents: false });
+    newWorld.loadFromJSON(entitiesData, { asComponents: false });
 
-    const loadedData = newWorld.db.query('SELECT * FROM tbl_character_stats');
+    const loadedData = queryEntities(newWorld, { with: ['characterStats'] });
     expect(loadedData).toHaveLength(1);
   });
 
   test('should handle empty database', async () => {
     const world = await createWorld([statsComponent], worldOpts);
 
-    const entitiesData = world.db.saveToJSON({ asComponents: false });
-    const componentsData = world.db.saveToJSON({ asComponents: true });
+    const entitiesData = world.saveToJSON({ asComponents: false });
+    const componentsData = world.saveToJSON({ asComponents: true });
 
     expect(entitiesData).toEqual([]);
     expect(componentsData).toEqual([]);
@@ -220,20 +218,20 @@ describe('Database JSON functions', () => {
 
     // Test invalid input for entities format
     expect(() => {
-      world.db.loadFromJSON('invalid', { asComponents: false });
+      world.loadFromJSON('invalid', { asComponents: false });
     }).toThrow('Expected array of entities');
 
     expect(() => {
-      world.db.loadFromJSON([{ invalid: 'entity' }], { asComponents: false });
+      world.loadFromJSON([{ invalid: 'entity' }], { asComponents: false });
     }).toThrow('Invalid entity format: expected object with id property');
 
     // Test invalid input for components format
     expect(() => {
-      world.db.loadFromJSON('invalid', { asComponents: true });
+      world.loadFromJSON('invalid', { asComponents: true });
     }).toThrow('Expected array of components');
 
     expect(() => {
-      world.db.loadFromJSON([{ invalid: 'component' }], { asComponents: true });
+      world.loadFromJSON([{ invalid: 'component' }], { asComponents: true });
     }).toThrow(
       'Invalid component format: expected object with type and eid properties'
     );

@@ -1,7 +1,6 @@
 import { getUnixTime } from 'odgn-helpers/time';
 
 import { defineComponent, s } from '@component';
-import { createEntity, deleteEntity, queryEntities } from '@entity';
 import { createSystem } from '@system';
 import type { Components, EntityWithComponents, World } from '@types';
 
@@ -57,7 +56,7 @@ export const createEventSystem = <
         }) ?? true;
 
       if (shouldDelete) {
-        deleteEntity(entity);
+        world.delete(entity);
       }
     },
     {
@@ -83,7 +82,7 @@ export const scheduleEvent = <
 ): EntityWithComponents<TComponents, 'event'> => {
   const when = scheduledAt ?? getUnixTime();
 
-  const e = createEntity(world, {
+  const e = world.create({
     event: {
       createdAt: new Date().toISOString(),
       payload: JSON.stringify(payload),
@@ -112,7 +111,7 @@ export const getEvents = <
 ): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
-  const entities = queryEntities(world, {
+  const entities = world.queryAll({
     args,
     where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
     with: ['event'] as const
@@ -135,7 +134,7 @@ export const getAllEvents = <
 ): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
-  const entities = queryEntities(world, {
+  const entities = world.queryAll({
     args,
     where: clause,
     with: ['event'] as const
@@ -157,7 +156,7 @@ export const getPendingEvents = <
 ): Array<EventComponentWithPayload> => {
   const { args, clause } = buildTypeWhereClause(type);
 
-  const entities = queryEntities(world, {
+  const entities = world.queryAll({
     args,
     // Ready-to-process events: scheduled_at <= now
     where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,

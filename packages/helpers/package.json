@@ -8,10 +8,12 @@
     "./log": "./src/log.ts",
     "./diff": "./src/diff.ts",
     "./json": "./src/json.ts",
+    "./hash": "./src/hash.ts",
     "./number": "./src/number.ts",
     "./string": "./src/string.ts",
     "./time": "./src/time.ts",
-    "./try-catch": "./src/try-catch.ts"
+    "./try-catch": "./src/try-catch.ts",
+    "./uuid": "./src/uuid.ts"
   },
   "dependencies": {
     "deep-object-diff": "^1.1.9",

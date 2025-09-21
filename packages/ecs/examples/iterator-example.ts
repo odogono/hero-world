@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 
-import { createWorld, flush } from '@/world';
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntitiesIterator } from '@entity';
+import { queryEntitiesIterator } from '@entity';
+import { createWorld } from '@world';
 
 // Define a component
 const healthComponent = defineComponent({
@@ -21,14 +21,14 @@ export const iteratorExample = async () => {
   const world = await createWorld([healthComponent]);
 
   // Create some entities
-  createEntity(world, { health: { current: 100, max: 100 } });
-  createEntity(world, { health: { current: 75, max: 100 } });
-  createEntity(world, { health: { current: 50, max: 100 } });
-  createEntity(world, { health: { current: 25, max: 100 } });
-  createEntity(world, { health: { current: 0, max: 100 } });
+  world.create({ health: { current: 100, max: 100 } });
+  world.create({ health: { current: 75, max: 100 } });
+  world.create({ health: { current: 50, max: 100 } });
+  world.create({ health: { current: 25, max: 100 } });
+  world.create({ health: { current: 0, max: 100 } });
 
   // Flush to persist to database
-  flush(world);
+  world.flush();
 
   console.log('1. Iterating over all entities:');
   const allEntities = queryEntitiesIterator(world, { with: ['health'] });

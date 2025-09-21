@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createWorld, flush } from '@/world';
 import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
-import { createEntity } from '@entity';
 import { createGameLoop, createSystem } from '@system';
+import { createWorld } from '@world';
 
 import { eventComponent } from '..';
 
@@ -28,9 +27,9 @@ describe('System Events Integration', () => {
     const gameLoop = createGameLoop(world);
 
     // Create some test entities
-    createEntity(world, { systemTest: { value: 10 } });
-    createEntity(world, { systemTest: { value: 20 } });
-    flush(world);
+    world.create({ systemTest: { value: 10 } });
+    world.create({ systemTest: { value: 20 } });
+    world.flush();
 
     const processedEntities: any[] = [];
 
@@ -43,7 +42,7 @@ describe('System Events Integration', () => {
 
     gameLoop.addSystem('entity-system', entitySystem);
 
-    flush(world);
+    world.flush();
 
     // Run the game loop
     gameLoop.update(16);

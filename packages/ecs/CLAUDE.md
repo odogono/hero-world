@@ -60,12 +60,12 @@ const world = (await createWorld())
   .registerComponent(statsComponent)
   .build();
 
-const entity = createEntity(world, {
+const entity = world.create({
   location: { name: 'Forest', region: 'North' },
   stats: { health: 100, level: 1, mana: 50 }
 });
 
-flush(world); // Persist changes to database
+world.flush(); // Persist changes to database
 saveWorld(world, 'game.db'); // Save to file
 ```
 
@@ -93,11 +93,11 @@ The library supports multiple database backends:
 
 #### Component Management
 
-- `createEntity(world, initialComponents?)` - Create entity with optional initial components
-- `deleteEntity(entity)` - Remove entity and cascade delete components
-- `queryEntities(world, options?)` - Query entities with specific components
-- `queryEntity(world, options?)` - Query single entity (automatically adds `limit: 1`)
-- `queryEntitiesIterator(world, options?)` - Memory-efficient iterator for large result sets
+- `world.create(initialComponents?)` - Create entity with optional initial components
+- `world.deleteEntity(entity)` - Remove entity and cascade delete components
+- `world.queryAll(options?)` - Query entities with specific components
+- `world.query(options?)` - Query single entity (automatically adds `limit: 1`)
+- `world.queryIterator(options?)` - Memory-efficient iterator for large result sets
 
 ### Path Aliases (tsconfig.json)
 
@@ -194,7 +194,7 @@ The ECS supports intuitive property assignment for component management:
 
 ```ts
 // Create entity without initial components
-const player = createEntity(world);
+const player = world.create();
 
 // Add components via property assignment
 player.health = { current: 100, max: 100 };
@@ -209,7 +209,7 @@ player.health = null; // Remove health component
 player.position = undefined; // Remove position component
 
 // Changes are persisted when you flush
-flush(world);
+world.flush();
 ```
 
 ### Testing Structure

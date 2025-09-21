@@ -1,10 +1,9 @@
 /* eslint-disable no-console */
 
-import { createWorld } from '@/world';
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntities } from '@entity';
 import { createEventSystem, eventComponent } from '@events';
 import { createGameLoop, createSystem, createWorldSystem } from '@system';
+import { createWorld } from '@world';
 
 // ============================================================================
 // Component Definitions
@@ -116,7 +115,7 @@ const spawnTank = (
   x: number,
   y: number
 ) => {
-  const tank = createEntity(world, {
+  const tank = world.create({
     position: { x, y },
     tank: {
       health: 100,
@@ -139,7 +138,7 @@ const spawnTank = (
 
 const issueMoveOrder = (tankId: string, targetX: number, targetY: number) => {
   // Find tank by ID
-  const tanks = queryEntities(world, {
+  const tanks = world.queryAll({
     args: [tankId],
     where: 'tank.tank_id = ?1',
     with: ['tank', 'position', 'velocity']
@@ -152,7 +151,7 @@ const issueMoveOrder = (tankId: string, targetX: number, targetY: number) => {
   }
 
   // Remove existing move order if present
-  const existingOrders = queryEntities(world, { with: ['move_order'] });
+  const existingOrders = world.queryAll({ with: ['move_order'] });
   const existingOrder = existingOrders.find(
     e => e.id === tank.id && world.entityCache.get(e.id)?.move_order
   );
@@ -198,7 +197,7 @@ const issueMoveOrder = (tankId: string, targetX: number, targetY: number) => {
 };
 
 const handleWorldStateQuery = (requestId: string) => {
-  const tanks = queryEntities(world, {
+  const tanks = world.queryAll({
     with: ['tank', 'position', 'velocity']
   });
 

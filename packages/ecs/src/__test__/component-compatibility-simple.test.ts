@@ -41,7 +41,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     const hash2 = hashComponentDefinition(playerComponent);
 
     expect(hash1).toBe(hash2);
-    expect(hash1).toHaveLength(64); // SHA-256 hex length
+    expect(hash1).toHaveLength(7); // SHA-256 hex length
   });
 
   test('should detect hash differences for different components', () => {
@@ -95,7 +95,7 @@ describe('Component Compatibility System - Simple Tests', () => {
 
     const metadata = getStoredComponentMetadata(testDb);
     expect(metadata).toHaveLength(1);
-    expect(metadata[0].tblName).toBe('tbl_player_test_4'); // table name with tbl_ prefix
+    expect(metadata[0]!.defId).toBe('playerTest4'); // table name with tbl_ prefix
     expect(metadata[0].hash).toBeTruthy();
 
     await cleanupDb();
@@ -150,9 +150,9 @@ describe('Component Compatibility System - Simple Tests', () => {
     // Check the hashes are actually different
     const hash1 = hashComponentDefinition(component1);
     const hash2 = hashComponentDefinition(component2);
-    console.log('Hash 1:', hash1);
-    console.log('Hash 2:', hash2);
-    console.log('Hashes different:', hash1 !== hash2);
+    // console.log('Hash 1:', hash1);
+    // console.log('Hash 2:', hash2);
+    // console.log('Hashes different:', hash1 !== hash2);
 
     // Validate with different component should show as new component
     const validation = validateComponentCompatibility(testDb, [
@@ -198,7 +198,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     ]);
     expect(validationAddition.compatible).toBe(true);
     expect(validationAddition.warnings).toContain(
-      "New component table 'tbl_player_test_9' added to the world definition"
+      "New component table 'tbl_player_test_9_w4nkvr' added to the world definition"
     );
 
     // Update metadata to include both
@@ -210,7 +210,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     ]);
     expect(validationRemoval.compatible).toBe(true);
     expect(validationRemoval.warnings).toContain(
-      "Component table 'tbl_player_test_9' was removed from the world definition"
+      "Component table 'tbl_player_test_9_w4nkvr' was removed from the world definition"
     );
 
     await cleanupDb();
@@ -249,7 +249,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     updateComponentMetadata(testDb, [component2]);
     metadata = getStoredComponentMetadata(testDb);
     expect(metadata).toHaveLength(1);
-    expect(metadata[0].tblName).toBe('tbl_player_test_11');
+    expect(metadata[0]!.defId).toBe('playerTest11');
 
     await cleanupDb();
   });

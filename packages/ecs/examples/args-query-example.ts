@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
 
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntities } from '@entity';
-import { createWorld, flush } from '@world';
+import { createWorld } from '@world';
 
 // Define components
 const playerComponent = defineComponent({
@@ -30,22 +29,22 @@ export const argsQueryExample = async () => {
   const world = await createWorld([playerComponent, enemyComponent]);
 
   // Create some players
-  createEntity(world, { player: { health: 100, level: 5, name: 'Alice' } });
-  createEntity(world, { player: { health: 150, level: 10, name: 'Bob' } });
-  createEntity(world, { player: { health: 200, level: 15, name: 'Charlie' } });
-  createEntity(world, { player: { health: 250, level: 20, name: 'Diana' } });
+  world.create({ player: { health: 100, level: 5, name: 'Alice' } });
+  world.create({ player: { health: 150, level: 10, name: 'Bob' } });
+  world.create({ player: { health: 200, level: 15, name: 'Charlie' } });
+  world.create({ player: { health: 250, level: 20, name: 'Diana' } });
 
   // Create some enemies
-  createEntity(world, { enemy: { difficulty: 1, type: 'goblin' } });
-  createEntity(world, { enemy: { difficulty: 5, type: 'orc' } });
-  createEntity(world, { enemy: { difficulty: 10, type: 'dragon' } });
-  createEntity(world, { enemy: { difficulty: 2, type: 'goblin' } });
+  world.create({ enemy: { difficulty: 1, type: 'goblin' } });
+  world.create({ enemy: { difficulty: 5, type: 'orc' } });
+  world.create({ enemy: { difficulty: 10, type: 'dragon' } });
+  world.create({ enemy: { difficulty: 2, type: 'goblin' } });
 
   // Flush to persist to database
-  flush(world);
+  world.flush();
 
   console.log('1. Query players by level using args:');
-  const highLevelPlayers = queryEntities(world, {
+  const highLevelPlayers = world.queryAll({
     args: [10],
     where: 'player_level >= ?1',
     with: ['player']
@@ -56,7 +55,7 @@ export const argsQueryExample = async () => {
   }
 
   console.log('\n2. Query enemies by type using args:');
-  const goblins = queryEntities(world, {
+  const goblins = world.queryAll({
     args: ['goblin'],
     where: 'enemy_type = ?1',
     with: ['enemy']
@@ -69,7 +68,7 @@ export const argsQueryExample = async () => {
   }
 
   console.log('\n3. Query with multiple args:');
-  const mediumDifficultyEnemies = queryEntities(world, {
+  const mediumDifficultyEnemies = world.queryAll({
     args: [3, 8],
     where: 'enemy_difficulty >= ?1 AND enemy_difficulty <= ?2',
     with: ['enemy']
@@ -84,7 +83,7 @@ export const argsQueryExample = async () => {
   }
 
   console.log('\n4. Query players with health range:');
-  const healthyPlayers = queryEntities(world, {
+  const healthyPlayers = world.queryAll({
     args: [120, 18],
     where: 'player_health > ?1 AND player_level < ?2',
     with: ['player']
@@ -97,7 +96,7 @@ export const argsQueryExample = async () => {
   }
 
   console.log('\n5. Query with string pattern matching:');
-  const playersWithA = queryEntities(world, {
+  const playersWithA = world.queryAll({
     args: ['%a%'],
     where: 'player_name LIKE ?1',
     with: ['player']
@@ -108,7 +107,7 @@ export const argsQueryExample = async () => {
   }
 
   console.log('\n6. Query with limit and args:');
-  const topPlayers = queryEntities(world, {
+  const topPlayers = world.queryAll({
     args: [5],
     limit: 2,
     where: 'player_level >= ?1',

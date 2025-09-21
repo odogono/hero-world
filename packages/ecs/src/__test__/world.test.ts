@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
-import { createEntity } from '@entity';
 import { createWorld } from '@world';
 
 describe('World', () => {
@@ -51,7 +50,7 @@ describe('World', () => {
     });
 
     const world = await createWorld([healthComponent, nameComponent]);
-    const entity = createEntity(world);
+    const entity = world.create();
 
     // Test property assignment
     entity.stats = { current: 100, max: 100 };
@@ -91,8 +90,8 @@ describe('World', () => {
 
     const world = await createWorld([healthComponent]);
 
-    const player1 = createEntity(world);
-    const player2 = createEntity(world);
+    const player1 = world.create();
+    const player2 = world.create();
 
     player1.attributes = { current: 100, max: 100 };
     player2.attributes = { current: 50, max: 75 };
@@ -122,6 +121,7 @@ describe('World', () => {
     // Verify the statement was registered
     const def = world.defs.get('metrics');
     expect(def).toBeDefined();
+    // console.log('def', def);
     expect(def?.byLevel).toBeDefined();
 
     world.close();
@@ -146,33 +146,38 @@ describe('World', () => {
     // Create initial world
     const world = await createWorld([health], { path: tempFile.name });
 
-    const entity = createEntity(world);
+    const entity = world.create();
     entity.health = { current: 100, max: 100 };
     world.flush();
     world.close();
 
     // Try to load with a different component that uses the same table name
     const health2 = defineComponent({
-      id: 'health2',
+      id: 'health',
       schema: {
         bonus: s.number(),
         current: s.number(),
         max: s.number()
-      },
-      tableName: 'tbl_health'
+      }
     });
 
     // This should fail because the table structure is incompatible
+
     await expect(
-      createWorld([health2], { path: tempFile.name })
+      createWorld([health2], {
+        allowRedefineDefinitions: false,
+        path: tempFile.name
+      })
     ).rejects.toThrow(/Component definition compatibility check failed/);
 
     // Loading with the same original component should work
-    const world2 = await createWorld([health], { path: tempFile.name });
+    const world2 = await createWorld([health], {
+      path: tempFile.name
+    });
     expect(world2).toBeTruthy();
 
     // Verify data is still there
-    const results = world2.db.query('SELECT * FROM tbl_health');
+    const results = world2.queryAll({ with: ['health'] });
     expect(results.length).toBeGreaterThan(0);
 
     world2.close();

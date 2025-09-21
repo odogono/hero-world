@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { z } from 'zod';
 
-import { defineComponent } from '@component';
+import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
-import { createEntity, deleteEntity, queryEntities } from '@entity';
-import { createWorld, flush } from '@world';
+import { createWorld } from '@world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.ALASQL;
 
@@ -27,20 +25,20 @@ describe.skip('ECS with AlasQL Backend', () => {
 
   test('should register components and create entities with AlasQL', async () => {
     const statsComponent = defineComponent({
-      name: 'alasqlStats' as const,
+      id: 'alasqlStats' as const,
       schema: {
-        health: z.number(),
-        level: z.number(),
-        mana: z.number()
+        health: s.number(),
+        level: s.number(),
+        mana: s.number()
       }
     });
 
     const locationComponent = defineComponent({
-      name: 'alasqlLocation' as const,
+      id: 'alasqlLocation' as const,
       schema: {
-        region: z.string(),
-        x: z.number(),
-        y: z.number()
+        region: s.string(),
+        x: s.number(),
+        y: s.number()
       }
     });
 
@@ -50,7 +48,7 @@ describe.skip('ECS with AlasQL Backend', () => {
     });
 
     // Create an entity with components
-    const entity = createEntity(world, {
+    const entity = world.create({
       alasqlLocation: { region: 'forest', x: 10, y: 20 },
       alasqlStats: { health: 100, level: 5, mana: 50 }
     });
@@ -60,24 +58,24 @@ describe.skip('ECS with AlasQL Backend', () => {
     expect(entity.alasqlLocation.x).toBe(10);
 
     // Flush changes to database
-    flush(world);
+    world.flush();
 
     // Query entities
-    const entities = queryEntities(world, {
+    const entities = world.queryAll({
       with: ['alasqlStats', 'alasqlLocation']
     });
 
     expect(entities).toHaveLength(1);
-    expect(entities[0].id).toBe(entity.id);
+    expect(entities[0]!.id).toBe(entity.id);
 
     world.db.close();
   });
 
   test('should handle entity deletion with AlasQL', async () => {
     const testComponent = defineComponent({
-      name: 'test' as const,
+      id: 'test' as const,
       schema: {
-        value: z.string()
+        value: s.string()
       }
     });
 
@@ -87,19 +85,19 @@ describe.skip('ECS with AlasQL Backend', () => {
     });
 
     // Create and delete entity
-    const entity = createEntity(world, {
+    const entity = world.create({
       test: { value: 'delete me' }
     });
 
-    flush(world);
+    world.flush();
 
-    const entitiesBefore = queryEntities(world, { with: ['test'] });
+    const entitiesBefore = world.queryAll({ with: ['test'] });
     expect(entitiesBefore).toHaveLength(1);
 
-    deleteEntity(entity);
-    flush(world);
+    world.delete(entity);
+    world.flush();
 
-    const entitiesAfter = queryEntities(world, { with: ['test'] });
+    const entitiesAfter = world.queryAll({ with: ['test'] });
     expect(entitiesAfter).toHaveLength(0);
 
     world.db.close();
@@ -107,10 +105,10 @@ describe.skip('ECS with AlasQL Backend', () => {
 
   test('should handle component updates with AlasQL', async () => {
     const mutableComponent = defineComponent({
-      name: 'mutable' as const,
+      id: 'mutable' as const,
       schema: {
-        counter: z.number(),
-        name: z.string()
+        counter: s.number(),
+        name: s.string()
       }
     });
 
@@ -119,48 +117,48 @@ describe.skip('ECS with AlasQL Backend', () => {
       path: `test_${Date.now()}_${testCounter++}`
     });
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       mutable: { counter: 0, name: 'initial' }
     });
 
-    flush(world);
+    world.flush();
 
     // Update the component
     entity.mutable.counter = 42;
     entity.mutable.name = 'updated';
 
-    flush(world);
+    world.flush();
 
     // Query to verify update
-    const allEntities = queryEntities(world, { with: ['mutable'] });
+    const allEntities = world.queryAll({ with: ['mutable'] });
     expect(allEntities).toHaveLength(1);
-    expect(allEntities[0].mutable.counter).toBe(42);
-    expect(allEntities[0].mutable.name).toBe('updated');
+    expect(allEntities[0]!.mutable.counter).toBe(42);
+    expect(allEntities[0]!.mutable.name).toBe('updated');
 
     // Test WHERE clause with reserved words
-    const updated = queryEntities(world, {
+    const updated = world.queryAll({
       where: 'mutable.counter = 42',
       with: ['mutable']
     });
     expect(updated).toHaveLength(1);
-    expect(updated[0].mutable.name).toBe('updated');
+    expect(updated[0]!.mutable.name).toBe('updated');
 
     world.db.close();
   });
 
   test('should handle multiple entities with mixed components', async () => {
     const nameComponent = defineComponent({
-      name: 'alasqlName',
+      id: 'alasqlName',
       schema: {
-        first: z.string(),
-        last: z.string()
+        first: s.string(),
+        last: s.string()
       }
     });
 
     const ageComponent = defineComponent({
-      name: 'alasqlAge',
+      id: 'alasqlAge',
       schema: {
-        years: z.number()
+        years: s.number()
       }
     });
 
@@ -170,36 +168,36 @@ describe.skip('ECS with AlasQL Backend', () => {
     });
 
     // Create entities with different component combinations
-    const person1 = createEntity(world, {
+    const person1 = world.create({
       alasqlAge: { years: 30 },
       alasqlName: { first: 'John', last: 'Doe' }
     });
 
-    const person2 = createEntity(world, {
+    const person2 = world.create({
       alasqlName: { first: 'Jane', last: 'Smith' }
       // No age component
     });
 
-    const person3 = createEntity(world, {
+    const person3 = world.create({
       alasqlAge: { years: 25 }
       // No name component
     });
 
-    flush(world);
+    world.flush();
 
     // Query for entities with both components
-    const withBoth = queryEntities(world, {
+    const withBoth = world.queryAll({
       with: ['alasqlName', 'alasqlAge']
     });
     expect(withBoth).toHaveLength(1);
-    expect(withBoth[0].id).toBe(person1.id);
+    expect(withBoth[0]!.id).toBe(person1.id);
 
     // Query for entities with just name
-    const withName = queryEntities(world, { with: ['alasqlName'] });
+    const withName = world.queryAll({ with: ['alasqlName'] });
     expect(withName).toHaveLength(2);
 
     // Query for entities with just age
-    const withAge = queryEntities(world, { with: ['alasqlAge'] });
+    const withAge = world.queryAll({ with: ['alasqlAge'] });
     expect(withAge).toHaveLength(2);
 
     world.db.close();

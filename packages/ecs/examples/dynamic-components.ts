@@ -8,7 +8,6 @@
 
 import { defineComponent, s } from '@component';
 import { healthComponent } from '@component/health';
-import { createEntity } from '@entity';
 import { createWorld } from '@world';
 
 export const manaComponent = defineComponent({
@@ -29,7 +28,7 @@ export const exampleUsage = async () => {
   const world = await createWorld([healthComponent, manaComponent]);
 
   // Create entity with components - TypeScript knows about 'health' and 'mana'!
-  const entity = createEntity(world, {
+  const entity = world.create({
     health: { current: 100, max: 100 },
     mana: { current: 50, max: 100, regen: 5 }
   });

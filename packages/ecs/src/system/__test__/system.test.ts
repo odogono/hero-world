@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
-import { createEntity, queryEntitiesIterator } from '@entity';
+import { queryEntitiesIterator } from '@entity';
 import { createSystem } from '@system';
 import type { ExtractWorldComponents } from '@types';
-import { createWorld, flush } from '@world';
+import { createWorld } from '@world';
 
 import type { EntityExecProps } from '../types';
 
@@ -37,18 +37,18 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create some entities
-    const entity1 = createEntity(world, {
+    const entity1 = world.create({
       constitution: { current: 100, max: 100 }
     });
-    const entity2 = createEntity(world, {
+    const entity2 = world.create({
       constitution: { current: 75, max: 100 }
     });
-    const entity3 = createEntity(world, {
+    const entity3 = world.create({
       constitution: { current: 50, max: 100 }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -80,19 +80,19 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different component combinations
-    const healthEntity = createEntity(world, {
+    const healthEntity = world.create({
       constitution: { current: 100, max: 100 }
     });
-    const locationEntity = createEntity(world, {
+    const locationEntity = world.create({
       systemLocation: { name: 'Forest', region: 'North' }
     });
-    const fullEntity = createEntity(world, {
+    const fullEntity = world.create({
       constitution: { current: 75, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -122,18 +122,18 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different health values
-    const healthyEntity = createEntity(world, {
+    const healthyEntity = world.create({
       constitution: { current: 100, max: 100 }
     });
-    const woundedEntity = createEntity(world, {
+    const woundedEntity = world.create({
       constitution: { current: 50, max: 100 }
     });
-    const criticalEntity = createEntity(world, {
+    const criticalEntity = world.create({
       constitution: { current: 10, max: 100 }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -169,14 +169,14 @@ describe('Systems', () => {
     const entities = [];
     for (let i = 0; i < 5; i++) {
       entities.push(
-        createEntity(world, {
+        world.create({
           constitution: { current: 100 - i * 10, max: 100 }
         })
       );
     }
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -209,14 +209,14 @@ describe('Systems', () => {
     const entities = [];
     for (let i = 0; i < 5; i++) {
       entities.push(
-        createEntity(world, {
+        world.create({
           constitution: { current: 100 - i * 10, max: 100 }
         })
       );
     }
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -251,19 +251,19 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different component combinations
-    const healthEntity = createEntity(world, {
+    const healthEntity = world.create({
       constitution: { current: 100, max: 100 }
     });
-    const locationEntity = createEntity(world, {
+    const locationEntity = world.create({
       systemLocation: { name: 'Forest', region: 'North' }
     });
-    const fullEntity = createEntity(world, {
+    const fullEntity = world.create({
       constitution: { current: 75, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -295,12 +295,12 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
-    const entity = createEntity(world, {
+    const entity = world.create({
       constitution: { current: 100, max: 100 }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Create a system that heals entities
     const system = createSystem<C, EntityExecProps<C['entity'], C>>(
@@ -319,7 +319,7 @@ describe('Systems', () => {
     if (entity.constitution) {
       entity.constitution.current = 50;
     }
-    flush(world);
+    world.flush();
 
     // Run the system
     system.exec({ deltaTime: 16, world });
@@ -367,12 +367,12 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create an entity
-    const entity = createEntity(world, {
+    const entity = world.create({
       constitution: { current: 100, max: 100 }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];
@@ -405,21 +405,21 @@ describe('Systems', () => {
     type C = ExtractWorldComponents<typeof world>;
 
     // Create entities with different combinations
-    const entity1 = createEntity(world, {
+    const entity1 = world.create({
       constitution: { current: 100, max: 100 },
       systemLocation: { name: 'Forest', region: 'North' }
     });
-    const entity2 = createEntity(world, {
+    const entity2 = world.create({
       constitution: { current: 50, max: 100 },
       systemLocation: { name: 'Cave', region: 'South' }
     });
-    const entity3 = createEntity(world, {
+    const entity3 = world.create({
       constitution: { current: 25, max: 100 },
       systemLocation: { name: 'Mountain', region: 'North' }
     });
 
     // Flush to persist to database
-    flush(world);
+    world.flush();
 
     // Track processed entities
     const processedEntities: number[] = [];

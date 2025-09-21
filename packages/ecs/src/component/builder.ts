@@ -79,6 +79,7 @@ const pk = () => columnBuilder('pk');
 const string = () => columnBuilder('string');
 const time = () => columnBuilder('time');
 const timestamp = () => columnBuilder('timestamp');
+const uuid = () => columnBuilder('uuid');
 
 export const s = {
   array,
@@ -96,5 +97,6 @@ export const s = {
   pk,
   string,
   time,
-  timestamp
+  timestamp,
+  uuid
 };

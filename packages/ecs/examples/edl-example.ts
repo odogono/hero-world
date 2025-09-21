@@ -101,7 +101,7 @@ entity stats_consumer {
   console.log('EDL executed and flushed.');
 
   // Query and print a few results
-  const lc = queryEntity(world, {
+  const lc = world.query({
     with: ['described', 'thing', 'container', 'lockable']
   })!;
   console.log('\nLockable Chest entity:');
@@ -111,10 +111,10 @@ entity stats_consumer {
   console.log('container:', lc.container);
   console.log('lockable:', lc.lockable);
 
-  const child = queryEntity(world, { with: ['link'] })!;
+  const child = world.query({ with: ['link'] })!;
   console.log('\nChild links to:', child.link.targetId);
 
-  const statsConsumer = queryEntity(world, {
+  const statsConsumer = world.query({
     where: 'thing_weight = 99',
     with: ['thing']
   })!;

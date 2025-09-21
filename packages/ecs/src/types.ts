@@ -1,9 +1,5 @@
-import type {
-  CreateDatabaseOptions,
-  Database,
-  DatabaseType,
-  Statement
-} from '@db';
+import type { CreateDatabaseOptions, DatabaseType, Statement } from '@db';
+import type { World } from '@world';
 
 import type { InferComponentType } from './component/types';
 import type { ColumnInfo } from './schema/types';
@@ -39,10 +35,12 @@ export type CDefColumnType =
   | 'time'
   | 'timestamp'
   | 'json'
-  | 'array';
+  | 'array'
+  | 'uuid';
 
 export type CDefColumnInfo = {
   default?: string | number | boolean | Date;
+  enum?: string[];
   foreignKey?: string;
   isIndexed?: boolean;
   isUnique?: boolean;
@@ -54,8 +52,9 @@ export type CDefColumnInfo = {
 
 export type CDef = {
   columns: CDefColumnInfo[];
+  hash: string;
   id: string;
-  tableName?: string;
+  statements?: Record<string, string>;
 };
 
 // //////////////////////////////////////////////////////////////
@@ -74,31 +73,22 @@ export type ComponentDef = {
   [key: string]: Statement;
 };
 
-/**
- * Component definition
- */
-export type ComponentDefinition = {
-  name: string;
-  schema: CDef;
-  statements?: Record<string, string>;
-};
-
 export type Components = Record<string, unknown>;
 
 /**
  * World type that includes component types - now based on static world
  */
-export type World<TComponents extends Components> = {
-  close: () => void;
-  readonly componentTypes: keyof TComponents;
-  db: Database;
-  defs: Map<string, ComponentDef>;
-  dirtyEntities: Map<number, Set<keyof TComponents>>;
-  entitiesToDelete: Set<number>;
-  entityCache: EntityCache<TComponents>;
-  flush: () => World<TComponents>;
-  stmts: Record<string, Statement>;
-};
+// export type World<TComponents extends Components> = {
+//   close: () => void;
+//   readonly componentTypes: (keyof TComponents)[];
+//   db: Database;
+//   defs: Map<string, ComponentDef>;
+//   dirtyEntities: Map<number, Set<keyof TComponents>>;
+//   entitiesToDelete: Set<number>;
+//   entityCache: EntityCache<TComponents>;
+//   flush: () => World<TComponents>;
+//   stmts: Record<string, Statement>;
+// };
 
 // Helper type to extract component types from a World instance
 export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;
@@ -109,6 +99,7 @@ export type GenericEntity<T extends Components> = {
 };
 
 export type Entity<C extends keyof Components = never> = {
+  id: number;
   world: World<Components>;
 } & {
   [K in C]-?: NonNullable<Components[K]>;
@@ -131,14 +122,6 @@ export type EntityWithComponents<
 } & {
   // Components in C are known-present and therefore required
   [K in C]-?: ComponentData<TComponents[K]>;
-};
-
-export const isEntity = (val: unknown): val is Entity => {
-  if (typeof val !== 'object' || val === null) {
-    return false;
-  }
-  const entity = val as Partial<Entity>;
-  return typeof entity.id === 'number';
 };
 
 // Type helper for registering components dynamically

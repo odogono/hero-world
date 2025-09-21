@@ -6,7 +6,6 @@ import { s } from '../src';
 const main = async () => {
   // Import all needed functions
   const { createEntity, createWorld, defineComponent } = await import('../src');
-  const { flush } = await import('../src/world');
 
   // Define some components
   const healthComponent = defineComponent({
@@ -41,7 +40,7 @@ const main = async () => {
   ]);
 
   // Create an entity without initial components
-  const player = createEntity(world);
+  const player = world.create();
 
   console.log('Entity created:', player.id);
 
@@ -110,7 +109,7 @@ const main = async () => {
 
   // Now flush to persist the deletions to the database
   console.log('\n--- Flushing Changes ---');
-  flush(world);
+  world.flush();
   console.log(
     'Flush completed! Component deletions have been persisted to database'
   );

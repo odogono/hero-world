@@ -1,57 +1,25 @@
 /* eslint-disable perfectionist/sort-objects */
-import { defineComponent, s, type InferComponentType } from '@component';
+
+import {
+  defineComponent,
+  s,
+  toTableName,
+  type InferComponentType
+} from '@component';
 import type { Database } from '@db';
 import type { CDef } from '@types';
 
 import { cdefToSql } from './cdef-to-sql';
 import { hashComponentDefinition } from './component-hash';
 
-/**
- * Schema for storing component definition metadata in the database
- */
-// export const componentMetadataSchema = z
-//   .object({
-//     created_at: z.string().default('CURRENT_TIMESTAMP'),
-//     hash: z.string(),
-//     id: pkWithAutoIncrement(),
-//     tbl_name: z.string(),
-//     version: z.number().default(1)
-//   })
-//   .meta({
-//     description:
-//       'Stores component definition hashes for compatibility checking',
-//     name: 'tbl_component_metadata'
-//   });
-
-// export type ComponentMetadata = z.infer<typeof componentMetadataSchema>;
-
 export const componentMetadata = defineComponent({
   id: 'component_metadata',
   schema: {
-    id: s.pk(),
-    tblName: s.string().unique(),
-    hash: s.string(),
-    version: s.int().default(1),
-    createdAt: s.datetime().default()
+    defId: s.string(),
+    hash: s.string().unique(),
+    version: s.int().default(1)
   }
 });
-
-// export const componentMetadata: CDef = {
-//   columns: [
-//     { name: 'id', type: 'pk' },
-//     { isIndexed: true, name: 'tblName', type: 'string' },
-//     { name: 'hash', type: 'string' },
-//     { default: 1, name: 'version', optional: false, type: 'int' },
-//     {
-//       default: 'current_timestamp',
-//       name: 'created_at',
-//       optional: false,
-//       type: 'datetime'
-//     }
-//   ],
-//   id: 'component_metadata',
-//   tableName: 'tbl_component_metadata'
-// };
 
 export type ComponentMetadata = InferComponentType<typeof componentMetadata>;
 
@@ -59,7 +27,9 @@ export type ComponentMetadata = InferComponentType<typeof componentMetadata>;
  * Initializes the component metadata table in the database
  */
 export const initializeComponentMetadataTable = (db: Database): void => {
-  const { sql } = cdefToSql(componentMetadata, {});
+  const { sql } = cdefToSql(componentMetadata, {
+    tableName: 'tbl_component_metadata'
+  });
   db.exec(sql);
 };
 
@@ -75,8 +45,8 @@ export const storeComponentMetadata = (
   useTransaction: boolean = true
 ): void => {
   const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO tbl_component_metadata (tbl_name, hash, version)
-    VALUES (:tbl_name, :hash, :version)
+    INSERT OR REPLACE INTO tbl_component_metadata (def_id, hash, version)
+    VALUES (:def_id, :hash, :version)
   `);
 
   const storeData = () => {
@@ -84,7 +54,7 @@ export const storeComponentMetadata = (
       const hash = hashComponentDefinition(def);
       insertStmt.run({
         hash,
-        tbl_name: def.tableName!,
+        def_id: def.id!,
         version: 1
       });
     }
@@ -104,9 +74,10 @@ export const getStoredComponentMetadata = (
   db: Database
 ): ComponentMetadata[] => {
   const selectStmt = db.prepare(`
-    SELECT id, tbl_name, hash, created_at, version 
+    SELECT id, def_id, hash, created_at, version 
     FROM tbl_component_metadata 
-    ORDER BY tbl_name
+    ORDER BY def_id, created_at
+    
   `);
 
   const result: ComponentMetadata[] = [];
@@ -115,7 +86,7 @@ export const getStoredComponentMetadata = (
   for (const row of query) {
     result.push({
       id: row.id,
-      tblName: row.tbl_name,
+      defId: row.def_id,
       hash: row.hash,
       version: row.version,
       createdAt: row.created_at
@@ -125,12 +96,17 @@ export const getStoredComponentMetadata = (
   return result;
 };
 
+type ValidateOptions = {
+  allowRedefineDefinitions: boolean;
+};
+
 /**
  * Validates component definitions against stored metadata
  */
 export const validateComponentCompatibility = (
   db: Database,
-  currentDefinitions: CDef[]
+  currentDefinitions: CDef[],
+  options: ValidateOptions = { allowRedefineDefinitions: true }
 ): {
   compatible: boolean;
   errors: string[];
@@ -139,52 +115,66 @@ export const validateComponentCompatibility = (
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  const allowRedefineDefinitions = options.allowRedefineDefinitions ?? true;
+
   try {
     const storedMetadata = getStoredComponentMetadata(db);
-    const storedByTableName = new Map(
-      storedMetadata.map(meta => [meta.tblName, meta])
+    const storedByHash = new Map(storedMetadata.map(meta => [meta.hash, meta]));
+    const storedByDefId = new Map(
+      storedMetadata.map(meta => [meta.defId, meta])
     );
 
-    const currentByTableName = new Map(
+    const currentByHash = new Map(
       currentDefinitions.map(def => [
-        def.tableName,
+        def.hash,
         {
           definition: def,
           hash: hashComponentDefinition(def),
-          tableName: def.tableName
+          defId: def.id!
         }
       ])
     );
 
+    // console.log('storedByHash', storedByHash);
+
     // Check for removed components (tables)
-    for (const [tableName] of storedByTableName) {
-      if (!currentByTableName.has(tableName)) {
+    for (const [hash, { defId }] of storedByHash) {
+      if (!currentByHash.has(hash)) {
         warnings.push(
-          `Component table '${tableName}' was removed from the world definition`
+          `Component table '${toTableName(defId, hash)}' was removed from the world definition`
         );
       }
     }
 
     // Check for new or modified components
-    for (const [tableName, current] of currentByTableName) {
-      const stored = storedByTableName.get(tableName!);
+    for (const [hash, { defId }] of currentByHash) {
+      if (allowRedefineDefinitions === false) {
+        if (storedByDefId.has(defId)) {
+          errors.push(
+            `Component table '${toTableName(defId, hash)}' was redefined in the world definition`
+          );
+          continue;
+        }
+      }
+
+      const stored = storedByHash.get(hash);
 
       if (!stored) {
         // New component table - this is usually fine
         warnings.push(
-          `New component table '${tableName}' added to the world definition`
+          `New component table '${toTableName(defId, hash)}' added to the world definition`
         );
         continue;
       }
 
       const storedHash = stored?.hash;
-      const currentHash = current.hash;
+      const currentHash = hash;
 
       // Check compatibility
       // const comparison = compareComponentHashes({ hash: storedHash, tbl_name: tableName! }, { hash: currentHash, tbl_name: tableName! });
       if (storedHash !== currentHash) {
         errors.push(
-          `Component table definition mismatch for '${tableName}':`,
+          `Component table definition mismatch for '${toTableName(defId, hash)}':`,
           `Stored hash: ${storedHash}`,
           `Current hash: ${currentHash}`
         );
@@ -214,12 +204,12 @@ export const updateComponentMetadata = (
   definitions: CDef[]
 ): void => {
   // First, remove metadata for component tables that no longer exist
-  const currentTableNames = definitions.map(def => def.tableName);
+  const currentTableNames = definitions.map(def => def.hash);
 
   if (currentTableNames.length > 0) {
     const placeholders = currentTableNames.map(() => '?').join(',');
     const deleteStmt = db.prepare(
-      `DELETE FROM tbl_component_metadata WHERE tbl_name NOT IN (${placeholders})`
+      `DELETE FROM tbl_component_metadata WHERE hash NOT IN (${placeholders})`
     );
     deleteStmt.run(...currentTableNames);
   } else {

@@ -33,15 +33,12 @@ export type Database = {
   close: () => void;
   dump: () => string;
   exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
-  loadFromJSON: (json: unknown, options?: LoadFromJSONOptions) => void;
-  // lastInsertRowId: () => number;
   prepare: (sql: string) => Statement;
   query: (
     sql: string,
     args?: StatementArgs,
     ...rest: StatementArgs[]
   ) => unknown[];
-  saveToJSON: (options?: SaveToJSONOptions) => unknown;
   saveToPath: (path: string) => void;
   transaction: <T>(fn: () => T) => T;
 };

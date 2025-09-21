@@ -10,16 +10,10 @@ import { parseArgs } from './helpers';
 import type {
   CreateDatabaseOptions,
   Database,
-  LoadFromJSONOptions,
-  SaveToJSONOptions,
   Statement,
   StatementArgs,
   StatementRunResult
 } from './index';
-import {
-  loadFromJSON as sharedLoadFromJSON,
-  saveToJSON as sharedSaveToJSON
-} from './json-functions';
 
 // Wrapper for Bun SQLite database
 export class BunDatabaseWrapper implements Database {
@@ -132,14 +126,6 @@ export class BunDatabaseWrapper implements Database {
 
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn)() as T;
-  }
-
-  saveToJSON(options: SaveToJSONOptions = {}): unknown {
-    return sharedSaveToJSON(this, options);
-  }
-
-  loadFromJSON(json: unknown, options: LoadFromJSONOptions = {}): void {
-    sharedLoadFromJSON(this, json, options);
   }
 
   dump(): string {

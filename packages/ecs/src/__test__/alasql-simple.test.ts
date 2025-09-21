@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createWorld } from '@/world';
 import { DatabaseType } from '@db';
+import { createWorld } from '@world';
 
 describe.skip('AlasQL ECS Integration', () => {
   test('should create AlasQL world successfully', async () => {

@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createWorld } from '@/world';
 import { DatabaseType } from '@db';
 import { eventComponent } from '@events';
 import { createSystem } from '@system';
-import type { ExtractWorldComponents, World } from '@types';
+import type { ExtractWorldComponents } from '@types';
+import { createWorld, type World } from '@world';
 
 import { createGameLoop, logSystemPerformance } from '../game-loop';
 

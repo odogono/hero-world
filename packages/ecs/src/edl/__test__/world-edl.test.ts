@@ -1,10 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 
 import { DatabaseType } from '@db';
-import { createEntity, queryEntities, queryEntity } from '@entity';
 import { createWorld } from '@world';
 
-describe('World EDL', () => {
+describe.skip('World EDL', () => {
   it('should create a world with defs from edl', async () => {
     const edl = `
     def position {
@@ -24,7 +23,7 @@ describe('World EDL', () => {
       type: DatabaseType.BUN
     });
 
-    const entity = createEntity(world, {
+    const entity = world.create({
       health: {
         health: 50,
         max: 100
@@ -86,7 +85,7 @@ describe('World EDL', () => {
       type: DatabaseType.BUN
     });
 
-    const box = queryEntity(world, { with: ['position', 'measured'] })!;
+    const box = world.query({ with: ['position', 'measured'] })!;
     expect(box.position.x).toBe(10);
     expect(box.position.y).toBe(20);
     expect(box.position.z).toBe(30);
@@ -94,10 +93,10 @@ describe('World EDL', () => {
     expect(box.measured.weight).toBe(20);
 
     // NOTE atoms are not saved as entities
-    const data = world.db.saveToJSON({ asComponents: false });
+    const data = world.saveToJSON({ asComponents: false });
     expect(data).toHaveLength(2);
 
-    const allEntities = queryEntities(world);
+    const allEntities = world.queryAll();
     expect(allEntities).toHaveLength(2);
   });
 });

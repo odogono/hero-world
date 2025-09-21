@@ -14,7 +14,7 @@ describe('Component Definitions to SQL', () => {
   test('should convert a component definition to a SQL table', () => {
     const cdef: CDef = {
       id: 'user',
-      tableName: 'tbl_users',
+      hash: '1234567',
       columns: [
         { name: 'id', type: 'pk' },
         { name: 'name', type: 'string' }
@@ -23,7 +23,7 @@ describe('Component Definitions to SQL', () => {
 
     const result = cdefToSql(cdef);
 
-    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_users');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user_1234567');
     expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('name TEXT NULL');
   });
@@ -31,6 +31,7 @@ describe('Component Definitions to SQL', () => {
   test('should convert a component definition to a SQL table', () => {
     const cdef: CDef = {
       id: 'user',
+      hash: '1234567',
       columns: [
         { name: 'name', type: 'string', optional: false },
         { name: 'email', type: 'email', isUnique: true, optional: false },
@@ -57,7 +58,7 @@ describe('Component Definitions to SQL', () => {
 
     const result = cdefToSql(cdef);
 
-    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user_1234567');
     expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('eid INTEGER NULL');
     expect(result.sql).toContain(
@@ -75,7 +76,7 @@ describe('Component Definitions to SQL', () => {
     expect(result.sql).toContain('type TEXT NOT NULL');
     expect(result.sql).toContain('status TEXT NOT NULL');
     expect(result.sql).toContain(
-      'CREATE INDEX IF NOT EXISTS idx_tbl_user_status ON tbl_user (status)'
+      'CREATE INDEX IF NOT EXISTS idx_tbl_user_1234567_status ON tbl_user_1234567 (status)'
     );
     expect(result.sql).toContain('birth_date TEXT NULL');
     expect(result.sql).toContain(
@@ -90,16 +91,20 @@ describe('Component Definitions to SQL', () => {
 
     const rollback = cdefToSql(cdef, { up: false, down: true });
 
-    expect(rollback.sql).not.toContain('CREATE TABLE IF NOT EXISTS tbl_user');
-    expect(rollback.sql).toContain('DROP TABLE IF EXISTS tbl_user');
-    expect(rollback.sql).toContain('DROP INDEX IF EXISTS idx_tbl_user_status');
+    expect(rollback.sql).not.toContain(
+      'CREATE TABLE IF NOT EXISTS tbl_user_1234567'
+    );
+    expect(rollback.sql).toContain('DROP TABLE IF EXISTS tbl_user_1234567');
+    expect(rollback.sql).toContain(
+      'DROP INDEX IF EXISTS idx_tbl_user_1234567_status'
+    );
   });
 
   test('multiple component definitions', () => {
     const userCdef: CDef[] = [
       {
         id: 'user',
-        tableName: 'tbl_user',
+        hash: '1234567',
         columns: [
           { name: 'id', type: 'pk' },
           { name: 'name', type: 'string' }
@@ -109,6 +114,7 @@ describe('Component Definitions to SQL', () => {
     const describableCdef: CDef[] = [
       {
         id: 'describable',
+        hash: '1234567',
         columns: [
           { name: 'name', type: 'string' },
           { name: 'description', type: 'string' }
@@ -123,12 +129,16 @@ describe('Component Definitions to SQL', () => {
     });
 
     expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_entity');
-    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user');
-    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_describable');
+    expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user_1234567');
+    expect(result.sql).toContain(
+      'CREATE TABLE IF NOT EXISTS tbl_describable_1234567'
+    );
 
     expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_entity');
-    expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_user');
-    expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_describable');
+    expect(result.sql).toContain('DROP TABLE IF EXISTS tbl_user_1234567');
+    expect(result.sql).toContain(
+      'DROP TABLE IF EXISTS tbl_describable_1234567'
+    );
   });
 
   test('should convert an enum component definition to a SQL table', () => {
@@ -158,6 +168,7 @@ describe('Component Definitions to SQL', () => {
     test('should convert a component definition to a SQL insert', () => {
       const cdef: CDef = {
         id: 'user',
+        hash: '1234567',
         columns: [
           { name: 'id', type: 'pk' },
           { name: 'name', type: 'string' },
@@ -169,11 +180,13 @@ describe('Component Definitions to SQL', () => {
       const sql = cdefToSqlInsert(cdef);
 
       expect(sql).toBe(
-        'INSERT INTO tbl_user (eid, name, age, email) VALUES (?1, ?2, ?3, ?4)'
+        'INSERT INTO tbl_user_1234567 (eid, name, age, email) VALUES (?1, ?2, ?3, ?4)'
       );
 
       const selectSql = cdefToSqlSelect(cdef);
-      expect(selectSql).toBe('SELECT id, eid, name, age, email FROM tbl_user');
+      expect(selectSql).toBe(
+        'SELECT id, eid, name, age, email FROM tbl_user_1234567'
+      );
     });
   });
 
@@ -181,6 +194,7 @@ describe('Component Definitions to SQL', () => {
     test('should query data from a table', () => {
       const cdef: CDef = {
         id: 'user',
+        hash: '1234567',
         columns: [
           { name: 'age', type: 'int', optional: true },
           { name: 'email', type: 'email' },
@@ -191,12 +205,12 @@ describe('Component Definitions to SQL', () => {
 
       const sql = cdefToSqlSelectWhere(cdef, 'id', 'name');
 
-      expect(sql).toEqual('SELECT id FROM tbl_user WHERE name = ?1');
+      expect(sql).toEqual('SELECT id FROM tbl_user_1234567 WHERE name = ?1');
 
       const sqlAnd = cdefToSqlSelectWhere(cdef, 'name', ['email', 'age']);
 
       expect(sqlAnd).toEqual(
-        'SELECT name FROM tbl_user WHERE email = ?1 AND age = ?2'
+        'SELECT name FROM tbl_user_1234567 WHERE email = ?1 AND age = ?2'
       );
     });
   });

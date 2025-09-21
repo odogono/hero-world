@@ -1,5 +1,6 @@
 import { toSnakeCase } from 'odgn-helpers/string';
 
+import { defToTableName } from '@component';
 import type { CDef, CDefColumnInfo } from '@types';
 
 import type { StatementOptions } from './types';
@@ -9,6 +10,7 @@ export type CDefToSqlInput = CDef | CDef[] | CDef[][];
 export type CDefToSqlOptions = {
   down?: boolean;
   includeEntity?: boolean;
+  tableName?: string;
   up?: boolean;
 };
 
@@ -113,26 +115,6 @@ const buildColumnDef = (
   return { column: parts.join(' '), fk };
 };
 
-const autoColumns = (): { columns: string[]; fks: string[] } => {
-  const columns: string[] = [];
-  const fks: string[] = [];
-
-  // id primary key
-  columns.push('id INTEGER PRIMARY KEY AUTOINCREMENT', 'eid INTEGER NULL');
-  fks.push('FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE');
-
-  // created_at, updated_at with default CURRENT_TIMESTAMP
-  columns.push(
-    'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'
-  );
-
-  return { columns, fks };
-};
-
-const toTableName = (cdef: CDef): string =>
-  cdef.tableName || `tbl_${toSnakeCase(cdef.id) || cdef.id}`;
-
 type ColumnInfo = {
   name: string;
   type: string;
@@ -157,22 +139,18 @@ const getColumns = (cdef: CDef): ColumnInfo[] => {
   return result;
 };
 
-const buildCreateTable = (cdef: CDef) => {
-  const tableName = toTableName(cdef);
-  const seen = new Set<string>();
+const buildCreateTable = (cdef: CDef, options?: StatementOptions) => {
+  const tableName = options?.tableName ?? defToTableName(cdef);
+  const seen = new Set<string>(['id', 'eid', 'created_at', 'updated_at']);
 
-  const cols: string[] = [];
-  const fks: string[] = [];
+  const cols: string[] = [
+    'id INTEGER PRIMARY KEY AUTOINCREMENT',
+    'eid INTEGER NULL'
+  ];
+  const fks: string[] = [
+    'FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE'
+  ];
   const indexes: string[] = [];
-
-  // Auto columns first
-  const auto = autoColumns();
-  for (const c of auto.columns) {
-    const name = c.split(' ')[0] as string;
-    seen.add(name);
-    cols.push(c);
-  }
-  fks.push(...auto.fks);
 
   // User-defined columns
   for (const col of cdef.columns) {
@@ -197,13 +175,18 @@ const buildCreateTable = (cdef: CDef) => {
     }
   }
 
+  cols.push(
+    'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'
+  );
+
   const all = [...cols, ...fks];
   const createSql = `CREATE TABLE IF NOT EXISTS ${tableName} (\n  ${all.join(',\n  ')}\n);`;
   return { indexes, sql: createSql, tableName };
 };
 
 const buildDropStatements = (cdef: CDef): string[] => {
-  const tableName = toTableName(cdef);
+  const tableName = defToTableName(cdef);
   const stmts: string[] = [];
   // Drop indexes that may have been created
   for (const col of cdef.columns) {
@@ -222,7 +205,12 @@ export const cdefToSql = (
   input: CDefToSqlInput,
   options: CDefToSqlOptions = {}
 ): CDefToSqlResult => {
-  const { down = false, includeEntity = false, up = true } = options;
+  const {
+    down = false,
+    includeEntity = false,
+    tableName: overrideTableName,
+    up = true
+  } = options;
 
   // Normalize input into a flat array of CDef
   const defs: CDef[] = Array.isArray(input)
@@ -241,7 +229,9 @@ export const cdefToSql = (
 
   if (up) {
     for (const d of defs) {
-      const { indexes, sql, tableName } = buildCreateTable(d);
+      const { indexes, sql, tableName } = buildCreateTable(d, {
+        tableName: overrideTableName
+      });
       stmts.push(sql, ...indexes);
       tableNames.push(tableName);
     }
@@ -263,7 +253,7 @@ export const cdefToSql = (
 export const cdefToSqlCreate = (cdef: CDef, options: CDefToSqlOptions = {}) => {
   const { down = false, includeEntity = false, up = true } = options;
 
-  const { indexes, sql, tableName } = buildCreateTable(cdef);
+  const { indexes, sql, tableName } = buildCreateTable(cdef, options);
 
   const columns = getColumns(cdef);
 
@@ -271,7 +261,7 @@ export const cdefToSqlCreate = (cdef: CDef, options: CDefToSqlOptions = {}) => {
 };
 
 export const cdefToSqlInsert = (cdef: CDef, options: StatementOptions = {}) => {
-  const tableName = options.tableName ?? toTableName(cdef);
+  const tableName = options.tableName ?? defToTableName(cdef);
 
   // Build columns list for INSERT
   // Include eid and all user-defined columns except auto-increment id
@@ -286,7 +276,7 @@ export const cdefToSqlInsert = (cdef: CDef, options: StatementOptions = {}) => {
   return `INSERT INTO ${tableName} (${statementColumns.join(', ')}) VALUES (${placeholders.join(', ')})`;
 };
 export const cdefToSqlUpdate = (cdef: CDef, options: StatementOptions = {}) => {
-  const tableName = options.tableName ?? toTableName(cdef);
+  const tableName = options.tableName ?? defToTableName(cdef);
 
   // Exclude id and eid from SET columns; eid used in WHERE
   const setColumns = getColumns(cdef)
@@ -307,7 +297,7 @@ export const cdefToSqlSelect = (
   cdef: CDef,
   options: { tableName?: string } = {}
 ): string => {
-  const tableName = options.tableName ?? toTableName(cdef);
+  const tableName = options.tableName ?? defToTableName(cdef);
   // Select all known columns except internal eid
   const columns = getColumns(cdef).map(c => c.name);
   return `SELECT ${columns.join(', ')} FROM ${tableName}`;
@@ -318,7 +308,7 @@ export const cdefToSqlSelectWhere = (
   selectColumn: string,
   whereColumn: string | string[]
 ): string => {
-  const tableName = toTableName(cdef);
+  const tableName = defToTableName(cdef);
   const whereColumns = Array.isArray(whereColumn) ? whereColumn : [whereColumn];
   const whereConditions = whereColumns.map(
     (col, index) => `${col} = ?${index + 1}`

@@ -1,3 +1,5 @@
+import type { CDef } from './types';
+
 /**
  * Base error class for the ECS system
  */
@@ -205,6 +207,7 @@ export class SQLiteError extends ECSError {
 export const ECSErrorCodes = {
   // General ECS errors
   COMPONENT_NOT_FOUND: 'COMPONENT_NOT_FOUND',
+  DUPLICATE_COMPONENT_DEFINITION: 'DUPLICATE_COMPONENT_DEFINITION',
   ENTITY_NOT_FOUND: 'ENTITY_NOT_FOUND',
   INVALID_COMPONENT_DEFINITION: 'INVALID_COMPONENT_DEFINITION',
   INVALID_ENTITY_ID: 'INVALID_ENTITY_ID',
@@ -308,4 +311,13 @@ export const createWorldNotInitializedError = (): ECSError =>
   new ECSError(
     'World has not been initialized',
     ECSErrorCodes.WORLD_NOT_INITIALIZED
+  );
+
+export const createDuplicateComponentDefinitionError = (
+  componentDef: CDef
+): ECSError =>
+  new ECSError(
+    `Duplicate component definition for '${componentDef.id}'`,
+    ECSErrorCodes.DUPLICATE_COMPONENT_DEFINITION,
+    { componentId: componentDef.id, hash: componentDef.hash }
   );

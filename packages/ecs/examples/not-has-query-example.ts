@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
 
-import { createWorld, flush } from '@/world';
 import { defineComponent, s } from '@component';
-import { createEntity, queryEntities } from '@entity';
+import { createWorld } from '@world';
 
 // Define some example components
 const healthComponent = defineComponent({
@@ -40,34 +39,34 @@ export const notHasQueryExample = async () => {
   ]);
 
   // Create various entities with different component combinations
-  const player1 = createEntity(world, {
+  const player1 = world.create({
     health: { current: 100, max: 100 },
     inventory: { capacity: 10, itemCount: 2 },
     player: { level: 5, name: 'Alice' }
   });
 
-  const player2 = createEntity(world, {
+  const player2 = world.create({
     health: { current: 80, max: 100 },
     player: { level: 3, name: 'Bob' }
     // No inventory component
   });
 
-  const npc1 = createEntity(world, {
+  const npc1 = world.create({
     health: { current: 50, max: 50 }
     // No player or inventory components
   });
 
-  const npc2 = createEntity(world, {
+  const npc2 = world.create({
     inventory: { capacity: 5, itemCount: 1 }
     // No player or health components
   });
 
-  const item = createEntity(world, {
+  const item = world.create({
     inventory: { capacity: 1, itemCount: 1 }
     // No player or health components
   });
 
-  flush(world);
+  world.flush();
 
   console.log('Created entities:');
   console.log('- Player 1: has player, health, inventory');
@@ -79,7 +78,7 @@ export const notHasQueryExample = async () => {
   // Query examples using with and without
 
   // 1. Find all players without inventory
-  const playersWithoutInventory = queryEntities(world, {
+  const playersWithoutInventory = world.queryAll({
     with: ['player', 'health'],
     without: ['inventory']
   });
@@ -89,7 +88,7 @@ export const notHasQueryExample = async () => {
   });
 
   // 2. Find all entities with health but no player component (NPCs)
-  const npcsWithHealth = queryEntities(world, {
+  const npcsWithHealth = world.queryAll({
     with: ['health'],
     without: ['player']
   });
@@ -99,7 +98,7 @@ export const notHasQueryExample = async () => {
   });
 
   // 3. Find all entities with inventory but no player component (items/containers)
-  const nonPlayerInventory = queryEntities(world, {
+  const nonPlayerInventory = world.queryAll({
     with: ['inventory'],
     without: ['player']
   });
@@ -114,7 +113,7 @@ export const notHasQueryExample = async () => {
   });
 
   // 4. Find all entities with health but no inventory (simple NPCs)
-  const simpleNpcs = queryEntities(world, {
+  const simpleNpcs = world.queryAll({
     with: ['health'],
     without: ['player', 'inventory']
   });
@@ -124,7 +123,7 @@ export const notHasQueryExample = async () => {
   });
 
   // 5. Combine without with other query options
-  const limitedResults = queryEntities(world, {
+  const limitedResults = world.queryAll({
     limit: 1,
     with: ['health'],
     without: ['player']
@@ -140,7 +139,7 @@ export const notHasQueryExample = async () => {
   }
 
   // 6. Use with option to specify which components to include
-  const playerWithHealthOnly = queryEntities(world, {
+  const playerWithHealthOnly = world.queryAll({
     with: ['player', 'health'],
     without: ['inventory']
   });

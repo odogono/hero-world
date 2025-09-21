@@ -16,11 +16,13 @@ import { resolve } from 'node:path';
 
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
+import type { CDef, CDefColumnInfo, CDefColumnType } from '@schema/types';
+
+import { defToTableName } from '../src';
 import { parseEDL } from '../src/edl';
 import { cdefToSql } from '../src/schema/cdef-to-sql';
 import { cdefToTypes } from '../src/schema/cdef-to-types';
 import { cdefToZod } from '../src/schema/cdef-to-zod';
-import type { CDef, CDefColumnInfo, CDefColumnType } from '../src/schema/types';
 
 type Flags = {
   down: boolean;
@@ -34,27 +36,27 @@ type Flags = {
 
 type EDLParsed = Array<
   | {
-      type: 'component';
+      columns: Array<{
+        default?: string;
+        isUnique?: boolean;
+        name: string;
+        optional?: boolean;
+        type: string;
+      }>;
       id: string;
       tableName?: string;
-      columns: Array<{
-        name: string;
-        type: string;
-        optional?: boolean;
-        isUnique?: boolean;
-        default?: string;
-      }>;
+      type: 'component';
     }
   | {
+      components: Record<string, Record<string, unknown>>;
+      id?: string;
       type: 'atom';
-      id?: string;
-      components: Record<string, Record<string, unknown>>;
     }
   | {
-      type: 'entity';
-      id?: string;
-      extends?: string[];
       components: Record<string, Record<string, unknown>>;
+      extends?: string[];
+      id?: string;
+      type: 'entity';
     }
 >;
 
@@ -66,16 +68,28 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--help' || a === '-h') return 'help';
-    if (a === '--include-entity') flags.includeEntity = true;
-    else if (a === '--down') flags.down = true;
-    else if (a === '--zod-no-imports') flags.zodNoImports = true;
-    else if (a === '--input') flags.input = argv[++i];
-    else if (a === '--sql-out') flags.sqlOut = argv[++i];
-    else if (a === '--types-out') flags.typesOut = argv[++i];
-    else if (a === '--zod-out') flags.zodOut = argv[++i];
-    else if (!flags.input && !a.startsWith('--')) flags.input = a;
-    else return 'invalid';
+    if (a === '--help' || a === '-h') {
+      return 'help';
+    }
+    if (a === '--include-entity') {
+      flags.includeEntity = true;
+    } else if (a === '--down') {
+      flags.down = true;
+    } else if (a === '--zod-no-imports') {
+      flags.zodNoImports = true;
+    } else if (a === '--input') {
+      flags.input = argv[++i];
+    } else if (a === '--sql-out') {
+      flags.sqlOut = argv[++i];
+    } else if (a === '--types-out') {
+      flags.typesOut = argv[++i];
+    } else if (a === '--zod-out') {
+      flags.zodOut = argv[++i];
+    } else if (!flags.input && !a.startsWith('--')) {
+      flags.input = a;
+    } else {
+      return 'invalid';
+    }
   }
   return flags;
 };
@@ -103,19 +117,23 @@ const toCDefType = (t: string): CDefColumnType => {
     'json',
     'array'
   ];
-  if ((allowed as string[]).includes(norm)) return norm as CDefColumnType;
+  if ((allowed as string[]).includes(norm)) {
+    return norm as CDefColumnType;
+  }
   return 'string';
 };
 
 const mapComponentsToCDefs = (defs: EDLParsed): CDef[] => {
   const cdefs: CDef[] = [];
   for (const d of defs) {
-    if (d.type !== 'component') continue;
+    if (d.type !== 'component') {
+      continue;
+    }
     const columns: CDefColumnInfo[] = d.columns.map(col => ({
-      name: col.name,
-      type: toCDefType(col.type),
-      optional: col.optional,
       isUnique: col.isUnique,
+      name: col.name,
+      optional: col.optional,
+      type: toCDefType(col.type),
       // heuristic: coerce default string to number/boolean where obvious
       default:
         col.default === undefined
@@ -128,68 +146,84 @@ const mapComponentsToCDefs = (defs: EDLParsed): CDef[] => {
                 ? (Number(col.default) as any)
                 : (col.default as any)
     }));
-    cdefs.push({ id: d.id, tableName: d.tableName, columns });
+    cdefs.push({ columns, id: d.id, tableName: d.tableName });
   }
   return cdefs;
 };
 
-const toTableName = (cdef: CDef): string =>
-  cdef.tableName || `tbl_${toSnakeCase(cdef.id) || cdef.id}`;
-
 const sqlValue = (v: unknown): string => {
-  if (v === null || v === undefined) return 'NULL';
-  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'NULL';
-  if (typeof v === 'boolean') return v ? '1' : '0';
+  if (v === null || v === undefined) {
+    return 'NULL';
+  }
+  if (typeof v === 'number') {
+    return Number.isFinite(v) ? String(v) : 'NULL';
+  }
+  if (typeof v === 'boolean') {
+    return v ? '1' : '0';
+  }
   const s = String(v);
   return `'${s.replaceAll("'", "''")}'`;
 };
 
 const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
   const entities = edl.filter(d => d.type === 'entity') as Array<{
-    type: 'entity';
-    id?: string;
-    extends?: string[];
     components: Record<string, Record<string, unknown>>;
+    extends?: string[];
+    id?: string;
+    type: 'entity';
   }>;
   const atoms = new Map<string, Record<string, Record<string, unknown>>>();
   for (const d of edl) {
-    if (d.type === 'atom' && d.id) atoms.set(d.id, d.components);
+    if (d.type === 'atom' && d.id) {
+      atoms.set(d.id, d.components);
+    }
   }
   const compById = new Map<string, CDef>();
-  for (const c of cdefs) compById.set(c.id, c);
+  for (const c of cdefs) {
+    compById.set(c.id, c);
+  }
 
   // Assign stable numeric ids to entities in order of appearance
   const idMap = new Map<string, number>();
   let nextId = 1;
   for (const e of entities) {
     const key = e.id ?? `entity_${nextId}`;
-    if (!idMap.has(key)) idMap.set(key, nextId++);
+    if (!idMap.has(key)) {
+      idMap.set(key, nextId++);
+    }
   }
 
   // Resolve extends components recursively
   const getEffectiveComponents = (
     e: {
-      id?: string;
-      extends?: string[];
       components: Record<string, Record<string, unknown>>;
+      extends?: string[];
+      id?: string;
     },
     seen: Set<string> = new Set()
   ): Record<string, Record<string, unknown>> => {
     const merged: Record<string, Record<string, unknown>> = {};
     const mergeInto = (src?: Record<string, Record<string, unknown>>) => {
-      if (!src) return;
-      for (const [k, v] of Object.entries(src))
+      if (!src) {
+        return;
+      }
+      for (const [k, v] of Object.entries(src)) {
         merged[k] = { ...(merged[k] || {}), ...v };
+      }
     };
     if (e.extends && e.extends.length) {
       for (const ext of e.extends) {
-        if (seen.has(ext)) continue; // avoid cycles
+        if (seen.has(ext)) {
+          continue;
+        } // avoid cycles
         seen.add(ext);
         if (atoms.has(ext)) {
           mergeInto(atoms.get(ext));
         } else {
           const target = entities.find(x => x.id === ext);
-          if (target) mergeInto(getEffectiveComponents(target, seen));
+          if (target) {
+            mergeInto(getEffectiveComponents(target, seen));
+          }
         }
       }
     }
@@ -215,13 +249,17 @@ const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
     lines.push('-- Seed entities');
     for (const e of entities) {
       const eid = idMap.get(e.id ?? '') ?? 0;
-      if (!eid) continue;
+      if (!eid) {
+        continue;
+      }
       lines.push(`INSERT INTO tbl_entity (id) VALUES (${eid});`);
 
       const effective = getEffectiveComponents(e);
       for (const [compName, props] of Object.entries(effective)) {
         const schema = compById.get(compName);
-        if (!schema) continue; // skip unknown components
+        if (!schema) {
+          continue;
+        } // skip unknown components
         const cols = compColumnMap.get(compName) || [];
         const snakeCols: string[] = [];
         const values: string[] = [];
@@ -231,7 +269,9 @@ const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
         for (const [k, rawVal] of Object.entries(props)) {
           // map property key (already camelCased by parser) to schema column
           const match = cols.find(c => c.camel === k);
-          if (!match) continue;
+          if (!match) {
+            continue;
+          }
           // resolve references like $name to mapped entity ids
           let v: unknown = rawVal;
           if (typeof v === 'string' && v.startsWith('$')) {
@@ -243,7 +283,7 @@ const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
           values.push(sqlValue(v));
         }
         if (snakeCols.length > 1) {
-          const tableName = toTableName(schema);
+          const tableName = defToTableName(schema);
           lines.push(
             `INSERT INTO ${tableName} (${snakeCols.join(', ')}) VALUES (${values.join(', ')});`
           );
@@ -256,7 +296,9 @@ const buildInsertSQL = (edl: EDLParsed, cdefs: CDef[]): string => {
 
 const main = () => {
   const parsed = parseArgs(process.argv);
-  if (parsed === 'help') return showHelp();
+  if (parsed === 'help') {
+    return showHelp();
+  }
   if (parsed === 'invalid' || !parsed.input) {
     console.error('Invalid arguments. Use --help.');
     process.exit(1);
@@ -264,7 +306,7 @@ const main = () => {
 
   const inputPath = resolve(process.cwd(), parsed.input);
   const edlRaw = readFileSync(inputPath, 'utf8');
-  const edl = edlRaw.replace(/\uFEFF/g, ''); // strip BOMs if present anywhere
+  const edl = edlRaw.replaceAll('\uFEFF', ''); // strip BOMs if present anywhere
   const defs = parseEDL(edl) as EDLParsed;
 
   // Convert component defs to CDef
@@ -273,9 +315,9 @@ const main = () => {
   // Generate SQL DDL
   const up = true;
   const { sql } = cdefToSql(cdefs, {
+    down: parsed.down,
     includeEntity: parsed.includeEntity,
-    up,
-    down: parsed.down
+    up
   });
 
   // Generate entity inserts
@@ -287,12 +329,15 @@ const main = () => {
   const zod = cdefToZod(cdefs, { includeImports: !parsed.zodNoImports });
 
   // Output
-  if (parsed.sqlOut)
+  if (parsed.sqlOut) {
     writeFileSync(resolve(process.cwd(), parsed.sqlOut), fullSql, 'utf8');
-  if (parsed.typesOut)
+  }
+  if (parsed.typesOut) {
     writeFileSync(resolve(process.cwd(), parsed.typesOut), types, 'utf8');
-  if (parsed.zodOut)
+  }
+  if (parsed.zodOut) {
     writeFileSync(resolve(process.cwd(), parsed.zodOut), zod, 'utf8');
+  }
 
   if (!parsed.sqlOut && !parsed.typesOut && !parsed.zodOut) {
     console.log('-- SQL --');

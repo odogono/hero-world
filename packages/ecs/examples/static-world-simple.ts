@@ -45,7 +45,7 @@ const main = async () => {
   );
 
   // Create an entity without initial components
-  const player = createEntity(world);
+  const player = world.create();
   console.log('Entity created:', player.id);
 
   // Property assignment with simple types
