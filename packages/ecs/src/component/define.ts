@@ -1,12 +1,10 @@
 import {
   hashComponentDefinition,
   type HashComponentDefinitionInput
-} from '../schema/component-hash';
-import type {
-  CDefWithSchema,
-  DefineComponentProps,
-  DefineComponentSchema
-} from './types';
+} from '@schema/component-hash';
+import type { CDefWithSchema } from '@types';
+
+import type { DefineComponentProps, DefineComponentSchema } from './types';
 
 export const defineComponent = <
   S extends DefineComponentSchema,

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 
 import { DatabaseType } from '@db';
 import { createWorld } from '@world';
@@ -72,5 +72,23 @@ describe('Component Definition', () => {
     expect(createWorld([defA, defB], opts)).rejects.toThrow(
       /Duplicate component definition for 'test'/
     );
+  });
+
+  it('should allow schema properties with reserved sqlite keywords', () => {
+    const def = defineComponent({
+      id: 'test',
+      schema: {
+        in: s.entityId(),
+        select: s.string(),
+        from: s.string(),
+        where: s.string(),
+        groupBy: s.string(),
+        having: s.string(),
+        orderBy: s.string(),
+        limit: s.string(),
+        offset: s.string()
+      }
+    });
+    expect(createWorld([def], worldOpts)).resolves.toBeTruthy();
   });
 });

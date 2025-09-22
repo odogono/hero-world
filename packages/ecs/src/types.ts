@@ -1,7 +1,10 @@
-import type { CreateDatabaseOptions, DatabaseType, Statement } from '@db';
+import type { Statement } from '@db';
 import type { World } from '@world';
 
-import type { InferComponentType } from './component/types';
+import type {
+  DefineComponentSchema,
+  InferComponentType
+} from './component/types';
 import type { ColumnInfo } from './schema/types';
 
 export type EntityId = number;
@@ -57,6 +60,14 @@ export type CDef = {
   statements?: Record<string, string>;
 };
 
+export type CDefWithSchema<
+  S extends DefineComponentSchema,
+  Name extends string = string
+> = Omit<CDef, 'id'> & {
+  __schema: S;
+  id: Name;
+};
+
 // //////////////////////////////////////////////////////////////
 // Old Component Definition types
 // //////////////////////////////////////////////////////////////
@@ -74,21 +85,6 @@ export type ComponentDef = {
 };
 
 export type Components = Record<string, unknown>;
-
-/**
- * World type that includes component types - now based on static world
- */
-// export type World<TComponents extends Components> = {
-//   close: () => void;
-//   readonly componentTypes: (keyof TComponents)[];
-//   db: Database;
-//   defs: Map<string, ComponentDef>;
-//   dirtyEntities: Map<number, Set<keyof TComponents>>;
-//   entitiesToDelete: Set<number>;
-//   entityCache: EntityCache<TComponents>;
-//   flush: () => World<TComponents>;
-//   stmts: Record<string, Statement>;
-// };
 
 // Helper type to extract component types from a World instance
 export type ExtractWorldComponents<T> = T extends World<infer C> ? C : never;
@@ -129,28 +125,7 @@ export type RegisterComponent<Name extends string, Schema extends CDef> = {
   [K in Name]: InferComponentType<Schema>;
 };
 
-// Static World Types - now just an alias for World (since World is now static)
-export type StaticWorld<TComponents extends Components> = World<TComponents>;
-
-// Helper type to infer component types from an array of component definitions
-export type InferComponentsFromDefs<T extends readonly ComponentDefinition[]> =
-  {
-    [K in T[number] as K['name']]: InferComponentType<K['schema']>;
-  };
-
 // Helper type to infer component types directly from CDef arrays
 export type InferComponentsFromCDefs<T extends readonly CDef[]> = {
   [K in T[number] as K['id']]: InferComponentType<K>;
 };
-
-// Tuple type for component definitions
-export type ComponentDefinitionTuple<T extends Components> = {
-  [K in keyof T]: ComponentDefinition;
-}[keyof T][];
-
-// Static world creation options
-export type CreateStaticWorldOptions<T extends Components> = {
-  components: ComponentDefinitionTuple<T>;
-} & Partial<CreateDatabaseOptions> & {
-    dbType?: DatabaseType;
-  };

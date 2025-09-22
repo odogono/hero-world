@@ -321,3 +321,17 @@ export const createDuplicateComponentDefinitionError = (
     ECSErrorCodes.DUPLICATE_COMPONENT_DEFINITION,
     { componentId: componentDef.id, hash: componentDef.hash }
   );
+
+export const createSqliteError = (
+  error: unknown,
+  sql: string,
+  options: {
+    context?: Record<string, unknown>;
+    params?: unknown[];
+    sqliteCode?: number;
+  }
+): SQLiteError => {
+  return SQLiteError.executionError(sql, error as Error | string, {
+    ...options
+  });
+};

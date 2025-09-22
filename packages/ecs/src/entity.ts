@@ -15,6 +15,7 @@ import type {
 } from '@types';
 
 import { SQLiteError } from './error';
+import { q } from './db/sql-helpers';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
@@ -132,7 +133,7 @@ const buildQuery = <T extends Components>(
     joins.push(join);
     def.columns.forEach(column => {
       const name = column.name;
-      const field = `${alias}.${name} AS ${alias}_${name}`;
+      const field = `${alias}.${q(name)} AS ${alias}_${name}`;
       fields.push(field);
     });
   });

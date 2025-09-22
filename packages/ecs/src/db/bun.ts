@@ -6,6 +6,7 @@ import type {
   SQLQueryBindings
 } from 'bun:sqlite';
 
+import { createSqliteError } from '../error';
 import { parseArgs } from './helpers';
 import type {
   CreateDatabaseOptions,
@@ -38,9 +39,15 @@ export class BunDatabaseWrapper implements Database {
     ...rest: StatementArgs[]
   ): Changes | void {
     const args = parseArgs(input, ...rest);
-    return !args
-      ? this.db.run(sql)
-      : this.db.query(sql).run(args as unknown as SQLQueryBindings);
+    try {
+      return !args
+        ? this.db.run(sql)
+        : this.db.query(sql).run(args as unknown as SQLQueryBindings);
+    } catch (error) {
+      throw createSqliteError(error, sql, {
+        args
+      });
+    }
   }
 
   query(

@@ -17,28 +17,6 @@ export type ColumnBuilder<
   unique: () => ColumnBuilder<TType, TOptional>;
 };
 
-export type DefineComponentSchema = {
-  [name: string]: ColumnBuilder<CDefColumnType, boolean>;
-};
-
-export type DefineComponentProps<
-  S extends DefineComponentSchema = DefineComponentSchema,
-  Name extends string = string
-> = {
-  id: Name;
-  schema: S;
-  statements?: Record<string, string>;
-  tableName?: string;
-};
-
-export type CDefWithSchema<
-  S extends DefineComponentSchema,
-  Name extends string = string
-> = Omit<CDef, 'id'> & {
-  __schema: S;
-  id: Name;
-};
-
 export type ValueFromType<T> = T extends 'string' | 'email'
   ? string
   : T extends 'int' | 'float'

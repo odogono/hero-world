@@ -5,6 +5,7 @@ import type { World } from '@world';
 import { isEntity } from '../entity';
 import type { Components } from '../types';
 import type { Database, LoadFromJSONOptions, SaveToJSONOptions } from './index';
+import { q } from './sql-helpers';
 
 /**
  * Converts values to SQLite-compatible types
@@ -248,8 +249,10 @@ export const loadFromComponents = <TComponents extends Components>(
           convertValueForSqlite(filteredData[col])
         );
 
+        // Quote column identifiers where needed
+        const colsSqlInline = columnNames.map(name => q(name)).join(', ');
         db.exec(
-          `INSERT OR REPLACE INTO ${tableName} (${columnNames.join(', ')}) VALUES (${placeholders})`,
+          `INSERT OR REPLACE INTO ${tableName} (${colsSqlInline}) VALUES (${placeholders})`,
           values
         );
       }
@@ -330,8 +333,9 @@ export const loadFromEntities = <TComponents extends Components>(
             convertValueForSqlite(filteredData[col])
           );
 
+          const colsSqlInline = columnNames.map(name => q(name)).join(', ');
           db.exec(
-            `INSERT OR REPLACE INTO ${tableName} (${columnNames.join(', ')}) VALUES (${placeholders})`,
+            `INSERT OR REPLACE INTO ${tableName} (${colsSqlInline}) VALUES (${placeholders})`,
             values
           );
         }

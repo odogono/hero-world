@@ -4,6 +4,7 @@ import { defToTableName } from '@component';
 import type { CDef, CDefColumnInfo } from '@types';
 
 import type { StatementOptions } from './types';
+import { q } from '../db/sql-helpers';
 
 export type CDefToSqlInput = CDef | CDef[] | CDef[][];
 
@@ -89,7 +90,7 @@ const buildColumnDef = (
   // Defaults: columns are nullable unless explicitly required, are enum, or have default
   const isNotNull = col.optional === false || isEnum || hasDefault;
 
-  const parts: string[] = [name, sqlType];
+  const parts: string[] = [q(name), sqlType];
 
   if (col.type === 'pk') {
     parts.push('PRIMARY KEY', 'AUTOINCREMENT');
@@ -109,7 +110,7 @@ const buildColumnDef = (
   let fk: string | undefined;
   if (col.foreignKey) {
     const cascade = ' ON DELETE CASCADE';
-    fk = `FOREIGN KEY (${name}) REFERENCES ${col.foreignKey} (id)${cascade}`;
+    fk = `FOREIGN KEY (${q(name)}) REFERENCES ${col.foreignKey} (id)${cascade}`;
   }
 
   return { column: parts.join(' '), fk };
@@ -148,7 +149,7 @@ const buildCreateTable = (cdef: CDef, options?: StatementOptions) => {
     'eid INTEGER NULL'
   ];
   const fks: string[] = [
-    'FOREIGN KEY (eid) REFERENCES tbl_entity (id) ON DELETE CASCADE'
+    `FOREIGN KEY (${q('eid')}) REFERENCES tbl_entity (id) ON DELETE CASCADE`
   ];
   const indexes: string[] = [];
 
@@ -170,7 +171,7 @@ const buildCreateTable = (cdef: CDef, options?: StatementOptions) => {
       const idxName = `idx_${tableName}_${name}`;
       const unique = col.isUnique ? 'UNIQUE ' : '';
       indexes.push(
-        `CREATE ${unique}INDEX IF NOT EXISTS ${idxName} ON ${tableName} (${name});`
+        `CREATE ${unique}INDEX IF NOT EXISTS ${idxName} ON ${tableName} (${q(name)});`
       );
     }
   }
@@ -269,11 +270,12 @@ export const cdefToSqlInsert = (cdef: CDef, options: StatementOptions = {}) => {
     .map(c => c.name)
     .filter(name => name !== 'id');
 
+  const columnListSql = statementColumns.map(col => q(col)).join(', ');
   const placeholders = statementColumns.map((col, index) =>
     options.namedParams ? `:${col}` : `?${index + 1}`
   );
 
-  return `INSERT INTO ${tableName} (${statementColumns.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  return `INSERT INTO ${tableName} (${columnListSql}) VALUES (${placeholders.join(', ')})`;
 };
 export const cdefToSqlUpdate = (cdef: CDef, options: StatementOptions = {}) => {
   const tableName = options.tableName ?? defToTableName(cdef);
@@ -283,13 +285,14 @@ export const cdefToSqlUpdate = (cdef: CDef, options: StatementOptions = {}) => {
     .map(c => c.name)
     .filter(name => name !== 'id' && name !== 'eid');
 
+  const setColumnsSql = setColumns.map(c => q(c)).join(', ');
   const placeholders = setColumns.map((col, index) =>
     options.namedParams ? `:${col}` : `?${index + 1}`
   );
 
   const whereClause = options.namedParams ? ':eid' : '?';
 
-  return `UPDATE ${tableName} SET (${setColumns.join(', ')}) = (${placeholders.join(', ')}) WHERE eid = ${whereClause}`;
+  return `UPDATE ${tableName} SET (${setColumnsSql}) = (${placeholders.join(', ')}) WHERE ${q('eid')} = ${whereClause}`;
 };
 
 // Optional select helpers to mirror zod schema functions
@@ -299,7 +302,7 @@ export const cdefToSqlSelect = (
 ): string => {
   const tableName = options.tableName ?? defToTableName(cdef);
   // Select all known columns except internal eid
-  const columns = getColumns(cdef).map(c => c.name);
+  const columns = getColumns(cdef).map(c => q(c.name));
   return `SELECT ${columns.join(', ')} FROM ${tableName}`;
 };
 
@@ -311,8 +314,8 @@ export const cdefToSqlSelectWhere = (
   const tableName = defToTableName(cdef);
   const whereColumns = Array.isArray(whereColumn) ? whereColumn : [whereColumn];
   const whereConditions = whereColumns.map(
-    (col, index) => `${col} = ?${index + 1}`
+    (col, index) => `${q(col)} = ?${index + 1}`
   );
   const whereClause = whereConditions.join(' AND ');
-  return `SELECT ${selectColumn} FROM ${tableName} WHERE ${whereClause}`;
+  return `SELECT ${q(selectColumn)} FROM ${tableName} WHERE ${whereClause}`;
 };
