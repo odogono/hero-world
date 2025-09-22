@@ -61,8 +61,11 @@ Definition
   / ComponentDef
 
 AtomDef
-  = 'atom' __ id:IdentifierOrString _ '{' _ comps:Components? _ '}' {
-      return { type: 'atom', id, components: comps ?? {} } as EDLDefinition;
+  = 'atom' __ id:IdentifierOrString _ ':' _ exts:ExtendsList _ '{' _ comps:Components? _ '}' {
+      return { type: 'atom', id, extends: exts, components: comps ?? {} } as EDLDefinition;
+    }
+  / 'atom' __ id2:IdentifierOrString _ '{' _ comps2:Components? _ '}' {
+      return { type: 'atom', id: id2, components: comps2 ?? {} } as EDLDefinition;
     }
 
 EntityDef

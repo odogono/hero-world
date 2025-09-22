@@ -218,6 +218,44 @@ entity lockable_chest: chest {
       ]);
     });
 
+    it('should handle atom inheritence', async () => {
+      const edl = `
+      atom base { thing { size: 10 weight: 20 } }
+      atom child: base { thing { size: 15 } }
+
+      entity chest: child {}
+      `;
+
+      const parsed = parseEDL(edl);
+
+      expect(parsed).toEqual([
+        {
+          type: 'atom',
+          id: 'base',
+          components: { thing: { size: 10, weight: 20 } }
+        },
+        {
+          type: 'atom',
+          id: 'child',
+          extends: ['base'],
+          components: { thing: { size: 15 } }
+        },
+        {
+          type: 'entity',
+          extends: ['child'],
+          components: {},
+          id: 'chest'
+        }
+      ]);
+
+      const world = await createWorld([thingComponent]);
+      executeEDL(world, edl);
+
+      const entity = world.query({ with: ['thing'] })!;
+      expect(entity.thing!.size).toBe(15);
+      expect(entity.thing!.weight).toBe(20);
+    });
+
     it('should parse a component defition', () => {
       const edl = `
         def user {

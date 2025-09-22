@@ -169,7 +169,9 @@ export const executeEDL = <T extends Components>(
     throw new EDLParseError(String(err?.message ?? 'EDL parse error'));
   }
 
-  // Atoms are templates that can be extended by entities
+  // Atoms are templates that can be extended by entities (and other atoms)
+  // We'll first collect raw atoms (own + extends), then resolve into `atoms`.
+  const rawAtoms = new Map<string, { extends: string[]; own: ComponentData }>();
   const atoms = new Map<string, ComponentData>();
   // Track created entities and their planned components prior to reference resolution
   const entityIdsByName = new Map<string, number>();
@@ -188,7 +190,10 @@ export const executeEDL = <T extends Components>(
   for (const def of defs) {
     if (def.type === 'atom') {
       if (def.id) {
-        atoms.set(def.id, def.components || {});
+        rawAtoms.set(def.id, {
+          extends: def.extends ?? [],
+          own: def.components || {}
+        });
       }
       continue;
     }
@@ -217,6 +222,38 @@ export const executeEDL = <T extends Components>(
     | EDLMissingPropertyError
     | EDLCircularReferenceError
   > = [];
+
+  // Resolve atom inheritance (atoms can extend other atoms)
+  const resolvedAtoms = new Map<string, ComponentData>();
+  const resolveAtom = (name: string, stack: Set<string> = new Set()): ComponentData => {
+    if (resolvedAtoms.has(name)) {
+      return resolvedAtoms.get(name)!;
+    }
+    const atom = rawAtoms.get(name);
+    if (!atom) {
+      return {};
+    }
+    if (stack.has(name)) {
+      errors.push(new EDLCircularReferenceError(`extends:${name}`));
+      return {};
+    }
+    stack.add(name);
+    let inherited: ComponentData = {};
+    for (const base of atom.extends) {
+      if (!rawAtoms.has(base)) {
+        continue; // unknown atom base ignored here
+      }
+      const baseResolved = resolveAtom(base, stack);
+      inherited = mergeComponents(inherited, baseResolved);
+    }
+    const combined = mergeComponents(inherited, atom.own);
+    resolvedAtoms.set(name, combined);
+    return combined;
+  };
+
+  for (const name of rawAtoms.keys()) {
+    atoms.set(name, resolveAtom(name));
+  }
 
   // Resolve inheritance for entities (supports atoms and entities, forward references allowed)
   const resolvedInheritance = new Map<number, ComponentData>();
