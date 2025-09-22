@@ -285,6 +285,15 @@ export class World<TComponents extends Components> {
     return queryEntitiesIterator(this, options);
   }
 
+  /**
+   * Execute EDL script on the world
+   *
+   * @param edl
+   */
+  executeEDL(edl: string) {
+    executeEDL(this, edl);
+  }
+
   flush(): World<TComponents> {
     const { db, defs, dirtyEntities, entitiesToDelete, entityCache } = this;
 

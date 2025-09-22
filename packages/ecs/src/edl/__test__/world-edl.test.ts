@@ -1,9 +1,10 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 
+import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
 import { createWorld } from '@world';
 
-describe.skip('World EDL', () => {
+describe('World EDL', () => {
   it('should create a world with defs from edl', async () => {
     const edl = `
     def position {
@@ -98,5 +99,33 @@ describe.skip('World EDL', () => {
 
     const allEntities = world.queryAll();
     expect(allEntities).toHaveLength(2);
+  });
+
+  it('should load and run edl on an existing world', async () => {
+    const containerDef = defineComponent({
+      id: 'container',
+      schema: {
+        capacity: s.number().default(10),
+        isClosed: s.boolean().default(false)
+      }
+    });
+
+    const world = await createWorld([containerDef], {
+      path: ':memory:',
+      type: DatabaseType.BUN
+    });
+
+    const edl = `
+    entity box {
+      container { capacity: 15 is_closed: true }
+    }
+    `;
+
+    world.executeEDL(edl);
+
+    const box = world.query({ with: ['container'] })!;
+
+    expect(box.container!.capacity).toBe(15);
+    expect(box.container!.isClosed).toBeTruthy();
   });
 });
