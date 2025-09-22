@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 
 import { defineComponent, removeComponent, s } from '@component';
 import { DatabaseType } from '@db';
@@ -791,9 +791,9 @@ describe('query', () => {
       const result = world.query({ with: ['testState'] })!;
       expect(result).not.toBeNull();
       // All fields should have default values applied automatically
-      expect(result.testState.status).toBe('pending');
-      expect(result.testState.isComplete).toBe(0); // SQLite stores booleans as integers
-      expect(result.testState.createdAt).toBeDefined();
+      expect(result.testState!.status).toBe('pending');
+      expect(result.testState!.isComplete).toBe(0); // SQLite stores booleans as integers
+      expect(result.testState!.createdAt).toBeDefined();
 
       result.testState!.status = 'in_progress';
       world.flush();
@@ -803,6 +803,81 @@ describe('query', () => {
       expect(result2.testState?.status).toBe('in_progress');
 
       // saveWorld(world, 'test.db');
+    });
+
+    it('should query a JSON component property', async () => {
+      const metaDef = defineComponent({
+        id: 'meta',
+        schema: {
+          props: s.json()
+        }
+      });
+
+      const world = await createWorld([metaDef, statusComponent], worldOpts);
+
+      world.create({
+        meta: { props: { id: 'thing_a' } },
+        status: { status: 'idle' }
+      });
+      world.create({
+        meta: { props: { id: 'thing_b' } },
+        status: { status: 'walking' }
+      });
+      world.create({
+        meta: { props: { id: 'thing_c' } },
+        status: { status: 'fighting' }
+      });
+      world.flush();
+
+      const result = world.query({
+        with: ['meta', 'status'],
+        where: 'meta.props.id = ?1',
+        args: ['thing_a']
+      })!;
+
+      expect(result.meta!.props.id).toBe('thing_a');
+      expect(result.status!.status).toBe('idle');
+    });
+
+    it('should handle reserved words in component properties', async () => {
+      const containedDef = defineComponent({
+        id: 'contained',
+        schema: {
+          in: s.entityId()
+        }
+      });
+
+      const world = await createWorld(
+        [containedDef, statusComponent],
+        worldOpts
+      );
+
+      world.executeEDL(`
+        entity thing_a {
+          status { status: "idle" }
+        }
+        entity thing_b {
+          status { status: "walking" }
+          contained { in: $thing_a }
+        }
+      `);
+
+      const dump = world.db.dump();
+      console.log('dump:', dump);
+
+      const thingA = world.query({
+        with: ['status'],
+        where: 'status.status = ?1',
+        args: ['idle']
+      })!;
+
+      const thingB = world.query({
+        with: ['contained', 'status'],
+        where: 'contained.in = ?1',
+        args: [thingA.id]
+      })!;
+
+      expect(thingB.status!.status).toBe('walking');
     });
   });
 });

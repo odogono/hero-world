@@ -14,8 +14,8 @@ import type {
   World
 } from '@types';
 
+import { needsQuoting, q } from './db/sql-helpers';
 import { SQLiteError } from './error';
-import { q } from './db/sql-helpers';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
@@ -97,6 +97,51 @@ export type QueryOptions<T extends Components> = {
   without?: (keyof T)[];
 };
 
+const rewriteJsonDotPaths = <T extends Components>(
+  world: World<T>,
+  included: (keyof T)[] | undefined,
+  where: string
+) => {
+  // Build alias → set(json columns) map
+  const aliasInfo = new Map<string, Set<string>>();
+  const names =
+    included && included.length
+      ? included
+      : (Array.from(world.defs.keys()) as (keyof T)[]);
+  for (const c of names) {
+    const def = world.defs.get(c as string);
+    if (!def) continue;
+    const alias = toSnakeCase(def.name);
+    const jsonCols = new Set(
+      (def.schema?.columns ?? [])
+        .filter(col => col.type === 'json')
+        .map(col => toSnakeCase(col.name) || col.name)
+    );
+    aliasInfo.set(alias, jsonCols);
+  }
+
+  // Match alias.col or alias.col.path...
+  const re =
+    /\b([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:\.((?:[A-Za-z_][A-Za-z0-9_]*|\d+)(?:\.(?:[A-Za-z_][A-Za-z0-9_]*|\d+))*))?/g;
+
+  return where.replace(re, (full, alias, col, rest) => {
+    const jsonCols = aliasInfo.get(alias);
+    const snakeCol = toSnakeCase(col) ?? col;
+    if (rest) {
+      // alias.col.rest - check if JSON
+      if (!jsonCols || !jsonCols.has(snakeCol)) return full;
+      const jsonPath = `$.${rest}`;
+      return `json_extract(${alias}.${q(snakeCol)}, '${jsonPath}')`;
+    } else {
+      // alias.col - quote if reserved
+      if (needsQuoting(col)) {
+        return `${alias}.${q(col)}`;
+      }
+      return full;
+    }
+  });
+};
+
 const buildQuery = <T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
@@ -158,7 +203,12 @@ const buildQuery = <T extends Components>(
   if (options?.entity) {
     conditions.push(`e.id = ${options.entity.id}`);
   } else if (options?.where) {
-    conditions.push(options.where);
+    const clause = rewriteJsonDotPaths(
+      world,
+      componentsToInclude,
+      options.where
+    );
+    conditions.push(clause);
   }
 
   // Add WITHOUT conditions
@@ -208,8 +258,15 @@ export const mapRowToEntity = <T extends Components>(
     const defName = toSnakeCase(def.name);
     const data: Record<string, unknown> = {};
     for (const column of def.columns) {
+      const schemaColumn = def.schema.columns.find(
+        c => (toSnakeCase(c.name) || c.name) === column.name
+      );
       const key = toCamelCase(column.name);
-      data[key] = row[`${defName}_${column.name}`];
+      const value = row[`${defName}_${column.name}`];
+      data[key] =
+        schemaColumn && schemaColumn.type === 'json' && value !== null
+          ? JSON.parse(value as string)
+          : value;
     }
     entity[c] = makeTrackedComponent(entity, c as string, data);
   }
