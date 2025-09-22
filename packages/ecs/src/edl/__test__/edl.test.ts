@@ -256,10 +256,9 @@ entity lockable_chest: chest {
       expect(entity.thing!.weight).toBe(20);
     });
 
-    it('should parse a component defition', () => {
+    it('should parse a component definition', () => {
       const edl = `
         def user {
-          _tbl: tbl_user
           name: string null
           email: email not null is_unique
           age: int default 0
@@ -276,7 +275,6 @@ entity lockable_chest: chest {
         {
           type: 'component',
           id: 'user',
-          tableName: 'tbl_user',
           columns: [
             { name: 'name', type: 'string' },
             { name: 'email', type: 'email', optional: false, isUnique: true },
@@ -290,6 +288,37 @@ entity lockable_chest: chest {
               default: 'current_timestamp'
             }
           ]
+        }
+      ]);
+    });
+
+    it('should parse JSON values', () => {
+      const edl = `
+      def user {
+        props: json default { "name": "John", "age": 30 }
+      }
+
+      entity anon {
+        user { props: { name: "Jane", age: 25, favs: [1, 2, 3] } }
+      }
+      `;
+
+      const parsed = parseEDL(edl);
+
+      expect(parsed).toEqual([
+        {
+          type: 'component',
+          id: 'user',
+          columns: [
+            { name: 'props', type: 'json', default: { name: 'John', age: 30 } }
+          ]
+        },
+        {
+          type: 'entity',
+          id: 'anon',
+          components: {
+            user: { props: { name: 'Jane', age: 25, favs: [1, 2, 3] } }
+          }
         }
       ]);
     });

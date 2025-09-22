@@ -99,16 +99,16 @@ ComponentBody
     }
 
 ComponentLine
-  = TableLine
-  / ColumnLine
-
-TableLine
-  = '_tbl' _ ':' _ name:Identifier {
-      return { kind: 'table', name };
-    }
+  = ColumnLine
 
 ColumnLine
-  = name:Identifier _ ':' _ type:Identifier rest:RestOfLine {
+  // Special-case JSON default to correctly capture braces without RestOfLine
+  = name:Identifier _ ':' _ type:'json' _ 'default' _ j:(Object / Array) {
+      const col: EDLComponentColumn = { name, type: 'json' };
+      col.default = j;
+      return { kind: 'column', col };
+    }
+  / name:Identifier _ ':' _ type:Identifier rest:RestOfLine {
       // Parse flags in the remainder of the line
       const restStr = rest?.trim?.() ?? '';
       // Strip inline comments while respecting quoted strings
@@ -131,7 +131,18 @@ ColumnLine
           if (tok === 'is_unique') { col.isUnique = true; continue; }
           if (tok === 'default') {
             const value = tokens.slice(i + 1).join(' ').trim();
-            if (value.length > 0) col.default = value;
+            if (value.length > 0) {
+              if (type === 'json') {
+                try {
+                  col.default = JSON.parse(value);
+                } catch {
+                  // If it is not valid JSON, preserve raw string
+                  col.default = value;
+                }
+              } else {
+                col.default = value;
+              }
+            }
             break;
           }
         }
@@ -189,7 +200,8 @@ Character
   / $([^"\\])
 
 Value
-  = ref:Reference { return ref; }
+  = obj:Object { return obj; }
+  / ref:Reference { return ref; }
   / arr:Array { return arr; }
   / s:String { return s; }
   / 'true' { return true; }
@@ -215,6 +227,24 @@ Array
       return [first, ...tail.map(t => t[3])];
     }
   / '[' _ ']' { return []; }
+
+// JSON-like object literal for property values
+Object
+  = '{' _ head:Pair tail:(_ ',' _ Pair)* _ '}' {
+      const out: Record<string, unknown> = {};
+      out[head[0]] = head[1];
+      for (const t of tail) {
+        const [k, v] = t[3];
+        out[k] = v;
+      }
+      return out;
+    }
+  / '{' _ '}' { return {}; }
+
+Pair
+  = key:(String / Identifier) _ ':' _ value:Value {
+      return [key, value] as [string, unknown];
+    }
 
 _ "whitespace"
   = ( [ \t\r\n]+ / Comment )*

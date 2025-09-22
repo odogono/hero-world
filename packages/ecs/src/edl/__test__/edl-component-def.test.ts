@@ -7,7 +7,6 @@ describe('EDL Component Definitions', () => {
     const edl = `
       # component first
       def user {
-        _tbl: tbl_user
         name: string null
         email: email not null is_unique
       }
@@ -25,7 +24,6 @@ describe('EDL Component Definitions', () => {
         { isUnique: true, name: 'email', optional: false, type: 'email' }
       ],
       id: 'user',
-      tableName: 'tbl_user',
       type: 'component'
     });
 
