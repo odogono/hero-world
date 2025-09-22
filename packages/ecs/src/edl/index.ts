@@ -3,6 +3,7 @@ export { executeEDL, type ExecuteOptions } from './execute';
 export {
   EDLError,
   EDLExecutionError,
+  EDLParseError,
   EDLMissingComponentError,
   EDLMissingPropertyError,
   EDLErrorCodes,

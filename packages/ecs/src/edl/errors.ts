@@ -3,6 +3,7 @@ import { ECSError } from '../error';
 export const EDLErrorCodes = {
   EDL_CIRCULAR_REFERENCE: 'EDL_CIRCULAR_REFERENCE',
   EDL_ERROR: 'EDL_ERROR',
+  EDL_PARSE_ERROR: 'EDL_PARSE_ERROR',
   EDL_EXECUTION_ERROR: 'EDL_EXECUTION_ERROR',
   EDL_MISSING_COMPONENT: 'EDL_MISSING_COMPONENT',
   EDL_MISSING_PROPERTY: 'EDL_MISSING_PROPERTY',
@@ -18,6 +19,14 @@ export class EDLError extends ECSError {
     super(message, code, context);
     this.name = 'EDLError';
     Object.setPrototypeOf(this, EDLError.prototype);
+  }
+}
+
+export class EDLParseError extends EDLError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, context, EDLErrorCodes.EDL_PARSE_ERROR);
+    this.name = 'EDLParseError';
+    Object.setPrototypeOf(this, EDLParseError.prototype);
   }
 }
 

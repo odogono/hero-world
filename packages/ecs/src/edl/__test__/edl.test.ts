@@ -130,13 +130,6 @@ describe('Entity Definition Language', () => {
     });
 
     it('should parse EDL', async () => {
-      // const world = await createWorld([
-      //   describedComponent,
-      //   thingComponent,
-      //   containerComponent,
-      //   lockableComponent
-      // ]);
-
       const edl = `
 # atoms are not instantiated, they are used as templates for entities
 atom chest {

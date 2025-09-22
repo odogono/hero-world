@@ -8,6 +8,7 @@ import { World } from '@world';
 import {
   EDLCircularReferenceError,
   EDLExecutionError,
+  EDLParseError,
   EDLMissingComponentError,
   EDLMissingPropertyError,
   EDLUnknownEntityReferenceError
@@ -111,13 +112,62 @@ export const executeEDL = <T extends Components>(
 ): void => {
   const commands = parseCommands(edl);
   // Remove command lines before parsing entity/atom definitions
+  const origLines = edl.split(/\r?\n/);
+  const includeMap: Array<{ originalIndex: number; text: string }> = [];
+  const parseLines: string[] = [];
+  for (let i = 0; i < origLines.length; i++) {
+    const stripped = stripComments(origLines[i]);
+    const trimmed = stripped.trim();
+    if (trimmed.length > 0 && trimmed[0] !== '!') {
+      // Keep left whitespace intact in the parse buffer so columns align
+      parseLines.push(stripped);
+      includeMap.push({ originalIndex: i, text: origLines[i] });
+    }
+  }
+  const edlForParse = parseLines.join('\n');
 
-  const edlForParse = edl
-    .split(/\r?\n/)
-    .map(l => stripComments(l))
-    .filter(l => l.trim().length > 0 && l.trim()[0] !== '!')
-    .join('\n');
-  const defs = parseEDL(edlForParse);
+  let defs: any;
+  try {
+    defs = parseEDL(edlForParse);
+  } catch (err: any) {
+    // Try to produce a friendly error with original line/column and a code frame
+    const loc = err?.location?.start;
+    if (loc && typeof loc.line === 'number' && typeof loc.column === 'number') {
+      const mapped = includeMap[loc.line - 1];
+      const origIndex = mapped?.originalIndex ?? loc.line - 1; // fallback
+      const displayLineNo = origIndex + 1;
+      const lineText = (mapped?.text ?? parseLines[loc.line - 1] ?? '').toString();
+      const caret = ' '.repeat(Math.max(0, loc.column - 1)) + '^';
+
+      const prev = origLines[origIndex - 1];
+      const next = origLines[origIndex + 1];
+
+      const frameParts: string[] = [];
+      if (prev !== undefined) {
+        frameParts.push(`${displayLineNo - 1} | ${prev}`);
+      }
+      frameParts.push(`${displayLineNo} | ${lineText}`);
+      frameParts.push(`    | ${caret}`);
+      if (next !== undefined) {
+        frameParts.push(`${displayLineNo + 1} | ${next}`);
+      }
+
+      const friendly = [
+        `EDL syntax error at line ${displayLineNo}, column ${loc.column}:`,
+        String(err?.message ?? 'Syntax error'),
+        '',
+        ...frameParts
+      ].join('\n');
+
+      throw new EDLParseError(friendly, {
+        line: displayLineNo,
+        column: loc.column
+      });
+    }
+
+    // Fallback if no location is available
+    throw new EDLParseError(String(err?.message ?? 'EDL parse error'));
+  }
 
   // Atoms are templates that can be extended by entities
   const atoms = new Map<string, ComponentData>();
