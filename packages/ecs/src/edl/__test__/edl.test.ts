@@ -643,7 +643,7 @@ entity lockable_chest: chest {
 
       const examine = mock(() => {});
       const world = await createWorld([thingComponent]);
-      executeEDL(world, edl, { commands: { '!examine': examine } });
+      world.executeEDL(edl, { commands: { '!examine': examine } });
 
       const chest = world.query({ with: ['thing'] })!;
       expect(chest).toBeDefined();
@@ -651,6 +651,42 @@ entity lockable_chest: chest {
 
       expect(typeof rowId).toBe('number');
       expect(examine.mock.calls).toEqual([[rowId, rowId, 1]]);
+    });
+
+    it('should handle optional properties', async () => {
+      const edl = `
+
+      entity room {
+        thing { size: 10 weight: 20 }
+      }
+
+      entity door_one {
+        portal { to: $room }
+      }
+        
+      entity door_two {
+        portal { msg: "The door is locked" }
+      }
+      `;
+
+      const portalDef = defineComponent({
+        id: 'portal',
+        schema: {
+          to: s.entityId().optional(),
+          msg: s.string().optional()
+        }
+      });
+
+      const world = await createWorld([thingComponent, portalDef]);
+      world.executeEDL(edl);
+
+      const thing = world.query({ with: ['thing'] })!;
+      expect(thing.thing!.size).toBe(10);
+
+      const doors = world.queryAll({ with: ['portal'] });
+      expect(doors).toHaveLength(2);
+      expect(doors[0]!.portal!.to).toBe(thing.id);
+      expect(doors[1]!.portal!.msg).toBe('The door is locked');
     });
   });
 });

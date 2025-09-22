@@ -9,7 +9,7 @@ import {
   type SaveToJSONOptions,
   type Statement
 } from '@db';
-import { executeEDL } from '@edl';
+import { executeEDL, type ExecuteOptions } from '@edl';
 import { convertKeysToSnakeCase } from '@helpers/convert-keys';
 import {
   initializeComponentMetadataTable,
@@ -290,8 +290,8 @@ export class World<TComponents extends Components> {
    *
    * @param edl
    */
-  executeEDL(edl: string) {
-    executeEDL(this, edl);
+  executeEDL(edl: string, options?: ExecuteOptions) {
+    executeEDL(this, edl, options);
   }
 
   flush(): World<TComponents> {
@@ -362,6 +362,18 @@ export class World<TComponents extends Components> {
             const updateData = serializeValues(
               convertKeysToSnakeCase({ ...dataWithoutId, eid })
             );
+
+            // Ensure all named params for UPDATE are present (bind null for missing)
+            // cdefToSqlUpdate uses all non-id, non-eid columns in SET and :eid in WHERE
+            for (const col of def.columns) {
+              const name = col.name;
+              if (name === 'id' || name === 'eid') {
+                continue;
+              }
+              if (!(name in updateData)) {
+                (updateData as any)[name] = null;
+              }
+            }
             def!.stmtUpdate.run(updateData);
           } else {
             // insert
@@ -372,6 +384,19 @@ export class World<TComponents extends Components> {
             const insertData = serializeValues(
               convertKeysToSnakeCase({ ...dataWithoutId, eid })
             );
+
+            // Ensure all named params for INSERT are present (bind null for missing)
+            // cdefToSqlInsert uses all columns except id
+            for (const col of def.columns) {
+              const name = col.name;
+              if (name === 'id') {
+                continue;
+              }
+              if (!(name in insertData)) {
+                (insertData as any)[name] = null;
+              }
+            }
+
             def!.stmtInsert.run(insertData);
             entry.exists = true;
           }
