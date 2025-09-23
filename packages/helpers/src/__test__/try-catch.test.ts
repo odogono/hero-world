@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { trycatch, type OperationResult } from '../trycatch';
+import { trycatch, type OperationResult } from '../try-catch';
 
 test('trycatch with synchronous operation that succeeds', () => {
   const result = trycatch(() => 'success');
@@ -159,8 +159,8 @@ test('trycatch with async function that returns complex data', async () => {
   const complexData = {
     users: [
       { id: 1, name: 'Alice' },
-      { id: 2, name: 'Bob' }
-    ]
+      { id: 2, name: 'Bob' },
+    ],
   };
   const result = await trycatch(async () => complexData);
 
