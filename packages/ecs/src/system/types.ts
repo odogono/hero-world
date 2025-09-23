@@ -1,5 +1,6 @@
 import type { QueryOptions } from '@entity';
-import type { Components, Entity, World } from '@types';
+import type { Components, Entity } from '@types';
+import type { World } from '@world';
 
 type EventsType = { entity: Entity<'event'>; payload: any; type: string };
 

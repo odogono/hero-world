@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
 
-import { createWorld } from '../world';
+import { createWorld } from '../../world';
 
 describe('Entity Basic', () => {
   test('should create entity with components', async () => {

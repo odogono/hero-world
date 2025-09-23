@@ -16,13 +16,13 @@ import { resolve } from 'node:path';
 
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef, CDefColumnInfo, CDefColumnType } from '@schema/types';
+import { parseEDL } from '@edl';
+import { cdefToSql } from '@schema/cdef-to-sql';
+import { cdefToTypes } from '@schema/cdef-to-types';
+import { cdefToZod } from '@schema/cdef-to-zod';
+import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
 
 import { defToTableName } from '../src';
-import { parseEDL } from '../src/edl';
-import { cdefToSql } from '../src/schema/cdef-to-sql';
-import { cdefToTypes } from '../src/schema/cdef-to-types';
-import { cdefToZod } from '../src/schema/cdef-to-zod';
 
 type Flags = {
   down: boolean;

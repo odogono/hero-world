@@ -14,8 +14,8 @@ import type {
   World
 } from '@types';
 
-import { needsQuoting, q } from './db/sql-helpers';
-import { SQLiteError } from './error';
+import { needsQuoting, q } from '../db/sql-helpers';
+import { SQLiteError } from '../error';
 
 // Overloads for type inference
 type CreateEntityOverloads = {
@@ -381,11 +381,7 @@ export function queryEntities<T extends Components>(
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const asProxy = options?.asProxy ?? false;
 
-  // const pre = world.db.query('select * from tbl_character_stats_1vy2m63');
-  // console.debug('fuckit', pre.length);
-
   const rows = world.db.query(sql, args);
-  // console.debug('queryEntities', sql, args, '😋', rows.length);
 
   const entities = rows.map((row: any) =>
     mapRowToEntity(world, componentsToInclude, row)

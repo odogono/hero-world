@@ -65,7 +65,7 @@ describe('createEntity', () => {
       }
     });
 
-    expect(entity.specialStats.strength).toBe(20);
+    expect(entity.specialStats!.strength).toBe(20);
   });
 
   test('createEntity should create entity without components', async () => {

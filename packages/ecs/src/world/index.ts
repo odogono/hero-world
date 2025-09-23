@@ -193,7 +193,9 @@ export class World<TComponents extends Components> {
     const eid = this.db.addEntity();
 
     const entity: any = { id: eid, world: this };
+
     this.entityCache.set(eid, {});
+
     if (initialComponents) {
       for (const [c, data] of Object.entries(initialComponents)) {
         const name = c as string;
@@ -220,6 +222,10 @@ export class World<TComponents extends Components> {
 
     return proxied as EntityWithComponents<TComponents, keyof TComponents>;
   }
+
+  clone(
+    entity: EntityWithComponents<TComponents, keyof TComponents>
+  ): EntityWithComponents<TComponents, keyof TComponents> {}
 
   get(id: number): GenericEntity<TComponents> | null {
     // return this.entityCache.get(eid)! as EntityWithComponents<TComponents, keyof TComponents>;
