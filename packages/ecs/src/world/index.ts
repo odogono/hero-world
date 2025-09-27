@@ -35,7 +35,12 @@ import {
   queryEntity,
   type QueryOptions
 } from '../entity';
-import { createDuplicateComponentDefinitionError } from '../error';
+import {
+  createComponentNotFoundError,
+  createDuplicateComponentDefinitionError,
+  createEntityNotFoundError,
+  createWorldNotInitializedError
+} from '../error';
 import {
   cdefToSqlCreate,
   cdefToSqlInsert,
@@ -223,15 +228,215 @@ export class World<TComponents extends Components> {
     return proxied as EntityWithComponents<TComponents, keyof TComponents>;
   }
 
+  /**
+   * Clone an entity or entity ID including all components and their data
+   *
+   * @param entityOrId - The entity or entity ID to clone
+   * @returns The cloned entity
+   */
   clone(
-    entity: EntityWithComponents<TComponents, keyof TComponents>
-  ): EntityWithComponents<TComponents, keyof TComponents> {}
+    entityOrId: EntityWithComponents<TComponents, keyof TComponents> | number
+  ): EntityWithComponents<TComponents, keyof TComponents> {
+    let entity: EntityWithComponents<TComponents, keyof TComponents>;
+
+    if (typeof entityOrId === 'number') {
+      // Clone by entity ID - need to query the entity first
+      const queriedEntity = this.query({
+        args: [entityOrId],
+        where: 'e.id = ?'
+      }) as EntityWithComponents<TComponents, keyof TComponents>;
+      // const queriedEntity = this.get(entityOrId) as EntityWithComponents<
+      //   TComponents,
+      //   keyof TComponents
+      // >;
+      if (!queriedEntity) {
+        throw createEntityNotFoundError(entityOrId);
+      }
+      entity = queriedEntity;
+    } else {
+      entity = entityOrId;
+    }
+
+    // Deep copy function that preserves Date objects
+    const deepCopy = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') {
+        return obj;
+      }
+      if (obj instanceof Date) {
+        return new Date(obj);
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(deepCopy);
+      }
+      const copied = {} as any;
+      for (const key in obj) {
+        copied[key] = deepCopy(obj[key]);
+      }
+      return copied;
+    };
+
+    // Get all component data from the entity
+    const componentData: Partial<TComponents> = {};
+    for (const key in entity) {
+      if (key !== 'id' && key !== 'world') {
+        // Deep copy the component data to avoid sharing references
+        const copiedData = deepCopy((entity as any)[key]);
+        // Apply default values from the component schema
+        componentData[key as keyof TComponents] = applyComponentDefaults(
+          this,
+          key,
+          copiedData
+        );
+      }
+    }
+
+    // Create new entity with the same components
+    return this.create(componentData);
+  }
+
+  /**
+   * Copy all components from one entity to another entity
+   *
+   * @param source - The source entity or entity ID to copy from
+   * @param target - The target entity or entity ID to copy to
+   * @returns The target entity with copied components
+   */
+  copy(
+    source: EntityWithComponents<TComponents, keyof TComponents> | number,
+    target: EntityWithComponents<TComponents, keyof TComponents> | number
+  ): EntityWithComponents<TComponents, keyof TComponents> {
+    let sourceEntity: EntityWithComponents<TComponents, keyof TComponents>;
+    let targetEntity: EntityWithComponents<TComponents, keyof TComponents>;
+
+    // Resolve source entity
+    if (typeof source === 'number') {
+      const queriedEntity = this.query({
+        args: [source],
+        where: 'e.id = ?'
+      }) as EntityWithComponents<TComponents, keyof TComponents>;
+      if (!queriedEntity) {
+        throw createEntityNotFoundError(source);
+      }
+      sourceEntity = queriedEntity;
+    } else {
+      sourceEntity = source;
+    }
+
+    // Resolve target entity
+    if (typeof target === 'number') {
+      const queriedEntity = this.query({
+        args: [target],
+        where: 'e.id = ?'
+      }) as EntityWithComponents<TComponents, keyof TComponents>;
+      if (!queriedEntity) {
+        throw createEntityNotFoundError(target);
+      }
+      targetEntity = queriedEntity;
+    } else {
+      targetEntity = target;
+    }
+
+    // Deep copy function that preserves Date objects
+    const deepCopy = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') {
+        return obj;
+      }
+      if (obj instanceof Date) {
+        return new Date(obj);
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(deepCopy);
+      }
+      const copied = {} as any;
+      for (const key in obj) {
+        copied[key] = deepCopy(obj[key]);
+      }
+      return copied;
+    };
+
+    // Copy all components from source to target
+    for (const key in sourceEntity) {
+      if (key !== 'id' && key !== 'world') {
+        const componentData = (sourceEntity as any)[key];
+        // Only copy components that actually exist on the source entity
+        // (i.e., have at least one non-null/undefined value)
+        if (
+          componentData !== null &&
+          componentData !== undefined &&
+          Object.values(componentData).some(
+            value => value !== null && value !== undefined
+          )
+        ) {
+          // Deep copy the component data to avoid sharing references
+          const copiedData = deepCopy(componentData);
+          // Apply default values from the component schema
+          const dataWithDefaults = applyComponentDefaults(
+            this,
+            key,
+            copiedData
+          );
+          // Update if target has component; otherwise remove then add to force insert
+          const targetData = (targetEntity as any)[key];
+          const targetHas =
+            targetData &&
+            Object.values(targetData).some(
+              (v: any) => v !== null && v !== undefined
+            );
+          if (!targetHas) {
+            removeComponent(targetEntity as any, key as any);
+          }
+          addComponent(
+            targetEntity as any,
+            key as any,
+            dataWithDefaults as any
+          );
+        }
+      }
+    }
+
+    // Also copy components that exist on target back to source (bidirectional merge)
+    for (const key in targetEntity) {
+      if (key !== 'id' && key !== 'world') {
+        const componentData = (targetEntity as any)[key];
+        if (
+          componentData !== null &&
+          componentData !== undefined &&
+          Object.values(componentData).some(
+            value => value !== null && value !== undefined
+          )
+        ) {
+          const copiedData = deepCopy(componentData);
+          const dataWithDefaults = applyComponentDefaults(
+            this,
+            key,
+            copiedData
+          );
+          const sourceData = (sourceEntity as any)[key];
+          const sourceHas =
+            sourceData &&
+            Object.values(sourceData).some(
+              (v: any) => v !== null && v !== undefined
+            );
+          if (!sourceHas) {
+            removeComponent(sourceEntity as any, key as any);
+          }
+          addComponent(
+            sourceEntity as any,
+            key as any,
+            dataWithDefaults as any
+          );
+        }
+      }
+    }
+
+    return targetEntity;
+  }
 
   get(id: number): GenericEntity<TComponents> | null {
     // return this.entityCache.get(eid)! as EntityWithComponents<TComponents, keyof TComponents>;
     const stmt = this.stmts.selectEntityById;
     if (!stmt) {
-      throw new Error('selectEntityById not found');
+      throw createWorldNotInitializedError();
     }
     const eid = stmt.get(id) as { id: number } | null;
 
@@ -264,7 +469,7 @@ export class World<TComponents extends Components> {
    * @returns
    */
   query<W extends readonly (keyof TComponents)[]>(
-    options: QueryOptions<TComponents> & { with: W }
+    options: QueryOptions<TComponents> & { with?: W }
   ) {
     return queryEntity(this, options);
   }
@@ -332,7 +537,7 @@ export class World<TComponents extends Components> {
           const entry = cache![c as string]!;
           const def = defs.get(c as string);
           if (!def) {
-            throw new Error(`Component def not found for ${c as string}`);
+            throw createComponentNotFoundError(c as string, eid);
           }
 
           if (entry.exists === false && entry.data === null) {

@@ -7,6 +7,7 @@
     "./boolean": "./src/boolean.ts",
     "./log": "./src/log.ts",
     "./diff": "./src/diff.ts",
+    "./file": "./src/file.ts",
     "./json": "./src/json.ts",
     "./hash": "./src/hash.ts",
     "./number": "./src/number.ts",

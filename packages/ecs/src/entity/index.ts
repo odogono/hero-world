@@ -10,9 +10,9 @@ import type {
   Components,
   Entity,
   EntityWithComponents,
-  GenericEntity,
-  World
+  GenericEntity
 } from '@types';
+import type { World } from '@world';
 
 import { needsQuoting, q } from '../db/sql-helpers';
 import { SQLiteError } from '../error';
@@ -110,7 +110,9 @@ const rewriteJsonDotPaths = <T extends Components>(
       : (Array.from(world.defs.keys()) as (keyof T)[]);
   for (const c of names) {
     const def = world.defs.get(c as string);
-    if (!def) continue;
+    if (!def) {
+      continue;
+    }
     const alias = toSnakeCase(def.name);
     const jsonCols = new Set(
       (def.schema?.columns ?? [])
@@ -122,14 +124,16 @@ const rewriteJsonDotPaths = <T extends Components>(
 
   // Match alias.col or alias.col.path...
   const re =
-    /\b([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:\.((?:[A-Za-z_][A-Za-z0-9_]*|\d+)(?:\.(?:[A-Za-z_][A-Za-z0-9_]*|\d+))*))?/g;
+    /\b([A-Z_a-z]\w*)\.([A-Z_a-z]\w*)(?:\.((?:[A-Z_a-z]\w*|\d+)(?:\.(?:[A-Z_a-z]\w*|\d+))*))?/g;
 
-  return where.replace(re, (full, alias, col, rest) => {
+  return where.replaceAll(re, (full, alias, col, rest) => {
     const jsonCols = aliasInfo.get(alias);
     const snakeCol = toSnakeCase(col) ?? col;
     if (rest) {
       // alias.col.rest - check if JSON
-      if (!jsonCols || !jsonCols.has(snakeCol)) return full;
+      if (!jsonCols || !jsonCols.has(snakeCol)) {
+        return full;
+      }
       const jsonPath = `$.${rest}`;
       return `json_extract(${alias}.${q(snakeCol)}, '${jsonPath}')`;
     } else {
@@ -168,13 +172,15 @@ const buildQuery = <T extends Components>(
   // console.log('componentsToInclude', world.defs.keys());
 
   // Handle components that entities must have
+  const explicitWith = Boolean(options?.with && options.with.length);
   componentsToInclude.forEach(c => {
     const def = world.defs.get(c as string);
     if (!def) {
       throw new Error(`Component def not found for ${String(c)}`);
     }
     const alias = toSnakeCase(def.name);
-    const join = `JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
+    const joinType = explicitWith ? 'INNER JOIN' : 'LEFT JOIN';
+    const join = `${joinType} ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
     joins.push(join);
     def.columns.forEach(column => {
       const name = column.name;
@@ -249,9 +255,10 @@ export const mapRowToEntity = <T extends Components>(
   componentsToInclude: (keyof T)[],
   row: unknown
 ) => {
-  const entity: Entity<keyof Components> = { id: row.eid, world } as Entity<
-    keyof Components
-  >;
+  const entity: Entity<keyof Components> = {
+    id: (row as any).eid,
+    world
+  } as Entity<keyof Components>;
 
   for (const c of componentsToInclude) {
     const def = world.defs.get(c as string)!;
@@ -262,7 +269,7 @@ export const mapRowToEntity = <T extends Components>(
         c => (toSnakeCase(c.name) || c.name) === column.name
       );
       const key = toCamelCase(column.name);
-      const value = row[`${defName}_${column.name}`];
+      const value = (row as any)[`${defName}_${column.name}`];
       data[key] =
         schemaColumn && schemaColumn.type === 'json' && value !== null
           ? JSON.parse(value as string)

@@ -26,7 +26,7 @@ export const uuidv7 = (): string => {
   hex = hex.substring(0, 12) + '7' + hex.substring(13);
 
   // Set the variant bits (10xx)
-  const variantNibble = (parseInt(hex[16], 16) & 0x3) | 0x8;
+  const variantNibble = (parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8;
   hex = hex.substring(0, 16) + variantNibble.toString(16) + hex.substring(17);
 
   // Format as UUID string
