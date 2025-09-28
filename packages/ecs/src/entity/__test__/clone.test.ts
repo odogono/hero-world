@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 import { deleteTempFile, makeTempFile } from 'odgn-helpers/file';
 
 import { defineComponent, s } from '@component';
@@ -12,6 +12,38 @@ const worldOpts = {
 };
 
 describe('Entity', () => {
+  describe('sanity', () => {
+    test('should create a world with a complex entity', async () => {
+      const edl = `
+    def name { nickname: string }
+    def stats { health: int mana: int }
+    def isSitting { sitting: bool }
+    def inventory { items: json }
+    def location { locationId: eid }
+    `;
+
+      const world = await createWorld(edl, worldOpts);
+      world.create({
+        inventory: { items: [{ id: 'sword', name: 'Sword' }] },
+        isSitting: { sitting: true },
+        location: { locationId: 1 },
+        name: { nickname: 'conan' },
+        stats: { health: 100, mana: 50 }
+      });
+
+      world.flush();
+
+      const e = world.query({ with: ['name', 'inventory'] });
+      expect(e.name.nickname).toBe('conan');
+      expect(e.inventory.items).toEqual([{ id: 'sword', name: 'Sword' }]);
+
+      // console.log(e);
+      const fe = world.get(e.id);
+      expect(fe.name).not.toBeDefined();
+      expect(fe.inventory).not.toBeDefined();
+    });
+  });
+
   describe('clone', () => {
     it('should clone an entity', async () => {
       const path = makeTempFile();

@@ -17,6 +17,18 @@ export type ColumnBuilder<
   unique: () => ColumnBuilder<TType, TOptional>;
 };
 
+export type DefineComponentSchema = Record<string, ColumnBuilder<any, any>>;
+
+export type DefineComponentProps<
+  S extends DefineComponentSchema,
+  Name extends string
+> = {
+  id: Name;
+  schema: S;
+  statements?: Record<string, string>;
+  tableName?: string;
+};
+
 export type ValueFromType<T> = T extends 'string' | 'email'
   ? string
   : T extends 'int' | 'float'

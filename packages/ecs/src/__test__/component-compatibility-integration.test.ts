@@ -106,7 +106,7 @@ describe('Component Compatibility Integration Tests', () => {
       id: 'realQuest3',
       schema: {
         completed: s.boolean().default(false),
-        id: s.string()
+        questId: s.string()
       }
     });
 

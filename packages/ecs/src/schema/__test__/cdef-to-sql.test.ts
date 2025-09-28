@@ -15,10 +15,7 @@ describe('Component Definitions to SQL', () => {
     const cdef: CDef = {
       id: 'user',
       hash: '1234567',
-      columns: [
-        { name: 'id', type: 'pk' },
-        { name: 'name', type: 'string' }
-      ]
+      columns: [{ name: 'name', type: 'string' }]
     };
 
     const result = cdefToSql(cdef);
@@ -105,10 +102,7 @@ describe('Component Definitions to SQL', () => {
       {
         id: 'user',
         hash: '1234567',
-        columns: [
-          { name: 'id', type: 'pk' },
-          { name: 'name', type: 'string' }
-        ]
+        columns: [{ name: 'name', type: 'string' }]
       }
     ];
     const describableCdef: CDef[] = [
@@ -145,7 +139,6 @@ describe('Component Definitions to SQL', () => {
     const cdef: CDef = {
       id: 'user',
       columns: [
-        { name: 'id', type: 'pk' },
         { name: 'name', type: 'string' },
         {
           name: 'status',
@@ -159,7 +152,6 @@ describe('Component Definitions to SQL', () => {
     const result = cdefToSql(cdef);
 
     expect(result.sql).toContain('CREATE TABLE IF NOT EXISTS tbl_user');
-    expect(result.sql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(result.sql).toContain('name TEXT NULL');
     expect(result.sql).toContain('status TEXT NOT NULL');
   });
@@ -170,7 +162,6 @@ describe('Component Definitions to SQL', () => {
         id: 'user',
         hash: '1234567',
         columns: [
-          { name: 'id', type: 'pk' },
           { name: 'name', type: 'string' },
           { name: 'age', type: 'int', optional: true },
           { name: 'email', type: 'email' }

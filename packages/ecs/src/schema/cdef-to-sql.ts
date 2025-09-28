@@ -3,8 +3,8 @@ import { toSnakeCase } from 'odgn-helpers/string';
 import { defToTableName } from '@component';
 import type { CDef, CDefColumnInfo } from '@types';
 
-import type { StatementOptions } from './types';
 import { q } from '../db/sql-helpers';
+import type { StatementOptions } from './types';
 
 export type CDefToSqlInput = CDef | CDef[] | CDef[][];
 
@@ -130,6 +130,11 @@ const getColumns = (cdef: CDef): ColumnInfo[] => {
 
   for (const col of cdef.columns) {
     const name = toSnakeCase(col.name) ?? col.name;
+    if (name === 'id' || name === 'eid') {
+      throw new Error(
+        `Component '${cdef.id}' cannot define reserved column '${name}'.`
+      );
+    }
     if (seen.has(name)) {
       continue;
     }
@@ -156,6 +161,11 @@ const buildCreateTable = (cdef: CDef, options?: StatementOptions) => {
   // User-defined columns
   for (const col of cdef.columns) {
     const name = toSnakeCase(col.name) || col.name;
+    if (name === 'id' || name === 'eid') {
+      throw new Error(
+        `Component '${cdef.id}' cannot define reserved column '${name}'.`
+      );
+    }
     // Skip if already provided by auto columns (id/eid/created_at/updated_at)
     if (seen.has(name)) {
       continue;

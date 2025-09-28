@@ -28,29 +28,6 @@ const thingComponent = defineComponent({
   }
 });
 
-const containerComponent = defineComponent({
-  id: 'container',
-  schema: {
-    capacity: s.number(),
-    isClosed: s.boolean()
-  }
-});
-
-const lockableComponent = defineComponent({
-  id: 'lockable',
-  schema: {
-    isLocked: s.boolean(),
-    key: s.string()
-  }
-});
-
-const containedComponent = defineComponent({
-  id: 'contained',
-  schema: {
-    id: s.entityId()
-  }
-});
-
 const linkComponent = defineComponent({
   id: 'link',
   schema: {
@@ -408,6 +385,14 @@ entity lockable_chest: chest {
       const child = world.query({ with: ['link'] })!;
 
       expect(child.link.targetId).toBe(parent.id);
+    });
+
+    it('should throw error when component defines reserved column', async () => {
+      const edl = `def bad { id: string }`;
+
+      await expect(createWorld(edl)).rejects.toThrow(
+        "Component 'bad' cannot define reserved column 'id'."
+      );
     });
 
     it('should throw on unknown entity reference', async () => {

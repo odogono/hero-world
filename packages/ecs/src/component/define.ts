@@ -1,3 +1,5 @@
+import { toSnakeCase } from 'odgn-helpers/string';
+
 import {
   hashComponentDefinition,
   type HashComponentDefinitionInput
@@ -21,6 +23,16 @@ export const defineComponent = <
 
   if (!componentId) {
     throw new Error('id must be provided to defineComponent');
+  }
+
+  // Validate that no schema key is a reserved column name
+  for (const key of Object.keys(schema)) {
+    const name = toSnakeCase(key) || key;
+    if (name === 'id' || name === 'eid') {
+      throw new Error(
+        `Component '${componentId}' cannot define reserved column '${name}'.`
+      );
+    }
   }
 
   const columns = Object.entries(schema).map(([name, schema]) =>

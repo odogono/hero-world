@@ -432,6 +432,12 @@ export class World<TComponents extends Components> {
     return targetEntity;
   }
 
+  /**
+   * Returns an entity instance by its id. This does not include any components.
+   *
+   * @param id - The id of the entity to return
+   * @returns The entity instance or null if the entity does not exist
+   */
   get(id: number): GenericEntity<TComponents> | null {
     // return this.entityCache.get(eid)! as EntityWithComponents<TComponents, keyof TComponents>;
     const stmt = this.stmts.selectEntityById;
