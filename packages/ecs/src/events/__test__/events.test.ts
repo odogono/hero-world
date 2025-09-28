@@ -102,7 +102,7 @@ describe('EventSystem', () => {
     expect(collectedEvents[0]?.payload.value).toBe(1);
   });
 
-  test.only('event system processing events', async () => {
+  test('event system processing events', async () => {
     const world = await createTestWorld();
 
     let readReceivedCount = 0;

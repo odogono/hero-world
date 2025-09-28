@@ -232,66 +232,74 @@ export class World<TComponents extends Components> {
    * Clone an entity or entity ID including all components and their data
    *
    * @param entityOrId - The entity or entity ID to clone
-   * @returns The cloned entity
+   * @returns The cloned entity (with id only, no components loaded)
    */
   clone(
     entityOrId: EntityWithComponents<TComponents, keyof TComponents> | number
-  ): EntityWithComponents<TComponents, keyof TComponents> {
-    let entity: EntityWithComponents<TComponents, keyof TComponents>;
+  ): GenericEntity<TComponents> {
+    let sourceEid: number;
 
     if (typeof entityOrId === 'number') {
-      // Clone by entity ID - need to query the entity first
-      const queriedEntity = this.query({
-        args: [entityOrId],
-        where: 'e.id = ?'
-      }) as EntityWithComponents<TComponents, keyof TComponents>;
-      // const queriedEntity = this.get(entityOrId) as EntityWithComponents<
-      //   TComponents,
-      //   keyof TComponents
-      // >;
-      if (!queriedEntity) {
-        throw createEntityNotFoundError(entityOrId);
-      }
-      entity = queriedEntity;
+      sourceEid = entityOrId;
     } else {
-      entity = entityOrId;
+      sourceEid = entityOrId.id;
     }
 
-    // Deep copy function that preserves Date objects
-    const deepCopy = (obj: any): any => {
-      if (obj === null || typeof obj !== 'object') {
-        return obj;
-      }
-      if (obj instanceof Date) {
-        return new Date(obj);
-      }
-      if (Array.isArray(obj)) {
-        return obj.map(deepCopy);
-      }
-      const copied = {} as any;
-      for (const key in obj) {
-        copied[key] = deepCopy(obj[key]);
-      }
-      return copied;
-    };
-
-    // Get all component data from the entity
-    const componentData: Partial<TComponents> = {};
-    for (const key in entity) {
-      if (key !== 'id' && key !== 'world') {
-        // Deep copy the component data to avoid sharing references
-        const copiedData = deepCopy((entity as any)[key]);
-        // Apply default values from the component schema
-        componentData[key as keyof TComponents] = applyComponentDefaults(
-          this,
-          key,
-          copiedData
-        );
-      }
+    // Verify source entity exists
+    const sourceEntity = this.get(sourceEid);
+    if (!sourceEntity) {
+      throw createEntityNotFoundError(sourceEid);
     }
 
-    // Create new entity with the same components
-    return this.create(componentData);
+    // Create new entity
+    const newEid = this.db.addEntity();
+
+    // Clone component rows using SQL
+    this.db.transaction(() => {
+      for (const [componentName, def] of this.defs.entries()) {
+        // Check if source entity has this component
+        const hasComponent =
+          this.db.query(
+            `SELECT 1 FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`,
+            sourceEid
+          ).length > 0;
+
+        if (hasComponent) {
+          // Query the source component data
+          const sourceRows = this.db.query(
+            `SELECT * FROM ${def.tableName} WHERE eid = ?`,
+            sourceEid
+          );
+          if (sourceRows.length > 0) {
+            const sourceRow = sourceRows[0] as Record<string, unknown>;
+
+            // Create new data with new eid
+            const newData: Record<string, unknown> = {
+              ...sourceRow,
+              eid: newEid
+            };
+            delete newData.id; // Remove id so it gets auto-increment
+
+            // Only keep the columns that the insert statement expects
+            const expectedColumns = def.columns
+              .filter(col => col.name !== 'id')
+              .map(col => col.name);
+
+            const insertData: Record<string, unknown> = {};
+            for (const col of expectedColumns) {
+              if (col in newData) {
+                insertData[col] = newData[col];
+              }
+            }
+
+            // Use the existing prepared statement to insert
+            def.stmtInsert.run(insertData);
+          }
+        }
+      }
+    });
+
+    return { id: newEid, world: this };
   }
 
   /**

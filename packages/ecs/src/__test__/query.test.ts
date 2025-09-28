@@ -783,16 +783,15 @@ describe('query', () => {
 
     test('should automatically apply default values from schema', async () => {
       const world = await createWorld([testStateComponent], worldOpts);
-      type TestStateComponent = z.infer<typeof testStateComponent.schema>;
       // This is the original scenario that was failing - create entity with empty testState
       // Defaults should be applied automatically from the Zod schema
-      world.create({ testState: {} as unknown as TestStateComponent });
+      world.create({ testState: {} });
       world.flush();
       const result = world.query({ with: ['testState'] })!;
       expect(result).not.toBeNull();
       // All fields should have default values applied automatically
       expect(result.testState!.status).toBe('pending');
-      expect(result.testState!.isComplete).toBe(0); // SQLite stores booleans as integers
+      expect(result.testState!.isComplete).toBe(false); // SQLite stores booleans as integers
       expect(result.testState!.createdAt).toBeDefined();
 
       result.testState!.status = 'in_progress';
@@ -830,9 +829,9 @@ describe('query', () => {
       world.flush();
 
       const result = world.query({
-        with: ['meta', 'status'],
+        args: ['thing_a'],
         where: 'meta.props.id = ?1',
-        args: ['thing_a']
+        with: ['meta', 'status']
       })!;
 
       expect(result.meta!.props.id).toBe('thing_a');
@@ -866,15 +865,15 @@ describe('query', () => {
       console.log('dump:', dump);
 
       const thingA = world.query({
-        with: ['status'],
+        args: ['idle'],
         where: 'status.status = ?1',
-        args: ['idle']
+        with: ['status']
       })!;
 
       const thingB = world.query({
-        with: ['contained', 'status'],
+        args: [thingA.id],
         where: 'contained.in = ?1',
-        args: [thingA.id]
+        with: ['contained', 'status']
       })!;
 
       expect(thingB.status!.status).toBe('walking');

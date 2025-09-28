@@ -60,11 +60,23 @@ describe('Entity', () => {
         name: { nickname: 'test' }
       });
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       // console.debug('entity', entity);
       const clonedEntity = world.clone(entity);
       expect(clonedEntity).toBeDefined();
-      expect(clonedEntity.name!.nickname).toBe('test');
       expect(clonedEntity.id).not.toBe(entity.id);
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['name'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+
+      expect(queriedClone).not.toBeNull();
+      expect(queriedClone!.name!.nickname).toBe('test');
 
       // change the original entity nickname and flush
       entity.name!.nickname = 'test2';
@@ -109,9 +121,17 @@ describe('Entity', () => {
       const anotherWorld = await createWorld([nameComponent], opts);
       const clonedEntity = anotherWorld.clone(entity.id);
       expect(clonedEntity).toBeDefined();
-      expect(clonedEntity.name!.nickname).toBe('test');
       expect(clonedEntity.id).not.toBe(entity.id);
-      clonedEntity.name!.nickname = 'test2';
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = anotherWorld.query({
+        with: ['name'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone!.name!.nickname).toBe('test');
+
+      queriedClone!.name!.nickname = 'test2';
       anotherWorld.flush();
 
       const entities = anotherWorld.queryAll({ with: ['name'] });
@@ -125,8 +145,16 @@ describe('Entity', () => {
 
     it('should clone entity with multiple components', async () => {
       const edl = `
-      def position { x: float y: float z: float }
-      def velocity { dx: float dy: float dz: float }
+      def position {
+        x: float
+        y: float
+        z: float
+      }
+      def velocity {
+        dx: float
+        dy: float
+        dz: float
+      }
       def name { nickname: string }
       `;
       const world = await createWorld(edl, worldOpts);
@@ -136,16 +164,27 @@ describe('Entity', () => {
         velocity: { dx: 1, dy: 2, dz: 3 }
       });
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       const clonedEntity = world.clone(entity);
       expect(clonedEntity).toBeDefined();
       expect(clonedEntity.id).not.toBe(entity.id);
-      expect(clonedEntity.position!.x).toBe(10);
-      expect(clonedEntity.velocity!.dy).toBe(2);
-      expect(clonedEntity.name!.nickname).toBe('original');
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['position', 'velocity', 'name'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone).not.toBeNull();
+      expect(queriedClone!.position!.x).toBe(10);
+      expect(queriedClone!.velocity!.dy).toBe(2);
+      expect(queriedClone!.name!.nickname).toBe('original');
 
       // Modify original and verify clone is independent
       entity.name!.nickname = 'modified';
-      expect(clonedEntity.name!.nickname).toBe('original');
+      expect(queriedClone!.name!.nickname).toBe('original');
 
       world.close();
     });
@@ -153,7 +192,11 @@ describe('Entity', () => {
     it('should clone entity with complex nested data', async () => {
       const edl = `
       def inventory { items: json }
-      def stats { health: int mana: int attributes: json }
+      def stats {
+        health: int
+        mana: int
+        attributes: json
+      }
       `;
       const world = await createWorld(edl, worldOpts);
       const entity = world.create({
@@ -170,21 +213,31 @@ describe('Entity', () => {
         }
       });
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       const clonedEntity = world.clone(entity);
       expect(clonedEntity).toBeDefined();
       expect(clonedEntity.id).not.toBe(entity.id);
-      expect(clonedEntity.inventory!.items).toEqual([
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['inventory', 'stats'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone!.inventory!.items).toEqual([
         { damage: 10, id: 'sword' },
         { defense: 5, id: 'shield' }
       ]);
-      expect(clonedEntity.stats!.attributes).toEqual({
+      expect(queriedClone!.stats!.attributes).toEqual({
         agility: 12,
         strength: 15
       });
 
       // Verify deep copy - modifying nested data doesn't affect clone
       entity.inventory!.items[0].damage = 20;
-      expect(clonedEntity.inventory!.items[0].damage).toBe(10);
+      expect(queriedClone!.inventory!.items[0].damage).toBe(10);
 
       world.close();
     });
@@ -227,10 +280,20 @@ describe('Entity', () => {
       expect(entity.stats!.health).toBe(200);
       expect(entity.stats!.mana).toBe(50);
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       const clonedEntity = world.clone(entity);
       expect(clonedEntity).toBeDefined();
-      expect(clonedEntity.stats!.health).toBe(200);
-      expect(clonedEntity.stats!.mana).toBe(50); // default value
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['stats'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone!.stats!.health).toBe(200);
+      expect(queriedClone!.stats!.mana).toBe(50); // default value
 
       world.close();
     });
@@ -257,13 +320,23 @@ describe('Entity', () => {
         }
       });
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       const clonedEntity = world.clone(entity);
       expect(clonedEntity).toBeDefined();
-      expect(clonedEntity.mixed!.str).toBe('test');
-      expect(clonedEntity.mixed!.num).toBe(42.5);
-      expect(clonedEntity.mixed!.bool).toBe(true);
-      expect(clonedEntity.mixed!.date).toEqual(testDate);
-      expect(clonedEntity.mixed!.arr).toEqual([1, 2, 3]);
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['mixed'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone!.mixed!.str).toBe('test');
+      expect(queriedClone!.mixed!.num).toBe(42.5);
+      expect(queriedClone!.mixed!.bool).toBe(true);
+      expect(queriedClone!.mixed!.date).toEqual(testDate);
+      expect(queriedClone!.mixed!.arr).toEqual([1, 2, 3]);
 
       world.close();
     });
@@ -277,12 +350,22 @@ describe('Entity', () => {
         counter: { value: 1 }
       });
 
+      // Flush to ensure data is in database before cloning
+      world.flush();
+
       const clonedEntity = world.clone(entity);
-      expect(clonedEntity.counter!.value).toBe(1);
+
+      // Query the cloned entity to verify components were copied
+      const queriedClone = world.query({
+        with: ['counter'],
+        where: 'e.id = ?',
+        args: [clonedEntity.id]
+      });
+      expect(queriedClone!.counter!.value).toBe(1);
 
       // Modify both entities
       entity.counter!.value = 10;
-      clonedEntity.counter!.value = 20;
+      queriedClone!.counter!.value = 20;
 
       world.flush();
 

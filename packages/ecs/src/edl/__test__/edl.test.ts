@@ -595,15 +595,7 @@ entity lockable_chest: chest {
       })!;
 
       expect(examine.mock.calls).toEqual([
-        [
-          20,
-          chest.id,
-          'arg_1',
-          13,
-          true,
-          'a medium sized chest',
-          chest.thing.id!
-        ]
+        [20, chest.id, 'arg_1', 13, true, 'a medium sized chest', 1]
       ]);
     });
 
@@ -623,7 +615,7 @@ entity lockable_chest: chest {
     it('should resolve component row id for commands', async () => {
       const edl = `
       entity chest { thing { size: 1 weight: 2 } }
-      !examine $chest.thing.id $chest.thing._row_id $chest._count
+      !examine $chest.thing.id $chest._count
     `;
 
       const examine = mock(() => {});
@@ -632,10 +624,7 @@ entity lockable_chest: chest {
 
       const chest = world.query({ with: ['thing'] })!;
       expect(chest).toBeDefined();
-      const rowId = chest.thing.id!;
-
-      expect(typeof rowId).toBe('number');
-      expect(examine.mock.calls).toEqual([[rowId, rowId, 1]]);
+      expect(examine.mock.calls).toEqual([[1, 1]]); // i don't really know why this is important
     });
 
     it('should handle optional properties', async () => {

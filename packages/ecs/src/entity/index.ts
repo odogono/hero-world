@@ -265,15 +265,36 @@ export const mapRowToEntity = <T extends Components>(
     const defName = toSnakeCase(def.name);
     const data: Record<string, unknown> = {};
     for (const column of def.columns) {
+      if (column.name === 'id' || column.name === 'eid') continue; // Skip id and eid columns
       const schemaColumn = def.schema.columns.find(
         c => (toSnakeCase(c.name) || c.name) === column.name
       );
       const key = toCamelCase(column.name);
       const value = (row as any)[`${defName}_${column.name}`];
-      data[key] =
-        schemaColumn && schemaColumn.type === 'json' && value !== null
-          ? JSON.parse(value as string)
-          : value;
+      let processedValue = value;
+
+      if (schemaColumn) {
+        if (
+          schemaColumn.type === 'boolean' ||
+          (schemaColumn.type as any) === 'bool'
+        ) {
+          processedValue = value === 1 || value === '1' ? true : false;
+        } else if (
+          schemaColumn.type === 'int' ||
+          schemaColumn.type === 'float'
+        ) {
+          processedValue =
+            typeof value === 'string' ? parseFloat(value) : value;
+        } else if (schemaColumn.type === 'json') {
+          processedValue = value !== null ? JSON.parse(value as string) : value;
+        } else if (schemaColumn.type === 'datetime') {
+          processedValue = value !== null ? new Date(value as string) : value;
+        } else {
+          processedValue = value;
+        }
+      }
+
+      data[key] = processedValue;
     }
     entity[c] = makeTrackedComponent(entity, c as string, data);
   }
