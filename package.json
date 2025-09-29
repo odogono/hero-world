@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
+    "odgn-query": "^0.0.1",
     "zod": "^4.1.5"
   },
   "devDependencies": {
