@@ -313,131 +313,49 @@ export class World<TComponents extends Components> {
     source: EntityWithComponents<TComponents, keyof TComponents> | number,
     target: EntityWithComponents<TComponents, keyof TComponents> | number
   ): EntityWithComponents<TComponents, keyof TComponents> {
-    let sourceEntity: EntityWithComponents<TComponents, keyof TComponents>;
-    let targetEntity: EntityWithComponents<TComponents, keyof TComponents>;
+    // Resolve EIDs
+    const sourceEid = typeof source === 'number' ? source : source.id;
+    const targetEid = typeof target === 'number' ? target : target.id;
 
-    // Resolve source entity
-    if (typeof source === 'number') {
-      const queriedEntity = this.query({
-        args: [source],
-        where: 'e.id = ?'
-      }) as EntityWithComponents<TComponents, keyof TComponents>;
-      if (!queriedEntity) {
-        throw createEntityNotFoundError(source);
-      }
-      sourceEntity = queriedEntity;
-    } else {
-      sourceEntity = source;
+    // Verify existence
+    if (!this.get(sourceEid)) {
+      throw createEntityNotFoundError(sourceEid);
+    }
+    if (!this.get(targetEid)) {
+      throw createEntityNotFoundError(targetEid);
     }
 
-    // Resolve target entity
-    if (typeof target === 'number') {
-      const queriedEntity = this.query({
-        args: [target],
-        where: 'e.id = ?'
-      }) as EntityWithComponents<TComponents, keyof TComponents>;
-      if (!queriedEntity) {
-        throw createEntityNotFoundError(target);
-      }
-      targetEntity = queriedEntity;
-    } else {
-      targetEntity = target;
-    }
-
-    // Deep copy function that preserves Date objects
-    const deepCopy = (obj: any): any => {
-      if (obj === null || typeof obj !== 'object') {
-        return obj;
-      }
-      if (obj instanceof Date) {
-        return new Date(obj);
-      }
-      if (Array.isArray(obj)) {
-        return obj.map(deepCopy);
-      }
-      const copied = {} as any;
-      for (const key in obj) {
-        copied[key] = deepCopy(obj[key]);
-      }
-      return copied;
-    };
-
-    // Copy all components from source to target
-    for (const key in sourceEntity) {
-      if (key !== 'id' && key !== 'world') {
-        const componentData = (sourceEntity as any)[key];
-        // Only copy components that actually exist on the source entity
-        // (i.e., have at least one non-null/undefined value)
-        if (
-          componentData !== null &&
-          componentData !== undefined &&
-          Object.values(componentData).some(
-            value => value !== null && value !== undefined
-          )
-        ) {
-          // Deep copy the component data to avoid sharing references
-          const copiedData = deepCopy(componentData);
-          // Apply default values from the component schema
-          const dataWithDefaults = applyComponentDefaults(
-            this,
-            key,
-            copiedData
-          );
-          // Update if target has component; otherwise remove then add to force insert
-          const targetData = (targetEntity as any)[key];
-          const targetHas =
-            targetData &&
-            Object.values(targetData).some(
-              (v: any) => v !== null && v !== undefined
-            );
-          if (!targetHas) {
-            removeComponent(targetEntity as any, key as any);
-          }
-          addComponent(
-            targetEntity as any,
-            key as any,
-            dataWithDefaults as any
-          );
+    // SQL-based copy of components from source -> target
+    this.db.transaction(() => {
+      for (const [, def] of this.defs) {
+        // Only operate if source has rows for this component
+        const hasSource =
+          this.db.query(
+            `SELECT 1 FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`,
+            sourceEid
+          ).length > 0;
+        if (!hasSource) {
+          continue;
         }
-      }
-    }
 
-    // Also copy components that exist on target back to source (bidirectional merge)
-    for (const key in targetEntity) {
-      if (key !== 'id' && key !== 'world') {
-        const componentData = (targetEntity as any)[key];
-        if (
-          componentData !== null &&
-          componentData !== undefined &&
-          Object.values(componentData).some(
-            value => value !== null && value !== undefined
-          )
-        ) {
-          const copiedData = deepCopy(componentData);
-          const dataWithDefaults = applyComponentDefaults(
-            this,
-            key,
-            copiedData
-          );
-          const sourceData = (sourceEntity as any)[key];
-          const sourceHas =
-            sourceData &&
-            Object.values(sourceData).some(
-              (v: any) => v !== null && v !== undefined
-            );
-          if (!sourceHas) {
-            removeComponent(sourceEntity as any, key as any);
-          }
-          addComponent(
-            sourceEntity as any,
-            key as any,
-            dataWithDefaults as any
-          );
-        }
-      }
-    }
+        // Overwrite target rows for this component
+        this.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, targetEid);
 
-    return targetEntity;
+        // Build INSERT ... SELECT excluding id column
+        const cols = def.columns.map(c => c.name).filter(n => n !== 'id');
+        const insertCols = cols.join(', ');
+        const selectCols = cols.map(n => (n === 'eid' ? '?1' : n)).join(', ');
+        const sql = `INSERT INTO ${def.tableName} (${insertCols}) SELECT ${selectCols} FROM ${def.tableName} WHERE eid = ?2`;
+        this.db.exec(sql, targetEid, sourceEid);
+      }
+    });
+
+    // Invalidate caches for target since DB has been updated directly
+    this.entityCache.delete(targetEid);
+    this.dirtyEntities.delete(targetEid);
+
+    // Return DB entity reference (id/world only)
+    return { id: targetEid, world: this } as any;
   }
 
   /**
@@ -761,8 +679,8 @@ const initialiseWorldDb = async <TComponents extends Components>(
 
   // Log warnings if any
   if (validation.warnings.length > 0) {
-    log.warn('Component definition warnings:');
-    validation.warnings.forEach(warning => log.warn(`  ${warning}`));
+    // log.warn('Component definition warnings:');
+    // validation.warnings.forEach(warning => log.warn(`  ${warning}`));
   }
 
   // Check for duplicate component definitions

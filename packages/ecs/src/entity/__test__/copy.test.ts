@@ -30,9 +30,19 @@ describe('Entity', () => {
 
       const entity2 = world.create();
 
+      // Ensure source data is in the DB for SQL-based copy
+      world.flush();
+
       world.copy(entity, entity2);
 
-      expect(entity2.name!.nickname).toBe('test');
+      // Re-query the target from DB to observe copied components
+      const refreshed = world.query({
+        with: ['name'],
+        where: 'e.id = ?',
+        args: [entity2.id]
+      });
+
+      expect(refreshed!.name!.nickname).toBe('test');
 
       world.close();
       deleteTempFile(path);
@@ -67,18 +77,31 @@ describe('Entity', () => {
         [nameComponent, statsComponent],
         opts
       );
-      const clonedEntity = anotherWorld.copy(entity.id, entity2.id);
-      expect(clonedEntity).toBeDefined();
-      expect(clonedEntity.name!.nickname).toBe('test');
-      expect(clonedEntity.stats!.health).toBe(100);
-      clonedEntity.stats!.health = 200;
+      anotherWorld.copy(entity.id, entity2.id);
+
+      // Query the target entity to verify components were copied
+      const queriedTarget = anotherWorld.query({
+        with: ['name', 'stats'],
+        where: 'e.id = ?',
+        args: [entity2.id]
+      });
+      expect(queriedTarget).toBeDefined();
+      expect(queriedTarget!.name!.nickname).toBe('test');
+      expect(queriedTarget!.stats!.health).toBe(100);
+
+      // Modify copied target and persist
+      queriedTarget!.stats!.health = 200;
       anotherWorld.flush();
 
-      const entities = anotherWorld.queryAll({ with: ['name', 'stats'] });
-      const nicknames = entities.map(e => e!.name!.nickname).sort();
-      const healths = entities.map(e => e!.stats!.health).sort();
+      // Verify names on both entities (copy is one-directional)
+      const nameEntities = anotherWorld.queryAll({ with: ['name'] });
+      const nicknames = nameEntities.map(e => e!.name!.nickname).sort();
       expect(nicknames).toEqual(['test', 'test']);
-      expect(healths).toEqual([100, 200]);
+
+      // Verify only the target has stats and it was updated
+      const statEntities = anotherWorld.queryAll({ with: ['stats'] });
+      const healths = statEntities.map(e => e!.stats!.health).sort();
+      expect(healths).toEqual([200]);
 
       anotherWorld.close();
 
