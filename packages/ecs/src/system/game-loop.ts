@@ -1,6 +1,7 @@
 import { createLog } from 'odgn-helpers/log';
 
-import type { Components, World } from '@types';
+import type { Components } from '@types';
+import { World } from '@world';
 
 import type {
   GameLoop,
@@ -154,7 +155,7 @@ export const createGameLoop = <TComponents extends Components>(
         continue;
       }
 
-      const startTime = Date.now();
+      const startTime = performance.now();
 
       try {
         // Execute system with events, disabling flush to prevent double flushing
@@ -168,7 +169,7 @@ export const createGameLoop = <TComponents extends Components>(
         const perf = perfMap.get(system.id);
 
         if (perf) {
-          const executionTime = Date.now() - startTime;
+          const executionTime = performance.now() - startTime;
           perf.lastExecutionTime = executionTime;
           perf.totalExecutionTime += executionTime;
           perf.executionCount++;

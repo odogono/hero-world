@@ -8,6 +8,8 @@ import type { ExecProps, System, SystemFunction, SystemOptions } from './types';
 // Re-export the event-aware game loop as the main game loop
 export { createGameLoop } from './game-loop';
 
+export * from './types';
+
 export const createSystem = <
   TComponents extends Components,
   TExecProps extends ExecProps<TComponents>

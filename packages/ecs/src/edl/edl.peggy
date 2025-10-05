@@ -75,8 +75,8 @@ EntityDef
   / 'entity' __ id2:IdentifierOrString _ '{' _ comps2:Components? _ '}' {
       return { type: 'entity', id: id2, components: comps2 ?? {} } as EDLDefinition;
     }
-  / 'entity' _ '{' _ '}' {
-      return { type: 'entity', id: undefined, components: {} } as EDLDefinition;
+  / 'entity' _ '{' _ comps3:Components? _ '}' {
+      return { type: 'entity', id: undefined, components: comps3 ?? {} } as EDLDefinition;
     }
 
 // Component definition grammar
@@ -189,15 +189,24 @@ Identifier
   = $([A-Za-z_][A-Za-z0-9_]*)
 
 String
-  = '"' chars:Character* '"' { return chars.join(''); }
+  = '"' chars:DoubleChar* '"' { return chars.join(''); }
+  / "'" chars2:SingleChar* "'" { return chars2.join(''); }
 
-Character
+DoubleChar
   = '\\"' { return '"'; }
   / '\\n' { return '\n'; }
   / '\\r' { return '\r'; }
   / '\\t' { return '\t'; }
   / '\\\\' { return '\\'; }
   / $([^"\\])
+
+SingleChar
+  = "\\'" { return "'"; }
+  / '\\n' { return '\n'; }
+  / '\\r' { return '\r'; }
+  / '\\t' { return '\t'; }
+  / '\\\\' { return '\\'; }
+  / $([^'\\])
 
 Value
   = obj:Object { return obj; }
