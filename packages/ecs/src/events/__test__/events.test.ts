@@ -34,7 +34,8 @@ describe('EventSystem', () => {
     world.flush();
 
     expect(eventEntity.event.type).toBe('test-event');
-    expect(JSON.parse(eventEntity.event.payload)).toEqual({ message: 'hello' });
+
+    expect(eventEntity.event.payload).toEqual({ message: 'hello' });
   });
 
   test('should schedule future events', async () => {

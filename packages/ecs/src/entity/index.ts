@@ -94,6 +94,9 @@ export type QueryOptions<T extends Components> = {
   offset?: number;
   where?: string;
   with?: (keyof T)[];
+  // Optionally include these components if present on the entity.
+  // They are not required to exist and will be omitted if missing.
+  maybe?: (keyof T)[];
   without?: (keyof T)[];
 };
 
@@ -156,30 +159,35 @@ const buildQuery = <T extends Components>(
   const withoutConditions: string[] = [];
 
   // Determine which components to include in the query
-  // Determine default join behavior:
-  // - If explicit `with` is provided, join only those.
-  // - Else, if filtering via `where` or `without`, join all component tables so unqualified
-  //   column names in WHERE can resolve.
-  // - Else (no `with`/`where`/`without`), return all entities without joins.
   const needsJoins =
     Boolean(options?.where) || (options?.without?.length ?? 0) > 0;
-  const componentsToInclude =
-    options?.with ??
-    (needsJoins
-      ? (Array.from(world.defs.keys()) as (keyof T)[])
-      : ([] as (keyof T)[]));
+  const withList = (options?.with ?? []) as (keyof T)[];
+  const maybeList = (options?.maybe ?? []) as (keyof T)[];
+  const explicitWith = withList.length > 0;
 
-  // console.log('componentsToInclude', world.defs.keys());
+  // Include both required (`with`) and optional (`maybe`) components.
+  let componentsToInclude = Array.from(
+    new Set([...withList, ...maybeList])
+  ) as (keyof T)[];
 
-  // Handle components that entities must have
-  const explicitWith = Boolean(options?.with && options.with.length);
+  // If none explicitly requested but joins are needed for filtering, include all defs
+  if (componentsToInclude.length === 0 && needsJoins) {
+    componentsToInclude = Array.from(world.defs.keys()) as (keyof T)[];
+  }
+
+  const withSet = new Set(withList as (keyof T)[]);
+
+  // Handle components that entities must have (with) and may have (maybe)
   componentsToInclude.forEach(c => {
     const def = world.defs.get(c as string);
     if (!def) {
       throw new Error(`Component def not found for ${String(c)}`);
     }
     const alias = toSnakeCase(def.name);
-    const joinType = explicitWith ? 'INNER JOIN' : 'LEFT JOIN';
+    const joinType =
+      withSet.has(c) || (!explicitWith && needsJoins)
+        ? 'INNER JOIN'
+        : 'LEFT JOIN';
     const join = `${joinType} ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
     joins.push(join);
     def.columns.forEach(column => {
@@ -253,7 +261,8 @@ const buildQuery = <T extends Components>(
 export const mapRowToEntity = <T extends Components>(
   world: World<T>,
   componentsToInclude: (keyof T)[],
-  row: unknown
+  row: unknown,
+  maybe?: (keyof T)[]
 ) => {
   const entity: Entity<keyof Components> = {
     id: (row as any).eid,
@@ -285,17 +294,55 @@ export const mapRowToEntity = <T extends Components>(
         ) {
           processedValue =
             typeof value === 'string' ? parseFloat(value) : value;
-        } else if (schemaColumn.type === 'json') {
+        } else if (
+          schemaColumn.type === 'json' ||
+          (schemaColumn.type as any) === 'array'
+        ) {
           processedValue = value !== null ? JSON.parse(value as string) : value;
         } else if (schemaColumn.type === 'datetime') {
           processedValue = value !== null ? new Date(value as string) : value;
         } else {
           processedValue = value;
         }
+      } else {
+        // If no schemaColumn info, heuristically parse JSON-like strings
+        if (
+          typeof value === 'string' &&
+          ((value as string).startsWith('[') ||
+            (value as string).startsWith('{'))
+        ) {
+          try {
+            processedValue = JSON.parse(value as string);
+          } catch {
+            processedValue = value;
+          }
+        }
+      }
+
+      // As a final fallback, attempt to parse JSON-looking strings
+      if (
+        typeof processedValue === 'string' &&
+        (processedValue.startsWith('[') || processedValue.startsWith('{'))
+      ) {
+        try {
+          processedValue = JSON.parse(processedValue);
+        } catch {
+          /* ignore */
+        }
       }
 
       data[key] = processedValue;
     }
+
+    const isMaybe = (maybe ?? []).includes(c);
+    const hasAnyValue = Object.values(data).some(
+      v => v !== null && v !== undefined
+    );
+    if (isMaybe && !hasAnyValue) {
+      // Component not present on this entity; omit it
+      continue;
+    }
+
     entity[c] = makeTrackedComponent(entity, c as string, data);
   }
 
@@ -383,7 +430,9 @@ export function queryEntity<T extends Components>(
   const stmt = world.db.prepare(sql);
   const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
   // console.debug('row', row);
-  let result = row ? mapRowToEntity(world, componentsToInclude, row) : null;
+  let result = row
+    ? mapRowToEntity(world, componentsToInclude, row, options?.maybe as any)
+    : null;
   stmt.finalize();
   if (result && options?.asProxy) {
     result = asProxiedEntity(result as any) as any;
@@ -412,7 +461,7 @@ export function queryEntities<T extends Components>(
   const rows = world.db.query(sql, args);
 
   const entities = rows.map((row: any) =>
-    mapRowToEntity(world, componentsToInclude, row)
+    mapRowToEntity(world, componentsToInclude, row, options?.maybe as any)
   );
 
   if (asProxy) {
@@ -471,7 +520,12 @@ export function queryEntitiesIterator<T extends Components>(
     *[Symbol.iterator]() {
       try {
         for (const row of iterator) {
-          let entity = mapRowToEntity(world, componentsToInclude, row);
+          let entity = mapRowToEntity(
+            world,
+            componentsToInclude,
+            row,
+            options?.maybe as any
+          );
           if (asProxy) {
             entity = asProxiedEntity(entity as any) as any;
           }

@@ -46,7 +46,7 @@ export const createEventSystem = <
     EntityExecProps<EntityWithComponents<TComponents, 'event'>, TComponents>
   >(
     ({ entity, world }) => {
-      const payload = JSON.parse(entity.event.payload);
+      const payload = entity.event.payload;
       const shouldDelete =
         exec({
           event: entity as EntityWithComponents<TComponents, 'event'>,
@@ -85,7 +85,7 @@ export const scheduleEvent = <
   const e = world.create({
     event: {
       createdAt: new Date().toISOString(),
-      payload: JSON.stringify(payload),
+      payload,
       scheduledAt: when,
       type
     }
@@ -119,7 +119,7 @@ export const getEvents = <
 
   return entities.map(e => ({
     ...e.event!,
-    payload: JSON.parse(e.event!.payload)
+    payload: e.event!.payload
   }));
 };
 
@@ -142,7 +142,7 @@ export const getAllEvents = <
 
   return entities.map(e => ({
     ...e.event!,
-    payload: JSON.parse(e.event!.payload)
+    payload: e.event!.payload
   }));
 };
 
@@ -165,7 +165,7 @@ export const getPendingEvents = <
 
   return entities.map(e => ({
     ...e.event!,
-    payload: JSON.parse(e.event!.payload)
+    payload: e.event!.payload
   }));
 };
 
