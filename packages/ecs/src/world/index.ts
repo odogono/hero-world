@@ -437,54 +437,54 @@ export class World<TComponents extends Components> {
    * Create a system instance bound to this world so `exec` does not require a `world` arg.
    * The returned system remains compatible with the standard System type.
    */
-  createSystem<
-    TExecProps extends { deltaTime: number } = { deltaTime: number }
-  >(
-    processFn: (props: TExecProps) => void,
-    options: QueryOptions<TComponents> & {
-      enabled?: boolean;
-      frequency?: number;
-      priority?: number;
-    } = {}
-  ) {
-    const hasQuery =
-      options.with !== undefined ||
-      options.without !== undefined ||
-      options.where !== undefined ||
-      options.entity !== undefined;
+  // createSystem<
+  //   TExecProps extends { deltaTime: number } = { deltaTime: number }
+  // >(
+  //   processFn: (props: TExecProps) => void,
+  //   options: QueryOptions<TComponents> & {
+  //     enabled?: boolean;
+  //     frequency?: number;
+  //     priority?: number;
+  //   } = {}
+  // ) {
+  //   const hasQuery =
+  //     options.with !== undefined ||
+  //     options.without !== undefined ||
+  //     options.where !== undefined ||
+  //     options.entity !== undefined;
 
-    const exec = (props: {
-      deltaTime: number;
-      flushOnExec?: boolean;
-      world?: World<TComponents>;
-    }) => {
-      const { deltaTime, flushOnExec = true } = props;
-      const world = this as World<TComponents>;
+  //   const exec = (props: {
+  //     deltaTime: number;
+  //     flushOnExec?: boolean;
+  //     world?: World<TComponents>;
+  //   }) => {
+  //     const { deltaTime, flushOnExec = true } = props;
+  //     const world = this as World<TComponents>;
 
-      if (hasQuery) {
-        using entities = queryEntitiesIterator(
-          world,
-          options as QueryOptions<TComponents>
-        );
-        for (const entity of entities) {
-          // Provide entity + bound world
-          processFn({ deltaTime, entity, world } as unknown as TExecProps);
-        }
-      } else {
-        // Provide bound world only
-        processFn({ deltaTime, world } as unknown as TExecProps);
-      }
+  //     if (hasQuery) {
+  //       using entities = queryEntitiesIterator(
+  //         world,
+  //         options as QueryOptions<TComponents>
+  //       );
+  //       for (const entity of entities) {
+  //         // Provide entity + bound world
+  //         processFn({ deltaTime, entity, world } as unknown as TExecProps);
+  //       }
+  //     } else {
+  //       // Provide bound world only
+  //       processFn({ deltaTime, world } as unknown as TExecProps);
+  //     }
 
-      if (flushOnExec) {
-        world.flush();
-      }
-    };
+  //     if (flushOnExec) {
+  //       world.flush();
+  //     }
+  //   };
 
-    return {
-      ...options,
-      exec
-    };
-  }
+  //   return {
+  //     ...options,
+  //     exec
+  //   };
+  // }
 
   /**
    * Execute EDL script on the world
