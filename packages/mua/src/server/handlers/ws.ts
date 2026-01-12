@@ -105,7 +105,12 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
       log.info('[open] WebSocket connection opened', getWsId(ws));
 
       const result = trycatch(() => {
-        ws.send(JSON.stringify({ message: 'Connected to echo server' }));
+        ws.send(
+          JSON.stringify({
+            success: true,
+            data: 'Welcome to MUA! Please enter your username:'
+          })
+        );
 
         const result = muaWorld.onConnectionOpened(
           ws as unknown as MuaConnection

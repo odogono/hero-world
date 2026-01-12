@@ -69,10 +69,54 @@ const describedDef = defineComponent({
   }
 });
 
+const playerDef = defineComponent({
+  id: 'player',
+  schema: {
+    name: s.string(),
+    connectedId: s.entityId().optional(),
+    location: s.entityId().optional(),
+    lastCommandAt: s.datetime().optional()
+  }
+});
+
+const inputEventDef = defineComponent({
+  id: 'inputEvent',
+  schema: {
+    wsId: s.string(),
+    text: s.string(),
+    timestamp: s.datetime()
+  }
+});
+
+const commandEventDef = defineComponent({
+  id: 'commandEvent',
+  schema: {
+    playerId: s.entityId(),
+    verb: s.string(),
+    target: s.string().optional(),
+    direction: s.string().optional(),
+    rawInput: s.string()
+  }
+});
+
+const outputEventDef = defineComponent({
+  id: 'outputEvent',
+  schema: {
+    wsId: s.string(),
+    message: s.string(),
+    broadcast: s.boolean().default(false),
+    roomId: s.entityId().optional()
+  }
+});
+
 export const defs = [
   connectedDef,
   authenticatingDef,
   authenticatedDef,
+  playerDef,
+  inputEventDef,
+  commandEventDef,
+  outputEventDef,
   containerDef,
   metaDef,
   containedDef,

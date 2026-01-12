@@ -20,6 +20,7 @@ export class MuaWorld {
   loop: GameLoop<any> | null = null;
   updateLoopInterval: ReturnType<typeof setInterval> | null = null;
   lastUpdateTime: number = 0;
+  private connections = new Map<string, MuaConnection>();
 
   constructor(options: MuaWorldOptions = {}) {
     this.options = options;
@@ -56,39 +57,17 @@ export class MuaWorld {
 
     this.loop = createGameLoop(this.world);
 
-    const authenticatingSystem = createSystem(
-      ({ deltaTime, entity }) => {
-        log.debug('deltaTime', deltaTime, serializeEntity(entity));
-      },
-      {
-        frequency: 1,
-        with: ['connected', 'authenticating']
-      }
-    );
+    // Import and register game systems
+    const { inputSystem } = await import('./systems/inputSystem');
+    const { parseSystem } = await import('./systems/parseSystem');
+    const { actionSystem } = await import('./systems/actionSystem');
+    const { createOutputSystem } = await import('./systems/outputSystem');
 
-    const updateSystem = createSystem(
-      ({ deltaTime }) => {
-        log.debug('Update loop 1 running - deltaTime:', deltaTime);
-      },
-      {
-        frequency: 1,
-        priority: 10
-      }
-    );
-
-    // const updateSystem2 = this.world.createSystem(
-    //   ({ deltaTime }) => {
-    //     log.debug('Update loop 2 running - deltaTime:', deltaTime);
-    //   },
-    //   {
-    //     frequency: 2,
-    //     priority: 5
-    //   }
-    // );
-
-    this.loop.addSystem('authenticating', authenticatingSystem);
-    // this.loop.addSystem('update', updateSystem);
-    // this.loop.addSystem('update2', updateSystem2);
+    // Register systems in priority order
+    this.loop.addSystem('input', inputSystem);
+    this.loop.addSystem('parse', parseSystem);
+    this.loop.addSystem('action', actionSystem);
+    this.loop.addSystem('output', createOutputSystem(this.connections));
 
     // Start the update loop that runs every second (1000ms)
     this.lastUpdateTime = performance.now();
@@ -123,30 +102,140 @@ export class MuaWorld {
     });
   }
 
+  private async handleLogin(
+    conn: MuaConnection,
+    username: string
+  ): Promise<boolean> {
+    try {
+      log.debug('handleLogin start', username);
+      const connectionEntity = this.world?.query({
+        with: ['connected'],
+        maybe: ['authenticating', 'authenticated'],
+        where: 'connected.ws_id = ?1',
+        args: [conn.id],
+        asProxy: true
+      });
+
+      if (!connectionEntity) {
+        log.error('Connection entity not found for login', conn.id);
+        return false;
+      }
+
+      // Find or create player
+      const { findPlayerByName } = await import('./queries/player');
+      const { findRoomByMetaId } = await import('./queries/room');
+
+      let player = findPlayerByName(this.world!, username);
+      log.debug('Found existing player?', !!player);
+
+      if (!player) {
+        const startRoom = findRoomByMetaId(this.world!, 'west_of_house');
+        log.debug('Start room found?', !!startRoom, startRoom?.id);
+
+        player = this.world?.create({
+          player: {
+            name: username,
+            connectedId: connectionEntity.id,
+            location: startRoom?.id
+          },
+          container: {
+            capacity: 10,
+            isClosed: false
+          }
+        });
+        log.debug('Player created', player?.id);
+      } else {
+        player.player.connectedId = connectionEntity.id;
+        log.debug('Player reconnected', player.id);
+      }
+
+      // Mark as authenticated and remove authenticating
+      connectionEntity.authenticated = {
+        authenticatedAt: new Date().toISOString()
+      };
+      // Remove authenticating by setting to undefined (null doesn't work)
+      delete connectionEntity.authenticating;
+
+      this.world?.flush();
+      log.debug('World flushed, authenticated:', !!connectionEntity.authenticated);
+
+      // Send welcome message
+      const message = `Welcome, ${username}! Type 'look' to begin.`;
+      conn.send(
+        JSON.stringify({
+          success: true,
+          data: message
+        })
+      );
+      log.debug('Welcome message sent', message);
+
+      return true;
+    } catch (error) {
+      log.error('Error in handleLogin', error);
+      return false;
+    }
+  }
+
   onConnectionCommand(conn: MuaConnection, command: any) {
     log.debug('onConnectionCommand', conn.id, command);
 
-    // get the connection entity
     const connectionEntity = this.world?.query({
       with: ['connected'],
+      maybe: ['authenticating', 'authenticated'],
       where: 'connected.ws_id = ?1',
-      args: [conn.id]
+      args: [conn.id],
+      asProxy: true
     });
 
     if (!connectionEntity) {
       log.error('Connection entity not found', conn.id);
-      // drop the connection
       conn.close();
       return false;
     }
 
-    // this.world?.execute(command);
+    log.debug(
+      'Connection state',
+      'authenticating:',
+      !!connectionEntity.authenticating,
+      'authenticated:',
+      !!connectionEntity.authenticated
+    );
+
+    // Handle login if authenticating
+    if (connectionEntity.authenticating && !connectionEntity.authenticated) {
+      const username = typeof command === 'string' ? command : command.username;
+      log.debug('About to call handleLogin', username);
+      // Fire and forget - don't await to keep the method synchronous
+      this.handleLogin(conn, username).catch((error) => {
+        log.error('handleLogin error', error);
+      });
+      return true;
+    }
+
+    // Handle game commands if authenticated
+    if (connectionEntity.authenticated) {
+      const text = typeof command === 'string' ? command : command.text;
+
+      // Create input event
+      this.world?.create({
+        inputEvent: {
+          wsId: conn.id,
+          text,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      this.world?.flush();
+    } else {
+      log.warn('Connection neither authenticating nor authenticated', conn.id);
+    }
 
     return true;
   }
 
   onConnectionOpened(conn: MuaConnection) {
     log.debug('onConnectionOpened', conn.id);
+    this.connections.set(conn.id, conn);
 
     // create an entity with the connection component
     this.world?.create({
@@ -164,6 +253,23 @@ export class MuaWorld {
 
   onConnectionClosed(conn: MuaConnection) {
     log.debug('onConnectionClosed', conn.id);
+    this.connections.delete(conn.id);
+
+    // Unlink player from connection
+    const player = this.world?.query({
+      with: ['player'],
+      where: `player.connected_id IN (
+        SELECT id FROM entity WHERE id IN (
+          SELECT id FROM connected WHERE connected.ws_id = ?1
+        )
+      )`,
+      args: [conn.id]
+    });
+
+    if (player) {
+      player.player.connectedId = undefined;
+      this.world?.flush();
+    }
 
     return true;
   }
