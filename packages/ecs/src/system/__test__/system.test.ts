@@ -4,7 +4,11 @@ import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
 import { queryEntitiesIterator } from '@entity';
 import { createSystem } from '@system';
-import type { ExtractWorldComponents } from '@types';
+import type {
+  Components,
+  EntityWithComponents,
+  ExtractWorldComponents
+} from '@types';
 import { createWorld } from '@world';
 
 import type { EntityExecProps } from '../types';
@@ -21,6 +25,15 @@ const worldOpts = {
   dbType: DatabaseType.BUN,
   path: ':memory:'
 };
+
+type SystemExecPropsFor<
+  TComponents extends Components,
+  RequiredKeys extends keyof TComponents = never
+> = EntityExecProps<
+  EntityWithComponents<TComponents, RequiredKeys>,
+  TComponents
+>;
+
 describe('Systems', () => {
   const locationComponent = defineComponent({
     id: 'systemLocation',
@@ -53,8 +66,8 @@ describe('Systems', () => {
     // Track processed entities
     const processedEntities: number[] = [];
 
-    // Create a system that tracks processed entities
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    // Create a system
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -98,7 +111,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with health component
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -139,7 +152,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that only processes entities with low health
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -182,7 +195,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes only first 3 entities
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -222,8 +235,8 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that skips first 2 entities
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
-      entity => {
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
+      ({ entity }) => {
         processedEntities.push(entity.id);
       },
       {
@@ -269,7 +282,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system that processes entities with location but without health component
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'systemLocation'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -303,7 +316,7 @@ describe('Systems', () => {
     world.flush();
 
     // Create a system that heals entities
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         if (entity.constitution.current < entity.constitution.max) {
           entity.constitution.current = Math.min(
@@ -346,7 +359,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -378,7 +391,7 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<C, SystemExecPropsFor<C, 'constitution'>>(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },
@@ -425,7 +438,10 @@ describe('Systems', () => {
     const processedEntities: number[] = [];
 
     // Create a system with complex query options
-    const system = createSystem<C, EntityExecProps<C['entity'], C>>(
+    const system = createSystem<
+      C,
+      SystemExecPropsFor<C, 'constitution' | 'systemLocation'>
+    >(
       ({ entity }) => {
         processedEntities.push(entity.id);
       },

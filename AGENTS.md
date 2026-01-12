@@ -1,42 +1,166 @@
-# Repository Guidelines
+# Hero World — Agent Guidelines
 
-## Project Structure & Module Organization
-- `packages/ecs`: TypeScript ECS library. Tests in `src/__test__`.
-- `packages/helpers`: Shared utilities (`log`, `string`, `try-catch`).
-- `packages/tank-world`: Vite + React app and Bun game server (`src/server`). Tests in `src/**/__test__`.
-- `docs`: Design and integration notes. Root is a Bun/TypeScript workspace.
+This file is for agentic coding tools (Codex/Claude/Cursor/etc.) working in this repo.
 
-## Build, Test, and Development Commands
-- Install deps once at root: `bun install` (Bun 1.1+, Node 20+).
-- ECS: `cd packages/ecs && bun test` (Bun tests), `bun run test:coverage`, `bun run lint`, `bun run format`.
-- Tank World app: `cd packages/tank-world && bun run dev` (Vite). Server: `bun run dev:server` (dev) | `bun run start:server` (prod).
-- Tank World tests: `bun run test`, coverage: `bun run coverage`, lint/format: `bun run lint` | `bun run format`.
-- Workspace utilities: `bunx npm-check-updates --interactive` to review updates.
+## Scope & precedence
 
-## Coding Style & Naming Conventions
-- Language: TypeScript ESM; prefer `type` aliases over interfaces.
-- Functions: Arrow functions; `prefer-const`; no `var`.
-- Imports: Sorted (Prettier + sort-imports); use type-only imports when possible.
-- Formatting: 2-space indent, semicolons on, trailing commas (Prettier).
-- Files: TS modules kebab-case (e.g., `game-loop.ts`); React components PascalCase (e.g., `SQLiteDemo.tsx`).
-- Naming: camelCase (vars/functions), PascalCase (types/enums), UPPER_SNAKE_CASE (constants).
+- This root `AGENTS.md` applies repo-wide by default.
+- More specific files override it within their directory trees:
+  - `packages/ecs/AGENTS.md`
+  - `packages/tank-world/AGENTS.md`
+  - `packages/mua/AGENTS.md`
 
-## Testing Guidelines
-- Frameworks: Bun test (ECS) and Vitest (Tank World).
-- Location: colocate under `src/__test__` with `*.test.ts(x)`.
-- Coverage: maintain or improve; aim for 80%+.
-- Determinism: prefer lightweight fakes; avoid brittle globals.
+## Cursor rules (found in `.cursor/rules/`)
 
-## ECS Query Tips
-- `queryEntity` returns snapshots by default; assign/remove won’t persist.
-- Use `queryEntity(world, { asProxy: true, with: [...] })` to enable add/remove via assignment, then call `world.flush()` to persist.
+- Prefer **Bun** commands and APIs:
+  - Use `bun`, not `node`/`npm`/`yarn`/`pnpm`.
+  - For Vite, use `bunx --bun vite` (already wired in scripts).
+  - Prefer `Bun.file(...)` over Node `fs` for simple file reads.
+  - Prefer `Bun.serve(...)` for HTTP/WebSocket servers where applicable.
+  - Prefer `bun:sqlite` for SQLite access.
 
-## Commit & Pull Request Guidelines
-- Commits: Conventional Commits (`feat:`, `fix:`, `chore:`) per history.
-- PRs: clear scope and rationale; link issues. Include screenshots for UI changes and failing/updated tests for logic changes.
-- Monorepo etiquette: limit changes to one package per PR when possible; update package `CHANGELOG` if maintained.
+## Copilot rules
 
-## Security & Configuration Tips
-- Use environment variables; do not commit `.env`.
-- SQLite WASM setup for ECS: see `packages/ecs/SQLITE_WASM_SETUP.md`.
-- Lint/format must pass before merge; CI may enforce.
+- No `.github/copilot-instructions.md` found in this repo.
+
+## Repo layout
+
+- `packages/ecs`: ECS + persistence/event system (TypeScript, Bun).
+- `packages/helpers`: shared utilities (logging/string/trycatch/etc.).
+- `packages/tank-world`: Vite + React client + Bun server (`src/server`).
+- `packages/mua`: server + TUI app.
+- `docs/`: design notes.
+
+## Setup
+
+- Install dependencies (workspace): `bun install`
+- TypeScript is configured at root: `tsconfig.json` (strict, `noEmit`).
+
+## Commands (build/lint/test)
+
+### Root
+
+- Install: `bun install`
+- Check outdated deps: `bun run outdated`
+- Typecheck (ad-hoc): `bunx tsc -p tsconfig.json --noEmit`
+
+### `packages/ecs`
+
+Run from `packages/ecs` unless stated.
+
+- Tests: `bun test`
+- Single test file: `bun test src/__test__/world.test.ts`
+- Single test by name: `bun test -t "proxy"`
+- Coverage: `bun run coverage` or `bun run test:coverage`
+- Lint: `bun run lint` (fix: `bun run lint:fix`)
+- Lint one file: `bun run lint -- src/world/index.ts`
+- Format: `bun run format` (check: `bun run format:check`)
+- Format one file: `bun run format -- src/world/index.ts`
+- Generators: `bun run generate` / `bun run generate:edl` / `bun run generate:cdef`
+
+### `packages/tank-world`
+
+Run from `packages/tank-world` unless stated.
+
+- Dev (client): `bun run dev` (Vite)
+- Build (client): `bun run build`
+- Preview: `bun run preview`
+- Dev server (Bun): `bun run dev:server`
+- Prod server (Bun): `bun run start:server`
+- Unit tests: `bun run test`
+- Single test file: `bun test src/server/game/__test__/world.test.ts`
+- Single test by name: `bun test -t "should"`
+- Coverage: `bun run coverage`
+- Lint: `bun run lint` (fix: `bun run lint:fix`)
+- Format: `bun run format` (check: `bun run format:check`)
+- E2E tests: `bun run test:e2e`
+  - Install browsers once: `bunx playwright install`
+  - Filter: `bun run test:e2e -- -g "login"`
+
+### `packages/mua`
+
+Run from `packages/mua` unless stated.
+
+- Dev server: `bun run server`
+- TUI (hot): `bun run tui`
+- Tests: `bun test` (single file: `bun test src/server/__test__/server.test.ts`)
+- Coverage: `bun run test:coverage`
+- Lint/format: `bun run lint` / `bun run format`
+
+### `packages/helpers`
+
+- No package scripts; tests exist under `packages/helpers/src/__test__`.
+- Prefer writing new tests using `bun:test` to match the rest of the repo.
+- Run helper tests via Bun (ad-hoc):
+  - `bun test packages/helpers/src/__test__/string.test.ts`
+- Note: there is at least one test using `vitest` imports.
+  - If needed, run Vitest directly: `bunx vitest packages/helpers/src/__test__/password.test.ts`
+
+## Code style (enforced by Prettier + ESLint)
+
+### Language & modules
+
+- TypeScript ESM (`"type": "module"`); keep code ESM-friendly.
+- Prefer `type` aliases over `interface` (enforced by ESLint).
+- Keep TS strictness in mind (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`).
+
+### Formatting (Prettier)
+
+Configured in package `.prettierrc` files.
+
+- 2 spaces, `semi: true`, `singleQuote: true`, `printWidth: 80`.
+- `trailingComma: "none"`.
+- `arrowParens: "avoid"`, `endOfLine: "lf"`.
+- In `packages/tank-world`, Tailwind classes are sorted via `prettier-plugin-tailwindcss`.
+
+### Imports
+
+- Imports are auto-sorted via `@ianvs/prettier-plugin-sort-imports`.
+- Import order (high level):
+  1. `react`
+  2. third-party
+  3. workspace/alias imports (e.g. `odgn-ecs/*`, `odgn-helpers/*`, `@...`)
+  4. relative (`./`, `../`)
+- Use type-only imports when possible: `import type { Foo } from '...'`.
+
+### Naming & files
+
+- Variables/functions: `camelCase`.
+- Types/enums: `PascalCase`.
+- Constants: `UPPER_SNAKE_CASE`.
+- Files:
+  - TS modules: `kebab-case` (e.g. `game-loop.ts`).
+  - React components: `PascalCase` (e.g. `SQLiteDemo.tsx`).
+
+### Functions
+
+- Prefer function expressions / arrow functions (ESLint `func-style: expression`).
+- Prefer `const`; never use `var`.
+
+### Error handling
+
+- Prefer explicit error handling over swallowing errors.
+- When you need a lightweight Result pattern, use `trycatch` from `odgn-helpers/try-catch` which returns `[data, error]`.
+- Convert `unknown` errors to `Error` before logging/returning (the helper already does this).
+
+### Linting expectations
+
+- ESLint uses `@nkzw/eslint-config` plus project rules.
+- Don’t fight the linter/formatter; run `bun run lint:fix` and `bun run format`.
+
+## Testing guidelines
+
+- Tests are colocated under `src/**/__test__` and named `*.test.ts(x)`.
+- Use `bun:test` APIs for new tests unless the package already uses another runner.
+- Keep tests deterministic; avoid relying on global/shared state.
+
+## Domain-specific notes
+
+- ECS entity queries: `queryEntity` returns snapshots by default.
+  - If you need assignment-based mutations, use `queryEntity(world, { asProxy: true, ... })` and then `world.flush()`.
+- Tank-world uses SQLite WASM; keep COOP/COEP headers in mind for SharedArrayBuffer.
+
+## Hygiene & security
+
+- Don’t commit secrets (`.env`, credentials) or generated artifacts (DB files, coverage output).
+- Keep changes focused to one package when possible in this monorepo.

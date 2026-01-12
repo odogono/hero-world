@@ -104,6 +104,7 @@ const start = async () => {
 };
 
 process.on('SIGTERM', async () => {
+  log.info('SIGTERM received');
   if (muaWorld) {
     await muaWorld.close();
   }
@@ -111,6 +112,7 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
+  log.info('SIGINT received');
   if (muaWorld) {
     await muaWorld.close();
   }

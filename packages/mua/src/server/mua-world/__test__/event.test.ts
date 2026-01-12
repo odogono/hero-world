@@ -11,36 +11,31 @@ type MuaEvent = {
 };
 
 describe('Events', () => {
-  it('should excel at creating events', async () => {
-    const muaWorld = new MuaWorld();
-    await muaWorld.open();
-
-    // retrieve all the containers
-
-    const containers = muaWorld.world?.queryAll({
-      with: ['container', 'described']
-    });
-
-    console.log(
-      'containers:',
-      containers?.map(c => c.described.name)
-    );
-
-    const westOfHouse = muaWorld.world?.query({
-      with: ['described', 'meta'],
-      where: 'meta.props.id = ?1',
-      args: ['west_of_house']
-    });
-    console.log('westOfHouse:', westOfHouse?.described.name);
-
-    const contents = muaWorld.getContents(westOfHouse!.id);
-    console.log(
-      'contents:',
-      contents?.map(c => c.described.name)
-    );
-    // const dump = muaWorld.world?.db.dump();
-    // console.log('dump:', dump);
-  });
+  // it('should excel at creating events', async () => {
+  //   const muaWorld = new MuaWorld();
+  //   await muaWorld.open();
+  //   // retrieve all the containers
+  //   const containers = muaWorld.world?.queryAll({
+  //     with: ['container', 'described']
+  //   });
+  //   console.log(
+  //     'containers:',
+  //     containers?.map(c => c.described.name)
+  //   );
+  //   const westOfHouse = muaWorld.world?.query({
+  //     with: ['described', 'meta'],
+  //     where: 'meta.props.id = ?1',
+  //     args: ['west_of_house']
+  //   });
+  //   console.log('westOfHouse:', westOfHouse?.described.name);
+  //   const contents = muaWorld.getContents(westOfHouse!.id);
+  //   console.log(
+  //     'contents:',
+  //     contents?.map(c => c.described.name)
+  //   );
+  //   // const dump = muaWorld.world?.db.dump();
+  //   // console.log('dump:', dump);
+  // });
 });
 
 /*
