@@ -1,27 +1,26 @@
 import { createSystem } from 'odgn-ecs/system';
 
-export const createOutputSystem = (connections: Map<string, any>) => {
-  return createSystem(
-    ({ world, entity }) => {
-      if (!entity.outputEvent) return;
+export const createOutputSystem = (connections: Map<string, any>) => createSystem(
+    ({ entity, world }) => {
+      if (!entity.outputEvent) {return;}
 
-      const { wsId, message, broadcast, roomId } = entity.outputEvent;
+      const { broadcast, message, roomId, wsId } = entity.outputEvent;
 
       if (broadcast && roomId) {
         // Send to all players in room
         const playersInRoom = world.queryAll({
-          with: ['player'],
+          args: [roomId],
           where: 'player.location = ?1',
-          args: [roomId]
+          with: ['player']
         });
 
-        playersInRoom.forEach((player) => {
+        playersInRoom.forEach(player => {
           if (player.player.connectedId) {
             const conn = world.get(player.player.connectedId);
             if (conn?.connected) {
               const ws = connections.get(conn.connected.wsId);
               if (ws) {
-                ws.send(JSON.stringify({ success: true, data: message }));
+                ws.send(JSON.stringify({ data: message, success: true }));
               }
             }
           }
@@ -30,7 +29,7 @@ export const createOutputSystem = (connections: Map<string, any>) => {
         // Send to specific connection
         const ws = connections.get(wsId);
         if (ws) {
-          ws.send(JSON.stringify({ success: true, data: message }));
+          ws.send(JSON.stringify({ data: message, success: true }));
         }
       }
 
@@ -43,4 +42,3 @@ export const createOutputSystem = (connections: Map<string, any>) => {
       with: ['outputEvent']
     }
   );
-};

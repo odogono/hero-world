@@ -10,24 +10,24 @@ import { createLog } from 'odgn-helpers/log';
 
 const log = createLog('cli-auth');
 
-interface DeviceCodeResponse {
+type DeviceCodeResponse = {
   device_code: string;
+  expires_in: number;
+  interval: number;
   user_code: string;
   verification_uri: string;
   verification_uri_complete: string;
-  expires_in: number;
-  interval: number;
 }
 
-interface DeviceTokenResponse {
+type DeviceTokenResponse = {
   access_token: string;
-  token_type: string;
   expires_in: number;
   refresh_token?: string;
   scope?: string;
+  token_type: string;
 }
 
-interface ErrorResponse {
+type ErrorResponse = {
   error: string;
   error_description?: string;
 }
@@ -36,10 +36,10 @@ const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
 
 async function initiateDeviceFlow(): Promise<DeviceCodeResponse> {
   const response = await fetch(`${SERVER_URL}/oauth/device`, {
-    method: 'POST',
     headers: {
       'Content-Type': 'application/json'
-    }
+    },
+    method: 'POST'
   });
 
   if (!response.ok) {
@@ -58,11 +58,11 @@ async function pollForToken(
 
   while (attempts < maxAttempts) {
     const response = await fetch(`${SERVER_URL}/oauth/token`, {
-      method: 'POST',
+      body: JSON.stringify({ device_code: deviceCode }),
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ device_code: deviceCode })
+      method: 'POST'
     });
 
     const data = await response.json();
@@ -110,11 +110,11 @@ async function simulateUserAuth(userCode: string): Promise<void> {
   // This simulates the user completing authorization in their browser
   // In a real implementation, this would be handled by Google's OAuth service
   const response = await fetch(`${SERVER_URL}/oauth/simulate-auth`, {
-    method: 'POST',
+    body: JSON.stringify({ user_code: userCode }),
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ user_code: userCode })
+    method: 'POST'
   });
 
   if (!response.ok) {

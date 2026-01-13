@@ -5,7 +5,7 @@ ws.onopen = () => {
   console.log('✓ Connected to server');
 };
 
-ws.onmessage = (event) => {
+ws.onmessage = event => {
   const data = JSON.parse(event.data as string);
   console.log('← Server:', data);
 
@@ -13,22 +13,22 @@ ws.onmessage = (event) => {
   if (data.data?.includes('username')) {
     console.log('→ Sending username: TestPlayer');
     setTimeout(() => {
-      ws.send(JSON.stringify({ type: 'cmd', payload: 'TestPlayer' }));
+      ws.send(JSON.stringify({ payload: 'TestPlayer', type: 'cmd' }));
     }, 100);
   } else if (data.data?.includes('Welcome, TestPlayer')) {
     console.log('→ Sending: look');
     setTimeout(() => {
-      ws.send(JSON.stringify({ type: 'cmd', payload: 'look' }));
+      ws.send(JSON.stringify({ payload: 'look', type: 'cmd' }));
     }, 100);
   } else if (data.data?.includes('West of house')) {
     console.log('→ Sending: north');
     setTimeout(() => {
-      ws.send(JSON.stringify({ type: 'cmd', payload: 'north' }));
+      ws.send(JSON.stringify({ payload: 'north', type: 'cmd' }));
     }, 100);
   } else if (data.data?.includes('north side')) {
     console.log('→ Sending: south');
     setTimeout(() => {
-      ws.send(JSON.stringify({ type: 'cmd', payload: 'south' }));
+      ws.send(JSON.stringify({ payload: 'south', type: 'cmd' }));
     }, 100);
   } else if (data.data?.includes('south side')) {
     console.log('✓ All tests passed!');
@@ -39,7 +39,7 @@ ws.onmessage = (event) => {
   }
 };
 
-ws.onerror = (error) => {
+ws.onerror = error => {
   console.error('✗ WebSocket error:', error);
   process.exit(1);
 };
@@ -53,4 +53,4 @@ setTimeout(() => {
   console.error('✗ Test timeout');
   ws.close();
   process.exit(1);
-}, 10000);
+}, 10_000);

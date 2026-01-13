@@ -4,7 +4,7 @@ import { createLog } from 'odgn-helpers/log';
 
 import { bearer } from '@elysiajs/bearer';
 
-export interface AuthUser {
+export type AuthUser = {
   [key: string]: unknown;
   email?: string;
   name?: string;
@@ -23,9 +23,9 @@ export const verifyToken = async (token: string): Promise<AuthUser> => {
   if (token.startsWith('mock_access_token_')) {
     // For development/testing with device flow
     return {
-      sub: 'mock_user_id',
       email: 'user@example.com',
-      name: 'Test User'
+      name: 'Test User',
+      sub: 'mock_user_id'
     };
   }
 

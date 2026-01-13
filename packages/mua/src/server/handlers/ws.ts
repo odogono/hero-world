@@ -26,38 +26,45 @@ const messageSchema = z.union([
     type: z.literal('ping')
   }),
   z.object({
-    type: z.literal('chat'),
-    payload: z.string()
+    payload: z.string(),
+    type: z.literal('chat')
   }),
   z.object({
-    type: z.literal('join'),
-    payload: z.object({ room: z.string() })
+    payload: z.object({ room: z.string() }),
+    type: z.literal('join')
   }),
   z.object({
-    type: z.literal('cmd'),
-    payload: z.any()
+    payload: z.any(),
+    type: z.literal('cmd')
   })
 ]);
 
 const responseSchema = z.object({
-  success: z.boolean(),
-  data: z.any()
+  data: z.any(),
+  success: z.boolean()
 });
 
 export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
   const getWsId = (ws: any) => ws?.raw?.id ?? ws?.id ?? 'unknown';
   return {
+    close(ws: any) {
+      const result = muaWorld.onConnectionClosed(
+        ws as unknown as MuaConnection
+      );
+
+      // log.info('WebSocket connection closed', ws.id);
+    },
     message(ws: any, message: unknown) {
       // try {
 
       // Parse incoming message with Zod
-      const { data, success, error } = messageSchema.safeParse(message);
+      const { data, error, success } = messageSchema.safeParse(message);
 
       if (!success) {
         const { issues } = error;
         const issue = issues[0];
         // log.debug('error', issues);
-        ws.send(JSON.stringify({ success: false, data: issue?.message }));
+        ws.send(JSON.stringify({ data: issue?.message, success: false }));
         return;
       }
 
@@ -66,7 +73,7 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
         case 'ping':
           ws.send(
             JSON.stringify(
-              responseSchema.parse({ success: true, data: 'pong' })
+              responseSchema.parse({ data: 'pong', success: true })
             )
           );
           break;
@@ -75,8 +82,8 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
           ws.send(
             JSON.stringify(
               responseSchema.parse({
-                success: true,
-                data: `You said: ${data.payload}`
+                data: `You said: ${data.payload}`,
+                success: true
               })
             )
           );
@@ -86,8 +93,8 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
           ws.send(
             JSON.stringify(
               responseSchema.parse({
-                success: true,
-                data: `Joined room: ${data.payload.room}`
+                data: `Joined room: ${data.payload.room}`,
+                success: true
               })
             )
           );
@@ -107,8 +114,8 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
       const result = trycatch(() => {
         ws.send(
           JSON.stringify({
-            success: true,
-            data: 'Welcome to MUA! Please enter your username:'
+            data: 'Welcome to MUA! Please enter your username:',
+            success: true
           })
         );
 
@@ -118,13 +125,6 @@ export const wsHandler = ({ muaWorld }: WsHandlerOptions) => {
       });
 
       // log.debug('[open]', result);
-    },
-    close(ws: any) {
-      const result = muaWorld.onConnectionClosed(
-        ws as unknown as MuaConnection
-      );
-
-      // log.info('WebSocket connection closed', ws.id);
     }
   };
 };

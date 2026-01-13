@@ -74,9 +74,9 @@ describe('World', () => {
     });
 
     const conn = {
+      close: () => {},
       id: 'test',
-      send: mockSend,
-      close: () => {}
+      send: mockSend
     };
 
     muaWorld.onConnectionOpened(conn);
@@ -93,11 +93,11 @@ describe('World', () => {
     expect(entities[0]?.authenticating.attempts).toBe(0);
 
     muaWorld.onConnectionCommand(conn, {
-      type: 'login',
       data: {
-        username: 'test',
-        password: 'test'
-      }
+        password: 'test',
+        username: 'test'
+      },
+      type: 'login'
     });
 
     // retrieve all the containers

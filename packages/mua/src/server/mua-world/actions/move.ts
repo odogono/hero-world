@@ -3,7 +3,7 @@ import type { ActionContext, ActionResult } from './types';
 import { lookAction } from './look';
 
 export const moveAction = (ctx: ActionContext): ActionResult => {
-  const { world, playerId, direction } = ctx;
+  const { direction, playerId, world } = ctx;
 
   if (!direction) {
     return { message: 'Which direction?' };
@@ -36,10 +36,10 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
   const lookResult = lookAction(ctx);
 
   return {
-    message: lookResult.message,
     broadcast: {
       message: `${player.player.name} arrives.`,
       roomId: exit.portal.to
-    }
+    },
+    message: lookResult.message
   };
 };

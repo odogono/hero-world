@@ -3,49 +3,49 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { createLog } from 'odgn-helpers/log';
 import * as z from 'zod';
 
-import { ORPCError, os as os2, os } from '@orpc/server';
+import { ORPCError, os } from '@orpc/server';
 
 const log = createLog('orpc-router');
 
 const PlanetSchema = z.object({
+  description: z.string().optional(),
   id: z.number().int().min(1),
-  name: z.string(),
-  description: z.string().optional()
+  name: z.string()
 });
 type Planet = z.infer<typeof PlanetSchema>;
 
 const planets: Planet[] = [
   {
+    description: 'The first planet in our solar system',
     id: 1,
-    name: 'Mercury',
-    description: 'The first planet in our solar system'
+    name: 'Mercury'
   },
   {
+    description: 'The second planet in our solar system',
     id: 2,
-    name: 'Venus',
-    description: 'The second planet in our solar system'
+    name: 'Venus'
   },
-  { id: 3, name: 'Earth', description: 'The third planet in our solar system' },
-  { id: 4, name: 'Mars', description: 'The fourth planet in our solar system' },
+  { description: 'The third planet in our solar system', id: 3, name: 'Earth' },
+  { description: 'The fourth planet in our solar system', id: 4, name: 'Mars' },
   {
+    description: 'The fifth planet in our solar system',
     id: 5,
-    name: 'Jupiter',
-    description: 'The fifth planet in our solar system'
+    name: 'Jupiter'
   },
   {
+    description: 'The sixth planet in our solar system',
     id: 6,
-    name: 'Saturn',
-    description: 'The sixth planet in our solar system'
+    name: 'Saturn'
   },
   {
+    description: 'The seventh planet in our solar system',
     id: 7,
-    name: 'Uranus',
-    description: 'The seventh planet in our solar system'
+    name: 'Uranus'
   },
   {
+    description: 'The eighth planet in our solar system',
     id: 8,
-    name: 'Neptune',
-    description: 'The eighth planet in our solar system'
+    name: 'Neptune'
   }
 ];
 
@@ -53,8 +53,8 @@ export const listPlanet = os
   .route({ method: 'GET', path: '/planets' })
   .input(
     z.object({
-      limit: z.coerce.number().int().min(1).max(planets.length).optional(),
-      cursor: z.coerce.number().int().min(0).max(planets.length).default(0)
+      cursor: z.coerce.number().int().min(0).max(planets.length).default(0),
+      limit: z.coerce.number().int().min(1).max(planets.length).optional()
     })
   )
   .output(z.array(PlanetSchema))
@@ -72,10 +72,10 @@ export const findPlanet = os
   .route({ method: 'GET', path: '/planets/{id}' })
   .input(z.object({ id: z.coerce.number().int().min(1) }))
   .output(PlanetSchema)
-  .handler(async ({ input }) => {
+  .handler(async ({ input }) => 
     // your find code here
-    return planets.find(planet => planet.id === input.id);
-  });
+     planets.find(planet => planet.id === input.id)
+  );
 
 export const createPlanet = os
   .$context<{ headers: IncomingHttpHeaders }>()
@@ -91,15 +91,15 @@ export const createPlanet = os
   .route({ method: 'POST', path: '/planets' })
   .input(PlanetSchema.omit({ id: true }))
   .output(PlanetSchema)
-  .handler(async ({ input, context }) => {
+  .handler(async ({ context, input }) => 
     // your create code here
-    return { id: 1, name: 'Mercury' };
-  });
+     ({ id: 1, name: 'Mercury' })
+  );
 
 export const router = {
   planet: {
-    list: listPlanet,
+    create: createPlanet,
     find: findPlanet,
-    create: createPlanet
+    list: listPlanet
   }
 };

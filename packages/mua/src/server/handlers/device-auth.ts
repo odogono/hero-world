@@ -1,56 +1,53 @@
 import { createLog } from 'odgn-helpers/log';
-import { tryCatch } from 'odgn-helpers/trycatch';
 
 const log = createLog('device-auth');
 
-export interface DeviceCodeResponse {
+export type DeviceCodeResponse = {
   device_code: string;
+  expires_in: number;
+  interval: number;
   user_code: string;
   verification_uri: string;
   verification_uri_complete: string;
-  expires_in: number;
-  interval: number;
 }
 
-export interface DeviceTokenResponse {
+export type DeviceTokenResponse = {
   access_token: string;
-  token_type: string;
   expires_in: number;
   refresh_token?: string;
   scope?: string;
+  token_type: string;
 }
 
-export interface DeviceAuthState {
+export type DeviceAuthState = {
+  access_token?: string;
   device_code: string;
-  user_code: string;
   expires_at: number;
   interval: number;
-  status: 'pending' | 'authorized' | 'expired' | 'denied';
-  access_token?: string;
   refresh_token?: string;
+  status: 'pending' | 'authorized' | 'expired' | 'denied';
   user?: {
-    sub: string;
     email?: string;
     name?: string;
+    sub: string;
   };
+  user_code: string;
 }
 
 // In-memory storage for device codes (in production, use Redis or database)
 const deviceAuthStates = new Map<string, DeviceAuthState>();
 
-export const generateDeviceCode = (): string => {
-  return (
-    Math.random().toString(36).substring(2, 15) +
-    Math.random().toString(36).substring(2, 15)
+export const generateDeviceCode = (): string => (
+    Math.random().toString(36).slice(2, 15) +
+    Math.random().toString(36).slice(2, 15)
   );
-};
 
 export const generateUserCode = (): string => {
   // Generate a user-friendly code (e.g., ABCD-EFGH)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
-    if (i === 4) result += '-';
+    if (i === 4) {result += '-';}
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
@@ -64,10 +61,10 @@ export const initiateDeviceFlow = async (): Promise<DeviceCodeResponse> => {
 
   const state: DeviceAuthState = {
     device_code: deviceCode,
-    user_code: userCode,
     expires_at: Date.now() + expiresIn * 1000,
     interval,
-    status: 'pending'
+    status: 'pending',
+    user_code: userCode
   };
 
   deviceAuthStates.set(deviceCode, state);
@@ -76,11 +73,11 @@ export const initiateDeviceFlow = async (): Promise<DeviceCodeResponse> => {
 
   return {
     device_code: deviceCode,
+    expires_in: expiresIn,
+    interval,
     user_code: userCode,
     verification_uri: 'https://accounts.google.com/device',
-    verification_uri_complete: `https://accounts.google.com/device?user_code=${userCode}`,
-    expires_in: expiresIn,
-    interval
+    verification_uri_complete: `https://accounts.google.com/device?user_code=${userCode}`
   };
 };
 
@@ -104,10 +101,10 @@ export const pollDeviceAuth = async (
   if (state.status === 'authorized' && state.access_token) {
     return {
       access_token: state.access_token,
-      token_type: 'Bearer',
       expires_in: 3600, // 1 hour
       refresh_token: state.refresh_token,
-      scope: 'openid email profile'
+      scope: 'openid email profile',
+      token_type: 'Bearer'
     };
   }
 
@@ -143,14 +140,14 @@ export const simulateUserAuthorization = async (
   state.access_token = mockAccessToken;
   state.refresh_token = mockRefreshToken;
   state.user = {
-    sub: `google_user_${Date.now()}`,
     email: 'user@example.com',
-    name: 'Test User'
+    name: 'Test User',
+    sub: `google_user_${Date.now()}`
   };
 
   log.info('User authorization completed', {
-    userCode,
-    deviceCode: state.device_code
+    deviceCode: state.device_code,
+    userCode
   });
 };
 
@@ -163,4 +160,4 @@ setInterval(() => {
       log.info('Device code expired', { deviceCode });
     }
   }
-}, 60000); // Check every minute
+}, 60_000); // Check every minute

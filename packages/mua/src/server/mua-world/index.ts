@@ -1,8 +1,8 @@
-import { createGameLoop, defineComponent, s } from 'odgn-ecs/component';
+import { createGameLoop } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
-import { EDLParseError, serializeEntity } from 'odgn-ecs/edl';
-import { createSystem, type GameLoop } from 'odgn-ecs/system';
-import type { CDefWithSchema, EntityId } from 'odgn-ecs/types';
+import { EDLParseError } from 'odgn-ecs/edl';
+import { type GameLoop } from 'odgn-ecs/system';
+import type { EntityId } from 'odgn-ecs/types';
 import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
@@ -45,12 +45,12 @@ export class MuaWorld {
       // console.log(dump);
       try {
         this.world.executeEDL(mainEDL);
-      } catch (err: any) {
-        if (err instanceof EDLParseError) {
-          const msg = `${err.message}\nFile: ${mainPath}`;
+      } catch (error: any) {
+        if (error instanceof EDLParseError) {
+          const msg = `${error.message}\nFile: ${mainPath}`;
           throw new EDLParseError(msg, { file: mainPath });
         }
-        throw err;
+        throw error;
       }
       log.info(`Loaded main EDL from ${mainPath}`);
     }
@@ -96,9 +96,9 @@ export class MuaWorld {
 
   getContents(containedIn: EntityId) {
     return this.world?.queryAll({
-      with: ['contained', 'described'],
+      args: [containedIn],
       where: 'contained.in = ?1',
-      args: [containedIn]
+      with: ['contained', 'described']
     });
   }
 
@@ -109,11 +109,11 @@ export class MuaWorld {
     try {
       log.debug('handleLogin start', username);
       const connectionEntity = this.world?.query({
-        with: ['connected'],
+        args: [conn.id],
+        asProxy: true,
         maybe: ['authenticating', 'authenticated'],
         where: 'connected.ws_id = ?1',
-        args: [conn.id],
-        asProxy: true
+        with: ['connected']
       });
 
       if (!connectionEntity) {
@@ -133,14 +133,14 @@ export class MuaWorld {
         log.debug('Start room found?', !!startRoom, startRoom?.id);
 
         player = this.world?.create({
-          player: {
-            name: username,
-            connectedId: connectionEntity.id,
-            location: startRoom?.id
-          },
           container: {
             capacity: 10,
             isClosed: false
+          },
+          player: {
+            connectedId: connectionEntity.id,
+            location: startRoom?.id,
+            name: username
           }
         });
         log.debug('Player created', player?.id);
@@ -163,8 +163,8 @@ export class MuaWorld {
       const message = `Welcome, ${username}! Type 'look' to begin.`;
       conn.send(
         JSON.stringify({
-          success: true,
-          data: message
+          data: message,
+          success: true
         })
       );
       log.debug('Welcome message sent', message);
@@ -180,11 +180,11 @@ export class MuaWorld {
     log.debug('onConnectionCommand', conn.id, command);
 
     const connectionEntity = this.world?.query({
-      with: ['connected'],
+      args: [conn.id],
+      asProxy: true,
       maybe: ['authenticating', 'authenticated'],
       where: 'connected.ws_id = ?1',
-      args: [conn.id],
-      asProxy: true
+      with: ['connected']
     });
 
     if (!connectionEntity) {
@@ -203,10 +203,13 @@ export class MuaWorld {
 
     // Handle login if authenticating
     if (connectionEntity.authenticating && !connectionEntity.authenticated) {
-      const username = typeof command === 'string' ? command : command.username;
+      const username =
+        typeof command === 'string'
+          ? command
+          : command.data?.username || command.username;
       log.debug('About to call handleLogin', username);
       // Fire and forget - don't await to keep the method synchronous
-      this.handleLogin(conn, username).catch((error) => {
+      this.handleLogin(conn, username).catch(error => {
         log.error('handleLogin error', error);
       });
       return true;
@@ -219,9 +222,9 @@ export class MuaWorld {
       // Create input event
       this.world?.create({
         inputEvent: {
-          wsId: conn.id,
           text,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          wsId: conn.id
         }
       });
 
@@ -239,8 +242,8 @@ export class MuaWorld {
 
     // create an entity with the connection component
     this.world?.create({
-      connected: { wsId: conn.id },
-      authenticating: { attempts: 0 }
+      authenticating: { attempts: 0 },
+      connected: { wsId: conn.id }
     });
 
     // the server now expects an authentication message
@@ -257,13 +260,13 @@ export class MuaWorld {
 
     // Unlink player from connection
     const player = this.world?.query({
-      with: ['player'],
+      args: [conn.id],
       where: `player.connected_id IN (
         SELECT id FROM entity WHERE id IN (
           SELECT id FROM connected WHERE connected.ws_id = ?1
         )
       )`,
-      args: [conn.id]
+      with: ['player']
     });
 
     if (player) {
@@ -276,7 +279,7 @@ export class MuaWorld {
 }
 
 export type MuaConnection = {
+  close: () => void;
   id: string;
   send: (data: string | BufferSource, compress?: boolean) => number;
-  close: () => void;
 };

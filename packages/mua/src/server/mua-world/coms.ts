@@ -3,8 +3,8 @@ import { defineComponent, s } from 'odgn-ecs/component';
 const connectedDef = defineComponent({
   id: 'connected',
   schema: {
-    wsId: s.string(),
-    connectedAt: s.datetime()
+    connectedAt: s.datetime(),
+    wsId: s.string()
   }
 });
 
@@ -40,8 +40,8 @@ const containedDef = defineComponent({
 const itemDef = defineComponent({
   id: 'item',
   schema: {
-    weight: s.number().optional().default(1),
-    isTakeable: s.boolean().default(true)
+    isTakeable: s.boolean().default(true),
+    weight: s.number().optional().default(1)
   }
 });
 
@@ -55,57 +55,57 @@ const metaDef = defineComponent({
 const portalDef = defineComponent({
   id: 'portal',
   schema: {
-    to: s.entityId().optional(),
     dir: s.string(),
-    msg: s.string().optional()
+    msg: s.string().optional(),
+    to: s.entityId().optional()
   }
 });
 
 const describedDef = defineComponent({
   id: 'described',
   schema: {
-    name: s.string(),
-    description: s.string()
+    description: s.string(),
+    name: s.string()
   }
 });
 
 const playerDef = defineComponent({
   id: 'player',
   schema: {
-    name: s.string(),
     connectedId: s.entityId().optional(),
+    lastCommandAt: s.datetime().optional(),
     location: s.entityId().optional(),
-    lastCommandAt: s.datetime().optional()
+    name: s.string()
   }
 });
 
 const inputEventDef = defineComponent({
   id: 'inputEvent',
   schema: {
-    wsId: s.string(),
     text: s.string(),
-    timestamp: s.datetime()
+    timestamp: s.datetime(),
+    wsId: s.string()
   }
 });
 
 const commandEventDef = defineComponent({
   id: 'commandEvent',
   schema: {
-    playerId: s.entityId(),
-    verb: s.string(),
-    target: s.string().optional(),
     direction: s.string().optional(),
-    rawInput: s.string()
+    playerId: s.entityId(),
+    rawInput: s.string(),
+    target: s.string().optional(),
+    verb: s.string()
   }
 });
 
 const outputEventDef = defineComponent({
   id: 'outputEvent',
   schema: {
-    wsId: s.string(),
-    message: s.string(),
     broadcast: s.boolean().default(false),
-    roomId: s.entityId().optional()
+    message: s.string(),
+    roomId: s.entityId().optional(),
+    wsId: s.string()
   }
 });
 

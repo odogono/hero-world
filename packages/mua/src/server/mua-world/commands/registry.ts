@@ -1,25 +1,25 @@
 export const verbAliases: Record<string, string> = {
-  look: 'look',
-  l: 'look',
+  e: 'move',
+  east: 'move',
   examine: 'look',
-  x: 'look',
-  move: 'move',
   go: 'move',
-  walk: 'move',
+  l: 'look',
+  look: 'look',
+  move: 'move',
   n: 'move',
   north: 'move',
   s: 'move',
   south: 'move',
-  e: 'move',
-  east: 'move',
   w: 'move',
-  west: 'move'
+  walk: 'move',
+  west: 'move',
+  x: 'look'
 };
 
 export const directions = ['north', 'south', 'east', 'west'];
 export const directionAliases: Record<string, string> = {
+  e: 'east',
   n: 'north',
   s: 'south',
-  e: 'east',
   w: 'west'
 };

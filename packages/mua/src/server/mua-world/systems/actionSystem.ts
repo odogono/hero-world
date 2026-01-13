@@ -2,18 +2,18 @@ import { createSystem } from 'odgn-ecs/system';
 import { executeAction } from '../actions';
 
 export const actionSystem = createSystem(
-  ({ world, entity }) => {
-    if (!entity.commandEvent) return;
+  ({ entity, world }) => {
+    if (!entity.commandEvent) {return;}
 
-    const { playerId, verb, target, direction } = entity.commandEvent;
+    const { direction, playerId, target, verb } = entity.commandEvent;
 
     // Execute action
     const result = executeAction({
-      world,
+      direction,
       playerId,
-      verb,
       target,
-      direction
+      verb,
+      world
     });
 
     // Get player's connection
@@ -32,9 +32,9 @@ export const actionSystem = createSystem(
     // Create output event for player
     world.create({
       outputEvent: {
-        wsId: connection.connected.wsId,
+        broadcast: false,
         message: result.message,
-        broadcast: false
+        wsId: connection.connected.wsId
       }
     });
 
@@ -42,10 +42,10 @@ export const actionSystem = createSystem(
     if (result.broadcast) {
       world.create({
         outputEvent: {
-          wsId: '', // Will be resolved by output system
-          message: result.broadcast.message,
           broadcast: true,
-          roomId: result.broadcast.roomId
+          message: result.broadcast.message,
+          roomId: result.broadcast.roomId,
+          wsId: '' // Will be resolved by output system
         }
       });
     }

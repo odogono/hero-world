@@ -1,10 +1,10 @@
 import { verbAliases, directionAliases, directions } from './registry';
-import type { CommandParseResult, ParsedCommand } from './types';
+import type { CommandParseResult } from './types';
 
 export const parseCommand = (input: string): CommandParseResult => {
   const trimmed = input.trim().toLowerCase();
   if (!trimmed) {
-    return { success: false, error: 'Please enter a command.' };
+    return { error: 'Please enter a command.', success: false };
   }
 
   const tokens = trimmed.split(/\s+/);
@@ -15,8 +15,8 @@ export const parseCommand = (input: string): CommandParseResult => {
   if (directions.includes(firstToken) || directionAliases[firstToken]) {
     const direction = directionAliases[firstToken] ?? firstToken;
     return {
-      success: true,
-      command: { verb: 'move', direction, rawInput: input }
+      command: { direction, rawInput: input, verb: 'move' },
+      success: true
     };
   }
 
@@ -26,22 +26,22 @@ export const parseCommand = (input: string): CommandParseResult => {
     case 'move': {
       const direction = directionAliases[restTokens[0]!] ?? restTokens[0];
       if (!direction || !directions.includes(direction)) {
-        return { success: false, error: 'Where do you want to go?' };
+        return { error: 'Where do you want to go?', success: false };
       }
-      return { success: true, command: { verb, direction, rawInput: input } };
+      return { command: { direction, rawInput: input, verb }, success: true };
     }
 
     case 'look':
       return {
-        success: true,
         command: {
-          verb,
+          rawInput: input,
           target: restTokens.join(' ') || undefined,
-          rawInput: input
-        }
+          verb
+        },
+        success: true
       };
 
     default:
-      return { success: false, error: `Unknown command: "${firstToken}"` };
+      return { error: `Unknown command: "${firstToken}"`, success: false };
   }
 };

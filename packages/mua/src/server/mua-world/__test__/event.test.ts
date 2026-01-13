@@ -1,13 +1,12 @@
-import { describe, expect, it, test } from 'bun:test';
+import { describe } from 'bun:test';
 import type { EntityId } from 'odgn-ecs/types';
 
-import { MuaWorld } from '../index';
 
 type MuaEvent = {
   actor: EntityId;
-  verb: string;
-  target: EntityId;
   args: any[];
+  target: EntityId;
+  verb: string;
 };
 
 describe('Events', () => {

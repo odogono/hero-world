@@ -3,10 +3,10 @@ import { parseCommand } from '../commands/parser';
 import { findPlayerByConnection } from '../queries/player';
 
 export const parseSystem = createSystem(
-  ({ world, entity }) => {
-    if (!entity.inputEvent) return;
+  ({ entity, world }) => {
+    if (!entity.inputEvent) {return;}
 
-    const { wsId, text } = entity.inputEvent;
+    const { text, wsId } = entity.inputEvent;
 
     // Find player for this connection
     const player = findPlayerByConnection(world, wsId);
@@ -15,9 +15,9 @@ export const parseSystem = createSystem(
       // Create output event with error
       world.create({
         outputEvent: {
-          wsId,
+          broadcast: false,
           message: 'Player not found. Please login.',
-          broadcast: false
+          wsId
         }
       });
       world.remove(entity.id);
@@ -31,9 +31,9 @@ export const parseSystem = createSystem(
       // Create output event with parse error
       world.create({
         outputEvent: {
-          wsId,
+          broadcast: false,
           message: parseResult.error,
-          broadcast: false
+          wsId
         }
       });
       world.remove(entity.id);
@@ -41,14 +41,14 @@ export const parseSystem = createSystem(
     }
 
     // Create command event
-    const { verb, target, direction, rawInput } = parseResult.command;
+    const { direction, rawInput, target, verb } = parseResult.command;
     world.create({
       commandEvent: {
-        playerId: player.id,
-        verb,
-        target,
         direction,
-        rawInput
+        playerId: player.id,
+        rawInput,
+        target,
+        verb
       }
     });
 

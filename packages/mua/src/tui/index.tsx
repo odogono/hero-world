@@ -2,96 +2,188 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createLog } from 'odgn-helpers/log';
 
-import { blue, bold, fg, red, t } from '@opentui/core';
-import { render, useKeyboard, useRenderer } from '@opentui/react';
+import { createRoot, useKeyboard, useRenderer } from '@opentui/react';
+import { createCliRenderer } from '@opentui/core';
 
+import { CommandInput } from './components/CommandInput';
+import { DebugPanel } from './components/DebugPanel';
+import { GameOutput } from './components/GameOutput';
+import { StatusBar } from './components/StatusBar';
+import { useCommandHistory } from './hooks/use-command-history';
+import { useDebugMode } from './hooks/use-debug-mode';
+import { useGameState } from './hooks/use-game-state';
 import { useWebSocket } from './hooks/use-websocket';
+import { completeVerb, KNOWN_VERBS } from './utils/verb-completer';
 
 const log = createLog('tui');
 
 export const App = () => {
   const renderer = useRenderer();
   const [value, setValue] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<
+    'connected' | 'disconnected' | 'connecting'
+  >('connecting');
+  const [debugPanelVisible, setDebugPanelVisible] = useState(false);
 
-  const { connect, disconnect, send } = useWebSocket();
+  // Initialize hooks
+  const gameState = useGameState();
+  const commandHistory = useCommandHistory();
+  const debugMode = useDebugMode();
+
+  const { connect, disconnect, send } = useWebSocket(
+    data => {
+      // Handle incoming messages from server
+      if (data && data.data) {
+        gameState.addMessage(data.data, data.success ? 'game' : 'error');
+      }
+    },
+    status => {
+      // Handle connection status changes
+      setConnectionStatus(status);
+    }
+  );
 
   const onSubmit = useCallback(
     (value: string) => {
-      send({ message: value });
+      const trimmed = value.trim();
+      if (!trimmed) {return;}
+
+      // CRITICAL FIX: Send correct message format for server
+      send({ payload: trimmed, type: 'cmd' });
+
+      // Add to command history
+      commandHistory.addCommand(trimmed);
+
+      // Clear input
       setValue('');
     },
-    [send]
+    [send, commandHistory]
+  );
+
+  const handleHistoryPrevious = useCallback(() => {
+    const prev = commandHistory.getPrevious();
+    if (prev !== null) {
+      setValue(prev);
+    }
+  }, [commandHistory]);
+
+  const handleHistoryNext = useCallback(() => {
+    const next = commandHistory.getNext();
+    if (next !== null) {
+      setValue(next);
+    } else {
+      setValue(''); // Clear input when reaching end of history
+    }
+  }, [commandHistory]);
+
+  const handleTabComplete = useCallback(() => {
+    const completed = completeVerb(value, KNOWN_VERBS);
+    if (completed) {
+      setValue(completed);
+    }
+  }, [value]);
+
+  const handleValueChange = useCallback(
+    (newValue: string) => {
+      setValue(newValue);
+      // Reset history index when user types
+      if (newValue !== value) {
+        commandHistory.reset();
+      }
+    },
+    [commandHistory, value]
   );
 
   useKeyboard(key => {
+    // Exit on ESC
     if (key.name === 'escape') {
       process.exit(0);
     }
+
+    // Toggle console with Ctrl+K
     if (key.ctrl && key.name === 'k') {
       renderer?.toggleDebugOverlay();
       renderer?.console.toggle();
     }
+
+    // Debug panel shortcuts
+    if (key.ctrl && key.name === 'd') {
+      setDebugPanelVisible(prev => !prev);
+    }
+    if (key.ctrl && key.name === 'r') {
+      if (debugMode.isRecording) {
+        debugMode.stopRecording();
+      } else {
+        debugMode.startRecording();
+      }
+    }
+    if (key.ctrl && key.name === 'p') {
+      debugMode.replay((cmd: string) => {
+        send({ payload: cmd, type: 'cmd' });
+      });
+    }
+    if (key.ctrl && key.name === 'c') {
+      // Don't clear if it's the default Ctrl+C (exit)
+      if (!key.meta && !key.shift) {
+        debugMode.clear();
+      }
+    }
+
+    // Command history navigation
+    if (key.name === 'up') {
+      handleHistoryPrevious();
+    }
+    if (key.name === 'down') {
+      handleHistoryNext();
+    }
+
+    // Tab completion
+    if (key.name === 'tab') {
+      handleTabComplete();
+    }
   });
 
   useEffect(() => {
-    connect('ws://localhost:3000/ws');
+    connect('ws://localhost:3974/ws');
+
     return () => {
       disconnect();
     };
   }, [connect, disconnect]);
 
   return (
-    <box flexDirection="column">
-      <scrollbox
-        height={10}
-        style={{
-          rootOptions: {
-            backgroundColor: '#24283b'
-          },
-          wrapperOptions: {
-            backgroundColor: '#1f2335'
-          },
-          viewportOptions: {
-            backgroundColor: '#1a1b26'
-          },
-          contentOptions: {
-            backgroundColor: '#16161e'
-          },
-          scrollbarOptions: {
-            showArrows: true,
-            trackOptions: {
-              foregroundColor: '#7aa2f7',
-              backgroundColor: '#414868'
-            }
-          }
+    <box flexDirection="column" style={{ height: '100%' }}>
+      <GameOutput currentRoom={gameState.currentRoom} messages={gameState.messages} />
+      <StatusBar
+        connectionStatus={connectionStatus}
+        health={gameState.playerState.health}
+        level={gameState.playerState.level}
+        location={gameState.playerState.location}
+      />
+      <CommandInput
+        onHistoryNext={handleHistoryNext}
+        onHistoryPrevious={handleHistoryPrevious}
+        onSubmit={onSubmit}
+        onTabComplete={handleTabComplete}
+        onValueChange={handleValueChange}
+        value={value}
+      />
+      <DebugPanel
+        debugState={debugMode}
+        onClear={debugMode.clear}
+        onRecord={debugMode.startRecording}
+        onReplay={() => {
+          debugMode.replay((cmd: string) => {
+            send({ payload: cmd, type: 'cmd' });
+          });
         }}
-        focused
-      >
-        {Array.from({ length: 10 }).map((_, i) => (
-          <box
-            key={i}
-            style={{
-              width: '100%',
-              padding: 1,
-              marginBottom: 1,
-              backgroundColor: i % 2 === 0 ? '#292e42' : '#2f3449'
-            }}
-          >
-            <text content={`Box ${i}`} />
-          </box>
-        ))}
-      </scrollbox>
-      <box style={{ border: true, height: 3 }}>
-        <input
-          placeholder="Type here..."
-          focused
-          onInput={setValue}
-          onSubmit={onSubmit}
-          value={value}
-        />
-      </box>
+        onStop={debugMode.stopRecording}
+        visible={debugPanelVisible}
+      />
     </box>
   );
 };
 
-render(<App />);
+const renderer = await createCliRenderer();
+const root = createRoot(renderer);
+root.render(<App />);

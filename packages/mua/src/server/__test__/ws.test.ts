@@ -5,15 +5,15 @@ import { MuaWorld } from '../mua-world';
 
 type FakeWS = {
   id: string;
-  sent: any[];
   send: (data: any) => void;
+  sent: any[];
 };
 
 const createFakeWS = (id = 'ws-1'): FakeWS => {
   const ws: FakeWS = {
     id,
-    sent: [],
-    send: data => ws.sent.push(data)
+    send: data => ws.sent.push(data),
+    sent: []
   };
   return ws;
 };
@@ -57,7 +57,10 @@ describe('WebSocket Handler', () => {
     handler.open?.(ws);
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({ message: 'Connected to echo server' });
+    expect(JSON.parse(ws.sent[0])).toEqual({
+      data: 'Welcome to MUA! Please enter your username:',
+      success: true
+    });
     expect(openedCalls.length).toBe(1);
     expect(openedCalls[0].id).toBe(ws.id);
   });
@@ -70,7 +73,7 @@ describe('WebSocket Handler', () => {
     handler.message?.(ws as any, { type: 'ping' });
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({ success: true, data: 'pong' });
+    expect(JSON.parse(ws.sent[0])).toEqual({ data: 'pong', success: true });
   });
 
   it('handles chat echo', () => {
@@ -78,12 +81,12 @@ describe('WebSocket Handler', () => {
     const ws = createFakeWS();
 
     // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { type: 'chat', payload: 'hello' });
+    handler.message?.(ws as any, { payload: 'hello', type: 'chat' });
 
     expect(ws.sent.length).toBe(1);
     expect(JSON.parse(ws.sent[0])).toEqual({
-      success: true,
-      data: 'You said: hello'
+      data: 'You said: hello',
+      success: true
     });
   });
 
@@ -92,12 +95,12 @@ describe('WebSocket Handler', () => {
     const ws = createFakeWS();
 
     // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { type: 'join', payload: { room: 'lobby' } });
+    handler.message?.(ws as any, { payload: { room: 'lobby' }, type: 'join' });
 
     expect(ws.sent.length).toBe(1);
     expect(JSON.parse(ws.sent[0])).toEqual({
-      success: true,
-      data: 'Joined room: lobby'
+      data: 'Joined room: lobby',
+      success: true
     });
   });
 
@@ -107,7 +110,7 @@ describe('WebSocket Handler', () => {
 
     const payload = { action: 'look', args: [] };
     // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { type: 'cmd', payload });
+    handler.message?.(ws as any, { payload, type: 'cmd' });
 
     expect(commandCalls.length).toBe(1);
     expect(commandCalls[0].conn.id).toBe(ws.id);

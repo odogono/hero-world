@@ -1,10 +1,10 @@
 export type ParsedCommand = {
-  verb: string;
-  target?: string;
   direction?: string;
   rawInput: string;
+  target?: string;
+  verb: string;
 };
 
 export type CommandParseResult =
-  | { success: true; command: ParsedCommand }
-  | { success: false; error: string };
+  | { command: ParsedCommand; success: true; }
+  | { error: string; success: false; };

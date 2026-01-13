@@ -1,4 +1,3 @@
-import { Elysia } from 'elysia';
 import { createLog } from 'odgn-helpers/log';
 
 import {
@@ -26,14 +25,10 @@ export const oauthHandler = (app: any) =>
         const { device_code } = body as { device_code: string };
         const response = await pollDeviceAuth(device_code);
 
-        if (response) {
-          return response;
-        } else {
-          return {
+        return response ? response : {
             error: 'authorization_pending',
             error_description: 'The authorization request is still pending'
           };
-        }
       } catch (error) {
         log.error('Failed to poll device auth:', error);
         return {

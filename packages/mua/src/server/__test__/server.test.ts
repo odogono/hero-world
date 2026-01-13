@@ -6,8 +6,7 @@ import {
   generateUserCode,
   initiateDeviceFlow,
   pollDeviceAuth,
-  simulateUserAuthorization,
-  type DeviceAuthState
+  simulateUserAuthorization
 } from '../handlers/device-auth';
 import { router as orpcRouter } from '../orpc/router';
 
@@ -36,8 +35,8 @@ describe.skip('ORPC Router', () => {
 
 describe('Client Handlers', () => {
   const mockUser = {
-    id: 'user123',
     email: 'test@example.com',
+    id: 'user123',
     name: 'Test User',
     sub: 'user123'
   };
@@ -108,7 +107,7 @@ describe('Device Authentication', () => {
       const code = generateUserCode();
 
       expect(code).toBeString();
-      expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+      expect(code).toMatch(/^[\dA-Z]{4}-[\dA-Z]{4}$/);
     });
 
     it('should generate unique user codes', () => {
@@ -131,7 +130,7 @@ describe('Device Authentication', () => {
       expect(response).toHaveProperty('interval');
 
       expect(response.device_code).toBeString();
-      expect(response.user_code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+      expect(response.user_code).toMatch(/^[\dA-Z]{4}-[\dA-Z]{4}$/);
       expect(response.verification_uri).toBe(
         'https://accounts.google.com/device'
       );

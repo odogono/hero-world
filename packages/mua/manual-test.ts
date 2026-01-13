@@ -14,7 +14,7 @@ ws.onopen = () => {
   console.log('[Client] Connected\n');
 };
 
-ws.onmessage = (event) => {
+ws.onmessage = event => {
   console.log('[Server] ←', event.data, '\n');
 
   // Send next command after a delay
@@ -23,14 +23,14 @@ ws.onmessage = (event) => {
     step++;
     setTimeout(() => {
       console.log('[Client] → Sending:', cmd);
-      ws.send(JSON.stringify({ type: 'cmd', payload: cmd }));
+      ws.send(JSON.stringify({ payload: cmd, type: 'cmd' }));
     }, 2000); // Wait 2 seconds between commands to allow game loop to process
   } else {
     console.log('[Client] All commands sent, waiting for responses...');
   }
 };
 
-ws.onerror = (error) => {
+ws.onerror = error => {
   console.error('[Client] Error:', error);
 };
 
@@ -43,4 +43,4 @@ setTimeout(() => {
   console.log('[Client] Test complete, closing connection');
   ws.close();
   process.exit(0);
-}, 30000);
+}, 30_000);

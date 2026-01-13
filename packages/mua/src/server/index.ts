@@ -19,7 +19,7 @@ const SERVER_PORT = safeParseInt(process.env.HUB_API_PORT, 3974);
 
 const log = createLog('server');
 
-interface CreateServerProps {
+type CreateServerProps = {
   enableLogging?: boolean;
 }
 

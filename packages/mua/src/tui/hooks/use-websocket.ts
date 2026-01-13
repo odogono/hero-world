@@ -4,23 +4,43 @@ import { createLog } from 'odgn-helpers/log';
 
 const log = createLog('useWebSocket');
 
-export const useWebSocket = () => {
+export const useWebSocket = (
+  onMessageCallback?: (data: any) => void,
+  onStatusChange?: (status: 'connected' | 'disconnected' | 'connecting') => void
+) => {
   const ws = useRef<WebSocket | null>(null);
+  const onMessageCallbackRef = useRef(onMessageCallback);
+  const onStatusChangeRef = useRef(onStatusChange);
+
+  // Update callback refs when they change
+  useEffect(() => {
+    onMessageCallbackRef.current = onMessageCallback;
+    onStatusChangeRef.current = onStatusChange;
+  }, [onMessageCallback, onStatusChange]);
 
   const onOpen = useCallback(() => {
     log.info('WebSocket connected');
+    onStatusChangeRef.current?.('connected');
   }, []);
 
   const onClose = useCallback(() => {
     log.info('WebSocket closed');
+    onStatusChangeRef.current?.('disconnected');
   }, []);
 
   const onError = useCallback((event: Event) => {
     log.error('WebSocket error', event);
+    onStatusChangeRef.current?.('disconnected');
   }, []);
 
   const onMessage = useCallback((event: MessageEvent) => {
-    log.info('[onMessage]', event.type, JSON.parse(event.data));
+    const parsed = JSON.parse(event.data);
+    log.info('[onMessage]', event.type, parsed);
+
+    // Call the callback if provided
+    if (onMessageCallbackRef.current) {
+      onMessageCallbackRef.current(parsed);
+    }
   }, []);
 
   const connect = useCallback((url: string) => {
@@ -31,7 +51,7 @@ export const useWebSocket = () => {
       ws.current.addEventListener('message', onMessage);
       ws.current.addEventListener('error', onError);
     }
-  }, []);
+  }, [onOpen, onClose, onMessage, onError]);
 
   const disconnect = useCallback(() => {
     if (ws.current) {
@@ -42,7 +62,7 @@ export const useWebSocket = () => {
       ws.current.removeEventListener('error', onError);
       ws.current = null;
     }
-  }, []);
+  }, [onOpen, onClose, onMessage, onError]);
 
   const send = useCallback((data: unknown) => {
     if (ws.current) {
