@@ -496,6 +496,8 @@ export const createEcsTalk = <TComponents extends Components>(
     pump,
     request,
     script: (atom: string) => scripts.get(atom),
+    /** Atoms and entities whose EDL declares a `script`, with source paths */
+    scriptOwners: () => world.getScriptOwners(),
     system,
     worldCapability
   };
