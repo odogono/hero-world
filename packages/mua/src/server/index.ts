@@ -21,7 +21,7 @@ const log = createLog('server');
 
 type CreateServerProps = {
   enableLogging?: boolean;
-}
+};
 
 let muaWorld: MuaWorld | null = null;
 

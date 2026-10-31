@@ -78,15 +78,15 @@ describe('Component Definition', () => {
     const def = defineComponent({
       id: 'test',
       schema: {
-        in: s.entityId(),
-        select: s.string(),
         from: s.string(),
-        where: s.string(),
         groupBy: s.string(),
         having: s.string(),
-        orderBy: s.string(),
+        in: s.entityId(),
         limit: s.string(),
-        offset: s.string()
+        offset: s.string(),
+        orderBy: s.string(),
+        select: s.string(),
+        where: s.string()
       }
     });
     expect(createWorld([def], worldOpts)).resolves.toBeTruthy();

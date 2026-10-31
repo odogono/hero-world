@@ -9,7 +9,7 @@ export type AuthUser = {
   email?: string;
   name?: string;
   sub: string;
-}
+};
 
 const log = createLog('auth-plugin');
 

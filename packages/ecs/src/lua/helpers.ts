@@ -7,7 +7,9 @@ import type { JSFunc, JSJsonish, LuaBindings } from './types';
 
 export const resolveLuaLibPath = (): string | null => {
   const fromEnv = process.env.LUA_LIB_PATH;
-  if (fromEnv && existsSync(fromEnv)) return fromEnv;
+  if (fromEnv && existsSync(fromEnv)) {
+    return fromEnv;
+  }
 
   const candidates = [
     // macOS (Homebrew)
@@ -29,7 +31,9 @@ export const resolveLuaLibPath = (): string | null => {
   ];
   for (const p of candidates) {
     try {
-      if (existsSync(p)) return p;
+      if (existsSync(p)) {
+        return p;
+      }
     } catch {
       // ignore
     }
@@ -46,14 +50,20 @@ export const loadLuaBindings = (luaLibPath?: string | null): LuaBindings => {
   }
 
   return dlopen(path, {
-    luaL_newstate: { args: [], returns: FFIType.ptr },
-    luaL_openlibs: { args: [FFIType.ptr], returns: FFIType.void },
     lua_close: { args: [FFIType.ptr], returns: FFIType.void },
     luaL_loadstring: {
       args: [FFIType.ptr, FFIType.cstring],
       returns: FFIType.i32
     },
+    luaL_newstate: { args: [], returns: FFIType.ptr },
+    luaL_openlibs: { args: [FFIType.ptr], returns: FFIType.void },
     // lua_pcall may not be exported; lua_pcallk is available in 5.4
+    lua_createtable: {
+      args: [FFIType.ptr, FFIType.i32, FFIType.i32],
+      returns: FFIType.void
+    },
+    lua_gettop: { args: [FFIType.ptr], returns: FFIType.i32 },
+    lua_next: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
     lua_pcallk: {
       args: [
         FFIType.ptr,
@@ -65,38 +75,21 @@ export const loadLuaBindings = (luaLibPath?: string | null): LuaBindings => {
       ],
       returns: FFIType.i32
     },
-    lua_tonumberx: {
-      args: [FFIType.ptr, FFIType.i32, FFIType.ptr],
-      returns: FFIType.f64
+    lua_pushboolean: {
+      args: [FFIType.ptr, FFIType.i32],
+      returns: FFIType.void
     },
-    lua_tolstring: {
-      args: [FFIType.ptr, FFIType.i32, FFIType.ptr],
-      returns: FFIType.cstring
-    },
-    lua_gettop: { args: [FFIType.ptr], returns: FFIType.i32 },
-    lua_type: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-    lua_pushnil: { args: [FFIType.ptr], returns: FFIType.void },
-    lua_next: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-    lua_settop: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.void },
-    lua_toboolean: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
     lua_pushcclosure: {
       args: [FFIType.ptr, FFIType.function, FFIType.i32],
       returns: FFIType.void
     },
-    lua_setglobal: {
-      args: [FFIType.ptr, FFIType.cstring],
-      returns: FFIType.void
-    },
+    lua_pushnil: { args: [FFIType.ptr], returns: FFIType.void },
     lua_pushnumber: { args: [FFIType.ptr, FFIType.f64], returns: FFIType.void },
     lua_pushstring: {
       args: [FFIType.ptr, FFIType.cstring],
       returns: FFIType.void
     },
-    lua_pushboolean: {
-      args: [FFIType.ptr, FFIType.i32],
-      returns: FFIType.void
-    },
-    lua_createtable: {
+    lua_rawseti: {
       args: [FFIType.ptr, FFIType.i32, FFIType.i32],
       returns: FFIType.void
     },
@@ -104,10 +97,21 @@ export const loadLuaBindings = (luaLibPath?: string | null): LuaBindings => {
       args: [FFIType.ptr, FFIType.i32, FFIType.cstring],
       returns: FFIType.void
     },
-    lua_rawseti: {
-      args: [FFIType.ptr, FFIType.i32, FFIType.i32],
+    lua_setglobal: {
+      args: [FFIType.ptr, FFIType.cstring],
       returns: FFIType.void
-    }
+    },
+    lua_settop: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.void },
+    lua_toboolean: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
+    lua_tolstring: {
+      args: [FFIType.ptr, FFIType.i32, FFIType.ptr],
+      returns: FFIType.cstring
+    },
+    lua_tonumberx: {
+      args: [FFIType.ptr, FFIType.i32, FFIType.ptr],
+      returns: FFIType.f64
+    },
+    lua_type: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 }
   }) as unknown as LuaBindings;
 };
 
@@ -150,7 +154,7 @@ export const registerJSFunction = (
       }
       return 0;
     },
-    { returns: 'i32', args: ['ptr'] }
+    { args: ['ptr'], returns: 'i32' }
   );
 
   lib.symbols.lua_pushcclosure(L, cb.ptr as number, 0);
@@ -169,9 +173,8 @@ export const toCStringBuffer = (s: string): Uint8Array => {
   return out;
 };
 
-export const fromCString = (cstr: unknown): string => {
-  return typeof cstr === 'string' ? cstr : String(cstr);
-};
+export const fromCString = (cstr: unknown): string =>
+  typeof cstr === 'string' ? cstr : String(cstr);
 
 export const luaToJSFromTop = (lib: LuaBindings, L: number): JSJsonish => {
   const LUA_TNIL = 0;
@@ -180,11 +183,18 @@ export const luaToJSFromTop = (lib: LuaBindings, L: number): JSJsonish => {
   const LUA_TSTRING = 4;
   const LUA_TTABLE = 5;
   const t = lib.symbols.lua_type(L, -1);
-  if (t === LUA_TNIL) return null;
-  if (t === LUA_TBOOLEAN) return lib.symbols.lua_toboolean(L, -1) !== 0;
-  if (t === LUA_TNUMBER) return lib.symbols.lua_tonumberx(L, -1, 0);
-  if (t === LUA_TSTRING)
+  if (t === LUA_TNIL) {
+    return null;
+  }
+  if (t === LUA_TBOOLEAN) {
+    return lib.symbols.lua_toboolean(L, -1) !== 0;
+  }
+  if (t === LUA_TNUMBER) {
+    return lib.symbols.lua_tonumberx(L, -1, 0);
+  }
+  if (t === LUA_TSTRING) {
     return fromCString(lib.symbols.lua_tolstring(L, -1, 0));
+  }
   if (t === LUA_TTABLE) {
     const numeric: Map<number, JSJsonish> = new Map();
     const object: Record<string, JSJsonish> = {};
@@ -199,7 +209,9 @@ export const luaToJSFromTop = (lib: LuaBindings, L: number): JSJsonish => {
         if (i === k && i > 0) {
           const val = luaToJSFromTop(lib, L);
           numeric.set(i, val);
-          if (i > maxIndex) maxIndex = i;
+          if (i > maxIndex) {
+            maxIndex = i;
+          }
           numericCount++;
         }
       } else if (keyType === LUA_TSTRING) {
@@ -210,11 +222,17 @@ export const luaToJSFromTop = (lib: LuaBindings, L: number): JSJsonish => {
     }
     if (numericCount > 0 && Object.keys(object).length === 0) {
       const arr: JSJsonish[] = new Array(maxIndex);
-      for (let i = 1; i <= maxIndex; i++) arr[i - 1] = numeric.get(i) ?? null;
-      while (arr.length && arr[arr.length - 1] === null) arr.pop();
+      for (let i = 1; i <= maxIndex; i++) {
+        arr[i - 1] = numeric.get(i) ?? null;
+      }
+      while (arr.length && arr.at(-1) === null) {
+        arr.pop();
+      }
       return arr;
     }
-    for (const [k, v] of numeric) object[String(k)] = v;
+    for (const [k, v] of numeric) {
+      object[String(k)] = v;
+    }
     return object;
   }
   return null;
@@ -250,8 +268,8 @@ export const pushJSValue = (
         }
         return;
       }
-      lib.symbols.lua_createtable(L, 0, Object.keys(value as any).length);
-      for (const [k, v] of Object.entries(value as any)) {
+      lib.symbols.lua_createtable(L, 0, Object.keys(value as object).length);
+      for (const [k, v] of Object.entries(value as object)) {
         pushJSValue(lib, L, v as JSJsonish);
         const kbuf = toCStringBuffer(k);
         lib.symbols.lua_setfield(L, -2, kbuf as unknown as string);
@@ -266,7 +284,9 @@ export const runLuaChunkReturnNumber = (
 ): number => {
   const lib = loadLuaBindings(luaLibPath);
   const L = lib.symbols.luaL_newstate();
-  if (!L) throw new Error('luaL_newstate failed');
+  if (!L) {
+    throw new Error('luaL_newstate failed');
+  }
   try {
     lib.symbols.luaL_openlibs(L);
     const buf = toCStringBuffer(code);
@@ -313,32 +333,44 @@ export const resolveLuaModulePath = (
     const resolved = resolve(basePath || process.cwd(), moduleName);
     for (const ext of extensions) {
       const fullPath = resolved + ext;
-      if (existsSync(fullPath)) return fullPath;
+      if (existsSync(fullPath)) {
+        return fullPath;
+      }
     }
     // Try as directory with init.lua
     const initPath = join(resolved, 'init.lua');
-    if (existsSync(initPath)) return initPath;
+    if (existsSync(initPath)) {
+      return initPath;
+    }
   }
 
   // Handle absolute paths
   if (moduleName.startsWith('/')) {
     for (const ext of extensions) {
       const fullPath = moduleName + ext;
-      if (existsSync(fullPath)) return fullPath;
+      if (existsSync(fullPath)) {
+        return fullPath;
+      }
     }
     const initPath = join(moduleName, 'init.lua');
-    if (existsSync(initPath)) return initPath;
+    if (existsSync(initPath)) {
+      return initPath;
+    }
   }
 
   // Search in standard paths
   for (const searchPath of searchPaths) {
     for (const ext of extensions) {
       const fullPath = join(searchPath, moduleName + ext);
-      if (existsSync(fullPath)) return fullPath;
+      if (existsSync(fullPath)) {
+        return fullPath;
+      }
     }
     // Try as directory with init.lua
     const initPath = join(searchPath, moduleName, 'init.lua');
-    if (existsSync(initPath)) return initPath;
+    if (existsSync(initPath)) {
+      return initPath;
+    }
   }
 
   throw new Error(`Module '${moduleName}' not found`);

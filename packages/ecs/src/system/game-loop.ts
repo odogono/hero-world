@@ -21,8 +21,8 @@ type GameLoopOptions = {
 /**
  * Utility function to log system performance
  */
-export const logSystemPerformance = (
-  gameLoop: GameLoop<any>,
+export const logSystemPerformance = <T extends Components>(
+  gameLoop: GameLoop<T>,
   threshold = 16.67
 ): void => {
   const perf = gameLoop.getPerformance();

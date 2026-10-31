@@ -1,5 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'bun:test';
+
+import { act, renderHook } from '@testing-library/react';
 
 import { useCommandHistory } from '../../hooks/use-command-history';
 

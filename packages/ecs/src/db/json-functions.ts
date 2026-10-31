@@ -57,7 +57,7 @@ const convertValueForSqlite = (value: unknown): unknown => {
 
     // Check if it's a simple object with a primitive value property
     if ('value' in value) {
-      const val = (value as any).value;
+      const val = (value as { value: unknown }).value;
       if (
         typeof val === 'number' ||
         typeof val === 'string' ||
@@ -87,7 +87,7 @@ export const saveAsComponents = <TComponents extends Components>(
   world: World<TComponents>
 ): unknown => {
   const db = world.db;
-  const result: any[] = [];
+  const result: Record<string, unknown>[] = [];
 
   for (const [componentName, { tableName }] of world.defs) {
     // Get all records from this component table
@@ -95,8 +95,8 @@ export const saveAsComponents = <TComponents extends Components>(
 
     for (const record of records) {
       // Manually construct the object to avoid serialization issues
-      const componentObj: any = { type: componentName };
-      for (const [key, value] of Object.entries(record)) {
+      const componentObj: Record<string, unknown> = { type: componentName };
+      for (const [key, value] of Object.entries(record as object)) {
         componentObj[toCamelCase(key)!] = value;
       }
       result.push(componentObj);
@@ -113,13 +113,13 @@ export const saveAsEntities = <TComponents extends Components>(
   world: World<TComponents>
 ): unknown => {
   const db = world.db;
-  const result: any[] = [];
+  const result: Record<string, unknown>[] = [];
 
   // Get all entities
   const entities = db.query('SELECT id FROM tbl_entity') as { id: number }[];
 
   for (const entity of entities) {
-    const entityData: any = { id: entity.id };
+    const entityData: Record<string, unknown> = { id: entity.id };
 
     // For each component table, check if this entity has a record
     for (const [componentName, { tableName }] of world.defs) {
@@ -127,7 +127,7 @@ export const saveAsEntities = <TComponents extends Components>(
       const componentDataArray = db.query(
         `SELECT * FROM ${tableName} WHERE eid = ?`,
         [entity.id]
-      ) as any[];
+      ) as Record<string, unknown>[];
 
       if (componentDataArray.length === 0) {
         continue;
@@ -136,7 +136,7 @@ export const saveAsEntities = <TComponents extends Components>(
       const componentData = componentDataArray[0];
       // Remove the eid and id columns from component data
       const { createdAt, eid, id, updatedAt, ...cleanComponentData } =
-        componentData as any;
+        componentData as Record<string, unknown>;
       const correctedComponentData = Object.entries(cleanComponentData).reduce(
         (acc, [key, value]) => {
           acc[toCamelCase(key)!] = value;
@@ -168,7 +168,7 @@ export const loadFromComponents = <TComponents extends Components>(
 
   // First, validate all components and collect entity IDs
   const entityIds = new Set<number>();
-  for (const component of json as any[]) {
+  for (const component of json as unknown[]) {
     if (
       typeof component !== 'object' ||
       component === null ||
@@ -201,7 +201,7 @@ export const loadFromComponents = <TComponents extends Components>(
       ]);
     }
     for (const component of json) {
-      const { type, ...componentData } = component as any;
+      const { type, ...componentData } = component as Record<string, unknown>;
 
       // Skip components with invalid eid values
       if (
@@ -212,7 +212,7 @@ export const loadFromComponents = <TComponents extends Components>(
         continue;
       }
 
-      const def = world.defs.get(type);
+      const def = world.defs.get(type as string);
       if (!def) {
         continue;
       }
@@ -233,7 +233,7 @@ export const loadFromComponents = <TComponents extends Components>(
       const validColumns = columns.map(col => col.name);
 
       // Filter component data to only include valid columns
-      const filteredData: any = {};
+      const filteredData: Record<string, unknown> = {};
       for (const col of validColumns) {
         if (col in componentData) {
           filteredData[col] = componentData[col];
@@ -317,10 +317,10 @@ export const loadFromEntities = <TComponents extends Components>(
         const dataWithEid = { eid: id, ...(componentData as object) };
 
         // Filter to only valid columns
-        const filteredData: any = {};
+        const filteredData: Record<string, unknown> = {};
         for (const col of validColumns) {
           if (col in dataWithEid) {
-            filteredData[col] = dataWithEid[col];
+            filteredData[col] = (dataWithEid as Record<string, unknown>)[col];
           }
         }
 

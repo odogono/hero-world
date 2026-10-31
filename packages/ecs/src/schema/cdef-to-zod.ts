@@ -85,7 +85,7 @@ const withOptional = (expr: string, col: CDefColumnInfo): string => {
 };
 
 const withMeta = (expr: string, col: CDefColumnInfo): string => {
-  const meta: Record<string, any> = {};
+  const meta: Record<string, unknown> = {};
   if (col.isUnique) {
     meta.unique = true;
   }
@@ -153,7 +153,7 @@ export const cdefToZod = (
 ): string => {
   const includeImports = options.includeImports ?? true;
   const defs: CDef[] = Array.isArray(input)
-    ? (input as any[]).flat(Infinity).filter(Boolean)
+    ? ((input as CDef[][]).flat(Infinity).filter(Boolean) as CDef[])
     : [input];
 
   const parts: string[] = [];

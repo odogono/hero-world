@@ -330,8 +330,7 @@ export const createSqliteError = (
     params?: unknown[];
     sqliteCode?: number;
   }
-): SQLiteError => {
-  return SQLiteError.executionError(sql, error as Error | string, {
+): SQLiteError =>
+  SQLiteError.executionError(sql, error as Error | string, {
     ...options
   });
-};

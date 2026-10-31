@@ -4,8 +4,13 @@ import { createLog } from 'odgn-helpers/log';
 
 const log = createLog('useWebSocket');
 
+export type ServerMessage = {
+  data?: string;
+  success?: boolean;
+};
+
 export const useWebSocket = (
-  onMessageCallback?: (data: any) => void,
+  onMessageCallback?: (data: ServerMessage) => void,
   onStatusChange?: (status: 'connected' | 'disconnected' | 'connecting') => void
 ) => {
   const ws = useRef<WebSocket | null>(null);
@@ -43,15 +48,18 @@ export const useWebSocket = (
     }
   }, []);
 
-  const connect = useCallback((url: string) => {
-    if (!ws.current) {
-      ws.current = new WebSocket(url);
-      ws.current.addEventListener('open', onOpen);
-      ws.current.addEventListener('close', onClose);
-      ws.current.addEventListener('message', onMessage);
-      ws.current.addEventListener('error', onError);
-    }
-  }, [onOpen, onClose, onMessage, onError]);
+  const connect = useCallback(
+    (url: string) => {
+      if (!ws.current) {
+        ws.current = new WebSocket(url);
+        ws.current.addEventListener('open', onOpen);
+        ws.current.addEventListener('close', onClose);
+        ws.current.addEventListener('message', onMessage);
+        ws.current.addEventListener('error', onError);
+      }
+    },
+    [onOpen, onClose, onMessage, onError]
+  );
 
   const disconnect = useCallback(() => {
     if (ws.current) {

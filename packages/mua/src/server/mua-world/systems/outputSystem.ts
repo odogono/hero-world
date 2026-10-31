@@ -1,8 +1,13 @@
 import { createSystem } from 'odgn-ecs/system';
 
-export const createOutputSystem = (connections: Map<string, any>) => createSystem(
+import type { MuaConnection } from '../index';
+
+export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
+  createSystem(
     ({ entity, world }) => {
-      if (!entity.outputEvent) {return;}
+      if (!entity.outputEvent) {
+        return;
+      }
 
       const { broadcast, message, roomId, wsId } = entity.outputEvent;
 

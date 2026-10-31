@@ -1,4 +1,4 @@
-import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
+import type { CDefColumnInfo, CDefColumnType } from '@types';
 
 export type ColumnBuilder<
   TType extends CDefColumnType,
@@ -17,7 +17,10 @@ export type ColumnBuilder<
   unique: () => ColumnBuilder<TType, TOptional>;
 };
 
-export type DefineComponentSchema = Record<string, ColumnBuilder<any, any>>;
+export type DefineComponentSchema = Record<
+  string,
+  ColumnBuilder<CDefColumnType, boolean>
+>;
 
 export type DefineComponentProps<
   S extends DefineComponentSchema,
@@ -40,7 +43,7 @@ export type ValueFromType<T> = T extends 'string' | 'email'
         : string | number | boolean;
 
 export type OptionalKeysFromSchema<S extends DefineComponentSchema> = {
-  [K in keyof S]: S[K] extends ColumnBuilder<any, true> ? K : never;
+  [K in keyof S]: S[K] extends ColumnBuilder<CDefColumnType, true> ? K : never;
 }[keyof S];
 export type RequiredKeysFromSchema<S extends DefineComponentSchema> = Exclude<
   keyof S,
@@ -48,11 +51,17 @@ export type RequiredKeysFromSchema<S extends DefineComponentSchema> = Exclude<
 >;
 
 export type InferFromSchema<S extends DefineComponentSchema> = {
-  [K in RequiredKeysFromSchema<S>]: S[K] extends ColumnBuilder<infer Type, any>
+  [K in RequiredKeysFromSchema<S>]: S[K] extends ColumnBuilder<
+    infer Type,
+    boolean
+  >
     ? ValueFromType<Type>
     : string | number | boolean;
 } & {
-  [K in OptionalKeysFromSchema<S>]?: S[K] extends ColumnBuilder<infer Type, any>
+  [K in OptionalKeysFromSchema<S>]?: S[K] extends ColumnBuilder<
+    infer Type,
+    boolean
+  >
     ? ValueFromType<Type>
     : string | number | boolean;
 };
@@ -65,22 +74,26 @@ export type InferComponentType<T> = T extends { __schema: infer S }
     ? C extends readonly unknown[]
       ? {
           // Required properties
-          [K in C[number] as K extends { name: infer N; optional: true }
-            ? never
-            : K extends { name: infer N }
-              ? N extends PropertyKey
-                ? N
+          [
+            K in C[number] as K extends { name: infer N; optional: true }
+              ? never
+              : K extends { name: infer N }
+                ? N extends PropertyKey
+                  ? N
+                  : never
                 : never
-              : never]: K extends { type: infer Type }
+          ]: K extends { type: infer Type }
             ? ValueFromType<Type>
             : string | number | boolean;
         } & {
           // Optional properties
-          [K in C[number] as K extends { name: infer N; optional: true }
-            ? N extends PropertyKey
-              ? N
+          [
+            K in C[number] as K extends { name: infer N; optional: true }
+              ? N extends PropertyKey
+                ? N
+                : never
               : never
-            : never]?: K extends { type: infer Type }
+          ]?: K extends { type: infer Type }
             ? ValueFromType<Type>
             : string | number | boolean;
         }

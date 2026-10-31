@@ -16,23 +16,25 @@ export const makeTrackedComponent = <
     throw new Error('Entity ID is required');
   }
 
-  if (!world.entityCache.has(id)) {
-    world.entityCache.set(id, {});
+  let cache = world.entityCache.get(id);
+  if (!cache) {
+    cache = {};
+    world.entityCache.set(id, cache);
   }
-  (world.entityCache.get(id) as any)[componentName] = {
+  cache[componentName] = {
     data,
     exists
   };
 
-  return new Proxy(data as any, {
+  return new Proxy(data as Record<PropertyKey, unknown>, {
     set(target, prop, value) {
       // console.debug('[makeTrackedComponent] set', prop, value);
-      (target as any)[prop] = value;
+      target[prop] = value;
       if (!world.dirtyEntities.has(id)) {
         world.dirtyEntities.set(id, new Set());
       }
       world.dirtyEntities.get(id)!.add(componentName);
       return true;
     }
-  });
+  }) as TWorldComponents[TComponentName];
 };

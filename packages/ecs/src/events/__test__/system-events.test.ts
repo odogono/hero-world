@@ -31,7 +31,7 @@ describe('System Events Integration', () => {
     world.create({ systemTest: { value: 20 } });
     world.flush();
 
-    const processedEntities: any[] = [];
+    const processedEntities: unknown[] = [];
 
     const entitySystem = createSystem(
       ({ deltaTime, entity, world }) => {

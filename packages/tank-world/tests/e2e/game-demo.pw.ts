@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('connects, spawns, and receives updates', async ({ page }) => {
   await page.goto('http://localhost:5173/');
@@ -8,7 +8,9 @@ test('connects, spawns, and receives updates', async ({ page }) => {
 
   // Connect
   await demo.getByTestId('connect-btn').click();
-  await expect(demo.getByTestId('status')).toContainText('open', { timeout: 20000 });
+  await expect(demo.getByTestId('status')).toContainText('open', {
+    timeout: 20_000
+  });
 
   // Spawn a tank
   await demo.getByTestId('spawn-team').selectOption('red');
@@ -17,5 +19,7 @@ test('connects, spawns, and receives updates', async ({ page }) => {
   await demo.getByTestId('spawn-submit').click();
 
   // Expect to receive world updates
-  await expect(demo.getByTestId('last-update')).toContainText('world:update', { timeout: 5000 });
+  await expect(demo.getByTestId('last-update')).toContainText('world:update', {
+    timeout: 5000
+  });
 });

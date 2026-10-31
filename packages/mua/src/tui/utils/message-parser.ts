@@ -22,7 +22,10 @@ export const parseGameMessage = (response: {
  * Extract room data from look command output
  */
 export const extractRoomData = (content: string): RoomData | null => {
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = content
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
 
   if (lines.length === 0) {
     return null;
@@ -64,7 +67,9 @@ export const extractRoomData = (content: string): RoomData | null => {
     : [];
 
   // Extract NPCs (if the format includes them)
-  const npcsLine = lines.find(l => l.startsWith('There is:') || l.startsWith('Here:'));
+  const npcsLine = lines.find(
+    l => l.startsWith('There is:') || l.startsWith('Here:')
+  );
   const npcs = npcsLine
     ? npcsLine
         .replace(/^(There is:|Here:)/, '')
@@ -85,4 +90,5 @@ export const extractRoomData = (content: string): RoomData | null => {
 /**
  * Check if content looks like room description (from look command)
  */
-export const isRoomDescription = (content: string): boolean => content.includes('Exits:') || content.includes('You see:');
+export const isRoomDescription = (content: string): boolean =>
+  content.includes('Exits:') || content.includes('You see:');

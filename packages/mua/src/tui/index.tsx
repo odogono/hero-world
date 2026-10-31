@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createLog } from 'odgn-helpers/log';
 
-import { createRoot, useKeyboard, useRenderer } from '@opentui/react';
 import { createCliRenderer } from '@opentui/core';
+import { createRoot, useKeyboard, useRenderer } from '@opentui/react';
 
 import { CommandInput } from './components/CommandInput';
 import { DebugPanel } from './components/DebugPanel';
@@ -13,7 +13,7 @@ import { useCommandHistory } from './hooks/use-command-history';
 import { useDebugMode } from './hooks/use-debug-mode';
 import { useGameState } from './hooks/use-game-state';
 import { useWebSocket } from './hooks/use-websocket';
-import { completeVerb, KNOWN_VERBS } from './utils/verb-completer';
+import { KNOWN_VERBS, completeVerb } from './utils/verb-completer';
 
 const log = createLog('tui');
 
@@ -46,7 +46,9 @@ export const App = () => {
   const onSubmit = useCallback(
     (value: string) => {
       const trimmed = value.trim();
-      if (!trimmed) {return;}
+      if (!trimmed) {
+        return;
+      }
 
       // CRITICAL FIX: Send correct message format for server
       send({ payload: trimmed, type: 'cmd' });
@@ -153,7 +155,10 @@ export const App = () => {
 
   return (
     <box flexDirection="column" style={{ height: '100%' }}>
-      <GameOutput currentRoom={gameState.currentRoom} messages={gameState.messages} />
+      <GameOutput
+        currentRoom={gameState.currentRoom}
+        messages={gameState.messages}
+      />
       <StatusBar
         connectionStatus={connectionStatus}
         health={gameState.playerState.health}

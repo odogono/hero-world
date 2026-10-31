@@ -4,7 +4,7 @@ import nkzw from '@nkzw/eslint-config';
 
 export default [
   {
-    ignores: ['**/dist/*']
+    ignores: ['**/dist/*', 'src/edl/parser.ts']
   },
   ...nkzw,
   {
@@ -14,6 +14,15 @@ export default [
       'arrow-parens': ['error', 'as-needed'],
       'arrow-spacing': ['error', { after: true, before: true }],
       'func-style': ['error', 'expression'],
+      'import-x/no-extraneous-dependencies': [
+        'error',
+        {
+          packageDir: [
+            import.meta.dirname,
+            resolve(import.meta.dirname, '../..')
+          ]
+        }
+      ],
       'import-x/no-unresolved': 'off',
       'no-var': 'error',
       'prefer-arrow-callback': 'error',
@@ -26,6 +35,12 @@ export default [
           project: resolve(process.cwd(), './tsconfig.json')
         }
       }
+    }
+  },
+  {
+    files: ['scripts/**', 'examples/**'],
+    rules: {
+      'no-console': 'off'
     }
   }
 ];

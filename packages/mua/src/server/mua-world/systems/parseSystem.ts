@@ -1,10 +1,13 @@
 import { createSystem } from 'odgn-ecs/system';
+
 import { parseCommand } from '../commands/parser';
 import { findPlayerByConnection } from '../queries/player';
 
 export const parseSystem = createSystem(
   ({ entity, world }) => {
-    if (!entity.inputEvent) {return;}
+    if (!entity.inputEvent) {
+      return;
+    }
 
     const { text, wsId } = entity.inputEvent;
 

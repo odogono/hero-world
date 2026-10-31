@@ -8,6 +8,8 @@ import {
 
 const log = createLog('oauth');
 
+// Elysia's group() generics are not practically expressible here
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const oauthHandler = (app: any) =>
   app
     // Device Authorization Grant endpoints
@@ -20,15 +22,17 @@ export const oauthHandler = (app: any) =>
         return { error: 'Failed to initiate device flow' };
       }
     })
-    .post('/token', async ({ body }: { body: any }) => {
+    .post('/token', async ({ body }: { body: unknown }) => {
       try {
         const { device_code } = body as { device_code: string };
         const response = await pollDeviceAuth(device_code);
 
-        return response ? response : {
-            error: 'authorization_pending',
-            error_description: 'The authorization request is still pending'
-          };
+        return response
+          ? response
+          : {
+              error: 'authorization_pending',
+              error_description: 'The authorization request is still pending'
+            };
       } catch (error) {
         log.error('Failed to poll device auth:', error);
         return {
@@ -39,7 +43,7 @@ export const oauthHandler = (app: any) =>
       }
     })
     // Development/testing endpoint to simulate user authorization
-    .post('/simulate-auth', async ({ body }: { body: any }) => {
+    .post('/simulate-auth', async ({ body }: { body: unknown }) => {
       try {
         const { user_code } = body as { user_code: string };
         await simulateUserAuthorization(user_code);

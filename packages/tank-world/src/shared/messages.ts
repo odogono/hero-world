@@ -2,26 +2,26 @@ import { z } from 'zod';
 
 // Client -> Server
 export const HelloSchema = z.object({
-  type: z.literal('hello'),
-  name: z.string().min(1).max(32).optional()
+  name: z.string().min(1).max(32).optional(),
+  type: z.literal('hello')
 });
 
 export const ChatSchema = z.object({
-  type: z.literal('chat'),
+  name: z.string().min(1).max(32).optional(),
   text: z.string().min(1).max(500),
-  name: z.string().min(1).max(32).optional()
+  type: z.literal('chat')
 });
 
 export const SpawnSchema = z.object({
-  type: z.literal('cmd:spawn'),
   team: z.enum(['red', 'blue']).default('red'),
+  type: z.literal('cmd:spawn'),
   x: z.number().finite(),
   y: z.number().finite()
 });
 
 export const MoveSchema = z.object({
-  type: z.literal('cmd:move'),
   id: z.number().int().nonnegative(),
+  type: z.literal('cmd:move'),
   x: z.number().finite(),
   y: z.number().finite()
 });
@@ -37,38 +37,38 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
 // Server -> Client
 export const WelcomeSchema = z.object({
-  type: z.literal('welcome'),
-  playerId: z.number().int().positive(),
   clients: z.number().int().nonnegative(),
-  ts: z.number().int().nonnegative()
+  playerId: z.number().int().positive(),
+  ts: z.number().int().nonnegative(),
+  type: z.literal('welcome')
 });
 
 export const ErrorSchema = z.object({
-  type: z.literal('error'),
+  issues: z.unknown().optional(),
   message: z.string(),
-  issues: z.unknown().optional()
+  type: z.literal('error')
 });
 
 export const TankStateSchema = z.object({
+  hp: z.number().int().nonnegative().default(100),
   id: z.number().int().nonnegative(),
   team: z.enum(['red', 'blue']),
-  x: z.number(),
-  y: z.number(),
   vx: z.number().default(0),
   vy: z.number().default(0),
-  hp: z.number().int().nonnegative().default(100)
+  x: z.number(),
+  y: z.number()
 });
 
 export const WorldSnapshotSchema = z.object({
-  type: z.literal('world:snapshot'),
+  tanks: z.array(TankStateSchema),
   tick: z.number().int().nonnegative(),
-  tanks: z.array(TankStateSchema)
+  type: z.literal('world:snapshot')
 });
 
 export const WorldUpdateSchema = z.object({
-  type: z.literal('world:update'),
+  tanks: z.array(TankStateSchema),
   tick: z.number().int().nonnegative(),
-  tanks: z.array(TankStateSchema)
+  type: z.literal('world:update')
 });
 
 export const ServerMessageSchema = z.discriminatedUnion('type', [
@@ -81,6 +81,7 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
 
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 
-export const parseClientMessage = (raw: unknown) => ClientMessageSchema.safeParse(raw);
-export const parseServerMessage = (raw: unknown) => ServerMessageSchema.safeParse(raw);
-
+export const parseClientMessage = (raw: unknown) =>
+  ClientMessageSchema.safeParse(raw);
+export const parseServerMessage = (raw: unknown) =>
+  ServerMessageSchema.safeParse(raw);

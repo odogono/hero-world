@@ -1,9 +1,9 @@
-import { queryEntity, queryEntities } from 'odgn-ecs/entity';
+import { queryEntities, queryEntity } from 'odgn-ecs/entity';
 import { createEventSystem } from 'odgn-ecs/events';
 import { createLog } from 'odgn-helpers/log';
 
 import type { TankEvents } from '../types';
-import type { TankWorld, World, ScheduleEvent } from '../world';
+import type { ScheduleEvent, TankWorld, World } from '../world';
 
 const log = createLog('command-system');
 
@@ -18,7 +18,7 @@ export const moveUnit = (
 
 export const commandSystem = createEventSystem(
   ['cmd:*', 'query:*'],
-  ({ payload, type, world, execAdditional }) => {
+  ({ execAdditional, payload, type, world }) => {
     const moveCmd = payload as TankEvents['cmd:move'];
     const queryCmd = payload as TankEvents['query:world_state'];
 
@@ -29,9 +29,13 @@ export const commandSystem = createEventSystem(
       case 'query:world_state':
         // Use the scheduleEvent from execAdditional if available, otherwise skip
         if (execAdditional?.scheduleEvent) {
-          handleWorldStateQuery(world, queryCmd.requestId, execAdditional.scheduleEvent);
+          handleWorldStateQuery(
+            world,
+            queryCmd.requestId,
+            execAdditional.scheduleEvent
+          );
         } else {
-          console.warn('scheduleEvent not available in execAdditional');
+          log.warn('scheduleEvent not available in execAdditional');
         }
         break;
     }
@@ -67,28 +71,32 @@ const issueMoveOrder = (
   };
 };
 
-const handleWorldStateQuery = (world: World, requestId: number, scheduleEvent: ScheduleEvent) => {
+const handleWorldStateQuery = (
+  world: World,
+  requestId: number,
+  scheduleEvent: ScheduleEvent
+) => {
   log.debug(`Handling world state query for request ${requestId}`);
-  
+
   // Query all tanks with their components
-  const tanks = queryEntities(world, { 
-    with: ['position', 'velocity', 'health', 'team'] 
+  const tanks = queryEntities(world, {
+    with: ['position', 'velocity', 'health', 'team']
   });
-  
+
   const worldState = tanks.map(tank => ({
+    hasActiveOrder: !!tank.moveOrder,
+    health: tank.health?.health ?? 0,
     id: tank.id,
-    x: tank.position?.x ?? 0,
-    y: tank.position?.y ?? 0,
-    velocityX: tank.velocity?.x ?? 0,
-    velocityY: tank.velocity?.y ?? 0,
+    maxHealth: tank.health?.maxHealth ?? 100,
     maxVelocityX: tank.velocity?.speed ?? 0,
     maxVelocityY: tank.velocity?.speed ?? 0,
-    health: tank.health?.health ?? 0,
-    maxHealth: tank.health?.maxHealth ?? 100,
     team: tank.team?.team ?? 'red',
-    hasActiveOrder: !!tank.moveOrder
+    velocityX: tank.velocity?.x ?? 0,
+    velocityY: tank.velocity?.y ?? 0,
+    x: tank.position?.x ?? 0,
+    y: tank.position?.y ?? 0
   }));
-  
+
   // Schedule response event
   scheduleEvent('world_state:response', {
     requestId,

@@ -27,7 +27,7 @@ export const removeComponent = <
   }
 
   // Remove from entity object
-  delete (entity as any)[componentName];
+  delete (entity as Record<PropertyKey, unknown>)[componentName];
 
   // Mark entity as dirty for this component
   if (!world.dirtyEntities.has(id)) {

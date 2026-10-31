@@ -6,7 +6,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
-import { defs } from './coms';
+import { defs, type MuaComponents } from './coms';
 
 const log = createLog('mua-world');
 
@@ -15,9 +15,9 @@ type MuaWorldOptions = {
 };
 
 export class MuaWorld {
-  world: World<any> | null = null;
+  world: World<MuaComponents> | null = null;
   options: MuaWorldOptions;
-  loop: GameLoop<any> | null = null;
+  loop: GameLoop<MuaComponents> | null = null;
   updateLoopInterval: ReturnType<typeof setInterval> | null = null;
   lastUpdateTime: number = 0;
   private connections = new Map<string, MuaConnection>();
@@ -45,7 +45,7 @@ export class MuaWorld {
       // console.log(dump);
       try {
         this.world.executeEDL(mainEDL);
-      } catch (error: any) {
+      } catch (error) {
         if (error instanceof EDLParseError) {
           const msg = `${error.message}\nFile: ${mainPath}`;
           throw new EDLParseError(msg, { file: mainPath });
@@ -157,7 +157,10 @@ export class MuaWorld {
       delete connectionEntity.authenticating;
 
       this.world?.flush();
-      log.debug('World flushed, authenticated:', !!connectionEntity.authenticated);
+      log.debug(
+        'World flushed, authenticated:',
+        !!connectionEntity.authenticated
+      );
 
       // Send welcome message
       const message = `Welcome, ${username}! Type 'look' to begin.`;
@@ -176,7 +179,7 @@ export class MuaWorld {
     }
   }
 
-  onConnectionCommand(conn: MuaConnection, command: any) {
+  onConnectionCommand(conn: MuaConnection, command: MuaCommand) {
     log.debug('onConnectionCommand', conn.id, command);
 
     const connectionEntity = this.world?.query({
@@ -209,7 +212,7 @@ export class MuaWorld {
           : command.data?.username || command.username;
       log.debug('About to call handleLogin', username);
       // Fire and forget - don't await to keep the method synchronous
-      this.handleLogin(conn, username).catch(error => {
+      this.handleLogin(conn, username as string).catch(error => {
         log.error('handleLogin error', error);
       });
       return true;
@@ -277,6 +280,15 @@ export class MuaWorld {
     return true;
   }
 }
+
+export type MuaCommand =
+  | string
+  | {
+      data?: { password?: string; username?: string };
+      text?: string;
+      type?: string;
+      username?: string;
+    };
 
 export type MuaConnection = {
   close: () => void;

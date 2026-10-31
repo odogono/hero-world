@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { COLORS, colorByType, colorizeMessage } from '../../utils/color-utils';
+import { colorByType, colorizeMessage } from '../../utils/color-utils';
 
 describe('color-utils', () => {
   describe('colorByType', () => {
@@ -49,10 +49,10 @@ describe('color-utils', () => {
 
     it('colorizes exits', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: ['north', 'south'],
         items: [],
+        name: 'Room',
         npcs: []
       };
 
@@ -63,10 +63,10 @@ describe('color-utils', () => {
 
     it('colorizes items', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: [],
         items: ['sword', 'shield'],
+        name: 'Room',
         npcs: []
       };
 
@@ -76,10 +76,10 @@ describe('color-utils', () => {
 
     it('colorizes NPCs', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: [],
         items: [],
+        name: 'Room',
         npcs: ['guard', 'merchant']
       };
 
@@ -89,10 +89,10 @@ describe('color-utils', () => {
 
     it('handles case-insensitive matching', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: ['North'],
         items: [],
+        name: 'Room',
         npcs: []
       };
 
@@ -103,15 +103,18 @@ describe('color-utils', () => {
 
     it('matches whole words only', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: ['north'],
         items: [],
+        name: 'Room',
         npcs: []
       };
 
       // Should match 'north' but not 'northern' or 'northward'
-      const result = colorizeMessage('Go north to the northern regions', roomData);
+      const result = colorizeMessage(
+        'Go north to the northern regions',
+        roomData
+      );
       // 'north' should be colored but 'northern' should not
       // This is hard to test without inspecting the exact output
       expect(result).toContain('north');
@@ -120,24 +123,27 @@ describe('color-utils', () => {
 
     it('colorizes multiple types simultaneously', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: ['north'],
         items: ['sword'],
+        name: 'Room',
         npcs: ['guard']
       };
 
-      const result = colorizeMessage('Take the sword from the guard and go north', roomData);
+      const result = colorizeMessage(
+        'Take the sword from the guard and go north',
+        roomData
+      );
       // Result should be styled (different from input)
       expect(result).not.toBe('Take the sword from the guard and go north');
     });
 
     it('handles empty room data arrays', () => {
       const roomData = {
-        name: 'Room',
         description: 'Desc',
         exits: [],
         items: [],
+        name: 'Room',
         npcs: []
       };
 

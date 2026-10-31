@@ -93,7 +93,7 @@ describe('Query Extended', () => {
     expect(e101Ex?.withAdmin).toBeUndefined();
 
     // queryAll with maybe should include optional components only when present
-    const all = world.queryAll({ with: ['connected'], maybe: ['watching'] });
+    const all = world.queryAll({ maybe: ['watching'], with: ['connected'] });
     expect(all).toHaveLength(4);
     const watchingTargets = all
       .map(e => e.watching?.target)
@@ -102,8 +102,8 @@ describe('Query Extended', () => {
 
     // iterator with maybe
     using iter = world.queryIterator({
-      with: ['connected'],
-      maybe: ['authenticated']
+      maybe: ['authenticated'],
+      with: ['connected']
     });
     const tokens: Array<string | undefined> = [];
     for (const e of iter) {

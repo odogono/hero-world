@@ -1,29 +1,39 @@
-import type { EntityId, World } from 'odgn-ecs/types';
+import type { EntityId } from 'odgn-ecs/types';
+import type { World } from 'odgn-ecs/world';
 
-export const getRoomContents = (world: World<any>, roomId: EntityId) => world.queryAll({
+import type { MuaComponents } from '../coms';
+
+export const getRoomContents = (
+  world: World<MuaComponents>,
+  roomId: EntityId
+) =>
+  world.queryAll({
     args: [roomId],
     where: 'contained.in = ?1',
     with: ['contained', 'described'],
     without: ['portal']
   });
 
-export const getRoomExits = (world: World<any>, roomId: EntityId) => world.queryAll({
+export const getRoomExits = (world: World<MuaComponents>, roomId: EntityId) =>
+  world.queryAll({
     args: [roomId],
     where: 'contained.in = ?1',
     with: ['contained', 'portal']
   });
 
 export const findExitByDirection = (
-  world: World<any>,
+  world: World<MuaComponents>,
   roomId: EntityId,
   direction: string
-) => world.query({
+) =>
+  world.query({
     args: [roomId, direction],
     where: 'contained.in = ?1 AND portal.dir = ?2',
     with: ['contained', 'portal']
   });
 
-export const findRoomByMetaId = (world: World<any>, metaId: string) => world.query({
+export const findRoomByMetaId = (world: World<MuaComponents>, metaId: string) =>
+  world.query({
     args: [metaId],
     where: `json_extract(meta.props, '$.id') = ?1`,
     with: ['described', 'meta']

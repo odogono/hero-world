@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync
+} from 'node:fs';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
@@ -15,6 +21,7 @@ import {
   toCStringBuffer
 } from '../helpers';
 import { LuaVM } from '../index';
+import type { LuaBindings } from '../types';
 
 // Test setup
 let luaLibPath: string | null = null;
@@ -33,6 +40,7 @@ describe('Lua FFI Integration', () => {
         expect(typeof luaLibPath).toBe('string');
         expect(existsSync(luaLibPath!)).toBe(true);
       } else {
+        // eslint-disable-next-line no-console -- surface why Lua tests are skipped
         console.warn('Lua library not found - skipping Lua-dependent tests');
       }
     });
@@ -71,7 +79,7 @@ describe('Lua FFI Integration', () => {
     test('toCStringBuffer handles unicode', () => {
       const buffer = toCStringBuffer('🚀');
       expect(buffer).toBeInstanceOf(Uint8Array);
-      expect(buffer[buffer.length - 1]).toBe(0); // null terminator
+      expect(buffer.at(-1)).toBe(0); // null terminator
     });
 
     test('fromCString handles string input', () => {
@@ -99,8 +107,10 @@ describe('Lua FFI Integration', () => {
       unlinkSync(testFile);
       // Clean up directory if empty
       try {
-        require('node:fs').rmdirSync(testDir);
-      } catch {}
+        rmdirSync(testDir);
+      } catch {
+        /* directory not empty or already removed */
+      }
     });
 
     test('loadLuaFile reads file content', () => {
@@ -133,27 +143,35 @@ describe('Lua FFI Integration', () => {
 
   describe('runLuaChunkReturnNumber', () => {
     test('executes simple arithmetic', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = runLuaChunkReturnNumber('return 2 + 3');
       expect(result).toBe(5);
     });
 
     test('executes complex expression', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = runLuaChunkReturnNumber('return math.sin(math.pi / 2)');
       expect(Math.abs(result - 1)).toBeLessThan(0.0001);
     });
 
     test('throws on syntax error', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => runLuaChunkReturnNumber('invalid syntax {{{')).toThrow();
     });
 
     test('throws on runtime error', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => runLuaChunkReturnNumber('error("test error")')).toThrow();
     });
@@ -163,16 +181,22 @@ describe('Lua FFI Integration', () => {
     let vm: LuaVM;
 
     beforeAll(() => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
       vm = new LuaVM(luaLibPath);
     });
 
     afterAll(() => {
-      if (vm) vm.close();
+      if (vm) {
+        vm.close();
+      }
     });
 
     test('constructor creates valid VM', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(vm).toBeTruthy();
       expect(typeof vm.eval).toBe('function');
@@ -180,7 +204,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('eval returns numbers', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(vm.eval('return 42')).toBe(42);
       expect(vm.eval('return 3.14')).toBe(3.14);
@@ -188,14 +214,18 @@ describe('Lua FFI Integration', () => {
     });
 
     test('eval returns strings', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(vm.eval('return "hello"')).toBe('hello');
       expect(vm.eval('return "hello " .. "world"')).toBe('hello world');
     });
 
     test('eval returns booleans', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(vm.eval('return true')).toBe(true);
       expect(vm.eval('return false')).toBe(false);
@@ -204,46 +234,60 @@ describe('Lua FFI Integration', () => {
     });
 
     test('eval returns null for nil', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(vm.eval('return nil')).toBe(null);
     });
 
     test('eval returns arrays', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = vm.eval('return {1, 2, 3}');
       expect(result).toEqual([1, 2, 3]);
     });
 
     test('eval returns objects', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = vm.eval('return {name = "test", value = 42}');
       expect(result).toEqual({ name: 'test', value: 42 });
     });
 
     test('eval returns mixed arrays/objects', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = vm.eval('return {1, 2, name = "test", value = 42}');
       expect(result).toEqual({ '1': 1, '2': 2, name: 'test', value: 42 });
     });
 
     test('eval throws on syntax error', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => vm.eval('invalid syntax {{{')).toThrow();
     });
 
     test('eval throws on runtime error', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => vm.eval('error("test error")')).toThrow();
     });
 
     test('setGlobal and eval integration', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       vm.setGlobal('testVar', 42);
       expect(vm.eval('return testVar')).toBe(42);
@@ -256,7 +300,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('setGlobal with complex values', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       vm.setGlobal('testArray', [1, 2, 3]);
       const result = vm.eval('return testArray');
@@ -268,7 +314,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('registerFunction works with numbers', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       vm.registerFunction('double', args => {
         const num = args[0] as number;
@@ -280,38 +328,46 @@ describe('Lua FFI Integration', () => {
     });
 
     test('registerFunction works with strings', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      vm.registerFunction('concat', args => {
-        return (args[0] as string) + (args[1] as string);
-      });
+      vm.registerFunction(
+        'concat',
+        args => (args[0] as string) + (args[1] as string)
+      );
 
       expect(vm.eval('return concat("hello", " world")')).toBe('hello world');
     });
 
     test('registerFunction works with booleans', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      vm.registerFunction('not', args => {
-        return !(args[0] as boolean);
-      });
+      vm.registerFunction('not', args => !(args[0] as boolean));
 
       expect(vm.eval('return not(true)')).toBe(false);
       expect(vm.eval('return not(false)')).toBe(true);
     });
 
     test('registerFunction handles multiple arguments', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      vm.registerFunction('sum', args => {
-        return (args[0] as number) + (args[1] as number) + (args[2] as number);
-      });
+      vm.registerFunction(
+        'sum',
+        args => (args[0] as number) + (args[1] as number) + (args[2] as number)
+      );
 
       expect(vm.eval('return sum(1, 2, 3)')).toBe(6);
     });
 
     test('registerFunction returns void', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       let called = false;
       vm.registerFunction('setFlag', () => {
@@ -323,21 +379,25 @@ describe('Lua FFI Integration', () => {
     });
 
     test('loadFile executes Lua file', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const testFile = join(process.cwd(), 'test-load.lua');
       writeFileSync(testFile, 'return {result = 42, name = "test"}');
 
       try {
         const result = vm.loadFile(testFile);
-        expect(result).toEqual({ result: 42, name: 'test' });
+        expect(result).toEqual({ name: 'test', result: 42 });
       } finally {
         unlinkSync(testFile);
       }
     });
 
     test('loadFile throws for non-existent file', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => vm.loadFile('/nonexistent/file.lua')).toThrow();
     });
@@ -349,7 +409,9 @@ describe('Lua FFI Integration', () => {
     const moduleFile = join(moduleDir, 'testmod.lua');
 
     beforeAll(() => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
       vm = new LuaVM(luaLibPath);
       mkdirSync(moduleDir, { recursive: true });
       writeFileSync(
@@ -359,15 +421,23 @@ describe('Lua FFI Integration', () => {
     });
 
     afterAll(() => {
-      if (vm) vm.close();
-      if (existsSync(moduleFile)) unlinkSync(moduleFile);
+      if (vm) {
+        vm.close();
+      }
+      if (existsSync(moduleFile)) {
+        unlinkSync(moduleFile);
+      }
       try {
-        require('node:fs').rmdirSync(moduleDir);
-      } catch {}
+        rmdirSync(moduleDir);
+      } catch {
+        /* directory not empty or already removed */
+      }
     });
 
     test('require loads module from file', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // This test would require setting up the module system properly
       // For now, we'll test the basic functionality
@@ -383,16 +453,22 @@ describe('Lua FFI Integration', () => {
     let vm: LuaVM;
 
     beforeAll(() => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
       vm = new LuaVM(luaLibPath);
     });
 
     afterAll(() => {
-      if (vm) vm.close();
+      if (vm) {
+        vm.close();
+      }
     });
 
     test('createCoroutine creates coroutine ID', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const coId = vm.createCoroutine('return 42');
       expect(typeof coId).toBe('string');
@@ -400,7 +476,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('resumeCoroutine executes code', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const coId = vm.createCoroutine('return 42');
       const result = vm.resumeCoroutine(coId);
@@ -409,7 +487,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('resumeCoroutine with arguments', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const coId = vm.createCoroutine('return arg1 + arg2');
       // Set global variables for the coroutine to use
@@ -421,7 +501,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('resumeCoroutine throws for invalid coroutine', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       expect(() => vm.resumeCoroutine('invalid')).toThrow(
         'Coroutine invalid not found'
@@ -429,14 +511,18 @@ describe('Lua FFI Integration', () => {
     });
 
     test('runCoroutineAsync executes asynchronously', async () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const result = await vm.runCoroutineAsync('return 42');
       expect(result).toBe(42);
     });
 
     test('runCoroutineAsync with arguments', async () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Set global variables for the coroutine to use
       vm.setGlobal('arg1', 6);
@@ -448,140 +534,168 @@ describe('Lua FFI Integration', () => {
 
   describe('Data Type Conversion', () => {
     let vm: LuaVM;
-    let lib: any;
+    let lib: LuaBindings;
+    let L: number;
 
     beforeAll(() => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
       vm = new LuaVM(luaLibPath);
-      lib = (vm as any).lib;
+      // Reach into private VM internals to drive the Lua stack directly
+      const internals = vm as unknown as { L: number; lib: LuaBindings };
+      lib = internals.lib;
+      L = internals.L;
     });
 
     afterAll(() => {
-      if (vm) vm.close();
+      if (vm) {
+        vm.close();
+      }
     });
 
     test('luaToJSFromTop handles nil', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       vm.eval('return nil');
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toBe(null);
     });
 
     test('luaToJSFromTop handles boolean', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Push boolean directly to stack and test conversion
-      lib.symbols.lua_pushboolean((vm as any).L, 1); // true
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      lib.symbols.lua_pushboolean(L, 1); // true
+      const result = luaToJSFromTop(lib, L);
       expect(result).toBe(true);
 
-      lib.symbols.lua_pushboolean((vm as any).L, 0); // false
-      const result2 = luaToJSFromTop(lib, (vm as any).L);
+      lib.symbols.lua_pushboolean(L, 0); // false
+      const result2 = luaToJSFromTop(lib, L);
       expect(result2).toBe(false);
     });
 
     test('luaToJSFromTop handles number', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Push number directly to stack and test conversion
-      lib.symbols.lua_pushnumber((vm as any).L, 42.5);
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      lib.symbols.lua_pushnumber(L, 42.5);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toBe(42.5);
     });
 
     test('luaToJSFromTop handles string', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Push string directly to stack and test conversion
       const buf = toCStringBuffer('test string');
-      lib.symbols.lua_pushstring((vm as any).L, buf as unknown as string);
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      lib.symbols.lua_pushstring(L, buf as unknown as string);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toBe('test string');
     });
 
     test('luaToJSFromTop handles array-like table', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Create array-like table directly on stack
-      lib.symbols.lua_createtable((vm as any).L, 3, 0);
-      lib.symbols.lua_pushnumber((vm as any).L, 1);
-      lib.symbols.lua_rawseti((vm as any).L, -2, 1);
-      lib.symbols.lua_pushnumber((vm as any).L, 2);
-      lib.symbols.lua_rawseti((vm as any).L, -2, 2);
-      lib.symbols.lua_pushnumber((vm as any).L, 3);
-      lib.symbols.lua_rawseti((vm as any).L, -2, 3);
+      lib.symbols.lua_createtable(L, 3, 0);
+      lib.symbols.lua_pushnumber(L, 1);
+      lib.symbols.lua_rawseti(L, -2, 1);
+      lib.symbols.lua_pushnumber(L, 2);
+      lib.symbols.lua_rawseti(L, -2, 2);
+      lib.symbols.lua_pushnumber(L, 3);
+      lib.symbols.lua_rawseti(L, -2, 3);
 
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toEqual([1, 2, 3]);
     });
 
     test('luaToJSFromTop handles object-like table', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Create object-like table directly on stack
-      lib.symbols.lua_createtable((vm as any).L, 0, 2);
-      lib.symbols.lua_pushnumber((vm as any).L, 1);
+      lib.symbols.lua_createtable(L, 0, 2);
+      lib.symbols.lua_pushnumber(L, 1);
       const abuf = toCStringBuffer('a');
-      lib.symbols.lua_setfield((vm as any).L, -2, abuf as unknown as string);
+      lib.symbols.lua_setfield(L, -2, abuf as unknown as string);
       const strBuf = toCStringBuffer('test');
-      lib.symbols.lua_pushstring((vm as any).L, strBuf as unknown as string);
+      lib.symbols.lua_pushstring(L, strBuf as unknown as string);
       const bbuf = toCStringBuffer('b');
-      lib.symbols.lua_setfield((vm as any).L, -2, bbuf as unknown as string);
+      lib.symbols.lua_setfield(L, -2, bbuf as unknown as string);
 
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toEqual({ a: 1, b: 'test' });
     });
 
     test('luaToJSFromTop handles mixed table', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       // Create mixed table directly on stack
-      lib.symbols.lua_createtable((vm as any).L, 2, 2);
-      lib.symbols.lua_pushnumber((vm as any).L, 1);
-      lib.symbols.lua_rawseti((vm as any).L, -2, 1);
-      lib.symbols.lua_pushnumber((vm as any).L, 2);
-      lib.symbols.lua_rawseti((vm as any).L, -2, 2);
-      lib.symbols.lua_pushnumber((vm as any).L, 42);
+      lib.symbols.lua_createtable(L, 2, 2);
+      lib.symbols.lua_pushnumber(L, 1);
+      lib.symbols.lua_rawseti(L, -2, 1);
+      lib.symbols.lua_pushnumber(L, 2);
+      lib.symbols.lua_rawseti(L, -2, 2);
+      lib.symbols.lua_pushnumber(L, 42);
       const abuf = toCStringBuffer('a');
-      lib.symbols.lua_setfield((vm as any).L, -2, abuf as unknown as string);
+      lib.symbols.lua_setfield(L, -2, abuf as unknown as string);
       const strBuf = toCStringBuffer('test');
-      lib.symbols.lua_pushstring((vm as any).L, strBuf as unknown as string);
+      lib.symbols.lua_pushstring(L, strBuf as unknown as string);
       const bbuf = toCStringBuffer('b');
-      lib.symbols.lua_setfield((vm as any).L, -2, bbuf as unknown as string);
+      lib.symbols.lua_setfield(L, -2, bbuf as unknown as string);
 
-      const result = luaToJSFromTop(lib, (vm as any).L);
+      const result = luaToJSFromTop(lib, L);
       expect(result).toEqual({ '1': 1, '2': 2, a: 42, b: 'test' });
     });
 
     test('pushJSValue handles primitives', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      pushJSValue(lib, (vm as any).L, 42);
+      pushJSValue(lib, L, 42);
       expect(vm.eval('return 42')).toBe(42);
 
-      pushJSValue(lib, (vm as any).L, 'test');
+      pushJSValue(lib, L, 'test');
       expect(vm.eval('return "test"')).toBe('test');
 
-      pushJSValue(lib, (vm as any).L, true);
+      pushJSValue(lib, L, true);
       expect(vm.eval('return true')).toBe(true);
 
-      pushJSValue(lib, (vm as any).L, null);
+      pushJSValue(lib, L, null);
       expect(vm.eval('return nil')).toBe(null);
     });
 
     test('pushJSValue handles arrays', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      pushJSValue(lib, (vm as any).L, [1, 2, 3]);
+      pushJSValue(lib, L, [1, 2, 3]);
       const result = vm.eval('return {1, 2, 3}');
       expect(result).toEqual([1, 2, 3]);
     });
 
     test('pushJSValue handles objects', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
-      pushJSValue(lib, (vm as any).L, { a: 1, b: 'test' });
+      pushJSValue(lib, L, { a: 1, b: 'test' });
       const result = vm.eval('return {a = 1, b = "test"}');
       expect(result).toEqual({ a: 1, b: 'test' });
     });
@@ -589,7 +703,9 @@ describe('Lua FFI Integration', () => {
 
   describe('Memory Management', () => {
     test('VM cleanup works properly', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm = new LuaVM(luaLibPath);
       vm.registerFunction('test', () => 42);
@@ -601,7 +717,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('multiple VMs can be created and closed', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm1 = new LuaVM(luaLibPath);
       const vm2 = new LuaVM(luaLibPath);
@@ -616,13 +734,17 @@ describe('Lua FFI Integration', () => {
 
   describe('Error Handling', () => {
     test('VM constructor throws without Lua library', () => {
-      if (luaAvailable) return; // Skip if Lua is available
+      if (luaAvailable) {
+        return;
+      } // Skip if Lua is available
 
       expect(() => new LuaVM()).toThrow('Lua shared library not found');
     });
 
     test('eval throws on invalid Lua code', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm = new LuaVM(luaLibPath);
       try {
@@ -633,7 +755,9 @@ describe('Lua FFI Integration', () => {
     });
 
     test('eval throws on runtime errors', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm = new LuaVM(luaLibPath);
       try {
@@ -648,15 +772,18 @@ describe('Lua FFI Integration', () => {
 
   describe('Integration Tests', () => {
     test('complex Lua-JS interaction', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm = new LuaVM(luaLibPath);
 
       try {
         // Register a JS function
-        vm.registerFunction('js_add', args => {
-          return (args[0] as number) + (args[1] as number);
-        });
+        vm.registerFunction(
+          'js_add',
+          args => (args[0] as number) + (args[1] as number)
+        );
 
         // Set a global variable
         vm.setGlobal('multiplier', 2);
@@ -676,21 +803,23 @@ describe('Lua FFI Integration', () => {
     });
 
     test('table manipulation between JS and Lua', () => {
-      if (!luaAvailable) return;
+      if (!luaAvailable) {
+        return;
+      }
 
       const vm = new LuaVM(luaLibPath);
 
       try {
         // Create a complex object in JS
         const data = {
-          users: [
-            { name: 'Alice', age: 30 },
-            { name: 'Bob', age: 25 }
-          ],
           settings: {
-            theme: 'dark',
-            notifications: true
-          }
+            notifications: true,
+            theme: 'dark'
+          },
+          users: [
+            { age: 30, name: 'Alice' },
+            { age: 25, name: 'Bob' }
+          ]
         };
 
         vm.setGlobal('data', data);
@@ -703,15 +832,15 @@ describe('Lua FFI Integration', () => {
         `);
 
         expect(result).toEqual({
-          users: [
-            { name: 'Alice', age: 31 },
-            { name: 'Bob', age: 25 }
-          ],
           settings: {
-            theme: 'dark',
             notifications: true,
+            theme: 'dark',
             volume: 75
-          }
+          },
+          users: [
+            { age: 31, name: 'Alice' },
+            { age: 25, name: 'Bob' }
+          ]
         });
       } finally {
         vm.close();

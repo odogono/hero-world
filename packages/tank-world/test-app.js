@@ -1,6 +1,6 @@
 import { firefox } from 'playwright';
 
-async function testApp() {
+const testApp = async () => {
   const browser = await firefox.launch({
     headless: false,
     slowMo: 100 // Slow down operations for better visibility
@@ -48,8 +48,8 @@ async function testApp() {
         domContentLoaded:
           perfData.domContentLoadedEventEnd -
           perfData.domContentLoadedEventStart,
-        loadComplete: perfData.loadEventEnd - perfData.loadEventStart,
         domInteractive: perfData.domInteractive,
+        loadComplete: perfData.loadEventEnd - perfData.loadEventStart,
         pageLoad: perfData.loadEventEnd - perfData.fetchStart
       };
     });
@@ -57,20 +57,22 @@ async function testApp() {
     console.log('📊 Performance Metrics:', metrics);
 
     // Check for React DevTools
-    const hasReactDevTools = await page.evaluate(() => {
-      return window.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined;
-    });
+    const hasReactDevTools = await page.evaluate(
+      () => window.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined
+    );
     console.log('🔧 React DevTools available:', hasReactDevTools);
 
     // Inspect the DOM structure
     const domInfo = await page.evaluate(() => {
       const root = document.getElementById('root');
-      if (!root) return { error: 'Root element not found' };
+      if (!root) {
+        return { error: 'Root element not found' };
+      }
 
       return {
-        rootChildren: root.children.length,
-        hasReactRoot: root.querySelector('[data-reactroot]') !== null,
         bodyChildren: document.body.children.length,
+        hasReactRoot: root.querySelector('[data-reactroot]') !== null,
+        rootChildren: root.children.length,
         scripts: document.querySelectorAll('script').length,
         styles: document.querySelectorAll('link[rel="stylesheet"]').length
       };
@@ -89,9 +91,9 @@ async function testApp() {
       );
 
       return {
-        sqliteGlobals,
         localStorageKeys: Object.keys(localStorage),
-        sessionStorageKeys: Object.keys(sessionStorage)
+        sessionStorageKeys: Object.keys(sessionStorage),
+        sqliteGlobals
       };
     });
 
@@ -110,15 +112,17 @@ async function testApp() {
       // Get React component tree info
       const reactInfo = await page.evaluate(() => {
         const root = document.getElementById('root');
-        if (!root) return null;
+        if (!root) {
+          return null;
+        }
 
         // Try to get React fiber information
         const reactInstance =
           root._reactInternalInstance || root._reactInternalFiber;
         return {
+          childrenCount: root.children.length,
           hasReactInstance: !!reactInstance,
-          rootType: reactInstance?.type?.name || 'Unknown',
-          childrenCount: root.children.length
+          rootType: reactInstance?.type?.name || 'Unknown'
         };
       });
 
@@ -128,9 +132,7 @@ async function testApp() {
     }
 
     // Check for any errors in the console
-    const consoleErrors = await page.evaluate(() => {
-      return window.consoleErrors || [];
-    });
+    const consoleErrors = await page.evaluate(() => window.consoleErrors || []);
 
     if (consoleErrors.length > 0) {
       console.log('⚠️ Console errors captured:', consoleErrors);
@@ -148,6 +150,6 @@ async function testApp() {
     console.log('🔒 Closing browser...');
     await browser.close();
   }
-}
+};
 
-testApp();
+await testApp();

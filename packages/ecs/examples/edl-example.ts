@@ -1,13 +1,10 @@
-/* eslint-disable no-console */
-
 import { s } from '../src/component';
 
 // Complete EDL example demonstrating atoms, inheritance, references, arrays, and errors
 const main = async () => {
   const { createWorld, defineComponent, queryEntity } = await import('../src');
-  const { EDLErrorCodes, EDLExecutionError, executeEDL } = await import(
-    '../src/edl'
-  );
+  const { EDLErrorCodes, EDLExecutionError, executeEDL } =
+    await import('../src/edl');
 
   // Define components used by the EDL script
   const described = defineComponent({

@@ -2,6 +2,9 @@ import { toSnakeCase } from 'odgn-helpers/string';
 
 import type { CDef, CDefColumnInfo, EntityWithComponents } from '../types';
 
+const isDate = (value: unknown): value is Date =>
+  Object.prototype.toString.call(value) === '[object Date]';
+
 type SerializableEntity =
   | EntityWithComponents<Record<string, unknown>>
   | {
@@ -17,10 +20,10 @@ const normalizeIdentifier = (value: string): string => {
 const escapeString = (value: string): string =>
   value
     .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replaceAll('\n', '\\n')
-    .replaceAll('\r', '\\r')
-    .replaceAll('\t', '\\t');
+    .replaceAll('"', String.raw`\"`)
+    .replaceAll('\n', String.raw`\n`)
+    .replaceAll('\r', String.raw`\r`)
+    .replaceAll('\t', String.raw`\t`);
 
 const formatQuotedString = (value: string): string =>
   `"${escapeString(value)}"`;
@@ -32,7 +35,7 @@ const ensureSerializableNumber = (value: number): string => {
   return value.toString();
 };
 
-const BARE_WORD_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const BARE_WORD_PATTERN = /^[A-Z_a-z]\w*$/;
 
 const formatDefaultLiteral = (
   value: unknown,
@@ -47,7 +50,7 @@ const formatDefaultLiteral = (
   if (typeof value === 'boolean') {
     return value ? 'true' : 'false';
   }
-  if (value instanceof Date) {
+  if (isDate(value)) {
     return formatQuotedString(value.toISOString());
   }
   if (typeof value === 'string') {
@@ -87,7 +90,7 @@ const formatValue = (value: unknown): string => {
   if (typeof value === 'bigint') {
     throw new TypeError('Cannot serialize bigint values to EDL');
   }
-  if (value instanceof Date) {
+  if (isDate(value)) {
     return formatQuotedString(value.toISOString());
   }
   if (Array.isArray(value)) {
@@ -119,7 +122,7 @@ const serializeComponentValue = (
   if (
     Array.isArray(componentData) ||
     typeof componentData !== 'object' ||
-    componentData instanceof Date
+    isDate(componentData)
   ) {
     return `  ${name} ${formatValue(componentData)}`;
   }
@@ -143,8 +146,10 @@ const indentLines = (lines: string[]): string =>
 
 const formatColumn = (column: CDefColumnInfo): string => {
   const tokens: string[] = [];
-  tokens.push(`${normalizeIdentifier(column.name)}: ${column.type}`);
-  tokens.push(column.optional === false ? 'not null' : 'null');
+  tokens.push(
+    `${normalizeIdentifier(column.name)}: ${column.type}`,
+    column.optional === false ? 'not null' : 'null'
+  );
   if (column.isUnique) {
     tokens.push('is_unique');
   }
@@ -199,7 +204,7 @@ export const serializeEntity = (
     .map(([componentKey, componentData]) =>
       serializeComponentValue(componentKey, componentData)
     )
-    .filter((value): value is string => Boolean(value));
+    .filter(Boolean);
 
   if (components.length === 0) {
     return `entity ${entityName} {}`;

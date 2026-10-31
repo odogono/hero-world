@@ -7,7 +7,12 @@ type StatusBarProps = {
   location: string;
 };
 
-export const StatusBar = ({ connectionStatus, health, level, location }: StatusBarProps) => {
+export const StatusBar = ({
+  connectionStatus,
+  health,
+  level,
+  location
+}: StatusBarProps) => {
   // Connection status indicator
   const statusDot =
     connectionStatus === 'connected'

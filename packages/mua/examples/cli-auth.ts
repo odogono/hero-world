@@ -17,7 +17,7 @@ type DeviceCodeResponse = {
   user_code: string;
   verification_uri: string;
   verification_uri_complete: string;
-}
+};
 
 type DeviceTokenResponse = {
   access_token: string;
@@ -25,16 +25,16 @@ type DeviceTokenResponse = {
   refresh_token?: string;
   scope?: string;
   token_type: string;
-}
+};
 
 type ErrorResponse = {
   error: string;
   error_description?: string;
-}
+};
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
 
-async function initiateDeviceFlow(): Promise<DeviceCodeResponse> {
+const initiateDeviceFlow = async (): Promise<DeviceCodeResponse> => {
   const response = await fetch(`${SERVER_URL}/oauth/device`, {
     headers: {
       'Content-Type': 'application/json'
@@ -47,12 +47,12 @@ async function initiateDeviceFlow(): Promise<DeviceCodeResponse> {
   }
 
   return response.json();
-}
+};
 
-async function pollForToken(
+const pollForToken = async (
   deviceCode: string,
   interval: number
-): Promise<DeviceTokenResponse> {
+): Promise<DeviceTokenResponse> => {
   const maxAttempts = 120; // 10 minutes max (120 * 5 seconds)
   let attempts = 0;
 
@@ -89,9 +89,9 @@ async function pollForToken(
   throw new Error(
     'Authorization timeout - user did not complete authorization in time'
   );
-}
+};
 
-async function makeAuthenticatedRequest(accessToken: string): Promise<void> {
+const makeAuthenticatedRequest = async (accessToken: string): Promise<void> => {
   const response = await fetch(`${SERVER_URL}/user`, {
     headers: {
       Authorization: `Bearer ${accessToken}`
@@ -104,9 +104,9 @@ async function makeAuthenticatedRequest(accessToken: string): Promise<void> {
 
   const userData = await response.json();
   log.info('Authenticated request successful:', userData);
-}
+};
 
-async function simulateUserAuth(userCode: string): Promise<void> {
+const simulateUserAuth = async (userCode: string): Promise<void> => {
   // This simulates the user completing authorization in their browser
   // In a real implementation, this would be handled by Google's OAuth service
   const response = await fetch(`${SERVER_URL}/oauth/simulate-auth`, {
@@ -122,9 +122,9 @@ async function simulateUserAuth(userCode: string): Promise<void> {
   }
 
   log.info('User authorization simulated successfully');
-}
+};
 
-async function main() {
+const main = async () => {
   try {
     log.info('Starting OAuth2 Device Authorization Grant flow...');
 
@@ -161,7 +161,7 @@ async function main() {
     log.error('OAuth2 flow failed:', error);
     process.exit(1);
   }
-}
+};
 
 // Run the example
-main();
+await main();

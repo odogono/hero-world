@@ -1,8 +1,14 @@
+import { resolve } from 'node:path';
+
 import { defineConfig } from 'vite';
+
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
 
 export default defineConfig({
+  assetsInclude: ['**/*.wasm'],
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm']
+  },
   plugins: [react()],
   resolve: {
     alias: {
@@ -22,21 +28,17 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3001',
-        changeOrigin: true
+        changeOrigin: true,
+        target: 'http://127.0.0.1:3001'
       },
       '/health': {
-        target: 'http://127.0.0.1:3001',
-        changeOrigin: true
+        changeOrigin: true,
+        target: 'http://127.0.0.1:3001'
       },
       '/ws': {
         target: 'ws://127.0.0.1:3001',
         ws: true
       }
     }
-  },
-  optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm']
-  },
-  assetsInclude: ['**/*.wasm']
+  }
 });

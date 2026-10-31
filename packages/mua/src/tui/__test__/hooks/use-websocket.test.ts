@@ -1,17 +1,22 @@
-import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
+import { act, renderHook } from '@testing-library/react';
+
 import { useWebSocket } from '../../hooks/use-websocket';
-import { createMockWebSocketConstructor, MockWebSocket } from '../mocks/websocket';
+import {
+  MockWebSocket,
+  createMockWebSocketConstructor,
+  type MockWebSocketConstructor
+} from '../mocks/websocket';
 
 describe('useWebSocket', () => {
   let originalWebSocket: typeof WebSocket;
-  let MockWSConstructor: typeof WebSocket;
+  let MockWSConstructor: MockWebSocketConstructor;
 
   beforeEach(() => {
     originalWebSocket = global.WebSocket;
     MockWSConstructor = createMockWebSocketConstructor();
-    (global as any).WebSocket = MockWSConstructor;
+    global.WebSocket = MockWSConstructor;
   });
 
   afterEach(() => {
@@ -25,20 +30,22 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
     expect(lastInstance).toBeDefined();
     expect(lastInstance.url).toBe('ws://localhost:3974/ws');
   });
 
   it('calls onStatusChange with connected on open', async () => {
     const onStatusChange = mock(() => {});
-    const { result } = renderHook(() => useWebSocket(undefined, onStatusChange));
+    const { result } = renderHook(() =>
+      useWebSocket(undefined, onStatusChange)
+    );
 
     act(() => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     await act(async () => {
       lastInstance.simulateOpen();
@@ -49,13 +56,15 @@ describe('useWebSocket', () => {
 
   it('calls onStatusChange with disconnected on close', async () => {
     const onStatusChange = mock(() => {});
-    const { result } = renderHook(() => useWebSocket(undefined, onStatusChange));
+    const { result } = renderHook(() =>
+      useWebSocket(undefined, onStatusChange)
+    );
 
     act(() => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     await act(async () => {
       lastInstance.simulateClose();
@@ -66,13 +75,15 @@ describe('useWebSocket', () => {
 
   it('calls onStatusChange with disconnected on error', async () => {
     const onStatusChange = mock(() => {});
-    const { result } = renderHook(() => useWebSocket(undefined, onStatusChange));
+    const { result } = renderHook(() =>
+      useWebSocket(undefined, onStatusChange)
+    );
 
     act(() => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     await act(async () => {
       lastInstance.simulateError();
@@ -89,7 +100,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     await act(async () => {
       lastInstance.simulateMessage({ data: 'test', success: true });
@@ -105,7 +116,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     // Simulate connection open so send works
     act(() => {
@@ -113,12 +124,15 @@ describe('useWebSocket', () => {
     });
 
     act(() => {
-      result.current.send({ type: 'cmd', payload: 'look' });
+      result.current.send({ payload: 'look', type: 'cmd' });
     });
 
     const sentMessages = lastInstance.getSentMessages();
     expect(sentMessages.length).toBe(1);
-    expect(JSON.parse(sentMessages[0])).toEqual({ type: 'cmd', payload: 'look' });
+    expect(JSON.parse(sentMessages[0])).toEqual({
+      payload: 'look',
+      type: 'cmd'
+    });
   });
 
   it('disconnects and cleans up listeners', () => {
@@ -128,7 +142,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     act(() => {
       result.current.disconnect();
@@ -146,7 +160,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws'); // Second call should be ignored
     });
 
-    const instances = (MockWSConstructor as any).instances;
+    const instances = MockWSConstructor.instances;
     expect(instances.length).toBe(1);
   });
 
@@ -154,7 +168,7 @@ describe('useWebSocket', () => {
     const onMessage1 = mock(() => {});
     const onMessage2 = mock(() => {});
 
-    const { result, rerender } = renderHook(
+    const { rerender, result } = renderHook(
       ({ callback }) => useWebSocket(callback),
       { initialProps: { callback: onMessage1 } }
     );
@@ -163,7 +177,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const lastInstance = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+    const lastInstance = MockWSConstructor.getLastInstance()!;
 
     // Change the callback
     rerender({ callback: onMessage2 });
@@ -192,7 +206,7 @@ describe('useWebSocket', () => {
       result.current.connect('ws://localhost:3974/ws');
     });
 
-    const instances = (MockWSConstructor as any).instances;
+    const instances = MockWSConstructor.instances;
     expect(instances.length).toBe(2); // Two separate connections created
   });
 });

@@ -1,4 +1,5 @@
 import alasql from 'alasql';
+import { createLog } from 'odgn-helpers/log';
 
 import { parseArgs } from './helpers';
 import type {
@@ -8,6 +9,8 @@ import type {
   StatementArgs,
   StatementRunResult
 } from './index';
+
+const log = createLog('alasql');
 
 // AlasSQL Statement wrapper
 class AlasqlStatementWrapper implements Statement {
@@ -242,15 +245,10 @@ export class AlasqlDatabaseWrapper implements Database {
           const replacement = this.formatValueForSql(arg);
 
           // Try numbered placeholder first, then simple placeholder
-          if (processedSql.includes(numberedPlaceholder)) {
-            processedSql = processedSql.replace(
-              numberedPlaceholder,
-              replacement
-            );
-          } else {
-            // Replace the first occurrence of ? with the value
-            processedSql = processedSql.replace(simplePlaceholder, replacement);
-          }
+          // (otherwise replace the first occurrence of ? with the value)
+          processedSql = processedSql.includes(numberedPlaceholder)
+            ? processedSql.replace(numberedPlaceholder, replacement)
+            : processedSql.replace(simplePlaceholder, replacement);
         });
       } else if (args && typeof args === 'object') {
         // Handle named parameters
@@ -294,15 +292,10 @@ export class AlasqlDatabaseWrapper implements Database {
           const replacement = this.formatValueForSql(arg);
 
           // Try numbered placeholder first, then simple placeholder
-          if (processedSql.includes(numberedPlaceholder)) {
-            processedSql = processedSql.replace(
-              numberedPlaceholder,
-              replacement
-            );
-          } else {
-            // Replace the first occurrence of ? with the value
-            processedSql = processedSql.replace(simplePlaceholder, replacement);
-          }
+          // (otherwise replace the first occurrence of ? with the value)
+          processedSql = processedSql.includes(numberedPlaceholder)
+            ? processedSql.replace(numberedPlaceholder, replacement)
+            : processedSql.replace(simplePlaceholder, replacement);
         });
       } else if (args && typeof args === 'object') {
         // Handle named parameters
@@ -341,7 +334,7 @@ export class AlasqlDatabaseWrapper implements Database {
 
     // Debug logging for CREATE INDEX
     if (convertedSql.toUpperCase().includes('CREATE INDEX')) {
-      console.log('DEBUG: Original CREATE INDEX SQL:', sql);
+      log.debug('DEBUG: Original CREATE INDEX SQL:', sql);
     }
 
     // Convert SQLite-specific features to AlasQL compatible ones
@@ -511,7 +504,7 @@ export class AlasqlDatabaseWrapper implements Database {
 
     // Debug logging for CREATE INDEX
     if (sql.toUpperCase().includes('CREATE INDEX')) {
-      console.log('DEBUG: Converted CREATE INDEX SQL:', convertedSql);
+      log.debug('DEBUG: Converted CREATE INDEX SQL:', convertedSql);
     }
     return convertedSql;
   }
@@ -527,7 +520,7 @@ export class AlasqlDatabaseWrapper implements Database {
 
     // AlasQL doesn't have built-in file persistence like SQLite
     // This would require implementing custom serialization
-    console.warn(
+    log.warn(
       'AlasQL saveToPath not fully implemented - requires custom serialization'
     );
   }

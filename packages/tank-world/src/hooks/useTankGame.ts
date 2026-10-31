@@ -1,154 +1,191 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import { useWebSocket } from './useWebSocket';
 
 export type Tank = {
+  hasActiveOrder: boolean;
+  health: number;
   id: number;
-  x: number;
-  y: number;
-  velocityX: number;
-  velocityY: number;
+  maxHealth: number;
   maxVelocityX: number;
   maxVelocityY: number;
-  health: number;
-  maxHealth: number;
   team: 'red' | 'blue';
-  hasActiveOrder: boolean;
+  velocityX: number;
+  velocityY: number;
+  x: number;
+  y: number;
 };
 
 export type GameEvent = {
-  type: string;
-  payload?: any;
+  payload?: unknown;
   ts: number;
+  type: string;
 };
 
-export function useTankGame() {
-  const { status, sendJson, messages, lastMessage } = useWebSocket({
+type GameMessage = GameEvent & {
+  payload?: {
+    id: number;
+    tanks?: Tank[];
+    team: 'red' | 'blue';
+    x: number;
+    y: number;
+  };
+  tankId?: number;
+  team: 'red' | 'blue';
+  x: number;
+  y: number;
+};
+
+export const useTankGame = () => {
+  const { lastMessage, messages, sendJson, status } = useWebSocket({
     url: 'ws://localhost:3001/ws' // Direct connection to backend server
   });
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [gameEvents, setGameEvents] = useState<GameEvent[]>([]);
 
   // Parse incoming messages
-  useEffect(() => {
-    if (!lastMessage?.json) return;
+  // Derived during render (rather than in an effect) to avoid cascading
+  // re-renders; runs once per new message.
+  const [prevMessage, setPrevMessage] = useState(lastMessage);
+  if (lastMessage !== prevMessage && lastMessage?.json) {
+    setPrevMessage(lastMessage);
+    const message = lastMessage.json as GameMessage;
 
-    const message = lastMessage.json as any;
-    
     // Handle game events
     if (message.type?.startsWith('game:')) {
       setGameEvents(prev => [...prev, message]);
-      
+
       switch (message.type) {
         case 'game:srv:spawned':
           // Tank spawned
           if (message.payload) {
             const newTank: Tank = {
+              hasActiveOrder: false,
+              health: 100,
               id: message.payload.id,
-              x: message.payload.x,
-              y: message.payload.y,
-              velocityX: 0,
-              velocityY: 0,
+              maxHealth: 100,
               maxVelocityX: 50,
               maxVelocityY: 50,
-              health: 100,
-              maxHealth: 100,
               team: message.payload.team,
-              hasActiveOrder: false
+              velocityX: 0,
+              velocityY: 0,
+              x: message.payload.x,
+              y: message.payload.y
             };
-            setTanks(prev => [...prev.filter(t => t.id !== newTank.id), newTank]);
+            setTanks(prev => [
+              ...prev.filter(t => t.id !== newTank.id),
+              newTank
+            ]);
           }
           break;
-        
+
         case 'game:world_state:response':
           // World state update
           if (message.payload?.tanks) {
             setTanks(message.payload.tanks);
           }
           break;
-        
+
         case 'game:tank_spawned':
           // Direct tank spawn response
           if (message.tankId) {
             const newTank: Tank = {
+              hasActiveOrder: false,
+              health: 100,
               id: message.tankId,
-              x: message.x,
-              y: message.y,
-              velocityX: 0,
-              velocityY: 0,
+              maxHealth: 100,
               maxVelocityX: 50,
               maxVelocityY: 50,
-              health: 100,
-              maxHealth: 100,
               team: message.team,
-              hasActiveOrder: false
+              velocityX: 0,
+              velocityY: 0,
+              x: message.x,
+              y: message.y
             };
-            setTanks(prev => [...prev.filter(t => t.id !== newTank.id), newTank]);
+            setTanks(prev => [
+              ...prev.filter(t => t.id !== newTank.id),
+              newTank
+            ]);
           }
           break;
       }
     }
-  }, [lastMessage]);
+  }
+
+  const requestWorldState = useCallback(
+    () =>
+      sendJson({
+        requestId: `${Date.now()}`,
+        type: 'game:world_state'
+      }),
+    [sendJson]
+  );
 
   // Request world state on connection
   useEffect(() => {
     if (status === 'open') {
       requestWorldState();
     }
-  }, [status]);
+  }, [status, requestWorldState]);
 
-  const spawnTank = useCallback((team: 'red' | 'blue', x?: number, y?: number) => {
-    return sendJson({
-      type: 'game:spawn',
-      team,
-      x,
-      y
-    });
-  }, [sendJson]);
+  const spawnTank = useCallback(
+    (team: 'red' | 'blue', x?: number, y?: number) =>
+      sendJson({
+        team,
+        type: 'game:spawn',
+        x,
+        y
+      }),
+    [sendJson]
+  );
 
-  const moveTank = useCallback((tankId: number, targetX: number, targetY: number) => {
-    return sendJson({
-      type: 'game:move',
-      tankId,
-      targetX,
-      targetY
-    });
-  }, [sendJson]);
-
-  const requestWorldState = useCallback(() => {
-    return sendJson({
-      type: 'game:world_state',
-      requestId: `${Date.now()}`
-    });
-  }, [sendJson]);
+  const moveTank = useCallback(
+    (tankId: number, targetX: number, targetY: number) =>
+      sendJson({
+        tankId,
+        targetX,
+        targetY,
+        type: 'game:move'
+      }),
+    [sendJson]
+  );
 
   const connectionStatus = useMemo(() => {
     switch (status) {
-      case 'connecting': return 'Connecting...';
-      case 'open': return 'Connected';
-      case 'closing': return 'Disconnecting...';
-      case 'closed': return 'Disconnected';
-      default: return 'Unknown';
+      case 'connecting':
+        return 'Connecting...';
+      case 'open':
+        return 'Connected';
+      case 'closing':
+        return 'Disconnecting...';
+      case 'closed':
+        return 'Disconnected';
+      default:
+        return 'Unknown';
     }
   }, [status]);
 
-  const tanksByTeam = useMemo(() => ({
-    red: tanks.filter(t => t.team === 'red'),
-    blue: tanks.filter(t => t.team === 'blue')
-  }), [tanks]);
+  const tanksByTeam = useMemo(
+    () => ({
+      blue: tanks.filter(t => t.team === 'blue'),
+      red: tanks.filter(t => t.team === 'red')
+    }),
+    [tanks]
+  );
 
   return {
     // Connection
     connectionStatus,
     isConnected: status === 'open',
-    
+
     // Game state
+    gameEvents: gameEvents.slice(-50), // Keep last 50 events
     tanks,
     tanksByTeam,
-    gameEvents: gameEvents.slice(-50), // Keep last 50 events
-    
+
     // Actions
-    spawnTank,
     moveTank,
-    requestWorldState
+    requestWorldState,
+    spawnTank
   };
-}
+};

@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 import { s } from '../src';
 
 // Main function to handle async operations

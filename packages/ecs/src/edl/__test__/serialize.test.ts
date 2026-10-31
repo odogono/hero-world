@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { CDef } from '@types';
+import type { CDef, Components } from '@types';
+import type { World } from '@world';
 
 import {
   serializeComponentDef,
@@ -11,16 +12,16 @@ import {
 describe('serializeEntity', () => {
   it('serializes an entity with basic components', () => {
     const entity = {
-      id: 1,
-      world: {} as any,
-      described: {
-        name: 'Test Entity',
-        description: 'A test entity'
-      },
       container: {
         capacity: 10,
         isClosed: false
-      }
+      },
+      described: {
+        description: 'A test entity',
+        name: 'Test Entity'
+      },
+      id: 1,
+      world: {} as World<Components>
     };
 
     const result = serializeEntity(entity);
@@ -34,15 +35,15 @@ describe('serializeEntity', () => {
   it('orders properties and formats nested values', () => {
     const entity = {
       id: 42,
-      world: {} as any,
       stats: {
-        count: 5,
         active: true,
-        rate: 3.14,
-        tags: ['a', 'b', 'c'],
         config: { enabled: true, level: 2 },
-        note: null
-      }
+        count: 5,
+        note: null,
+        rate: 3.14,
+        tags: ['a', 'b', 'c']
+      },
+      world: {} as World<Components>
     };
 
     const result = serializeEntity(entity);
@@ -55,10 +56,10 @@ describe('serializeEntity', () => {
   it('uses custom name when provided', () => {
     const entity = {
       id: 123,
-      world: {} as any,
       item: {
         weight: 1.5
-      }
+      },
+      world: {} as World<Components>
     };
 
     const result = serializeEntity(entity, 'my_item');
@@ -71,13 +72,13 @@ describe('serializeEntity', () => {
   it('handles references and string escaping', () => {
     const entity = {
       id: 7,
-      world: {} as any,
       location: {
         in: '$room_1'
       },
       notes: {
         text: 'Line 1\n"quoted"'
-      }
+      },
+      world: {} as World<Components>
     };
 
     const result = serializeEntity(entity);
@@ -85,7 +86,7 @@ describe('serializeEntity', () => {
     const expected = [
       'entity entity_7 {',
       '  location { in: $room_1 }',
-      '  notes { text: "Line 1\\n\\"quoted\\"" }',
+      String.raw`  notes { text: "Line 1\n\"quoted\"" }`,
       '}'
     ].join('\n');
 
@@ -95,10 +96,10 @@ describe('serializeEntity', () => {
   it('throws when encountering unsupported values', () => {
     const entity = {
       id: 8,
-      world: {} as any,
       script: {
         run: () => {}
-      }
+      },
+      world: {} as World<Components>
     };
 
     expect(() => serializeEntity(entity)).toThrow('Cannot serialize function');
@@ -108,18 +109,18 @@ describe('serializeEntity', () => {
 describe('serializeComponentDef', () => {
   it('serializes component definitions with defaults and flags', () => {
     const def: CDef = {
-      id: 'UserProfile',
-      hash: 'hash',
       columns: [
-        { name: 'id', type: 'pk', optional: false },
-        { name: 'displayName', type: 'string', default: 'Anonymous' },
-        { name: 'email', type: 'string', optional: false, isUnique: true },
+        { name: 'id', optional: false, type: 'pk' },
+        { default: 'Anonymous', name: 'displayName', type: 'string' },
+        { isUnique: true, name: 'email', optional: false, type: 'string' },
         {
+          default: { mode: 'auto' } as unknown as string,
           name: 'settings',
-          type: 'json',
-          default: { mode: 'auto' } as unknown as string
+          type: 'json'
         }
-      ]
+      ],
+      hash: 'hash',
+      id: 'UserProfile'
     };
 
     expect(serializeComponentDef(def)).toBe(`def user_profile {
@@ -134,17 +135,17 @@ describe('serializeComponentDef', () => {
 describe('serializeEDL', () => {
   it('serializes component definitions and entities together', () => {
     const def: CDef = {
-      id: 'Thing',
+      columns: [{ name: 'name', type: 'string' }],
       hash: 'hash',
-      columns: [{ name: 'name', type: 'string' }]
+      id: 'Thing'
     };
 
     const entity = {
       id: 21,
-      world: {} as any,
       thing: {
         name: 'Widget'
-      }
+      },
+      world: {} as World<Components>
     };
 
     expect(

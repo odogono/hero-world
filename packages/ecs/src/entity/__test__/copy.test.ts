@@ -37,9 +37,9 @@ describe('Entity', () => {
 
       // Re-query the target from DB to observe copied components
       const refreshed = world.query({
-        with: ['name'],
+        args: [entity2.id],
         where: 'e.id = ?',
-        args: [entity2.id]
+        with: ['name']
       });
 
       expect(refreshed!.name!.nickname).toBe('test');
@@ -81,9 +81,9 @@ describe('Entity', () => {
 
       // Query the target entity to verify components were copied
       const queriedTarget = anotherWorld.query({
-        with: ['name', 'stats'],
+        args: [entity2.id],
         where: 'e.id = ?',
-        args: [entity2.id]
+        with: ['name', 'stats']
       });
       expect(queriedTarget).toBeDefined();
       expect(queriedTarget!.name!.nickname).toBe('test');

@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 import { defineComponent, s } from '@component';
 import { createWorld } from '@world';
 

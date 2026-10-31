@@ -9,7 +9,7 @@ export type DeviceCodeResponse = {
   user_code: string;
   verification_uri: string;
   verification_uri_complete: string;
-}
+};
 
 export type DeviceTokenResponse = {
   access_token: string;
@@ -17,7 +17,7 @@ export type DeviceTokenResponse = {
   refresh_token?: string;
   scope?: string;
   token_type: string;
-}
+};
 
 export type DeviceAuthState = {
   access_token?: string;
@@ -32,22 +32,23 @@ export type DeviceAuthState = {
     sub: string;
   };
   user_code: string;
-}
+};
 
 // In-memory storage for device codes (in production, use Redis or database)
 const deviceAuthStates = new Map<string, DeviceAuthState>();
 
-export const generateDeviceCode = (): string => (
-    Math.random().toString(36).slice(2, 15) +
-    Math.random().toString(36).slice(2, 15)
-  );
+export const generateDeviceCode = (): string =>
+  Math.random().toString(36).slice(2, 15) +
+  Math.random().toString(36).slice(2, 15);
 
 export const generateUserCode = (): string => {
   // Generate a user-friendly code (e.g., ABCD-EFGH)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
-    if (i === 4) {result += '-';}
+    if (i === 4) {
+      result += '-';
+    }
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;

@@ -1,6 +1,6 @@
 import { parseEDL } from '.';
 import { hashComponentDefinition } from '../schema/component-hash';
-import type { CDef } from '../types';
+import type { CDef, CDefColumnInfo } from '../types';
 
 // Helper to parse an EDL default literal from a line-tail token into a typed value
 export const parseEDLDefault = (
@@ -40,8 +40,10 @@ export const parseEDLDefault = (
   return s;
 };
 
-const cdefFromEDL = (d: any) => {
-  const columns = (d.columns || []).map((c: any) => ({
+type EDLComponentNode = { columns?: CDefColumnInfo[]; id: string };
+
+const cdefFromEDL = (d: EDLComponentNode) => {
+  const columns = (d.columns || []).map((c: CDefColumnInfo) => ({
     foreignKey: c.foreignKey,
     isIndexed: c.isIndexed,
     isUnique: c.isUnique,

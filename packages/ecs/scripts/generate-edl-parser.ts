@@ -24,14 +24,13 @@ const main = async (): Promise<void> => {
   }) as string;
 
   await Bun.write(outPath, source);
-  // eslint-disable-next-line no-console
+
   console.log(`Generated: ${outPath}`);
 };
 
 try {
   await main();
 } catch (error) {
-  // eslint-disable-next-line no-console
   console.error(error);
   process.exit(1);
 }

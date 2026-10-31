@@ -1,12 +1,17 @@
-import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+
+import { act, renderHook } from '@testing-library/react';
 
 import { useCommandHistory } from '../hooks/use-command-history';
 import { useDebugMode } from '../hooks/use-debug-mode';
 import { useGameState } from '../hooks/use-game-state';
-import { useWebSocket } from '../hooks/use-websocket';
-import { completeVerb, KNOWN_VERBS } from '../utils/verb-completer';
-import { createMockWebSocketConstructor, MockWebSocket } from './mocks/websocket';
+import { useWebSocket, type ServerMessage } from '../hooks/use-websocket';
+import { KNOWN_VERBS, completeVerb } from '../utils/verb-completer';
+import {
+  MockWebSocket,
+  createMockWebSocketConstructor,
+  type MockWebSocketConstructor
+} from './mocks/websocket';
 
 /**
  * Integration tests for the TUI App
@@ -14,12 +19,12 @@ import { createMockWebSocketConstructor, MockWebSocket } from './mocks/websocket
  */
 describe('TUI App Integration', () => {
   let originalWebSocket: typeof WebSocket;
-  let MockWSConstructor: typeof WebSocket;
+  let MockWSConstructor: MockWebSocketConstructor;
 
   beforeEach(() => {
     originalWebSocket = global.WebSocket;
     MockWSConstructor = createMockWebSocketConstructor();
-    (global as any).WebSocket = MockWSConstructor;
+    global.WebSocket = MockWSConstructor;
   });
 
   afterEach(() => {
@@ -36,7 +41,7 @@ describe('TUI App Integration', () => {
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
       expect(ws).toBeDefined();
       expect(ws.url).toBe('ws://localhost:3974/ws');
 
@@ -53,13 +58,19 @@ describe('TUI App Integration', () => {
       // Verify message format
       const sentMessages = ws.getSentMessages();
       expect(sentMessages.length).toBe(1);
-      expect(JSON.parse(sentMessages[0])).toEqual({ payload: 'look', type: 'cmd' });
+      expect(JSON.parse(sentMessages[0])).toEqual({
+        payload: 'look',
+        type: 'cmd'
+      });
     });
 
     it('receives and displays server responses', () => {
-      const onMessage = mock((data: any) => {
+      const onMessage = mock((data: ServerMessage) => {
         if (data && data.data) {
-          gameStateResult.current.addMessage(data.data, data.success ? 'game' : 'error');
+          gameStateResult.current.addMessage(
+            data.data,
+            data.success ? 'game' : 'error'
+          );
         }
       });
 
@@ -70,25 +81,33 @@ describe('TUI App Integration', () => {
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
 
       // Simulate server response
       act(() => {
-        ws.simulateMessage({ data: 'You look around the room.', success: true });
+        ws.simulateMessage({
+          data: 'You look around the room.',
+          success: true
+        });
       });
 
-      expect(onMessage).toHaveBeenCalledWith({ data: 'You look around the room.', success: true });
+      expect(onMessage).toHaveBeenCalledWith({
+        data: 'You look around the room.',
+        success: true
+      });
     });
 
     it('tracks connection status changes', () => {
       const onStatusChange = mock(() => {});
-      const { result: wsResult } = renderHook(() => useWebSocket(undefined, onStatusChange));
+      const { result: wsResult } = renderHook(() =>
+        useWebSocket(undefined, onStatusChange)
+      );
 
       act(() => {
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
 
       // Simulate connection events
       act(() => {
@@ -203,9 +222,19 @@ Exits: north, south, east`;
       // Verify room data was extracted
       expect(gameStateResult.current.currentRoom).not.toBeNull();
       expect(gameStateResult.current.currentRoom?.name).toBe('Town Square');
-      expect(gameStateResult.current.currentRoom?.description).toContain('bustling marketplace');
-      expect(gameStateResult.current.currentRoom?.exits).toEqual(['north', 'south', 'east']);
-      expect(gameStateResult.current.currentRoom?.items).toEqual(['sword', 'shield', 'potion']);
+      expect(gameStateResult.current.currentRoom?.description).toContain(
+        'bustling marketplace'
+      );
+      expect(gameStateResult.current.currentRoom?.exits).toEqual([
+        'north',
+        'south',
+        'east'
+      ]);
+      expect(gameStateResult.current.currentRoom?.items).toEqual([
+        'sword',
+        'shield',
+        'potion'
+      ]);
 
       // Verify player location was updated
       expect(gameStateResult.current.playerState.location).toBe('Town Square');
@@ -242,7 +271,10 @@ Exits: south, west`;
         gameStateResult.current.addMessage(room2, 'game');
       });
       expect(gameStateResult.current.playerState.location).toBe('Dark Forest');
-      expect(gameStateResult.current.currentRoom?.exits).toEqual(['south', 'west']);
+      expect(gameStateResult.current.currentRoom?.exits).toEqual([
+        'south',
+        'west'
+      ]);
     });
   });
 
@@ -298,7 +330,10 @@ Exits: south, west`;
       const { result: wsResult } = renderHook(() =>
         useWebSocket(data => {
           if (data && data.data) {
-            gameStateResult.current.addMessage(data.data, data.success ? 'game' : 'error');
+            gameStateResult.current.addMessage(
+              data.data,
+              data.success ? 'game' : 'error'
+            );
           }
         })
       );
@@ -310,7 +345,7 @@ Exits: south, west`;
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
 
       act(() => {
         ws.simulateOpen();
@@ -328,7 +363,10 @@ Exits: south, west`;
       // Verify command was sent
       const sentMessages = ws.getSentMessages();
       expect(sentMessages.length).toBe(1);
-      expect(JSON.parse(sentMessages[0])).toEqual({ payload: 'look', type: 'cmd' });
+      expect(JSON.parse(sentMessages[0])).toEqual({
+        payload: 'look',
+        type: 'cmd'
+      });
 
       // Verify command was added to history
       expect(historyResult.current.history).toContain('look');
@@ -357,7 +395,10 @@ Exits: north, south`,
       const { result: wsResult } = renderHook(() =>
         useWebSocket(data => {
           if (data && data.data) {
-            gameStateResult.current.addMessage(data.data, data.success ? 'game' : 'error');
+            gameStateResult.current.addMessage(
+              data.data,
+              data.success ? 'game' : 'error'
+            );
           }
         })
       );
@@ -367,7 +408,7 @@ Exits: north, south`,
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
 
       // Server sends error
       act(() => {
@@ -378,7 +419,7 @@ Exits: north, south`,
       });
 
       // Verify error message was added
-      const lastMessage = gameStateResult.current.messages[gameStateResult.current.messages.length - 1];
+      const lastMessage = gameStateResult.current.messages.at(-1);
       expect(lastMessage.type).toBe('error');
       expect(lastMessage.content).toBe('Unknown command');
     });
@@ -423,7 +464,7 @@ Exits: north, south`,
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      let ws = (MockWSConstructor as any).getLastInstance() as MockWebSocket;
+      const ws = MockWSConstructor.getLastInstance()!;
       expect(ws.url).toBe('ws://localhost:3974/ws');
 
       // Disconnect
@@ -438,7 +479,7 @@ Exits: north, south`,
         wsResult.current.connect('ws://localhost:3974/ws');
       });
 
-      const instances = (MockWSConstructor as any).instances;
+      const instances = MockWSConstructor.instances;
       expect(instances.length).toBe(2); // New connection created
     });
   });
