@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path';
+
 import { toCamelCase } from 'odgn-helpers/string';
 
 import { addComponents } from '@component';
@@ -49,6 +51,22 @@ const mergeComponents = (
 
 export type ExecuteOptions = {
   commands?: Record<string, (...args: unknown[]) => void>;
+  /** Path of the .edl file; `script.src` values resolve relative to it */
+  path?: string;
+};
+
+/** The component that attaches a NorthTalk Script to an atom or entity */
+const SCRIPT_COMPONENT = 'script';
+
+const scriptPath = (
+  own: ComponentData,
+  edlPath: string | undefined
+): string | undefined => {
+  const src = own[SCRIPT_COMPONENT]?.src;
+  if (typeof src !== 'string' || src.length === 0) {
+    return undefined;
+  }
+  return edlPath ? resolve(dirname(edlPath), src) : src;
 };
 
 const stripComments = (line: string) => {
@@ -382,6 +400,21 @@ export const executeEDL = <T extends Components>(
   }
   for (const [eid, plan] of entityPlansById.entries()) {
     world.entityLineage.set(eid, [...plan.extends]);
+  }
+
+  // Record Script owners: only atoms and entities that declare `script`
+  // themselves own a Script; inheritors share their atom's Script
+  for (const [name, atom] of rawAtoms.entries()) {
+    const path = scriptPath(atom.own, options.path);
+    if (path) {
+      world.atomScripts.set(name, path);
+    }
+  }
+  for (const [eid, plan] of entityPlansById.entries()) {
+    const path = scriptPath(plan.own, options.path);
+    if (path) {
+      world.entityScripts.set(eid, path);
+    }
   }
 
   // Persist initial entities/components so rows (ids) exist for command refs
