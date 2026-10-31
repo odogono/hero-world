@@ -30,6 +30,14 @@ _Avoid_: contents, children
 The Host Object that stands for one entity inside a Script Group.
 _Avoid_: proxy, wrapper
 
+**Owner**:
+The Host Object an atom's Script owns; `me` in that Script. It stands for the atom, never an entity.
+_Avoid_: me (when you mean the entity), self
+
+**Receiver**:
+The entity a message was delivered to; `the target` in every Script on its Message Path. It stays the same as the message climbs.
+_Avoid_: me, sender
+
 **Message Path**:
-The route an unhandled message climbs, from an entity through its Lineage's atoms.
+The route an unhandled message climbs, from an entity through the atoms in its Lineage that have Scripts. Atoms without a Script are skipped.
 _Avoid_: inheritance chain, delegation
