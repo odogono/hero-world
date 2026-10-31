@@ -72,6 +72,32 @@ def user {
     - `is_unique`
     - `default <raw tail of line>` (quotes/spaces preserved)
 
+## Scripts
+
+Attach a NorthTalk Script to an atom or entity with a plain `script` component. Declare it like any other component:
+
+```
+def script {
+  src: string not null
+}
+
+atom door: exit {
+  door   { is_locked: true }
+  script { src: "door.talk" }
+}
+
+entity front_door: door {}
+entity vault_door: door {
+  script { src: "vault.talk" }
+}
+```
+
+- `src` is stored as written. When `executeEDL` is given the file's `path` (`world.executeEDL(edl, { path })`), the owner's source path is resolved relative to the `.edl` file.
+- Inheritance works as for any component, so `front_door` has a `script` component copied from `door`.
+- Sharing rule: only an atom or entity that declares `script` itself **owns** a Script. An entity that inherits `script` from its atom shares that atom's Script and does not get its own copy. Above, `door` and `vault_door` own Scripts; `front_door` shares `door`'s.
+- `world.getScriptOwners()` lists owners as `{ kind: 'atom', name, src }` or `{ kind: 'entity', eid, src }`.
+- `serializeEDL` writes `script` like any other component.
+
 ## Commands
 
 - Lines beginning with `!` are parsed as commands and executed after definitions.

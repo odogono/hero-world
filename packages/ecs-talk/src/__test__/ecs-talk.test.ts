@@ -300,3 +300,34 @@ describe('ecs-talk', () => {
     expect(show(await reply.result)).toBe('hi!');
   });
 });
+
+describe('script owners', () => {
+  it('lists the atoms and entities whose EDL declares a script', async () => {
+    const scriptComponent = defineComponent({
+      id: 'script' as const,
+      schema: { src: s.string() }
+    });
+    const world = await createWorld([statsComponent, scriptComponent]);
+    world.executeEDL(
+      `
+      atom person {
+        stats { hp: 20 }
+        script { src: "person.talk" }
+      }
+      entity hero: person {}
+      entity boss: person {
+        script { src: "boss.talk" }
+      }
+      `,
+      { path: '/game/main.edl' }
+    );
+    const boss = world
+      .queryAll({ with: ['script'] })
+      .find(e => e.script.src === 'boss.talk')!;
+
+    expect(createEcsTalk(world).scriptOwners()).toEqual([
+      { kind: 'atom', name: 'person', src: '/game/person.talk' },
+      { eid: boss.id, kind: 'entity', src: '/game/boss.talk' }
+    ]);
+  });
+});

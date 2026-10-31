@@ -174,6 +174,10 @@ const registerComponentDef = <TComponents extends Components>(
   world.defs.set(name, def);
 };
 
+export type ScriptOwner =
+  | { kind: 'atom'; name: string; src: string }
+  | { eid: number; kind: 'entity'; src: string };
+
 export class World<TComponents extends Components> {
   db!: Database;
   options: CreateWorldOptions;
@@ -187,6 +191,9 @@ export class World<TComponents extends Components> {
   /** Lineage: the ordered base atoms each entity (by id) and atom (by name) extends */
   entityLineage: Map<number, string[]>;
   atomLineage: Map<string, string[]>;
+  /** Script owners: atoms (by name) and entities (by id) that declare their own `script`, mapped to its source path */
+  atomScripts: Map<string, string>;
+  entityScripts: Map<number, string>;
 
   constructor(options: CreateWorldOptions) {
     this.options = options;
@@ -198,6 +205,24 @@ export class World<TComponents extends Components> {
     this.stmts = {};
     this.entityLineage = new Map();
     this.atomLineage = new Map();
+    this.atomScripts = new Map();
+    this.entityScripts = new Map();
+  }
+
+  /** Atoms and entities that own a Script, with the Script's source path */
+  getScriptOwners(): ScriptOwner[] {
+    return [
+      ...[...this.atomScripts].map(([name, src]) => ({
+        kind: 'atom' as const,
+        name,
+        src
+      })),
+      ...[...this.entityScripts].map(([eid, src]) => ({
+        eid,
+        kind: 'entity' as const,
+        src
+      }))
+    ];
   }
 
   /** The ordered base atoms an entity was built from (empty if none) */
