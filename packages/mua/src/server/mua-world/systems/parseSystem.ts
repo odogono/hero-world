@@ -23,7 +23,7 @@ export const parseSystem = createSystem(
           wsId
         }
       });
-      world.remove(entity.id);
+      world.delete(entity);
       return;
     }
 
@@ -39,7 +39,7 @@ export const parseSystem = createSystem(
           wsId
         }
       });
-      world.remove(entity.id);
+      world.delete(entity);
       return;
     }
 
@@ -56,7 +56,7 @@ export const parseSystem = createSystem(
     });
 
     // Remove input event
-    world.remove(entity.id);
+    world.delete(entity);
   },
   {
     frequency: 1,

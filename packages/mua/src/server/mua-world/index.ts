@@ -7,6 +7,7 @@ import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
 import { defs, type MuaComponents } from './coms';
+import { findPlayerByConnection } from './queries/player';
 
 const log = createLog('mua-world');
 
@@ -44,7 +45,7 @@ export class MuaWorld {
       // const dump = this.world.db.dump();
       // console.log(dump);
       try {
-        this.world.executeEDL(mainEDL);
+        this.world.executeEDL(mainEDL, { path: mainPath });
       } catch (error) {
         if (error instanceof EDLParseError) {
           const msg = `${error.message}\nFile: ${mainPath}`;
@@ -55,19 +56,24 @@ export class MuaWorld {
       log.info(`Loaded main EDL from ${mainPath}`);
     }
 
+    const { createMuaTalk, createShowSystem } = await import('./talk');
+    const talk = await createMuaTalk(this.world);
     this.loop = createGameLoop(this.world);
 
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
     const { parseSystem } = await import('./systems/parseSystem');
-    const { actionSystem } = await import('./systems/actionSystem');
+    const { createActionSystem } = await import('./systems/actionSystem');
     const { createOutputSystem } = await import('./systems/outputSystem');
 
     // Register systems in priority order
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
-    this.loop.addSystem('action', actionSystem);
+    this.loop.addSystem('action', createActionSystem(talk));
+    this.loop.addSystem('show', createShowSystem());
     this.loop.addSystem('output', createOutputSystem(this.connections));
+    // runs last: systems, then the Pump, then the end-of-frame flush
+    this.loop.addSystem('talk', talk.system);
 
     // Start the update loop that runs every second (1000ms)
     this.lastUpdateTime = performance.now();
@@ -97,8 +103,8 @@ export class MuaWorld {
   getContents(containedIn: EntityId) {
     return this.world?.queryAll({
       args: [containedIn],
-      where: 'contained.in = ?1',
-      with: ['contained', 'described']
+      where: 'location."in" = ?1',
+      with: ['location', 'described']
     });
   }
 
@@ -137,9 +143,9 @@ export class MuaWorld {
             capacity: 10,
             isClosed: false
           },
+          location: { in: startRoom!.id },
           player: {
             connectedId: connectionEntity.id,
-            location: startRoom?.id,
             name: username
           }
         });
@@ -262,15 +268,7 @@ export class MuaWorld {
     this.connections.delete(conn.id);
 
     // Unlink player from connection
-    const player = this.world?.query({
-      args: [conn.id],
-      where: `player.connected_id IN (
-        SELECT id FROM entity WHERE id IN (
-          SELECT id FROM connected WHERE connected.ws_id = ?1
-        )
-      )`,
-      with: ['player']
-    });
+    const player = this.world && findPlayerByConnection(this.world, conn.id);
 
     if (player) {
       player.player.connectedId = undefined;

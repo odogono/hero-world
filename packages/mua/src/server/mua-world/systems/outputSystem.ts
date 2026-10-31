@@ -15,14 +15,17 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
         // Send to all players in room
         const playersInRoom = world.queryAll({
           args: [roomId],
-          where: 'player.location = ?1',
-          with: ['player']
+          where: 'location."in" = ?1',
+          with: ['player', 'location']
         });
 
         playersInRoom.forEach(player => {
           if (player.player.connectedId) {
-            const conn = world.get(player.player.connectedId);
-            if (conn?.connected) {
+            const conn = world.query({
+              entity: { id: player.player.connectedId, world } as never,
+              with: ['connected']
+            });
+            if (conn) {
               const ws = connections.get(conn.connected.wsId);
               if (ws) {
                 ws.send(JSON.stringify({ data: message, success: true }));
@@ -39,7 +42,7 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
       }
 
       // Remove output event
-      world.remove(entity.id);
+      world.delete(entity);
     },
     {
       frequency: 1,

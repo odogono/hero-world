@@ -9,16 +9,16 @@ export const getRoomContents = (
 ) =>
   world.queryAll({
     args: [roomId],
-    where: 'contained.in = ?1',
-    with: ['contained', 'described'],
+    where: 'location."in" = ?1',
+    with: ['location', 'described'],
     without: ['portal']
   });
 
 export const getRoomExits = (world: World<MuaComponents>, roomId: EntityId) =>
   world.queryAll({
     args: [roomId],
-    where: 'contained.in = ?1',
-    with: ['contained', 'portal']
+    where: 'location."in" = ?1',
+    with: ['location', 'portal']
   });
 
 export const findExitByDirection = (
@@ -28,8 +28,8 @@ export const findExitByDirection = (
 ) =>
   world.query({
     args: [roomId, direction],
-    where: 'contained.in = ?1 AND portal.dir = ?2',
-    with: ['contained', 'portal']
+    where: 'location."in" = ?1 AND portal.dir = ?2',
+    with: ['location', 'portal']
   });
 
 export const findRoomByMetaId = (world: World<MuaComponents>, metaId: string) =>

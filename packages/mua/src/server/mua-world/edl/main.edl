@@ -14,28 +14,32 @@
 atom root {
 }
 
-# !set $root.props.look !LookRoom
-
 # Base container atom (reusable defaults)
 atom container {
   meta { props: { id: "container" } }
-  container { capacity: 10 is_closed: false look: "!LookContainer" }
+  container { capacity: 10 is_closed: false }
 }
 
 # Room atom (conceptually inherits container via entity-level extension)
 atom room: container {
   # Provide defaults; entities will override name/description
   described { name: "Room" description: "An unremarkable room." }
-  container { look: "!LookRoom" }
+  script { src: "scripts/room.talk" }
 }
 
-# Exit atom
+# Exit atom: `traverse` moves an actor through its portal
 atom exit {
-  
+  script { src: "scripts/exit.talk" }
+}
+
+# Door atom: an exit that vetoes `beforeTraverse` while it is locked
+atom door: exit {
+  door { is_locked: true }
+  script { src: "scripts/door.talk" }
 }
 
 # Generic item atom
-entity item {
+atom item {
   meta { props: { id: "item atom" } }
   item { weight: 1 is_takeable: true }
 }
@@ -82,29 +86,29 @@ entity behind_house : room {
 # !set $behind_house.mua.id "behind_house"
 
 entity west_of_house_north : exit {  
-  contained { in: $west_of_house } portal { dir: "north" to: $north_of_house } }
+  location { in: $west_of_house } portal { dir: "north" to: $north_of_house } }
 entity west_of_house_south : exit {  
-  contained { in: $west_of_house } portal { dir: "south" to: $south_of_house } }
+  location { in: $west_of_house } portal { dir: "south" to: $south_of_house } }
 
 entity north_of_house_east : exit {  
-  contained { in: $north_of_house } portal { dir: "east" to: $behind_house } }
+  location { in: $north_of_house } portal { dir: "east" to: $behind_house } }
 entity north_of_house_south : exit {  
-  contained { in: $north_of_house } portal { dir: "south" msg: "The windows are all barred" } }
+  location { in: $north_of_house } portal { dir: "south" msg: "The windows are all barred" } }
 
 entity south_of_house_west : exit {  
-  contained { in: $south_of_house } portal { dir: "west" to: $west_of_house } }
+  location { in: $south_of_house } portal { dir: "west" to: $west_of_house } }
 entity south_of_house_east : exit {  
-  contained { in: $south_of_house } portal { dir: "east" to: $behind_house } }
+  location { in: $south_of_house } portal { dir: "east" to: $behind_house } }
 entity south_of_house_north : exit {  
-  contained { in: $south_of_house } portal { dir: "north" msg: "The windows are all barred" } }
+  location { in: $south_of_house } portal { dir: "north" msg: "The windows are all barred" } }
 
 
-entity behind_house_west : exit {  
-  contained { in: $behind_house } portal { dir: "west" msg: "The window is closed" } }
+entity behind_house_west : door {
+  location { in: $behind_house } portal { dir: "west" msg: "The window is closed" } }
 entity behind_house_north : exit {  
-  contained { in: $behind_house } portal { dir: "north" to: $north_of_house } }
+  location { in: $behind_house } portal { dir: "north" to: $north_of_house } }
 entity behind_house_south : exit {  
-  contained { in: $behind_house } portal { dir: "south" to: $south_of_house } }
+  location { in: $behind_house } portal { dir: "south" to: $south_of_house } }
 
 
 # ==========
@@ -115,11 +119,11 @@ entity behind_house_south : exit {
 entity mailbox: container {
   described { name: "Mailbox" description: "A small mailbox on a wooden post." }
   container { capacity: 5 is_closed: true }
-  contained { in: $west_of_house }
+  location { in: $west_of_house }
 }
 
 entity leaflet: item {
   described { name: "Leaflet" description: "A leaflet with bold letters: 'WELCOME TO MUA'" }
   item { weight: 1 }
-  contained { in: $mailbox }
+  location { in: $mailbox }
 }

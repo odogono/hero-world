@@ -1,0 +1,31 @@
+-- Owned by the `room` atom. `the target` is the room that got the message.
+use join from text
+
+-- Show the actor the room's name and description, what is in it and the exits
+on look actor
+  put the described of the target into room
+  put newline & the name of room & newline & the description of room & newline into msg
+
+  ask world to find the target, "item"
+  put it into things
+  repeat for each thing in things collecting the name of the described of thing into items
+    if the described of thing is nothing then next repeat
+    if not the isTakeable of the item of thing then next repeat
+  end repeat
+  if items is not empty then put newline & "You see: " & join(items, ", ") after msg
+
+  ask world to find the target, "container"
+  put it into boxes
+  repeat for each box in boxes collecting the name of the described of box into containers
+    if the described of box is nothing then next repeat
+  end repeat
+  if containers is not empty then put newline & "There is: " & join(containers, ", ") after msg
+
+  ask world to find the target, "portal"
+  put it into exits
+  repeat for each ex in exits collecting the dir of the portal of ex into dirs
+  end repeat
+  if dirs is not empty then put newline & newline & "Exits: " & join(dirs, ", ") after msg
+
+  show actor, msg
+end look

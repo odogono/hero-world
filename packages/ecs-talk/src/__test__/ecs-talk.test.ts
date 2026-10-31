@@ -4,7 +4,7 @@ import { eventComponent, getAllEvents } from 'odgn-ecs/events';
 import { createGameLoop } from 'odgn-ecs/system';
 import { createWorld } from 'odgn-ecs/world';
 
-import { talk, text, type Report, type Value } from '@northtalk/ts';
+import { num, talk, text, type Report, type Value } from '@northtalk/ts';
 
 import { TALK_SHOW_EVENT, createEcsTalk, locationComponent } from '../index';
 
@@ -298,6 +298,84 @@ describe('ecs-talk', () => {
     const reply = ecsTalk.request(byName('hero'), 'echo', text('hi'));
     ecsTalk.pump();
     expect(show(await reply.result)).toBe('hi!');
+  });
+});
+
+describe('links and Decisions', () => {
+  const linkComponent = defineComponent({
+    id: 'link' as const,
+    schema: { locked: s.boolean().default(false), to: s.entityId().optional() }
+  });
+
+  const setupLinks = async () => {
+    const world = await createWorld([linkComponent, eventComponent]);
+    world.executeEDL(`
+      atom place { link {} }
+      entity far: place {}
+      entity near: place { link { to: $far } }
+      entity shut: place { link { to: $far locked: true } }
+    `);
+    const byTo = (locked: boolean) =>
+      world
+        .queryAll({ with: ['link'] })
+        .find(e => e.link.to && e.link.locked === locked)!.id;
+    const ecsTalk = createEcsTalk(world);
+    ecsTalk.loadAtomScript(
+      'place',
+      talk`
+        on go
+          ask world to resolve the to of the link of the target
+          send arrive to it
+        end go
+
+        on arrive
+          show the target, "arrived"
+        end arrive
+
+        on probe id
+          ask world to resolve id
+          return it is nothing
+        end probe
+
+        on beforeGo, deciding
+          if the locked of the link of the target then veto "locked"
+        end beforeGo
+      `
+    );
+    return { byTo, ecsTalk, world };
+  };
+
+  it('delivers to an entity a Script first reaches inside a Run', async () => {
+    const { byTo, ecsTalk, world } = await setupLinks();
+    ecsTalk.deliver(byTo(false), 'go');
+    ecsTalk.pump();
+    ecsTalk.pump();
+    world.flush();
+    const events = getAllEvents(world as never, TALK_SHOW_EVENT);
+    expect(events.map(e => e.payload)).toEqual([
+      {
+        actor: world.queryAll({ with: ['link'] }).find(e => !e.link.to)!.id,
+        text: 'arrived'
+      }
+    ]);
+  });
+
+  it('resolves an id that names no entity to Nothing', async () => {
+    const { byTo, ecsTalk } = await setupLinks();
+    const reply = ecsTalk.request(byTo(false), 'probe', num(9999));
+    ecsTalk.pump();
+    expect(show(await reply.result)).toBe('true');
+  });
+
+  it('answers a Decision with a veto reason', async () => {
+    const { byTo, ecsTalk } = await setupLinks();
+    const open = ecsTalk.decide(byTo(false), 'beforeGo');
+    const shut = ecsTalk.decide(byTo(true), 'beforeGo');
+    ecsTalk.pump();
+    expect((await open.decided).verdict).toBe('allowed');
+    const vetoed = await shut.decided;
+    expect(vetoed.verdict).toBe('vetoed');
+    expect(show(vetoed.vetoes[0]!.reason)).toBe('locked');
   });
 });
 

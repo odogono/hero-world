@@ -326,6 +326,18 @@ export const createEcsTalk = <TComponents extends Components>(
       },
       mode: 'immediate'
     },
+    resolve: {
+      args: [shape.number],
+      cost: COST,
+      do: (_call, id) => {
+        const eid = Number(id);
+        return Number.isInteger(eid) && isLive(eid)
+          ? handle(eid).value
+          : nothing;
+      },
+      mode: 'immediate',
+      result: shape.optional(entityArg)
+    },
     show: {
       args: [entityArg, shape.text],
       command: true,
@@ -430,7 +442,10 @@ export const createEcsTalk = <TComponents extends Components>(
     try {
       const script = group.load({
         grants: {
-          world: worldCapability.grant(['find', 'moveTo', 'show'], undefined),
+          world: worldCapability.grant(
+            ['find', 'moveTo', 'resolve', 'show'],
+            undefined
+          ),
           ...loadOptions.grants
         },
         limits: loadOptions.limits,
@@ -451,19 +466,33 @@ export const createEcsTalk = <TComponents extends Components>(
   /**
    * Drop the Handles of entities whose deletion has been flushed. One only
    * marked for deletion stays, and reads as Nothing until it is dropped.
+   *
+   * Then make a Handle for every live entity built from a scripted atom.
+   * `setParent` is queued Host input that applies when the next Pump admits
+   * it, so a Handle first made inside a Run has no Message Path for that
+   * Run, and a `send` to it is lost. Making them here, before the Pump,
+   * means a Script can always message an entity it reaches.
    */
-  const sweep = () => {
+  const sync = () => {
     for (const [eid, obj] of handles) {
       if (world.get(eid) === null) {
         handles.delete(eid);
         group.dispose(obj);
       }
     }
+    if (atomObjects.size === 0) {
+      return;
+    }
+    for (const eid of world.entityLineage.keys()) {
+      if (!handles.has(eid) && isLive(eid) && parentOfEntity(eid)) {
+        handle(eid);
+      }
+    }
   };
 
   /** Pump the Script Group once */
   const pump = (): PumpResult => {
-    sweep();
+    sync();
     const result = group.pump(clock());
     onPump?.(result);
     return result;
@@ -486,8 +515,12 @@ export const createEcsTalk = <TComponents extends Components>(
   const request = (eid: number, message: string, ...args: Value[]) =>
     group.request(handle(eid), { args, name: message });
 
+  const decide = (eid: number, message: string, ...args: Value[]) =>
+    group.decide(handle(eid), { args, name: message });
+
   return {
     atomKind,
+    decide,
     deliver,
     entityKind,
     group,
