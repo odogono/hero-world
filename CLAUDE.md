@@ -208,3 +208,4 @@ Tank-world includes specialized Vite configuration:
 - SQLite WASM optimization exclusions
 - COOP/COEP headers for SharedArrayBuffer support
 - WebSocket and API proxy to backend server
+@AGENTS.md
