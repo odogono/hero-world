@@ -8,9 +8,10 @@ import { World } from '@world';
 import {
   EDLCircularReferenceError,
   EDLExecutionError,
-  EDLParseError,
+  EDLInvalidExtendError,
   EDLMissingComponentError,
   EDLMissingPropertyError,
+  EDLParseError,
   EDLUnknownEntityReferenceError
 } from './errors';
 
@@ -136,7 +137,11 @@ export const executeEDL = <T extends Components>(
       const mapped = includeMap[loc.line - 1];
       const origIndex = mapped?.originalIndex ?? loc.line - 1; // fallback
       const displayLineNo = origIndex + 1;
-      const lineText = (mapped?.text ?? parseLines[loc.line - 1] ?? '').toString();
+      const lineText = (
+        mapped?.text ??
+        parseLines[loc.line - 1] ??
+        ''
+      ).toString();
       const caret = ' '.repeat(Math.max(0, loc.column - 1)) + '^';
 
       const prev = origLines[origIndex - 1];
@@ -221,11 +226,15 @@ export const executeEDL = <T extends Components>(
     | EDLMissingComponentError
     | EDLMissingPropertyError
     | EDLCircularReferenceError
+    | EDLInvalidExtendError
   > = [];
 
   // Resolve atom inheritance (atoms can extend other atoms)
   const resolvedAtoms = new Map<string, ComponentData>();
-  const resolveAtom = (name: string, stack: Set<string> = new Set()): ComponentData => {
+  const resolveAtom = (
+    name: string,
+    stack: Set<string> = new Set()
+  ): ComponentData => {
     if (resolvedAtoms.has(name)) {
       return resolvedAtoms.get(name)!;
     }
@@ -240,6 +249,10 @@ export const executeEDL = <T extends Components>(
     stack.add(name);
     let inherited: ComponentData = {};
     for (const base of atom.extends) {
+      if (!rawAtoms.has(base) && entityIdsByName.has(base)) {
+        errors.push(new EDLInvalidExtendError(name, base));
+        continue;
+      }
       if (!rawAtoms.has(base)) {
         continue; // unknown atom base ignored here
       }
@@ -255,45 +268,19 @@ export const executeEDL = <T extends Components>(
     atoms.set(name, resolveAtom(name));
   }
 
-  // Resolve inheritance for entities (supports atoms and entities, forward references allowed)
-  const resolvedInheritance = new Map<number, ComponentData>();
-  const resolveInheritance = (
-    eid: number,
-    stack: Set<number> = new Set()
-  ): ComponentData => {
-    if (resolvedInheritance.has(eid)) {
-      return resolvedInheritance.get(eid)!;
-    }
-    if (stack.has(eid)) {
-      // Circular inheritance; record error and return empty to avoid crash
-      const name = entityNameById.get(eid) ?? String(eid);
-      errors.push(new EDLCircularReferenceError(`extends:${name}`));
-      return {};
-    }
-    stack.add(eid);
-    const plan = entityPlansById.get(eid);
-    if (!plan) {
-      return {};
-    }
+  // Resolve inheritance for entities: only atoms may be extended
+  for (const [eid, plan] of entityPlansById.entries()) {
     let inherited: ComponentData = {};
     for (const ext of plan.extends) {
       if (atoms.has(ext)) {
         inherited = mergeComponents(inherited, atoms.get(ext));
-        continue;
-      }
-      const baseId = entityIdsByName.get(ext);
-      if (baseId !== undefined) {
-        const baseResolved = resolveInheritance(baseId, stack);
-        inherited = mergeComponents(inherited, baseResolved);
+      } else if (entityIdsByName.has(ext)) {
+        errors.push(
+          new EDLInvalidExtendError(entityNameById.get(eid) ?? String(eid), ext)
+        );
       }
     }
-    const combined = mergeComponents(inherited, plan.own);
-    resolvedInheritance.set(eid, combined);
-    return combined;
-  };
-
-  for (const eid of entityPlansById.keys()) {
-    plannedComponentsById.set(eid, resolveInheritance(eid));
+    plannedComponentsById.set(eid, mergeComponents(inherited, plan.own));
   }
 
   // Helper to resolve reference strings like $name or $name.comp.prop
@@ -376,6 +363,14 @@ export const executeEDL = <T extends Components>(
 
   if (errors.length > 0) {
     throw new EDLExecutionError(errors);
+  }
+
+  // Record Lineage: each atom's and entity's ordered base atoms
+  for (const [name, atom] of rawAtoms.entries()) {
+    world.atomLineage.set(name, [...atom.extends]);
+  }
+  for (const [eid, plan] of entityPlansById.entries()) {
+    world.entityLineage.set(eid, [...plan.extends]);
   }
 
   // Persist initial entities/components so rows (ids) exist for command refs

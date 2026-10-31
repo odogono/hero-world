@@ -488,22 +488,58 @@ entity lockable_chest: chest {
       expect(e).not.toBeNull();
     });
 
-    it('should inherit from an entity and allow overrides', async () => {
+    it('should reject an entity extending an entity', async () => {
       const edl = `
       entity base { thing { size: 3 weight: 4 } }
       entity child: base { thing { weight: 8 } }
       `;
 
       const world = await createWorld([thingComponent]);
+      expect(() => executeEDL(world, edl)).toThrow(
+        /'child' cannot extend 'base': only atoms may be extended/
+      );
+    });
+
+    it('should reject an atom extending an entity', async () => {
+      const edl = `
+      entity base { thing { size: 3 weight: 4 } }
+      atom child: base {}
+      `;
+
+      const world = await createWorld([thingComponent]);
+      expect(() => executeEDL(world, edl)).toThrow(
+        /only atoms may be extended/
+      );
+    });
+
+    it('should keep Lineage for entities and atoms after loading', async () => {
+      const edl = `
+      atom base { thing { size: 1 weight: 2 } }
+      atom heavy: base { thing { weight: 50 } }
+      atom big { thing { size: 99 } }
+      entity rock: heavy big {}
+      entity pebble { thing { size: 1 weight: 1 } }
+      `;
+
+      const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const child = world.query({
-        with: ['thing'],
-        where: 'thing_weight = 8'
-      })!;
+      const rock = world.query({ with: ['thing'], where: 'thing_size = 99' })!;
+      expect(rock.thing.weight).toBe(50);
+      expect(world.getEntityLineage(rock.id)).toEqual(['heavy', 'big']);
 
-      expect(child.thing.size).toBe(3);
-      expect(child.thing.weight).toBe(8);
+      const pebble = world.query({
+        with: ['thing'],
+        where: 'thing_size = 1'
+      })!;
+      expect(world.getEntityLineage(pebble.id)).toEqual([]);
+
+      expect(world.getAtomLineage('heavy')).toEqual(['base']);
+      expect(world.getAtomLineage('base')).toEqual([]);
+      expect(world.getAtomLineage('missing')).toBeUndefined();
+
+      // atoms never become entities
+      expect(world.queryAll({ with: ['thing'] })).toHaveLength(2);
     });
 
     it('should throw on circular value references', async () => {
@@ -519,8 +555,8 @@ entity lockable_chest: chest {
 
     it('should throw on circular inheritance', async () => {
       const edl = `
-      entity a: b {}
-      entity b: a {}
+      atom a: b {}
+      atom b: a {}
       `;
 
       const world = await createWorld([]);
