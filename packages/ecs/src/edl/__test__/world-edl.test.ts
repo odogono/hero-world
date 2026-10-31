@@ -72,7 +72,7 @@ describe('World EDL', () => {
       container { capacity: 10 is_closed: false }
     }
 
-    entity thing {
+    atom thing {
       measured { area: 10 weight: 20 }
     }
 
@@ -95,10 +95,10 @@ describe('World EDL', () => {
 
     // NOTE atoms are not saved as entities
     const data = world.saveToJSON({ asComponents: false });
-    expect(data).toHaveLength(2);
+    expect(data).toHaveLength(1);
 
     const allEntities = world.queryAll();
-    expect(allEntities).toHaveLength(2);
+    expect(allEntities).toHaveLength(1);
   });
 
   it('should load and run edl on an existing world', async () => {

@@ -4,6 +4,7 @@ export const EDLErrorCodes = {
   EDL_CIRCULAR_REFERENCE: 'EDL_CIRCULAR_REFERENCE',
   EDL_ERROR: 'EDL_ERROR',
   EDL_EXECUTION_ERROR: 'EDL_EXECUTION_ERROR',
+  EDL_INVALID_EXTEND: 'EDL_INVALID_EXTEND',
   EDL_MISSING_COMPONENT: 'EDL_MISSING_COMPONENT',
   EDL_MISSING_PROPERTY: 'EDL_MISSING_PROPERTY',
   EDL_PARSE_ERROR: 'EDL_PARSE_ERROR',
@@ -95,5 +96,17 @@ export class EDLExecutionError extends EDLError {
     this.name = 'EDLExecutionError';
     this.errors = errors;
     Object.setPrototypeOf(this, EDLExecutionError.prototype);
+  }
+}
+
+export class EDLInvalidExtendError extends EDLError {
+  constructor(name: string, base: string) {
+    super(
+      `'${name}' cannot extend '${base}': only atoms may be extended, and '${base}' is an entity`,
+      { base, name },
+      EDLErrorCodes.EDL_INVALID_EXTEND
+    );
+    this.name = 'EDLInvalidExtendError';
+    Object.setPrototypeOf(this, EDLInvalidExtendError.prototype);
   }
 }

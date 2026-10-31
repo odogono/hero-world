@@ -158,6 +158,9 @@ export class World<TComponents extends Components> {
   entityCache: EntityCache<TComponents>;
   defs: Map<string, ComponentDef>;
   stmts: Record<string, Statement>;
+  /** Lineage: the ordered base atoms each entity (by id) and atom (by name) extends */
+  entityLineage: Map<number, string[]>;
+  atomLineage: Map<string, string[]>;
 
   constructor(options: CreateWorldOptions) {
     this.options = options;
@@ -167,6 +170,19 @@ export class World<TComponents extends Components> {
     this.entityCache = new Map();
     this.defs = new Map<string, ComponentDef>();
     this.stmts = {};
+    this.entityLineage = new Map();
+    this.atomLineage = new Map();
+  }
+
+  /** The ordered base atoms an entity was built from (empty if none) */
+  getEntityLineage(eid: number): string[] {
+    return [...(this.entityLineage.get(eid) ?? [])];
+  }
+
+  /** The ordered base atoms an atom extends, or undefined if no such atom */
+  getAtomLineage(name: string): string[] | undefined {
+    const lineage = this.atomLineage.get(name);
+    return lineage ? [...lineage] : undefined;
   }
 
   async open() {
