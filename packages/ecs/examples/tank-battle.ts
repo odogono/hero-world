@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 import { defineComponent, s } from '@component';
 import { createEventSystem, eventComponent } from '@events';
 import { createGameLoop, createSystem, createWorldSystem } from '@system';
@@ -291,7 +289,7 @@ const commandSystem = createWorldSystem<typeof world>(
     // Process incoming command events
     events.forEach(event => {
       switch (event.type) {
-        case 'command:move_tank':
+        case 'command:move_tank': {
           const moveCmd = event.payload as {
             tankId: string;
             targetX: number;
@@ -299,14 +297,26 @@ const commandSystem = createWorldSystem<typeof world>(
           };
           issueMoveOrder(moveCmd.tankId, moveCmd.targetX, moveCmd.targetY);
           break;
-        case 'query:world_state':
+        }
+        case 'query:world_state': {
           const query = event.payload as { requestId: string };
           handleWorldStateQuery(query.requestId);
           break;
+        }
       }
     });
   }
 );
+
+type TankState = {
+  hasActiveOrder: boolean;
+  id: string;
+  team: string;
+  velocityX: number;
+  velocityY: number;
+  x: number;
+  y: number;
+};
 
 // Notification System - handles outgoing notifications
 const notificationSystem = createWorldSystem<typeof world>(
@@ -354,7 +364,7 @@ export class TankBattleServer {
     return true;
   }
 
-  getWorldState(): Promise<{ tanks: Array<any> }> {
+  getWorldState(): Promise<{ tanks: Array<TankState> }> {
     return new Promise(resolve => {
       const requestId = `req_${Date.now()}_${Math.random()}`;
 

@@ -1,6 +1,6 @@
 import { findExitByDirection } from '../queries/room';
-import type { ActionContext, ActionResult } from './types';
 import { lookAction } from './look';
+import type { ActionContext, ActionResult } from './types';
 
 export const moveAction = (ctx: ActionContext): ActionResult => {
   const { direction, playerId, world } = ctx;

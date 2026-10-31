@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { wsHandler } from '../handlers/ws';
-import { MuaWorld } from '../mua-world';
+import { MuaWorld, type MuaConnection } from '../mua-world';
 
 type FakeWS = {
   id: string;
-  send: (data: any) => void;
-  sent: any[];
+  send: (data: string) => void;
+  sent: string[];
 };
 
 const createFakeWS = (id = 'ws-1'): FakeWS => {
@@ -21,9 +21,9 @@ const createFakeWS = (id = 'ws-1'): FakeWS => {
 describe('WebSocket Handler', () => {
   let muaWorld: MuaWorld;
   let handler: ReturnType<typeof wsHandler>;
-  let openedCalls: any[];
-  let closedCalls: any[];
-  let commandCalls: any[];
+  let openedCalls: MuaConnection[];
+  let closedCalls: MuaConnection[];
+  let commandCalls: { conn: MuaConnection; payload: unknown }[];
 
   beforeEach(() => {
     muaWorld = new MuaWorld();
@@ -34,15 +34,17 @@ describe('WebSocket Handler', () => {
     commandCalls = [];
 
     // Monkey-patch lifecycle methods to capture calls
-    (muaWorld as any).onConnectionOpened = (conn: any) => {
-      openedCalls.push(conn);
-    };
-    (muaWorld as any).onConnectionClosed = (conn: any) => {
-      closedCalls.push(conn);
-    };
-    (muaWorld as any).onConnectionCommand = (conn: any, payload: any) => {
-      commandCalls.push({ conn, payload });
-    };
+    Object.assign(muaWorld, {
+      onConnectionClosed: (conn: MuaConnection) => {
+        closedCalls.push(conn);
+      },
+      onConnectionCommand: (conn: MuaConnection, payload: unknown) => {
+        commandCalls.push({ conn, payload });
+      },
+      onConnectionOpened: (conn: MuaConnection) => {
+        openedCalls.push(conn);
+      }
+    });
   });
 
   afterEach(() => {
@@ -53,38 +55,35 @@ describe('WebSocket Handler', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
     handler.open?.(ws);
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({
+    expect(JSON.parse(ws.sent[0]!)).toEqual({
       data: 'Welcome to MUA! Please enter your username:',
       success: true
     });
     expect(openedCalls.length).toBe(1);
-    expect(openedCalls[0].id).toBe(ws.id);
+    expect(openedCalls[0]!.id).toBe(ws.id);
   });
 
   it('handles ping -> pong', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { type: 'ping' });
+    handler.message?.(ws, { type: 'ping' });
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({ data: 'pong', success: true });
+    expect(JSON.parse(ws.sent[0]!)).toEqual({ data: 'pong', success: true });
   });
 
   it('handles chat echo', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { payload: 'hello', type: 'chat' });
+    handler.message?.(ws, { payload: 'hello', type: 'chat' });
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({
+    expect(JSON.parse(ws.sent[0]!)).toEqual({
       data: 'You said: hello',
       success: true
     });
@@ -94,11 +93,10 @@ describe('WebSocket Handler', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { payload: { room: 'lobby' }, type: 'join' });
+    handler.message?.(ws, { payload: { room: 'lobby' }, type: 'join' });
 
     expect(ws.sent.length).toBe(1);
-    expect(JSON.parse(ws.sent[0])).toEqual({
+    expect(JSON.parse(ws.sent[0]!)).toEqual({
       data: 'Joined room: lobby',
       success: true
     });
@@ -109,24 +107,22 @@ describe('WebSocket Handler', () => {
     const ws = createFakeWS();
 
     const payload = { action: 'look', args: [] };
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { payload, type: 'cmd' });
+    handler.message?.(ws, { payload, type: 'cmd' });
 
     expect(commandCalls.length).toBe(1);
-    expect(commandCalls[0].conn.id).toBe(ws.id);
-    expect(commandCalls[0].payload).toEqual(payload);
+    expect(commandCalls[0]!.conn.id).toBe(ws.id);
+    expect(commandCalls[0]!.payload).toEqual(payload);
   });
 
   it('rejects invalid message object', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, { type: 'invalid' });
+    handler.message?.(ws, { type: 'invalid' });
 
     expect(ws.sent.length).toBe(1);
     // Handler stringifies error responses
-    const payload = JSON.parse(ws.sent[0]);
+    const payload = JSON.parse(ws.sent[0]!);
     expect(payload.success).toBe(false);
     expect(typeof payload.data).toBe('string');
   });
@@ -135,11 +131,10 @@ describe('WebSocket Handler', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.message?.(ws as any, 'not-json');
+    handler.message?.(ws, 'not-json');
 
     expect(ws.sent.length).toBe(1);
-    const payload = JSON.parse(ws.sent[0]);
+    const payload = JSON.parse(ws.sent[0]!);
     expect(payload.success).toBe(false);
     expect(typeof payload.data).toBe('string');
   });
@@ -148,10 +143,9 @@ describe('WebSocket Handler', () => {
     handler = wsHandler({ muaWorld });
     const ws = createFakeWS();
 
-    // @ts-expect-error Partial handler type
-    handler.close?.(ws as any);
+    handler.close?.(ws);
 
     expect(closedCalls.length).toBe(1);
-    expect(closedCalls[0].id).toBe(ws.id);
+    expect(closedCalls[0]!.id).toBe(ws.id);
   });
 });

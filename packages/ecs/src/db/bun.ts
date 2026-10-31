@@ -177,6 +177,7 @@ export class BunDatabaseWrapper implements Database {
             if (typeof val === 'number') {
               return val.toString();
             }
+            // eslint-disable-next-line @nkzw/no-instanceof -- BLOB detection; no structural alternative for Uint8Array
             if (val instanceof Uint8Array) {
               // BLOB → hex literal
               return `X'${Buffer.from(val).toString('hex')}'`;

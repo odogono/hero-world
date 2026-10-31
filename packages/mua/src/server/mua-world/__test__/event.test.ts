@@ -1,10 +1,9 @@
 import { describe } from 'bun:test';
 import type { EntityId } from 'odgn-ecs/types';
 
-
 type MuaEvent = {
   actor: EntityId;
-  args: any[];
+  args: unknown[];
   target: EntityId;
   verb: string;
 };

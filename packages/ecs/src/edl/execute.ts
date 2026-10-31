@@ -17,6 +17,20 @@ import {
 
 type ComponentData = Record<string, Record<string, unknown>>;
 
+type EDLNode = {
+  components?: ComponentData;
+  extends?: string[];
+  id?: string;
+  type: string;
+};
+
+type EDLSyntaxError = {
+  location?: { start?: { column?: unknown; line?: unknown } };
+  message?: unknown;
+};
+
+type EntityRef = { id: number; world: World<Components> };
+
 const mergeComponents = (
   base: ComponentData,
   extension?: ComponentData
@@ -34,7 +48,7 @@ const mergeComponents = (
 };
 
 export type ExecuteOptions = {
-  commands?: Record<string, (...args: any[]) => void>;
+  commands?: Record<string, (...args: unknown[]) => void>;
 };
 
 const stripComments = (line: string) => {
@@ -52,42 +66,42 @@ const stripComments = (line: string) => {
 };
 
 // Lightweight command tokenizer supporting quoted strings and comments
+const tokenize = (line: string): string[] => {
+  const tokens: string[] = [];
+  const re = /"([^"\\]|\\.)*"|\S+/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(line))) {
+    const tok = match[0];
+    if (tok.startsWith('"')) {
+      // Unquote + unescape
+      const inner = tok.slice(1, -1);
+      tokens.push(
+        inner.replaceAll(/\\(["\\nrt])/g, (_m, c) => {
+          switch (c) {
+            case 'n':
+              return '\n';
+            case 'r':
+              return '\r';
+            case 't':
+              return '\t';
+            case '"':
+              return '"';
+            case '\\':
+            default:
+              return '\\';
+          }
+        })
+      );
+    } else {
+      tokens.push(tok);
+    }
+  }
+  return tokens;
+};
+
 const parseCommands = (edl: string) => {
   const lines = edl.split(/\r?\n/);
   const commands: Array<{ name: string; rawArgs: string[] }> = [];
-
-  const tokenize = (line: string): string[] => {
-    const tokens: string[] = [];
-    const re = /"([^"\\]|\\.)*"|\S+/g;
-    let match: RegExpExecArray | null;
-    while ((match = re.exec(line))) {
-      const tok = match[0];
-      if (tok.startsWith('"')) {
-        // Unquote + unescape
-        const inner = tok.slice(1, -1);
-        tokens.push(
-          inner.replaceAll(/\\(["\\nrt])/g, (_m, c) => {
-            switch (c) {
-              case 'n':
-                return '\n';
-              case 'r':
-                return '\r';
-              case 't':
-                return '\t';
-              case '"':
-                return '"';
-              case '\\':
-              default:
-                return '\\';
-            }
-          })
-        );
-      } else {
-        tokens.push(tok);
-      }
-    }
-    return tokens;
-  };
 
   for (let raw of lines) {
     raw = stripComments(raw).trim();
@@ -127,12 +141,13 @@ export const executeEDL = <T extends Components>(
   }
   const edlForParse = parseLines.join('\n');
 
-  let defs: any;
+  let defs: EDLNode[];
   try {
     defs = parseEDL(edlForParse);
-  } catch (err: any) {
+  } catch (error_: unknown) {
+    const error = error_ as EDLSyntaxError | undefined;
     // Try to produce a friendly error with original line/column and a code frame
-    const loc = err?.location?.start;
+    const loc = error?.location?.start;
     if (loc && typeof loc.line === 'number' && typeof loc.column === 'number') {
       const mapped = includeMap[loc.line - 1];
       const origIndex = mapped?.originalIndex ?? loc.line - 1; // fallback
@@ -151,27 +166,26 @@ export const executeEDL = <T extends Components>(
       if (prev !== undefined) {
         frameParts.push(`${displayLineNo - 1} | ${prev}`);
       }
-      frameParts.push(`${displayLineNo} | ${lineText}`);
-      frameParts.push(`    | ${caret}`);
+      frameParts.push(`${displayLineNo} | ${lineText}`, `    | ${caret}`);
       if (next !== undefined) {
         frameParts.push(`${displayLineNo + 1} | ${next}`);
       }
 
       const friendly = [
         `EDL syntax error at line ${displayLineNo}, column ${loc.column}:`,
-        String(err?.message ?? 'Syntax error'),
+        String(error?.message ?? 'Syntax error'),
         '',
         ...frameParts
       ].join('\n');
 
       throw new EDLParseError(friendly, {
-        line: displayLineNo,
-        column: loc.column
+        column: loc.column,
+        line: displayLineNo
       });
     }
 
     // Fallback if no location is available
-    throw new EDLParseError(String(err?.message ?? 'EDL parse error'));
+    throw new EDLParseError(String(error?.message ?? 'EDL parse error'));
   }
 
   // Atoms are templates that can be extended by entities (and other atoms)
@@ -182,10 +196,7 @@ export const executeEDL = <T extends Components>(
   const entityIdsByName = new Map<string, number>();
   const entityNameById = new Map<number, string | undefined>();
   const plannedComponentsById = new Map<number, ComponentData>();
-  const entitiesById = new Map<
-    number,
-    { id: number; world: World<Components> }
-  >();
+  const entitiesById = new Map<number, EntityRef>();
   const entityPlansById = new Map<
     number,
     { extends: string[]; own: ComponentData }
@@ -209,7 +220,7 @@ export const executeEDL = <T extends Components>(
 
     // Create entity without components to avoid schema validation before resolving refs
     const entity = world.create();
-    entitiesById.set(entity.id, entity as any);
+    entitiesById.set(entity.id, entity as unknown as EntityRef);
     if (def.id) {
       entityIdsByName.set(def.id, entity.id);
     }
@@ -314,12 +325,12 @@ export const executeEDL = <T extends Components>(
       errors.push(new EDLMissingComponentError(entityName, componentName));
       return undefined;
     }
-    let value: any = plan[compKey];
+    let value: unknown = plan[compKey];
     for (const key of propPath) {
       if (value == null) {
         break;
       }
-      value = (value as any)[key];
+      value = (value as Record<string, unknown>)[key];
       if (value === undefined) {
         errors.push(
           new EDLMissingPropertyError(
@@ -337,7 +348,7 @@ export const executeEDL = <T extends Components>(
   };
 
   // Deeply resolve references within an object
-  const resolveObject = (obj: any): any => {
+  const resolveObject = (obj: unknown): unknown => {
     if (Array.isArray(obj)) {
       return obj.map(resolveObject);
     }
@@ -358,7 +369,7 @@ export const executeEDL = <T extends Components>(
   for (const [eid, plan] of plannedComponentsById.entries()) {
     const resolved = resolveObject(plan) as ComponentData;
     const entity = entitiesById.get(eid)!;
-    addComponents(entity as any, resolved);
+    addComponents(entity as Parameters<typeof addComponents>[0], resolved);
   }
 
   if (errors.length > 0) {
@@ -411,13 +422,13 @@ export const executeEDL = <T extends Components>(
     // Entity-level helper: $name._count -> number of components attached
     if (componentName === '_count' && propPath.length === 0) {
       let count = 0;
-      for (const def of (world as any).defs.values()) {
+      for (const def of world.defs.values()) {
         try {
           const row = world.db
             .prepare(
               `SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`
             )
-            .get(targetId) as any;
+            .get(targetId);
           if (row) {
             count++;
           }
@@ -430,14 +441,14 @@ export const executeEDL = <T extends Components>(
 
     const plan = plannedComponentsById.get(targetId);
     const compKey = componentName;
-    let value: any = plan ? (plan as any)[compKey] : undefined;
+    let value: unknown = plan ? plan[compKey] : undefined;
 
     // Walk the path if available in planned components
     for (const key of propPath) {
       if (value == null) {
         break;
       }
-      value = (value as any)[key];
+      value = (value as Record<string, unknown>)[key];
     }
 
     // If specifically asking for '.id' (or alias 'rowId' / '_row_id') and not present in plan, query DB for row id
@@ -448,12 +459,12 @@ export const executeEDL = <T extends Components>(
         propPath[0] === 'rowId' ||
         propPath[0] === '_row_id')
     ) {
-      const def = (world as any).defs.get(compKey);
+      const def = world.defs.get(compKey);
       if (def) {
         try {
           const row = world.db
             .prepare(`SELECT id FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`)
-            .get(targetId) as any;
+            .get(targetId) as { id?: unknown } | null | undefined;
           if (row && row.id !== undefined) {
             return row.id;
           }
@@ -469,14 +480,14 @@ export const executeEDL = <T extends Components>(
       propPath.length === 1 &&
       (propPath[0] === 'exists' || propPath[0] === '_exists')
     ) {
-      const def = (world as any).defs.get(compKey);
+      const def = world.defs.get(compKey);
       if (def) {
         try {
           const row = world.db
             .prepare(
               `SELECT 1 AS ok FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`
             )
-            .get(targetId) as any;
+            .get(targetId);
           return !!row;
         } catch {
           return false;
@@ -501,7 +512,7 @@ export const executeEDL = <T extends Components>(
   };
 
   // Execute commands in order
-  const toValue = (raw: string): any => {
+  const toValue = (raw: string): unknown => {
     if (raw === 'true') {
       return true;
     }
@@ -543,7 +554,10 @@ export const executeEDL = <T extends Components>(
         );
         continue;
       }
-      const entity = entitiesById.get(eid)! as any;
+      const entity = entitiesById.get(eid)! as unknown as Record<
+        string,
+        Record<string, unknown> | undefined
+      >;
       const compKey = componentName ?? '';
       // Prepare property key (only first-level used in tests)
       const propKey = propPath[0] ? toCamelCase(propPath[0]) : undefined;
@@ -552,16 +566,20 @@ export const executeEDL = <T extends Components>(
         continue;
       }
 
-      if (entity[compKey]) {
+      const component = entity[compKey];
+      if (component) {
         // Component exists, set property directly
-        entity[compKey][propKey] = value;
+        component[propKey] = value;
       } else {
         const defaults: Record<string, unknown> = {};
 
         // Override with the provided property
         defaults[propKey] = value;
         // Add the component with defaults + property
-        addComponents(entity, { [compKey]: defaults } as any);
+        addComponents(
+          entity as unknown as Parameters<typeof addComponents>[0],
+          { [compKey]: defaults }
+        );
       }
       continue;
     }

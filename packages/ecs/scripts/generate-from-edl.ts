@@ -139,12 +139,13 @@ const mapComponentsToCDefs = (defs: EDLParsed): CDef[] => {
         col.default === undefined
           ? undefined
           : col.default === 'true'
-            ? (true as any)
+            ? true
             : col.default === 'false'
-              ? (false as any)
-              : isFinite(Number(col.default)) && col.default.trim() !== ''
-                ? (Number(col.default) as any)
-                : (col.default as any)
+              ? false
+              : Number.isFinite(Number(col.default)) &&
+                  col.default.trim() !== ''
+                ? Number(col.default)
+                : col.default
     }));
     cdefs.push({ columns, id: d.id, tableName: d.tableName });
   }

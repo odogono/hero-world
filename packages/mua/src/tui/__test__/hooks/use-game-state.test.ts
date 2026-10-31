@@ -1,5 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'bun:test';
+
+import { act, renderHook } from '@testing-library/react';
 
 import { useGameState } from '../../hooks/use-game-state';
 
@@ -72,8 +73,14 @@ You see: sword, shield`;
 
     expect(result.current.currentRoom).not.toBeNull();
     expect(result.current.currentRoom?.name).toBe('Town Square');
-    expect(result.current.currentRoom?.description).toContain('bustling marketplace');
-    expect(result.current.currentRoom?.exits).toEqual(['north', 'south', 'east']);
+    expect(result.current.currentRoom?.description).toContain(
+      'bustling marketplace'
+    );
+    expect(result.current.currentRoom?.exits).toEqual([
+      'north',
+      'south',
+      'east'
+    ]);
     expect(result.current.currentRoom?.items).toEqual(['sword', 'shield']);
     expect(result.current.playerState.location).toBe('Town Square');
   });
@@ -82,7 +89,10 @@ You see: sword, shield`;
     const { result } = renderHook(() => useGameState());
 
     act(() => {
-      result.current.addMessage('Just a regular message without room info', 'game');
+      result.current.addMessage(
+        'Just a regular message without room info',
+        'game'
+      );
     });
 
     expect(result.current.currentRoom).toBeNull();
@@ -105,7 +115,11 @@ You see: sword, shield`;
     const { result } = renderHook(() => useGameState());
 
     act(() => {
-      result.current.updatePlayerState({ health: 100, level: 5, location: 'Forest' });
+      result.current.updatePlayerState({
+        health: 100,
+        level: 5,
+        location: 'Forest'
+      });
     });
 
     act(() => {
@@ -121,10 +135,10 @@ You see: sword, shield`;
     const { result } = renderHook(() => useGameState());
 
     const roomData = {
-      name: 'Dark Cave',
       description: 'A dark and mysterious cave',
       exits: ['west'],
       items: ['torch'],
+      name: 'Dark Cave',
       npcs: ['bat']
     };
 

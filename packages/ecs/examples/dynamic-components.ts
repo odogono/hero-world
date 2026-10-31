@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Example demonstrating the new dynamic component system
  *

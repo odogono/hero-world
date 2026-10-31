@@ -14,6 +14,8 @@ export default [
       'arrow-parens': ['error', 'as-needed'],
       'arrow-spacing': ['error', { after: true, before: true }],
       'func-style': ['error', 'expression'],
+      // Path aliases (@components etc.) and bun:* builtins; tsc covers this.
+      'import-x/no-unresolved': 'off',
       'no-var': 'error',
       'prefer-arrow-callback': 'error',
       'prefer-const': 'error',
@@ -26,5 +28,10 @@ export default [
         }
       }
     }
+  },
+  {
+    // Playwright debugging script: console output is its purpose.
+    files: ['test-app.js'],
+    rules: { 'no-console': 'off' }
   }
 ];

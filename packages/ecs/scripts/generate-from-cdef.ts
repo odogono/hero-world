@@ -11,8 +11,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { cdefToSql } from '../src/schema/cdef-to-sql';
-import { cdefToZod } from '../src/schema/cdef-to-zod';
+import { cdefToSql, type CDefToSqlInput } from '../src/schema/cdef-to-sql';
+import { cdefToZod, type CDefToZodInput } from '../src/schema/cdef-to-zod';
 
 type Flags = {
   down: boolean;
@@ -31,15 +31,26 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--help' || a === '-h') return 'help';
-    if (a === '--include-entity') flags.includeEntity = true;
-    else if (a === '--down') flags.down = true;
-    else if (a === '--zod-no-imports') flags.zodNoImports = true;
-    else if (a === '--input') flags.input = argv[++i];
-    else if (a === '--sql-out') flags.sqlOut = argv[++i];
-    else if (a === '--zod-out') flags.zodOut = argv[++i];
-    else if (!flags.input && !a.startsWith('--')) flags.input = a;
-    else return 'invalid';
+    if (a === '--help' || a === '-h') {
+      return 'help';
+    }
+    if (a === '--include-entity') {
+      flags.includeEntity = true;
+    } else if (a === '--down') {
+      flags.down = true;
+    } else if (a === '--zod-no-imports') {
+      flags.zodNoImports = true;
+    } else if (a === '--input') {
+      flags.input = argv[++i];
+    } else if (a === '--sql-out') {
+      flags.sqlOut = argv[++i];
+    } else if (a === '--zod-out') {
+      flags.zodOut = argv[++i];
+    } else if (!flags.input && !a.startsWith('--')) {
+      flags.input = a;
+    } else {
+      return 'invalid';
+    }
   }
   return flags;
 };
@@ -52,7 +63,9 @@ const showHelp = () => {
 
 const main = () => {
   const parsed = parseArgs(process.argv);
-  if (parsed === 'help') return showHelp();
+  if (parsed === 'help') {
+    return showHelp();
+  }
   if (parsed === 'invalid' || !parsed.input) {
     console.error('Invalid arguments. Use --help.');
     process.exit(1);
@@ -63,18 +76,18 @@ const main = () => {
   let defs: unknown;
   try {
     defs = JSON.parse(raw);
-  } catch (err) {
-    console.error('Failed to parse JSON:', err);
+  } catch (error) {
+    console.error('Failed to parse JSON:', error);
     process.exit(1);
   }
 
   const up = true;
-  const sqlResult = cdefToSql(defs as any, {
+  const sqlResult = cdefToSql(defs as CDefToSqlInput, {
+    down: parsed.down,
     includeEntity: parsed.includeEntity,
-    up,
-    down: parsed.down
+    up
   });
-  const zodResult = cdefToZod(defs as any, {
+  const zodResult = cdefToZod(defs as CDefToZodInput, {
     includeImports: !parsed.zodNoImports
   });
 

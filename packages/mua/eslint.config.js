@@ -27,5 +27,19 @@ export default [
         }
       }
     }
+  },
+  {
+    // CLI / manual scripts print directly to the terminal
+    files: ['index.ts', 'manual-test.ts', 'test-gameplay.ts', 'examples/**'],
+    rules: {
+      'no-console': 'off'
+    }
+  },
+  {
+    // @nkzw/eslint-config is a root workspace devDependency
+    files: ['eslint.config.js'],
+    rules: {
+      'import-x/no-extraneous-dependencies': 'off'
+    }
   }
 ];

@@ -1,4 +1,4 @@
-import { verbAliases, directionAliases, directions } from './registry';
+import { directionAliases, directions, verbAliases } from './registry';
 import type { CommandParseResult } from './types';
 
 export const parseCommand = (input: string): CommandParseResult => {

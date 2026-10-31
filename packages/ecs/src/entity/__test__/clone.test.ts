@@ -70,9 +70,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['name'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['name']
       });
 
       expect(queriedClone).not.toBeNull();
@@ -125,9 +125,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = anotherWorld.query({
-        with: ['name'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['name']
       });
       expect(queriedClone!.name!.nickname).toBe('test');
 
@@ -173,9 +173,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['position', 'velocity', 'name'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['position', 'velocity', 'name']
       });
       expect(queriedClone).not.toBeNull();
       expect(queriedClone!.position!.x).toBe(10);
@@ -222,9 +222,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['inventory', 'stats'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['inventory', 'stats']
       });
       expect(queriedClone!.inventory!.items).toEqual([
         { damage: 10, id: 'sword' },
@@ -288,9 +288,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['stats'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['stats']
       });
       expect(queriedClone!.stats!.health).toBe(200);
       expect(queriedClone!.stats!.mana).toBe(50); // default value
@@ -328,9 +328,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['mixed'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['mixed']
       });
       expect(queriedClone!.mixed!.str).toBe('test');
       expect(queriedClone!.mixed!.num).toBe(42.5);
@@ -357,9 +357,9 @@ describe('Entity', () => {
 
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
-        with: ['counter'],
+        args: [clonedEntity.id],
         where: 'e.id = ?',
-        args: [clonedEntity.id]
+        with: ['counter']
       });
       expect(queriedClone!.counter!.value).toBe(1);
 

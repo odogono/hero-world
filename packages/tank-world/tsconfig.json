@@ -2,9 +2,7 @@
   "files": [],
   "compilerOptions": {
     "paths": {
-      "@server/*": [
-        "./src/server/*"
-      ]
+      "@server/*": ["./src/server/*"]
     }
   },
   "references": [

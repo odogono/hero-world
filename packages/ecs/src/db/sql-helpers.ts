@@ -130,20 +130,26 @@ const SQLITE_RESERVED = new Set<string>([
 
 // Whether an identifier needs quoting (reserved or contains special chars)
 export const needsQuoting = (ident: string): boolean => {
-  if (!ident) return false;
+  if (!ident) {
+    return false;
+  }
   const up = ident.toUpperCase();
-  if (SQLITE_RESERVED.has(up)) return true;
+  if (SQLITE_RESERVED.has(up)) {
+    return true;
+  }
   // Quote if it contains anything other than letters, numbers, or underscore
-  return /[^A-Za-z0-9_]/.test(ident);
+  return /\W/.test(ident);
 };
 
 // Quote identifier with double quotes and escape embedded quotes
 export const quoteIdent = (ident: string): string => {
-  if (!ident) return ident;
+  if (!ident) {
+    return ident;
+  }
   const escaped = ident.replaceAll('"', '""');
   return `"${escaped}"`;
 };
 
 // Quote only when necessary
-export const q = (ident: string): string => (needsQuoting(ident) ? quoteIdent(ident) : ident);
-
+export const q = (ident: string): string =>
+  needsQuoting(ident) ? quoteIdent(ident) : ident;

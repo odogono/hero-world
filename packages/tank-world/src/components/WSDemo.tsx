@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 
 import { useWebSocket } from '@hooks/useWebSocket';
 
@@ -7,11 +7,6 @@ export const WSDemo = () => {
   const [text, setText] = useState('');
   const { connect, disconnect, lastMessage, messages, sendJson, status } =
     useWebSocket();
-
-  const parsed = useMemo(
-    () => (lastMessage?.json as any) ?? null,
-    [lastMessage]
-  );
 
   const onSubmit = useCallback(
     (e: FormEvent) => {

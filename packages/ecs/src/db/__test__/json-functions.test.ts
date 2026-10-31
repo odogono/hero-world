@@ -130,7 +130,7 @@ describe('Database JSON functions', () => {
     const originalComponentsData = world.saveToJSON({ asComponents: true });
 
     expect(Array.isArray(originalComponentsData)).toBe(true);
-    const originalComponents = originalComponentsData as any[];
+    const originalComponents = originalComponentsData as { type: string }[];
     expect(originalComponents).toHaveLength(3); // 2 stats + 1 location
 
     // console.log('originalComponents', originalComponentsData);

@@ -19,11 +19,7 @@ const columnBuilder = <TType extends CDefColumnType>(
     },
     default: (
       value?:
-        | string
-        | number
-        | boolean
-        | Array<string | number | boolean>
-        | undefined
+        string | number | boolean | Array<string | number | boolean> | undefined
     ) => {
       column.default = value === undefined ? getDefault(column.type) : value;
       return builder;

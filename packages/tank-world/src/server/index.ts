@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { createLog } from 'odgn-helpers/log';
 import { z } from 'zod';
 
 import {
@@ -12,6 +13,8 @@ import {
   spawnTank,
   type TankWorld
 } from './game/world';
+
+const log = createLog('server');
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -78,7 +81,7 @@ const initializeGameWorld = async () => {
     return gameWorld;
   }
 
-  console.log('Initializing game world...');
+  log.info('Initializing game world...');
   gameWorld = await createWorld();
 
   // Connect notification system to WebSocket broadcasting
@@ -88,7 +91,7 @@ const initializeGameWorld = async () => {
   spawnTank(gameWorld, 'red', 100, 100);
   spawnTank(gameWorld, 'blue', 300, 300);
 
-  console.log('Game world initialized with sample tanks');
+  log.info('Game world initialized with sample tanks');
   return gameWorld;
 };
 
@@ -98,7 +101,7 @@ const startGameLoop = () => {
     return;
   }
 
-  console.log(`Starting game loop at ${GAME_TICK_RATE} FPS`);
+  log.info(`Starting game loop at ${GAME_TICK_RATE} FPS`);
   gameLoopInterval = setInterval(() => {
     gameWorld!.loop.update(GAME_TICK_INTERVAL);
   }, GAME_TICK_INTERVAL);
@@ -109,12 +112,12 @@ const stopGameLoop = () => {
   if (gameLoopInterval) {
     clearInterval(gameLoopInterval);
     gameLoopInterval = null;
-    console.log('Game loop stopped');
+    log.info('Game loop stopped');
   }
 };
 
 // Broadcast message to all connected clients
-const broadcastToClients = (message: any) => {
+const broadcastToClients = (message: unknown) => {
   const json = JSON.stringify(message);
   for (const client of clients) {
     client.send(json);
@@ -122,7 +125,10 @@ const broadcastToClients = (message: any) => {
 };
 
 // Handle game messages from WebSocket
-const handleGameMessage = (ws: any, message: z.infer<typeof GameMessage>) => {
+const handleGameMessage = (
+  ws: ClientConn,
+  message: z.infer<typeof GameMessage>
+) => {
   if (!gameWorld) {
     ws.send(
       JSON.stringify({
@@ -157,7 +163,7 @@ const handleMoveCommand = (
     return;
   }
 
-  console.log(`Moving tank ${tankId} to (${targetX}, ${targetY})`);
+  log.info(`Moving tank ${tankId} to (${targetX}, ${targetY})`);
   gameWorld.scheduleEvent('cmd:move', { id: tankId, targetX, targetY });
 };
 
@@ -170,7 +176,7 @@ const handleSpawnCommand = (team: 'red' | 'blue', x?: number, y?: number) => {
   const spawnX = x ?? Math.random() * 400;
   const spawnY = y ?? Math.random() * 300;
 
-  console.log(`Spawning ${team} tank at (${spawnX}, ${spawnY})`);
+  log.info(`Spawning ${team} tank at (${spawnX}, ${spawnY})`);
   const tank = spawnTank(gameWorld, team, spawnX, spawnY);
 
   // Broadcast spawn event to all clients
@@ -185,12 +191,12 @@ const handleSpawnCommand = (team: 'red' | 'blue', x?: number, y?: number) => {
 };
 
 // Handle world state request
-const handleWorldStateRequest = (ws: any, requestId: string) => {
+const handleWorldStateRequest = (ws: ClientConn, requestId: string) => {
   if (!gameWorld) {
     return;
   }
 
-  console.log(`Requesting world state with ID: ${requestId}`);
+  log.info(`Requesting world state with ID: ${requestId}`);
   // Use the ECS event system to query world state
   gameWorld.scheduleEvent('query:world_state', {
     requestId: Number(requestId)
@@ -224,10 +230,10 @@ const app = new Elysia()
       }
     },
     message(ws, message) {
-      console.log('WebSocket message received (typeof):', typeof message);
-      console.log('WebSocket message received (raw):', message);
+      log.info('WebSocket message received (typeof):', typeof message);
+      log.info('WebSocket message received (raw):', message);
 
-      let candidate: any;
+      let candidate: unknown;
 
       // Handle different message types
       if (typeof message === 'string') {
@@ -246,12 +252,12 @@ const app = new Elysia()
         candidate = { text: raw, type: 'chat' };
       }
 
-      console.log('Parsed message:', candidate);
+      log.info('Parsed message:', candidate);
 
       // Try to parse as game message first
       const gameMessageResult = GameMessage.safeParse(candidate);
       if (gameMessageResult.success) {
-        console.log('Valid game message:', gameMessageResult.data);
+        log.info('Valid game message:', gameMessageResult.data);
         handleGameMessage(ws, gameMessageResult.data);
         return;
       }
@@ -329,19 +335,19 @@ const startServer = async () => {
 
     app.listen(PORT);
 
-    console.log(`API listening on http://localhost:${PORT}`);
-    console.log(`HTTP:  GET  /health, /api/hello, /api/time`);
-    console.log(`WS:    ws://localhost:${PORT}/ws`);
-    console.log('Game server ready!');
+    log.info(`API listening on http://localhost:${PORT}`);
+    log.info(`HTTP:  GET  /health, /api/hello, /api/time`);
+    log.info(`WS:    ws://localhost:${PORT}/ws`);
+    log.info('Game server ready!');
   } catch (error) {
-    console.error('Failed to start server:', error);
+    log.error('Failed to start server:', error);
     process.exit(1);
   }
 };
 
-console.log(`API listening on http://localhost:${PORT}`);
-console.log(`HTTP:  GET  /health, /api/hello, /api/time`);
-console.log(`WS:    ws://localhost:${PORT}/ws`);
+log.info(`API listening on http://localhost:${PORT}`);
+log.info(`HTTP:  GET  /health, /api/hello, /api/time`);
+log.info(`WS:    ws://localhost:${PORT}/ws`);
 
 // Game loop and broadcaster
 const startGameLoops = async () => {
@@ -376,13 +382,13 @@ const stopGameLoops = () => {
 };
 
 process.on('SIGINT', () => {
-  console.log('\nShutting down server...');
+  log.info('\nShutting down server...');
   stopGameLoop();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nShutting down server...');
+  log.info('\nShutting down server...');
   stopGameLoop();
   process.exit(0);
 });

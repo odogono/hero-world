@@ -1,3 +1,5 @@
+import { createLog } from 'odgn-helpers/log';
+
 import type {
   CDef,
   CDefColumnInfo,
@@ -5,6 +7,8 @@ import type {
   Components,
   World
 } from '@types';
+
+const log = createLog('defaults');
 
 /**
  * Apply default values from a Zod schema to component data
@@ -42,10 +46,7 @@ export const applyComponentDefaults = <
     return applyDefaults(def.schema, data as Partial<D>);
   } catch (error) {
     // If validation fails, log error and return data as-is
-    console.warn(
-      `Failed to apply defaults for component ${componentName}:`,
-      error
-    );
+    log.warn(`Failed to apply defaults for component ${componentName}:`, error);
     return data;
   }
 };

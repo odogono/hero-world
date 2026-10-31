@@ -861,9 +861,6 @@ describe('query', () => {
         }
       `);
 
-      const dump = world.db.dump();
-      console.log('dump:', dump);
-
       const thingA = world.query({
         args: ['idle'],
         where: 'status.status = ?1',

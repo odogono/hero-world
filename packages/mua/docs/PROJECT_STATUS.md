@@ -5,6 +5,7 @@
 ## 🎉 Latest Updates (Priority 1, 2 & 5 Completed)
 
 **Implemented in previous session (Priority 1 & 2):**
+
 - ✅ **Full Event-Driven Architecture**: 4-stage ECS system pipeline (input → parse → action → output)
 - ✅ **Command Parser**: Natural language parsing with alias support (15 passing tests)
 - ✅ **Core Actions**: `look` (room exploration) and `move` (navigation)
@@ -14,6 +15,7 @@
 - ✅ **Integration**: WebSocket → game loop → ECS → output pipeline fully functional
 
 **Implemented in this session (Priority 5):**
+
 - ✅ **Game Output Display**: Real-time message display with scrollable area, replaced demo boxes
 - ✅ **Command History**: Up/Down arrow navigation through last 50 commands
 - ✅ **Visual Enhancements**: Split pane layout with status bar (location, HP, level, connection status)
@@ -31,6 +33,7 @@
 You've built a **fully functional** Multi-User Adventure (MUD) server with event-driven game loop architecture and a **professional terminal UI client**. The game is now **fully playable** with an excellent user experience, featuring:
 
 **✅ Completed Infrastructure:**
+
 - ECS-based game engine with SQLite persistence
 - OAuth2 Device Authorization Flow for CLI authentication (structure in place)
 - WebSocket server with message validation (Zod schemas)
@@ -40,6 +43,7 @@ You've built a **fully functional** Multi-User Adventure (MUD) server with event
 - Comprehensive test coverage (~500 lines of tests + 15 parser tests)
 
 **✅ Completed Game Loop (Priority 1 & 2):**
+
 - **Event-driven architecture**: Full ECS event pipeline with 4 systems (input → parse → action → output)
 - **Command parser**: Interprets "go north", "look", "n", "l", etc. with alias support
 - **Action system**: `lookAction` (describe rooms/contents/exits), `moveAction` (navigation with auto-look)
@@ -49,10 +53,12 @@ You've built a **fully functional** Multi-User Adventure (MUD) server with event
 - **Output formatting**: Messages formatted and sent through event system
 
 **⚠️ Partially Implemented:**
+
 - **OAuth2 Authentication**: Device flow structure exists but uses simple username login for now
 - **Broadcast system**: Architecture in place for multi-player room broadcasting
 
 **❌ Missing Extended Game Mechanics:**
+
 - Additional actions: `take`, `drop`, `inventory`, `open`, `close`
 - Container/inventory interactions (architecture in place, needs actions)
 - Multi-player testing and room broadcasting
@@ -128,6 +134,7 @@ WebSocket → inputEvent → parseSystem → commandEvent → actionSystem → o
    - ✅ `findRoomByMetaId`: EDL metadata lookups
 
 **Benefits Achieved:**
+
 - ✅ Clean separation of concerns (parse/action/output decoupled)
 - ✅ Event entities are ECS entities (can be queried, persisted)
 - ✅ Extensible architecture for new commands/actions
@@ -229,6 +236,7 @@ The terminal UI has been transformed from a basic demo into a **professional MUD
    - ⏳ Entity/component inspector - planned for future
 
 **New File Structure:**
+
 ```
 src/tui/
 ├── components/            # NEW - UI components
@@ -251,6 +259,7 @@ src/tui/
 ```
 
 **Keyboard Shortcuts:**
+
 - **ESC**: Exit application
 - **Ctrl+K**: Toggle debug console (existing)
 - **Ctrl+D**: Toggle debug panel
@@ -353,14 +362,15 @@ src/
 ### **Testing Strategy Enhancements**
 
 1. **Integration Tests**: End-to-end command execution
+
    ```typescript
-   test("player can take item from room", async () => {
-     const world = await createTestWorld()
-     const playerId = await simulateLogin(world, "alice")
-     const response = await sendCommand(playerId, "take leaflet")
-     expect(response).toContain("You take the leaflet")
-     expect(await queryPlayerInventory(playerId)).toContain("leaflet")
-   })
+   test('player can take item from room', async () => {
+     const world = await createTestWorld();
+     const playerId = await simulateLogin(world, 'alice');
+     const response = await sendCommand(playerId, 'take leaflet');
+     expect(response).toContain('You take the leaflet');
+     expect(await queryPlayerInventory(playerId)).toContain('leaflet');
+   });
    ```
 
 2. **Load Testing**: Simulate 100+ concurrent players
@@ -371,6 +381,7 @@ src/
 ## Quick Wins (Low Effort, High Value) 🎯
 
 **Completed:**
+
 1. ✅ **Implement `look` command** - Players can explore and see room descriptions, contents, and exits
 2. ✅ **Implement `go <direction>` command** - Players can navigate the world with auto-look
 3. ✅ **Command aliases** - Support for shortcuts like `n`, `s`, `l`, `x`
@@ -414,25 +425,25 @@ src/
 
 ### Current Implementation Statistics
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| **Server Core** |
-| `src/server/mua-world/index.ts` | ~250 | Core game world engine with event system |
-| `src/server/mua-world/coms.ts` | ~126 | 13 component definitions |
-| `src/server/mua-world/edl/main.edl` | 126 | Zork-inspired world definition |
-| `src/server/handlers/device-auth.ts` | 166 | OAuth2 device flow |
-| `src/server/handlers/ws.ts` | ~130 | WebSocket message handling with login |
-| `src/server/mua-world/systems/*.ts` | ~180 | 4 ECS systems (input/parse/action/output) |
-| `src/server/mua-world/commands/*.ts` | ~70 | Command parser with alias support |
-| `src/server/mua-world/actions/*.ts` | ~100 | Action implementations (look, move) |
-| `src/server/mua-world/queries/*.ts` | ~60 | ECS query helpers |
-| `src/server/index.ts` | 122 | Main server setup |
-| **Terminal UI (Priority 5)** |
-| `src/tui/index.tsx` | ~190 | Main TUI app with all integrations |
-| `src/tui/components/*.tsx` | ~180 | 5 UI components (GameOutput, StatusBar, etc.) |
-| `src/tui/hooks/*.ts` | ~200 | 4 state management hooks |
-| `src/tui/utils/*.ts` | ~150 | Parser, colors, tab completion |
-| `src/tui/types.ts` | ~45 | TypeScript type definitions |
+| File                                 | Lines | Purpose                                       |
+| ------------------------------------ | ----- | --------------------------------------------- |
+| **Server Core**                      |
+| `src/server/mua-world/index.ts`      | ~250  | Core game world engine with event system      |
+| `src/server/mua-world/coms.ts`       | ~126  | 13 component definitions                      |
+| `src/server/mua-world/edl/main.edl`  | 126   | Zork-inspired world definition                |
+| `src/server/handlers/device-auth.ts` | 166   | OAuth2 device flow                            |
+| `src/server/handlers/ws.ts`          | ~130  | WebSocket message handling with login         |
+| `src/server/mua-world/systems/*.ts`  | ~180  | 4 ECS systems (input/parse/action/output)     |
+| `src/server/mua-world/commands/*.ts` | ~70   | Command parser with alias support             |
+| `src/server/mua-world/actions/*.ts`  | ~100  | Action implementations (look, move)           |
+| `src/server/mua-world/queries/*.ts`  | ~60   | ECS query helpers                             |
+| `src/server/index.ts`                | 122   | Main server setup                             |
+| **Terminal UI (Priority 5)**         |
+| `src/tui/index.tsx`                  | ~190  | Main TUI app with all integrations            |
+| `src/tui/components/*.tsx`           | ~180  | 5 UI components (GameOutput, StatusBar, etc.) |
+| `src/tui/hooks/*.ts`                 | ~200  | 4 state management hooks                      |
+| `src/tui/utils/*.ts`                 | ~150  | Parser, colors, tab completion                |
+| `src/tui/types.ts`                   | ~45   | TypeScript type definitions                   |
 
 **Total implementation:** ~2,100+ lines of core code (excluding tests/docs)
 **Test coverage:** ~650+ lines of tests (500 original + 150 new parser/system tests)
@@ -459,6 +470,7 @@ src/
 ### EDL World: "West of House" (Zork Tribute)
 
 The demo world recreates the iconic opening of Zork:
+
 - **4 rooms**: west_of_house, north_of_house, south_of_house, behind_house
 - **Items**: mailbox (container) with leaflet inside
 - **Exits**: Bidirectional portals with compass directions
@@ -469,6 +481,7 @@ The demo world recreates the iconic opening of Zork:
 ## Recent Commits Context
 
 From the git history:
+
 - `2cc9996` - **feat: serialise entity/def to edl** - Can now export entities back to EDL format
 - `8ce796c` - **feat: query maybe** - Added optional query support
 - `3c8a7d2` - **chore: relaxed edl parser to allow anon entities** - Entities can be unnamed
@@ -484,6 +497,7 @@ From the git history:
 ### What Works Right Now:
 
 **Server:**
+
 - ✅ Players can connect via WebSocket and login with username
 - ✅ Full command parsing with natural language and aliases (`north`, `n`, `go north` all work)
 - ✅ Room exploration with `look` command showing descriptions, contents, and exits
@@ -493,6 +507,7 @@ From the git history:
 - ✅ Clean separation of concerns (parse/action/output systems)
 
 **Terminal UI (Priority 5 ✅):**
+
 - ✅ Professional split-pane layout with scrollable message area
 - ✅ Color-coded output: Exits (blue), items (yellow), NPCs (purple), errors (red)
 - ✅ Command history with Up/Down arrow navigation (last 50 commands)

@@ -93,7 +93,7 @@ const buildSingleType = (cdef: CDef): { name: string; typeBlock: string } => {
 
 export const cdefToTypes = (input: CDefToTypesInput): string => {
   const defs: CDef[] = Array.isArray(input)
-    ? (input as any[]).flat(Infinity).filter(Boolean)
+    ? ((input as CDef[][]).flat(Infinity).filter(Boolean) as CDef[])
     : [input];
 
   const parts: string[] = [];
@@ -107,8 +107,8 @@ export const cdefToTypes = (input: CDefToTypesInput): string => {
 
   // Union type for all components
   if (names.length > 0) {
-    parts.push('// Union type for all components');
     parts.push(
+      '// Union type for all components',
       `export type AllComponents =\n  | ${names.join('\n  | ')};`,
       '',
       '// Components type for ECS World type inference',

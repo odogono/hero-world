@@ -30,12 +30,13 @@ export const addComponent = <
     data
   );
 
-  (entity as any)[componentName] = makeTrackedComponent(
-    entity,
-    componentName,
-    dataWithDefaults,
-    isUpdate // mark as existing if updating, new if adding
-  ) as TWorldComponents[TComponentName];
+  (entity as Record<PropertyKey, unknown>)[componentName] =
+    makeTrackedComponent(
+      entity,
+      componentName,
+      dataWithDefaults,
+      isUpdate // mark as existing if updating, new if adding
+    ) as TWorldComponents[TComponentName];
 
   if (!world.dirtyEntities.has(id)) {
     world.dirtyEntities.set(id, new Set());
@@ -65,12 +66,13 @@ export const addComponents = <
     // Apply default values from the component schema
     const dataWithDefaults = applyComponentDefaults(world, componentName, data);
 
-    (entity as any)[componentName] = makeTrackedComponent(
-      entity,
-      componentName,
-      dataWithDefaults,
-      false // mark as new
-    );
+    (entity as Record<PropertyKey, unknown>)[componentName] =
+      makeTrackedComponent(
+        entity,
+        componentName,
+        dataWithDefaults,
+        false // mark as new
+      );
 
     if (!world.dirtyEntities.has(id)) {
       world.dirtyEntities.set(id, new Set());

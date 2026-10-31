@@ -60,8 +60,34 @@ const log = createLog('world');
 
 // Create a Proxy wrapper around an entity object that intercepts
 // component add/remove via property assignment.
-const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
-  new Proxy(entity, {
+const isDate = (value: unknown): value is Date =>
+  Object.prototype.toString.call(value) === '[object Date]';
+
+const serializeValues = (obj: Record<string, unknown>) => {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) {
+      out[k] = v;
+      continue;
+    }
+    if (isDate(v)) {
+      out[k] = v.toISOString();
+      continue;
+    }
+    if (typeof v === 'object') {
+      out[k] = JSON.stringify(v);
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+};
+
+const proxyEntity = <T extends Components>(
+  world: World<T>,
+  entity: GenericEntity<T>
+) =>
+  new Proxy(entity as GenericEntity<T> & Record<PropertyKey, unknown>, {
     set(target, prop, value) {
       const propName = String(prop);
 
@@ -73,7 +99,7 @@ const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
         value !== null
       ) {
         if (world.defs.has(propName)) {
-          addComponent(target, propName as any, value);
+          addComponent(target, propName, value as T[keyof T]);
           return true;
         }
       }
@@ -85,13 +111,13 @@ const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
         (value === null || value === undefined)
       ) {
         if (world.defs.has(propName)) {
-          removeComponent(target, propName as any);
+          removeComponent(target, propName);
           return true;
         }
       }
 
       // Fallback to normal set
-      (target as any)[prop] = value;
+      target[prop] = value;
       return true;
     }
   });
@@ -218,7 +244,10 @@ export class World<TComponents extends Components> {
   ): EntityWithComponents<TComponents, keyof TComponents> {
     const eid = this.db.addEntity();
 
-    const entity: any = { id: eid, world: this };
+    const entity: GenericEntity<TComponents> & Record<string, unknown> = {
+      id: eid,
+      world: this
+    };
 
     this.entityCache.set(eid, {});
 
@@ -258,13 +287,8 @@ export class World<TComponents extends Components> {
   clone(
     entityOrId: EntityWithComponents<TComponents, keyof TComponents> | number
   ): GenericEntity<TComponents> {
-    let sourceEid: number;
-
-    if (typeof entityOrId === 'number') {
-      sourceEid = entityOrId;
-    } else {
-      sourceEid = entityOrId.id;
-    }
+    const sourceEid =
+      typeof entityOrId === 'number' ? entityOrId : entityOrId.id;
 
     // Verify source entity exists
     const sourceEntity = this.get(sourceEid);
@@ -376,7 +400,10 @@ export class World<TComponents extends Components> {
     this.dirtyEntities.delete(targetEid);
 
     // Return DB entity reference (id/world only)
-    return { id: targetEid, world: this } as any;
+    return { id: targetEid, world: this } as unknown as EntityWithComponents<
+      TComponents,
+      keyof TComponents
+    >;
   }
 
   /**
@@ -550,26 +577,6 @@ export class World<TComponents extends Components> {
             continue;
           }
 
-          const serializeValues = (obj: Record<string, unknown>) => {
-            const out: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(obj)) {
-              if (v === null || v === undefined) {
-                out[k] = v as any;
-                continue;
-              }
-              if (v instanceof Date) {
-                out[k] = v.toISOString();
-                continue;
-              }
-              if (typeof v === 'object') {
-                out[k] = JSON.stringify(v);
-                continue;
-              }
-              out[k] = v as any;
-            }
-            return out;
-          };
-
           if (entry.exists) {
             // update
             const { id, ...dataWithoutId } = entry.data as Record<
@@ -588,7 +595,7 @@ export class World<TComponents extends Components> {
                 continue;
               }
               if (!(name in updateData)) {
-                (updateData as any)[name] = null;
+                updateData[name] = null;
               }
             }
             def!.stmtUpdate.run(updateData);
@@ -610,7 +617,7 @@ export class World<TComponents extends Components> {
                 continue;
               }
               if (!(name in insertData)) {
-                (insertData as any)[name] = null;
+                insertData[name] = null;
               }
             }
 
@@ -678,6 +685,7 @@ export async function createWorld(
   options?: CreateWorldOptions
 ): Promise<World<Components>>;
 export async function createWorld<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped EDL worlds must allow arbitrary component access
   TComponents extends Record<string, any> = Record<string, any>
 >(edl: string, options?: CreateWorldOptions): Promise<World<TComponents>>;
 export async function createWorld(
@@ -693,13 +701,13 @@ export async function createWorld(
     await initialiseWorldDb(world, defs, options);
     // Execute entity/atom definitions and commands to populate initial data
     executeEDL(world, componentDefs);
-    return world as any;
+    return world;
   }
 
   const world = new World(options || {});
   await world.open();
   await initialiseWorldDb(world, componentDefs, options);
-  return world as any;
+  return world;
 }
 
 const initialiseWorldDb = async <TComponents extends Components>(
@@ -820,5 +828,5 @@ export const loadWorld = async <TDefs extends readonly CDef[]>(
   const world = new World({ ...options, path } as CreateWorldOptions);
   await world.open();
   await initialiseWorldDb(world, componentDefs);
-  return world as any;
+  return world as World<InferComponentsFromCDefs<TDefs>>;
 };

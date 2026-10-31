@@ -1,4 +1,3 @@
-
 type CommandInputProps = {
   onHistoryNext: () => void;
   onHistoryPrevious: () => void;
@@ -16,13 +15,13 @@ export const CommandInput = ({
   onValueChange,
   value
 }: CommandInputProps) => (
-    <box style={{ border: true, height: 3 }}>
-      <input
-        focused
-        onInput={onValueChange}
-        onSubmit={onSubmit}
-        placeholder="Type a command..."
-        value={value}
-      />
-    </box>
-  );
+  <box style={{ border: true, height: 3 }}>
+    <input
+      focused
+      onInput={onValueChange}
+      onSubmit={onSubmit}
+      placeholder="Type a command..."
+      value={value}
+    />
+  </box>
+);

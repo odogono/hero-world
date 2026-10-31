@@ -12,7 +12,7 @@ describe('world', () => {
     expect(loop).toBeDefined();
   });
 
-  it.only('should spawn a tank', async () => {
+  it('should spawn a tank', async () => {
     const tankWorld = await createWorld();
     const tank = spawnTank(tankWorld, 'red', 0, 0);
     // tankWorld.world.flush();
@@ -34,6 +34,6 @@ describe('world', () => {
     expect(e.moveOrder).toBeDefined();
 
     // console.debug('e', e);
-    console.debug(tankWorld.world.db.saveToJSON());
+    // console.debug(tankWorld.world.db.saveToJSON());
   });
 });

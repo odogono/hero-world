@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { defineComponent, s } from '@component';
-import { DatabaseType, createDatabase } from '@db';
+import { DatabaseType, createDatabase, type Database } from '@db';
 
 import { hashComponentDefinition } from '../schema/component-hash';
 import {
@@ -14,7 +14,7 @@ import {
 } from '../schema/component-metadata';
 
 describe('Component Compatibility System - Simple Tests', () => {
-  let testDb: any;
+  let testDb: Database;
   const cleanupDb = async () => {
     if (testDb) {
       testDb.close();

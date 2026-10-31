@@ -58,9 +58,6 @@ export const createWorld = async () => {
 
   const snapshot = () => serializeSnapshot(world, tick);
 
-  const run = () => {};
-  const stop = () => {};
-
   return { getTick, loop, scheduleEvent, snapshot, update, world };
 };
 
@@ -98,11 +95,20 @@ export const issueMoveOrder = (
   scheduleEvent('cmd:move', { id, targetX, targetY });
 };
 
+type ComponentRow = {
+  eid: number;
+  health: number;
+  team: 'red' | 'blue';
+  x: number;
+  y: number;
+};
+type ComponentRows = Record<string, ComponentRow[]>;
+
 // Basic serializer for broadcasting state to clients
 export const serializeSnapshot = (world: World, tick: number) => {
   // Use DB dump as a source of truth; map to compact tank state
-  const json = world.db.saveToJSON() as any;
-  const comps: Record<string, any[]> = json.components ?? {};
+  const json = world.db.saveToJSON() as { components?: ComponentRows };
+  const comps: ComponentRows = json.components ?? {};
 
   const positions = new Map<number, { x: number; y: number }>();
   const velocities = new Map<number, { x: number; y: number }>();

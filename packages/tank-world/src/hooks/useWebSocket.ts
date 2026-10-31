@@ -31,8 +31,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
 
   const defaultCandidates = useMemo(() => {
     const envUrl =
-      ((import.meta as any).env?.VITE_WS_URL as string | undefined) ||
-      undefined;
+      (import.meta.env?.VITE_WS_URL as string | undefined) || undefined;
     const localWs = `${window.location.origin.replace(/^http/, 'ws')}/ws`;
     const direct = `ws://127.0.0.1:3001/ws`;
     const arr = [envUrl, localWs, direct].filter(Boolean) as string[];
@@ -62,6 +61,10 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     }
   };
 
+  // `connect` re-invokes itself (candidate fallback / reconnect); go through a
+  // ref so the callback never references itself before declaration.
+  const connectRef = useRef<() => void>(() => {});
+
   const connect = useCallback(() => {
     cleanupTimer();
     setError(null);
@@ -71,7 +74,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
       if (candidateIndex.current < candidates.length - 1) {
         candidateIndex.current += 1;
         attemptedOnce.current = false;
-        connect();
+        connectRef.current();
         return true;
       }
       return false;
@@ -96,10 +99,11 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
       } catch {
         // non-JSON messages are fine
       }
-      if (json.type === 'world:update') {
+      const type = (json as { type?: unknown } | undefined)?.type;
+      if (type === 'world:update') {
         return;
       }
-      if (json.type === 'chat') {
+      if (type === 'chat') {
         log.debug('chat', raw);
       }
       setMessages(prev => [...prev, { json, raw, ts: Date.now() }]);
@@ -124,7 +128,10 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
       if (autoReconnect && reconnects.current < reconnectAttempts) {
         const delay = reconnectDelayMs * Math.max(1, reconnects.current);
         reconnects.current += 1;
-        reconnectTimer.current = window.setTimeout(() => connect(), delay);
+        reconnectTimer.current = window.setTimeout(
+          () => connectRef.current(),
+          delay
+        );
       }
     };
   }, [
@@ -134,6 +141,10 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     reconnectAttempts,
     reconnectDelayMs
   ]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     cleanupTimer();
@@ -173,6 +184,9 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
   );
 
   useEffect(() => {
+    // Opening the socket is a legitimate external-system sync; connect() sets
+    // status to "connecting" before the socket exists.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     connect();
     return () => {
       disconnect();

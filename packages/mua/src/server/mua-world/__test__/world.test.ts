@@ -5,7 +5,7 @@ import { MuaWorld } from '../index';
 
 type MuaEvent = {
   actor: EntityId;
-  args: any[];
+  args: unknown[];
   target: EntityId;
   verb: string;
 };
@@ -67,11 +67,10 @@ describe('World', () => {
     await muaWorld.close();
   });
 
-  it.only('should create a connection entity on connection opened', async () => {
-    const mockSend = mock((data: any) => {
-      console.log('send', data);
-      return 1; // Return a number as expected by the send method
-    });
+  it('should create a connection entity on connection opened', async () => {
+    const mockSend = mock(
+      (_data: string | BufferSource) => 1 // Return a number as expected by the send method
+    );
 
     const conn = {
       close: () => {},
@@ -84,9 +83,9 @@ describe('World', () => {
     muaWorld.loop?.update(16.67);
     muaWorld.loop?.update(16.67);
 
-    const entities = await muaWorld.world?.queryAll({
+    const entities = await muaWorld.world!.queryAll({
       with: ['connected', 'authenticating']
-    })!;
+    });
 
     expect(entities).toHaveLength(1);
     expect(entities[0]?.connected.wsId).toBe('test');

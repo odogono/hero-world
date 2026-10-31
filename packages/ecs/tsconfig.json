@@ -2,62 +2,25 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     // Paths
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@component": [
-        "./src/component"
-      ],
-      "@component/*": [
-        "./src/component/*"
-      ],
-      "@db": [
-        "./src/db"
-      ],
-      "@db/*": [
-        "./src/db/*"
-      ],
-      "@edl": [
-        "./src/edl/index.ts"
-      ],
-      "@edl/*": [
-        "./src/edl/*"
-      ],
-      "@entity": [
-        "./src/entity/index.ts"
-      ],
-      "@entity/*": [
-        "./src/entity/*"
-      ],
-      "@events": [
-        "./src/events"
-      ],
-      "@events/*": [
-        "./src/events/*"
-      ],
-      "@helpers/*": [
-        "./src/helpers/*"
-      ],
-      "@schema": [
-        "./src/schema"
-      ],
-      "@schema/*": [
-        "./src/schema/*"
-      ],
-      "@system": [
-        "./src/system/index.ts"
-      ],
-      "@system/*": [
-        "./src/system/*"
-      ],
-      "@types": [
-        "./src/types"
-      ],
-      "@world": [
-        "./src/world/index.ts"
-      ]
+      "@/*": ["./src/*"],
+      "@component": ["./src/component"],
+      "@component/*": ["./src/component/*"],
+      "@db": ["./src/db"],
+      "@db/*": ["./src/db/*"],
+      "@edl": ["./src/edl/index.ts"],
+      "@edl/*": ["./src/edl/*"],
+      "@entity": ["./src/entity/index.ts"],
+      "@entity/*": ["./src/entity/*"],
+      "@events": ["./src/events"],
+      "@events/*": ["./src/events/*"],
+      "@helpers/*": ["./src/helpers/*"],
+      "@schema": ["./src/schema"],
+      "@schema/*": ["./src/schema/*"],
+      "@system": ["./src/system/index.ts"],
+      "@system/*": ["./src/system/*"],
+      "@types": ["./src/types"],
+      "@world": ["./src/world/index.ts"]
     }
   }
 }

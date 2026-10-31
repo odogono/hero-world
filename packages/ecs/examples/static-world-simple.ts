@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 import { s } from '@component';
 
 // Main function to handle async operations

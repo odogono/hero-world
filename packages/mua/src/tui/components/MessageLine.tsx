@@ -15,7 +15,11 @@ export const MessageLine = ({ message, roomData }: MessageLineProps) => {
   }
 
   // Apply type-based coloring for errors/success
-  if (message.type === 'error' || message.type === 'success' || message.type === 'system') {
+  if (
+    message.type === 'error' ||
+    message.type === 'success' ||
+    message.type === 'system'
+  ) {
     displayContent = colorByType(displayContent, message.type);
   }
 

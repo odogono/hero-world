@@ -22,7 +22,9 @@ export class LuaVM {
   constructor(luaLibPath?: string | null) {
     this.lib = loadLuaBindings(luaLibPath);
     const L = this.lib.symbols.luaL_newstate();
-    if (!L) throw new Error('luaL_newstate failed');
+    if (!L) {
+      throw new Error('luaL_newstate failed');
+    }
     this.L = L;
     this.lib.symbols.luaL_openlibs(this.L);
     this.setupModuleSystem();
@@ -59,7 +61,9 @@ export class LuaVM {
     for (const cb of this.callbacks) {
       try {
         cb.close();
-      } catch {}
+      } catch {
+        /* ignore callback close errors */
+      }
     }
     // Clean up coroutine states (no-op for now since we're not using actual Lua threads)
     this.lib.symbols.lua_close(this.L);
@@ -140,7 +144,7 @@ export class LuaVM {
           return 0;
         }
       },
-      { returns: 'i32', args: ['ptr'] }
+      { args: ['ptr'], returns: 'i32' }
     );
 
     this.lib.symbols.lua_pushcclosure(this.L, requireCallback.ptr as number, 0);
@@ -177,10 +181,10 @@ export class LuaVM {
 
   // Simple coroutine support (just async execution for now)
   createCoroutine(code: string): string {
-    const coId = `co_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const coId = `co_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     // For now, just store the code - we'll execute it when resumed
-    this.coroutineStates.set(coId, code as any);
+    this.coroutineStates.set(coId, code);
 
     return coId;
   }
@@ -188,9 +192,11 @@ export class LuaVM {
   resumeCoroutine(
     coId: string,
     ...args: JSJsonish[]
-  ): { status: 'yielded' | 'dead'; result: JSJsonish } {
+  ): { result: JSJsonish; status: 'yielded' | 'dead' } {
     const code = this.coroutineStates.get(coId) as string;
-    if (!code) throw new Error(`Coroutine ${coId} not found`);
+    if (!code) {
+      throw new Error(`Coroutine ${coId} not found`);
+    }
 
     try {
       // Set arguments as global variables for the coroutine
@@ -200,9 +206,9 @@ export class LuaVM {
         }
       }
 
-      const result: JSJsonish = (this.eval(code) as any) ?? null;
+      const result: JSJsonish = this.eval(code) ?? null;
       this.coroutineStates.delete(coId);
-      return { status: 'dead', result };
+      return { result, status: 'dead' };
     } catch (error) {
       this.coroutineStates.delete(coId);
       throw error;
@@ -217,7 +223,7 @@ export class LuaVM {
     const coId = this.createCoroutine(code);
     const results: JSJsonish[] = [];
 
-    let status: { status: 'yielded' | 'dead'; result: JSJsonish };
+    let status: { result: JSJsonish; status: 'yielded' | 'dead' };
     do {
       status = this.resumeCoroutine(coId, ...args);
       results.push(status.result);

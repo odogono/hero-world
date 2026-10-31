@@ -2,10 +2,18 @@
  * Mock WebSocket for testing
  * Simulates WebSocket behavior for unit tests
  */
+type Listener = (data: unknown) => void;
+
+export type MockWebSocketConstructor = typeof WebSocket & {
+  clearInstances: () => void;
+  getLastInstance: () => MockWebSocket | undefined;
+  instances: MockWebSocket[];
+};
+
 export class MockWebSocket {
   url: string;
   readyState: number = 0; // CONNECTING
-  listeners: Map<string, Function[]> = new Map();
+  listeners: Map<string, Listener[]> = new Map();
   sentMessages: string[] = [];
 
   // WebSocket ready states
@@ -21,7 +29,7 @@ export class MockWebSocket {
   /**
    * Add event listener
    */
-  addEventListener(event: string, handler: Function) {
+  addEventListener(event: string, handler: Listener) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -31,7 +39,7 @@ export class MockWebSocket {
   /**
    * Remove event listener
    */
-  removeEventListener(event: string, handler: Function) {
+  removeEventListener(event: string, handler: Listener) {
     const handlers = this.listeners.get(event);
     if (handlers) {
       const index = handlers.indexOf(handler);
@@ -62,7 +70,7 @@ export class MockWebSocket {
   /**
    * Trigger an event (for testing)
    */
-  trigger(event: string, data: any) {
+  trigger(event: string, data: unknown) {
     const handlers = this.listeners.get(event);
     if (handlers) {
       handlers.forEach(h => h(data));
@@ -72,7 +80,7 @@ export class MockWebSocket {
   /**
    * Simulate receiving a message
    */
-  simulateMessage(data: any) {
+  simulateMessage(data: unknown) {
     const event = new MessageEvent('message', {
       data: JSON.stringify(data)
     });
@@ -90,7 +98,7 @@ export class MockWebSocket {
   /**
    * Simulate connection error
    */
-  simulateError(error?: any) {
+  simulateError(error?: unknown) {
     this.trigger('error', error || new Event('error'));
   }
 
@@ -120,7 +128,7 @@ export class MockWebSocket {
 /**
  * Create a mock WebSocket constructor for global replacement
  */
-export function createMockWebSocketConstructor(): typeof WebSocket {
+export const createMockWebSocketConstructor = (): MockWebSocketConstructor => {
   const instances: MockWebSocket[] = [];
 
   const MockWSConstructor = class extends MockWebSocket {
@@ -136,9 +144,9 @@ export function createMockWebSocketConstructor(): typeof WebSocket {
     }
 
     static getLastInstance(): MockWebSocket | undefined {
-      return instances[instances.length - 1];
+      return instances.at(-1);
     }
-  } as any;
+  };
 
-  return MockWSConstructor;
-}
+  return MockWSConstructor as unknown as MockWebSocketConstructor;
+};

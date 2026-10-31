@@ -1,11 +1,14 @@
 import dotenv from 'dotenv';
+import { createLog } from 'odgn-helpers/log';
 
 import type { AuthUser } from '../plugins/auth';
 
 dotenv.config();
 
+const log = createLog('client-handler');
+
 export const testDataHandler = ({ user }: { user: AuthUser }) => {
-  console.log('testDataHandler', user);
+  log.info('testDataHandler', user);
   return {
     data: {
       items: [

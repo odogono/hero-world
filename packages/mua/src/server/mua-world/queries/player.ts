@@ -1,6 +1,12 @@
-import type { World } from 'odgn-ecs/types';
+import type { World } from 'odgn-ecs/world';
 
-export const findPlayerByConnection = (world: World<any>, wsId: string) => world.query({
+import type { MuaComponents } from '../coms';
+
+export const findPlayerByConnection = (
+  world: World<MuaComponents>,
+  wsId: string
+) =>
+  world.query({
     args: [wsId],
     where: `player.connected_id IN (
       SELECT id FROM entity WHERE id IN (
@@ -10,7 +16,8 @@ export const findPlayerByConnection = (world: World<any>, wsId: string) => world
     with: ['player']
   });
 
-export const findPlayerByName = (world: World<any>, name: string) => world.query({
+export const findPlayerByName = (world: World<MuaComponents>, name: string) =>
+  world.query({
     args: [name],
     where: 'player.name = ?1',
     with: ['player']

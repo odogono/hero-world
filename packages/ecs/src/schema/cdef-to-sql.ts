@@ -225,7 +225,7 @@ export const cdefToSql = (
 
   // Normalize input into a flat array of CDef
   const defs: CDef[] = Array.isArray(input)
-    ? (input as any[]).flat(Infinity).filter(Boolean)
+    ? ((input as CDef[][]).flat(Infinity).filter(Boolean) as CDef[])
     : [input];
 
   const stmts: string[] = [];

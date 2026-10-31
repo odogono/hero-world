@@ -1,9 +1,12 @@
 import { createSystem } from 'odgn-ecs/system';
+
 import { executeAction } from '../actions';
 
 export const actionSystem = createSystem(
   ({ entity, world }) => {
-    if (!entity.commandEvent) {return;}
+    if (!entity.commandEvent) {
+      return;
+    }
 
     const { direction, playerId, target, verb } = entity.commandEvent;
 

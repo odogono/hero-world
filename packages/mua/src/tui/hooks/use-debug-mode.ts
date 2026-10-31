@@ -48,7 +48,9 @@ export const useDebugMode = (): DebugState => {
    */
   const recordCommand = useCallback(
     (command: string, response: string) => {
-      if (!isRecording) {return;}
+      if (!isRecording) {
+        return;
+      }
 
       const debugCommand: DebugCommand = {
         command,

@@ -14,7 +14,9 @@ export const useCommandHistory = (): CommandHistory => {
    */
   const addCommand = useCallback((cmd: string) => {
     const trimmed = cmd.trim();
-    if (!trimmed) {return;}
+    if (!trimmed) {
+      return;
+    }
 
     setHistory(prev => {
       // Don't add duplicate consecutive commands
@@ -35,7 +37,9 @@ export const useCommandHistory = (): CommandHistory => {
    * Get previous command (up arrow)
    */
   const getPrevious = useCallback((): string | null => {
-    if (history.length === 0) {return null;}
+    if (history.length === 0) {
+      return null;
+    }
 
     setCurrentIndex(prev => {
       // If at end (-1), start from last item
@@ -51,7 +55,8 @@ export const useCommandHistory = (): CommandHistory => {
     });
 
     // Return the command at the new index
-    const newIndex = currentIndex === -1 ? history.length - 1 : Math.max(0, currentIndex - 1);
+    const newIndex =
+      currentIndex === -1 ? history.length - 1 : Math.max(0, currentIndex - 1);
     return history[newIndex] || null;
   }, [history, currentIndex]);
 
@@ -59,8 +64,12 @@ export const useCommandHistory = (): CommandHistory => {
    * Get next command (down arrow)
    */
   const getNext = useCallback((): string | null => {
-    if (history.length === 0) {return null;}
-    if (currentIndex === -1) {return null;}
+    if (history.length === 0) {
+      return null;
+    }
+    if (currentIndex === -1) {
+      return null;
+    }
 
     setCurrentIndex(prev => {
       // If at end, stay at end

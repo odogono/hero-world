@@ -1,4 +1,5 @@
 import { defineComponent, s } from 'odgn-ecs/component';
+import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
 
 const connectedDef = defineComponent({
   id: 'connected',
@@ -124,3 +125,5 @@ export const defs = [
   describedDef,
   itemDef
 ];
+
+export type MuaComponents = InferComponentsFromCDefs<typeof defs>;

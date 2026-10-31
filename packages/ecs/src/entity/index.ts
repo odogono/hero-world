@@ -44,7 +44,10 @@ export const createEntity: CreateEntityOverloads = <
 ): EntityWithComponents<TComponents, keyof C & keyof TComponents> => {
   const eid = world.db.addEntity();
 
-  const entity: any = { id: eid, world };
+  const entity: GenericEntity<TComponents> & Record<string, unknown> = {
+    id: eid,
+    world
+  };
   world.entityCache.set(eid, {});
   if (initialComponents) {
     for (const [c, data] of Object.entries(initialComponents)) {
@@ -91,12 +94,12 @@ export type QueryOptions<T extends Components> = {
   asProxy?: boolean;
   entity?: GenericEntity<T>;
   limit?: number;
-  offset?: number;
-  where?: string;
-  with?: (keyof T)[];
   // Optionally include these components if present on the entity.
   // They are not required to exist and will be omitted if missing.
   maybe?: (keyof T)[];
+  offset?: number;
+  where?: string;
+  with?: (keyof T)[];
   without?: (keyof T)[];
 };
 
@@ -265,7 +268,7 @@ export const mapRowToEntity = <T extends Components>(
   maybe?: (keyof T)[]
 ) => {
   const entity: Entity<keyof Components> = {
-    id: (row as any).eid,
+    id: (row as { eid: number }).eid,
     world
   } as Entity<keyof Components>;
 
@@ -274,18 +277,22 @@ export const mapRowToEntity = <T extends Components>(
     const defName = toSnakeCase(def.name);
     const data: Record<string, unknown> = {};
     for (const column of def.columns) {
-      if (column.name === 'id' || column.name === 'eid') continue; // Skip id and eid columns
+      if (column.name === 'id' || column.name === 'eid') {
+        continue;
+      } // Skip id and eid columns
       const schemaColumn = def.schema.columns.find(
         c => (toSnakeCase(c.name) || c.name) === column.name
       );
       const key = toCamelCase(column.name);
-      const value = (row as any)[`${defName}_${column.name}`];
+      const value = (row as Record<string, unknown>)[
+        `${defName}_${column.name}`
+      ];
       let processedValue = value;
 
       if (schemaColumn) {
         if (
           schemaColumn.type === 'boolean' ||
-          (schemaColumn.type as any) === 'bool'
+          (schemaColumn.type as string) === 'bool'
         ) {
           processedValue = value === 1 || value === '1' ? true : false;
         } else if (
@@ -293,10 +300,10 @@ export const mapRowToEntity = <T extends Components>(
           schemaColumn.type === 'float'
         ) {
           processedValue =
-            typeof value === 'string' ? parseFloat(value) : value;
+            typeof value === 'string' ? Number.parseFloat(value) : value;
         } else if (
           schemaColumn.type === 'json' ||
-          (schemaColumn.type as any) === 'array'
+          (schemaColumn.type as string) === 'array'
         ) {
           processedValue = value !== null ? JSON.parse(value as string) : value;
         } else if (schemaColumn.type === 'datetime') {
@@ -353,8 +360,11 @@ export const mapRowToEntity = <T extends Components>(
  * Create a Proxy wrapper around an entity object that intercepts
  * component add/remove via property assignment.
  */
-const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
-  new Proxy(entity, {
+const proxyEntity = <T extends Components>(
+  world: World<T>,
+  entity: GenericEntity<T>
+) =>
+  new Proxy(entity as GenericEntity<T> & Record<PropertyKey, unknown>, {
     set(target, prop, value) {
       const propName = String(prop);
 
@@ -366,7 +376,7 @@ const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
         value !== null
       ) {
         if (world.defs.has(propName)) {
-          addComponent(target, propName as any, value);
+          addComponent(target, propName, value as T[keyof T]);
           return true;
         }
       }
@@ -378,13 +388,13 @@ const proxyEntity = <T extends Components>(world: World<T>, entity: any) =>
         (value === null || value === undefined)
       ) {
         if (world.defs.has(propName)) {
-          removeComponent(target, propName as any);
+          removeComponent(target, propName);
           return true;
         }
       }
 
       // Fallback to normal set
-      (target as any)[prop] = value;
+      target[prop] = value;
       return true;
     }
   });
@@ -431,13 +441,13 @@ export function queryEntity<T extends Components>(
   const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
   // console.debug('row', row);
   let result = row
-    ? mapRowToEntity(world, componentsToInclude, row, options?.maybe as any)
+    ? mapRowToEntity(world, componentsToInclude, row, options?.maybe)
     : null;
   stmt.finalize();
   if (result && options?.asProxy) {
-    result = asProxiedEntity(result as any) as any;
+    result = asProxiedEntity(result as GenericEntity<T>) as typeof result;
   }
-  return result as any;
+  return result;
 }
 
 export function queryEntities<
@@ -460,15 +470,15 @@ export function queryEntities<T extends Components>(
 
   const rows = world.db.query(sql, args);
 
-  const entities = rows.map((row: any) =>
-    mapRowToEntity(world, componentsToInclude, row, options?.maybe as any)
+  const entities = rows.map(row =>
+    mapRowToEntity(world, componentsToInclude, row, options?.maybe)
   );
 
   if (asProxy) {
-    return entities.map(e => asProxiedEntity(e as any)) as any;
+    return entities.map(e => asProxiedEntity(e as GenericEntity<T>));
   }
 
-  return entities as any;
+  return entities;
 }
 
 export function queryEntitiesIterator<
@@ -524,12 +534,14 @@ export function queryEntitiesIterator<T extends Components>(
             world,
             componentsToInclude,
             row,
-            options?.maybe as any
+            options?.maybe
           );
           if (asProxy) {
-            entity = asProxiedEntity(entity as any) as any;
+            entity = asProxiedEntity(
+              entity as GenericEntity<T>
+            ) as typeof entity;
           }
-          yield entity as any;
+          yield entity;
         }
       } catch (error) {
         throw SQLiteError.executionError(sql, error as Error, {
@@ -540,5 +552,5 @@ export function queryEntitiesIterator<T extends Components>(
         finalize();
       }
     }
-  } as any;
+  };
 }

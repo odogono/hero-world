@@ -14,6 +14,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
+    "types": ["bun"],
     // Best practices
     "strict": true,
     "skipLibCheck": true,
@@ -25,13 +26,12 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     // Path mapping for workspace packages
-    "baseUrl": ".",
     "paths": {
       "odgn-ecs/*": [
-        "packages/ecs/src/*"
+        "./packages/ecs/src/*"
       ],
       "odgn-helpers/*": [
-        "packages/helpers/src/*"
+        "./packages/helpers/src/*"
       ]
     }
   }

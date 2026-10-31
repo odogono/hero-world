@@ -1,10 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -12,17 +9,10 @@
     "jsxImportSource": "@opentui/react",
     "strict": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@server/*": [
-        "./src/server/*"
-      ],
-      "@tui/*": [
-        "./src/tui/*"
-      ]
+      "@/*": ["./src/*"],
+      "@server/*": ["./src/server/*"],
+      "@tui/*": ["./src/tui/*"]
     }
   }
 }

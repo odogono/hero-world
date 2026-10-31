@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 
 import { createLog } from 'odgn-helpers/log';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { ORPCError, os } from '@orpc/server';
 
@@ -72,9 +72,9 @@ export const findPlanet = os
   .route({ method: 'GET', path: '/planets/{id}' })
   .input(z.object({ id: z.coerce.number().int().min(1) }))
   .output(PlanetSchema)
-  .handler(async ({ input }) => 
+  .handler(async ({ input }) =>
     // your find code here
-     planets.find(planet => planet.id === input.id)
+    planets.find(planet => planet.id === input.id)
   );
 
 export const createPlanet = os
@@ -91,9 +91,9 @@ export const createPlanet = os
   .route({ method: 'POST', path: '/planets' })
   .input(PlanetSchema.omit({ id: true }))
   .output(PlanetSchema)
-  .handler(async ({ context, input }) => 
+  .handler(async ({ context, input }) =>
     // your create code here
-     ({ id: 1, name: 'Mercury' })
+    ({ id: 1, name: 'Mercury' })
   );
 
 export const router = {

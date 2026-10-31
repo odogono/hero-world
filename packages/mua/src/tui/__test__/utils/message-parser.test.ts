@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
-import { extractRoomData, isRoomDescription, parseGameMessage } from '../../utils/message-parser';
+import {
+  extractRoomData,
+  isRoomDescription,
+  parseGameMessage
+} from '../../utils/message-parser';
 
 describe('message-parser', () => {
   describe('parseGameMessage', () => {
     it('creates game message for success', () => {
-      const result = parseGameMessage({ data: 'Welcome to the game', success: true });
+      const result = parseGameMessage({
+        data: 'Welcome to the game',
+        success: true
+      });
 
       expect(result.type).toBe('game');
       expect(result.content).toBe('Welcome to the game');
@@ -14,7 +21,10 @@ describe('message-parser', () => {
     });
 
     it('creates error message for failure', () => {
-      const result = parseGameMessage({ data: 'Error occurred', success: false });
+      const result = parseGameMessage({
+        data: 'Error occurred',
+        success: false
+      });
 
       expect(result.type).toBe('error');
       expect(result.content).toBe('Error occurred');
@@ -45,7 +55,9 @@ describe('message-parser', () => {
     });
 
     it('identifies room descriptions with both', () => {
-      expect(isRoomDescription('A room\nYou see: sword\nExits: north')).toBe(true);
+      expect(isRoomDescription('A room\nYou see: sword\nExits: north')).toBe(
+        true
+      );
     });
 
     it('rejects non-room content', () => {
@@ -72,7 +84,9 @@ A bustling marketplace.
 Merchants call out their wares.`;
 
       const result = extractRoomData(content);
-      expect(result?.description).toBe('A bustling marketplace.\nMerchants call out their wares.');
+      expect(result?.description).toBe(
+        'A bustling marketplace.\nMerchants call out their wares.'
+      );
     });
 
     it('extracts exits', () => {
@@ -137,7 +151,9 @@ Line after items should not be in description
 Exits: north`;
 
       const result = extractRoomData(content);
-      expect(result?.description).toBe('Line 1 of description\nLine 2 of description');
+      expect(result?.description).toBe(
+        'Line 1 of description\nLine 2 of description'
+      );
     });
 
     it('handles whitespace and empty lines', () => {

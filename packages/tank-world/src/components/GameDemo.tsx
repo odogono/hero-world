@@ -1,6 +1,32 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 
 import { useGameNetwork } from '@helpers/network';
+
+type TankRow = {
+  hp?: number;
+  id: number;
+  team: 'red' | 'blue';
+  vx?: number;
+  vy?: number;
+  x: number;
+  y: number;
+};
+
+type ServerTank = {
+  hp?: number;
+  id: number;
+  team: 'red' | 'blue';
+  vx?: number;
+  vy?: number;
+  x?: number;
+  y?: number;
+};
+
+type ServerMessage = {
+  message?: string;
+  tanks?: ServerTank[];
+  type?: string;
+};
 
 export const GameDemo = () => {
   const {
@@ -21,46 +47,37 @@ export const GameDemo = () => {
   const [moveX, setMoveX] = useState<number>(10);
   const [moveY, setMoveY] = useState<number>(10);
 
-  const parsed = useMemo(
-    () => (lastMessage?.json as any) ?? null,
-    [lastMessage]
-  );
+  const parsed = (lastMessage?.json as ServerMessage | undefined) ?? null;
 
-  type TankRow = {
-    hp?: number;
-    id: number;
-    team: 'red' | 'blue';
-    vx?: number;
-    vy?: number;
-    x: number;
-    y: number;
-  };
   const [tanks, setTanks] = useState<TankRow[]>([]);
-
-  useEffect(() => {
-    if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) {
-      return;
-    }
-    const p: any = parsed;
-    if (p.type === 'error') {
-      setErrorMsg(p.message || 'Server reported an error.');
-      return;
-    }
-    if (p.type === 'world:snapshot' || p.type === 'world:update') {
-      const rows: TankRow[] = (p.tanks || []).map((t: any) => ({
-        hp: t.hp ?? 100,
-        id: t.id,
-        team: t.team,
-        vx: Math.round((t.vx ?? 0) * 100) / 100,
-        vy: Math.round((t.vy ?? 0) * 100) / 100,
-        x: Math.round((t.x ?? 0) * 100) / 100,
-        y: Math.round((t.y ?? 0) * 100) / 100
-      }));
-      setTanks(rows);
-    }
-  }, [parsed]);
-
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Derive state from each new message during render (instead of in an
+  // effect) to avoid cascading re-renders.
+  const [prevMessage, setPrevMessage] = useState(lastMessage);
+  if (lastMessage !== prevMessage) {
+    setPrevMessage(lastMessage);
+    if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+      if (parsed.type === 'error') {
+        setErrorMsg(parsed.message || 'Server reported an error.');
+      } else if (
+        parsed.type === 'world:snapshot' ||
+        parsed.type === 'world:update'
+      ) {
+        setTanks(
+          (parsed.tanks || []).map(t => ({
+            hp: t.hp ?? 100,
+            id: t.id,
+            team: t.team,
+            vx: Math.round((t.vx ?? 0) * 100) / 100,
+            vy: Math.round((t.vy ?? 0) * 100) / 100,
+            x: Math.round((t.x ?? 0) * 100) / 100,
+            y: Math.round((t.y ?? 0) * 100) / 100
+          }))
+        );
+      }
+    }
+  }
 
   const onSpawn = useCallback(
     (e: FormEvent) => {

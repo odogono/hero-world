@@ -6,5 +6,4 @@ export type ParsedCommand = {
 };
 
 export type CommandParseResult =
-  | { command: ParsedCommand; success: true; }
-  | { error: string; success: false; };
+  { command: ParsedCommand; success: true } | { error: string; success: false };

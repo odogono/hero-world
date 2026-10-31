@@ -15,33 +15,36 @@ export const useGameState = () => {
   /**
    * Add a new message to the history
    */
-  const addMessage = useCallback((content: string, type: GameMessage['type'] = 'game') => {
-    const newMessage: GameMessage = {
-      content,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      type
-    };
+  const addMessage = useCallback(
+    (content: string, type: GameMessage['type'] = 'game') => {
+      const newMessage: GameMessage = {
+        content,
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        type
+      };
 
-    setMessages(prev => {
-      const updated = [...prev, newMessage];
-      // Keep only last MAX_MESSAGES
-      return updated.slice(-MAX_MESSAGES);
-    });
+      setMessages(prev => {
+        const updated = [...prev, newMessage];
+        // Keep only last MAX_MESSAGES
+        return updated.slice(-MAX_MESSAGES);
+      });
 
-    // Try to extract room data if this looks like a room description
-    if (isRoomDescription(content)) {
-      const roomData = extractRoomData(content);
-      if (roomData) {
-        setCurrentRoom(roomData);
-        // Update player location from room name
-        setPlayerState(prev => ({
-          ...prev,
-          location: roomData.name
-        }));
+      // Try to extract room data if this looks like a room description
+      if (isRoomDescription(content)) {
+        const roomData = extractRoomData(content);
+        if (roomData) {
+          setCurrentRoom(roomData);
+          // Update player location from room name
+          setPlayerState(prev => ({
+            ...prev,
+            location: roomData.name
+          }));
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * Update player state

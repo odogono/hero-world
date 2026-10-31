@@ -16,7 +16,10 @@ export const COLORS = {
 /**
  * Apply color coding to message content based on room data
  */
-export const colorizeMessage = (content: string, roomData?: RoomData): string => {
+export const colorizeMessage = (
+  content: string,
+  roomData?: RoomData
+): string => {
   let result = content;
 
   if (!roomData) {
@@ -27,7 +30,7 @@ export const colorizeMessage = (content: string, roomData?: RoomData): string =>
   if (roomData.exits && roomData.exits.length > 0) {
     roomData.exits.forEach(exit => {
       // Match whole words only
-      const regex = new RegExp(`\\b${exit}\\b`, 'gi');
+      const regex = new RegExp(String.raw`\b${exit}\b`, 'gi');
       result = result.replace(regex, match => fg(COLORS.exit, match));
     });
   }
@@ -36,7 +39,7 @@ export const colorizeMessage = (content: string, roomData?: RoomData): string =>
   if (roomData.items && roomData.items.length > 0) {
     roomData.items.forEach(item => {
       // Match whole words only, case insensitive
-      const regex = new RegExp(`\\b${item}\\b`, 'gi');
+      const regex = new RegExp(String.raw`\b${item}\b`, 'gi');
       result = result.replace(regex, match => fg(COLORS.item, match));
     });
   }
@@ -44,7 +47,7 @@ export const colorizeMessage = (content: string, roomData?: RoomData): string =>
   // Color NPCs
   if (roomData.npcs && roomData.npcs.length > 0) {
     roomData.npcs.forEach(npc => {
-      const regex = new RegExp(`\\b${npc}\\b`, 'gi');
+      const regex = new RegExp(String.raw`\b${npc}\b`, 'gi');
       result = result.replace(regex, match => fg(COLORS.npc, match));
     });
   }

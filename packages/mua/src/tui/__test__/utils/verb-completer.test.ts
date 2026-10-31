@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
-import { KNOWN_VERBS, completeVerb, getMatchingVerbs } from '../../utils/verb-completer';
+import {
+  KNOWN_VERBS,
+  completeVerb,
+  getMatchingVerbs
+} from '../../utils/verb-completer';
 
 describe('verb-completer', () => {
   describe('completeVerb', () => {

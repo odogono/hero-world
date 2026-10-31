@@ -9,17 +9,21 @@ import {
 } from './helpers';
 import type { JSFunc } from './types';
 
-export function runLuaWithJSFunction<
+type LuaResult<T> = T extends void ? void : T;
+
+export const runLuaWithJSFunction = <
   T extends number | string | boolean | void
 >(
   name: string,
   fn: JSFunc,
   code: string,
   luaLibPath?: string | null
-): T extends void ? void : T {
+): LuaResult<T> => {
   const lib = loadLuaBindings(luaLibPath);
   const L = lib.symbols.luaL_newstate();
-  if (!L) throw new Error('luaL_newstate failed');
+  if (!L) {
+    throw new Error('luaL_newstate failed');
+  }
   let cb: JSCallback | null = null;
   try {
     lib.symbols.luaL_openlibs(L);
@@ -39,27 +43,38 @@ export function runLuaWithJSFunction<
     const LUA_TBOOLEAN = 1;
     const LUA_TSTRING = 4;
     const t = lib.symbols.lua_type(L, -1);
-    if (t === LUA_TNUMBER) return lib.symbols.lua_tonumberx(L, -1, 0) as any;
-    if (t === LUA_TBOOLEAN)
-      return (lib.symbols.lua_toboolean(L, -1) !== 0) as any;
-    if (t === LUA_TSTRING)
-      return fromCString(lib.symbols.lua_tolstring(L, -1, 0)) as any;
-    return undefined as any;
+    if (t === LUA_TNUMBER) {
+      return lib.symbols.lua_tonumberx(L, -1, 0) as unknown as LuaResult<T>;
+    }
+    if (t === LUA_TBOOLEAN) {
+      return (lib.symbols.lua_toboolean(L, -1) !==
+        0) as unknown as LuaResult<T>;
+    }
+    if (t === LUA_TSTRING) {
+      return fromCString(
+        lib.symbols.lua_tolstring(L, -1, 0)
+      ) as unknown as LuaResult<T>;
+    }
+    return undefined as LuaResult<T>;
   } finally {
     try {
       cb?.close();
-    } catch {}
+    } catch {
+      /* ignore callback close errors */
+    }
     lib.symbols.lua_close(L);
   }
-}
+};
 
-export function runLuaChunkReturnString(
+export const runLuaChunkReturnString = (
   code: string,
   luaLibPath?: string | null
-): string {
+): string => {
   const lib = loadLuaBindings(luaLibPath);
   const L = lib.symbols.luaL_newstate();
-  if (!L) throw new Error('luaL_newstate failed');
+  if (!L) {
+    throw new Error('luaL_newstate failed');
+  }
   try {
     lib.symbols.luaL_openlibs(L);
     const buf = toCStringBuffer(code);
@@ -81,15 +96,17 @@ export function runLuaChunkReturnString(
   } finally {
     lib.symbols.lua_close(L);
   }
-}
+};
 
-export function runLuaChunkReturnObject(
+export const runLuaChunkReturnObject = (
   code: string,
   luaLibPath?: string | null
-): Record<string, string | number | boolean> {
+): Record<string, string | number | boolean> => {
   const lib = loadLuaBindings(luaLibPath);
   const L = lib.symbols.luaL_newstate();
-  if (!L) throw new Error('luaL_newstate failed');
+  if (!L) {
+    throw new Error('luaL_newstate failed');
+  }
   try {
     lib.symbols.luaL_openlibs(L);
     const buf = toCStringBuffer(code);
@@ -134,18 +151,20 @@ export function runLuaChunkReturnObject(
   } finally {
     lib.symbols.lua_close(L);
   }
-}
+};
 // If invoked directly: run a small demo
+/* eslint-disable no-console -- CLI demo output when run as a script */
 if (import.meta.main) {
   const code = 'return 10 + 32';
   try {
     const result = runLuaChunkReturnNumber(code);
     console.log(`[FFI] Lua result:`, result);
-  } catch (err) {
-    console.error(String(err));
+  } catch (error) {
+    console.error(String(error));
     console.error(
       'Hint: install Lua (e.g., brew install lua) and/or set LUA_LIB_PATH to the liblua path.'
     );
     process.exit(1);
   }
 }
+/* eslint-enable no-console */
