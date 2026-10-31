@@ -164,3 +164,17 @@ Configured in package `.prettierrc` files.
 
 - Don’t commit secrets (`.env`, credentials) or generated artifacts (DB files, coverage output).
 - Keep changes focused to one package when possible in this monorepo.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues on odogono/hero-world (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
