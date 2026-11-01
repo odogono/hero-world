@@ -150,4 +150,44 @@ describe('timer Capability', () => {
       text: 'ding'
     });
   });
+
+  it('lets the Host schedule timers and handle them itself', async () => {
+    const world = await createWorld([
+      metaComponent,
+      locationComponent,
+      eventComponent,
+      talkTimerComponent
+    ]);
+    world.executeEDL(EDL);
+    let now = 1_000_000_000_000n;
+    const handled: string[] = [];
+    const ecsTalk = createEcsTalk(world, {
+      clock: () => now,
+      onTimer: timer => {
+        if (timer.script !== 'host') {
+          return false;
+        }
+        handled.push(`${timer.owner}:${timer.message}`);
+        return true;
+      }
+    });
+    ecsTalk.loadAtomScript('bell', BELL);
+    const tower = world
+      .queryAll({ with: ['meta'] })
+      .find(e => (e.meta.props as { id: string }).id === 'tower')!.id;
+
+    ecsTalk.schedule({
+      at: now + 5_000_000n,
+      message: 'reset',
+      name: 'reset',
+      owner: tower,
+      script: 'host'
+    });
+    now += 5_000_000n;
+    ecsTalk.pump();
+    world.flush();
+
+    expect(handled).toEqual([`${tower}:reset`]);
+    expect(world.queryAll({ with: ['talkTimer'] })).toHaveLength(0);
+  });
 });

@@ -1,4 +1,4 @@
-import { createEcsTalk } from 'ecs-talk';
+import { createEcsTalk, type DueTimer } from 'ecs-talk';
 import { createGameLoop } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
 import { EDLParseError } from 'odgn-ecs/edl';
@@ -17,7 +17,6 @@ import {
   type ScriptRunner
 } from './scripts/runner';
 import { tell } from './systems/output';
-import { createTimerSystem } from './systems/timerSystem';
 import { createWorldClock, type WorldClock } from './world/clock';
 import { expandExits } from './world/exits';
 import {
@@ -26,6 +25,7 @@ import {
   type Lifecycle
 } from './world/lifecycle';
 import { ensurePlaces, type Places } from './world/places';
+import { createMuaTimers } from './world/timers';
 
 const log = createLog('mua-world');
 
@@ -98,11 +98,25 @@ export class MuaWorld {
 
     // NorthTalk Scripts, attached to atoms by their EDL `script` component
     this.clock = createWorldClock(this.world, this.places.system);
-    const ecsTalk = createEcsTalk(this.world, { clock: this.clock.micros });
+    // mua's own timers are handled once they exist (see world/timers.ts)
+    const hooks: { onTimer?: (timer: DueTimer) => boolean } = {};
+    const ecsTalk = createEcsTalk(this.world, {
+      clock: this.clock.micros,
+      onTimer: timer => hooks.onTimer?.(timer) ?? false
+    });
     const scriptedAtoms = await loadScripts(this.world, ecsTalk);
     const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
     this.scripts = scripts;
-    this.lifecycle = createLifecycle(this.world, scripts, this.places);
+    const lifecycle = createLifecycle(this.world, scripts, this.places);
+    this.lifecycle = lifecycle;
+    const places = this.places;
+    const timers = createMuaTimers(this.world, ecsTalk, this.clock, () => ({
+      lifecycle,
+      places,
+      scripts
+    }));
+    hooks.onTimer = timers.onTimer;
+    timers.arm();
 
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
@@ -118,10 +132,6 @@ export class MuaWorld {
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
     this.loop.addSystem('npcs', npcSystem);
-    this.loop.addSystem(
-      'timers',
-      createTimerSystem(this.clock, this.lifecycle, scripts, this.places)
-    );
     this.loop.addSystem('action', createActionSystem(scripts));
     this.loop.addSystem('show', showSystem);
     this.loop.addSystem('output', createOutputSystem(this.connections));
