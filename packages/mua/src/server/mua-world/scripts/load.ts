@@ -13,7 +13,7 @@ const log = createLog('scripts');
  */
 export const loadScripts = async (
   world: World<MuaComponents>,
-  ecsTalk: EcsTalk
+  ecsTalk: EcsTalk<MuaComponents>
 ): Promise<Set<string>> => {
   const scripted = new Set<string>();
   for (const owner of world.getScriptOwners()) {

@@ -57,7 +57,7 @@ export const NO_SCRIPTS: ScriptRunner = {
 
 export const createScriptRunner = (
   world: World<MuaComponents>,
-  ecsTalk: EcsTalk,
+  ecsTalk: EcsTalk<MuaComponents>,
   scriptedAtoms: ReadonlySet<string>
 ): ScriptRunner => {
   const replies = new Map<string, ScriptReply>();

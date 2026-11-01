@@ -93,7 +93,7 @@
     "packages/helpers/src/hash.ts": 2,
     "packages/helpers/src/string.ts": 5,
     "packages/mua/src/server/index.ts": 3,
-    "packages/mua/src/server/mua-world/index.ts": 3,
+    "packages/mua/src/server/mua-world/index.ts": 1,
     "packages/mua/src/server/mua-world/systems/create-mua-system.ts": 1,
     "packages/mua/src/server/orpc/router.ts": 1,
     "packages/mua/src/server/plugins/auth.ts": 2,

@@ -525,4 +525,7 @@ export const createEcsTalk = <TComponents extends Components>(
   };
 };
 
-export type EcsTalk = ReturnType<typeof createEcsTalk>;
+/** The adapter for a world of `TComponents`, as `createEcsTalk` returns it */
+export type EcsTalk<TComponents extends Components = Components> = ReturnType<
+  typeof createEcsTalk<TComponents>
+>;
