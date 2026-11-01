@@ -7,6 +7,7 @@ import { createLog } from 'odgn-helpers/log';
 import {
   Decimal,
   ScriptError,
+  clockCapability,
   defineCapability,
   defineObjectKind,
   fromValue,
@@ -28,6 +29,7 @@ import {
 } from '@northtalk/ts';
 
 import { toComponentShape, type ComponentShape } from './component-shape';
+import { createTalkTimers } from './timer';
 
 const log = createLog('ecs-talk');
 
@@ -359,6 +361,18 @@ export const createEcsTalk = <TComponents extends Components>(
 
   const group: Group = newGroup({ name });
 
+  /** `clock`'s `now` reads the Pump's Clock, so a Script can work out `at` */
+  const clockGrant = clockCapability({ now: { fuel: 1 } }).grant(
+    'all',
+    undefined
+  );
+
+  const timers = createTalkTimers(world, {
+    deliver: (eid, message, args) =>
+      group.deliver(handle(eid), { args, name: message }),
+    entityValue: eid => (isLive(eid) ? handle(eid).value : undefined)
+  });
+
   /** The scripted atom a Message Path climbs to from these bases, if any */
   const scriptedParent = (
     bases: string[],
@@ -445,10 +459,14 @@ export const createEcsTalk = <TComponents extends Components>(
     try {
       const script = group.load({
         grants: {
+          clock: clockGrant,
           world: worldCapability.grant(
             ['find', 'moveTo', 'resolve', 'show'],
             undefined
           ),
+          ...(timers.capability
+            ? { timer: timers.capability.grant('all', undefined) }
+            : {}),
           ...loadOptions.grants
         },
         limits: loadOptions.limits,
@@ -479,10 +497,12 @@ export const createEcsTalk = <TComponents extends Components>(
     }
   };
 
-  /** Pump the Script Group once */
+  /** Pump the Script Group once, after delivering the timers now due */
   const pump = (): PumpResult => {
     sync();
-    const result = group.pump(clock());
+    const now = clock();
+    timers.fireDue(now);
+    const result = group.pump(now);
     onPump?.(result);
     return result;
   };
@@ -498,14 +518,24 @@ export const createEcsTalk = <TComponents extends Components>(
     priority: Number.MIN_SAFE_INTEGER
   };
 
-  const deliver = (eid: number, message: string, ...args: Value[]) =>
-    group.deliver(handle(eid), { args, name: message });
+  // each Delivery's receiver is noted, so a timer its Run sets belongs to it
+  const deliver = (eid: number, message: string, ...args: Value[]) => {
+    const id = group.deliver(handle(eid), { args, name: message });
+    timers.noteDelivery(id, eid);
+    return id;
+  };
 
-  const request = (eid: number, message: string, ...args: Value[]) =>
-    group.request(handle(eid), { args, name: message });
+  const request = (eid: number, message: string, ...args: Value[]) => {
+    const requested = group.request(handle(eid), { args, name: message });
+    timers.noteDelivery(requested.id, eid);
+    return requested;
+  };
 
-  const decide = (eid: number, message: string, ...args: Value[]) =>
-    group.decide(handle(eid), { args, name: message });
+  const decide = (eid: number, message: string, ...args: Value[]) => {
+    const deciding = group.decide(handle(eid), { args, name: message });
+    timers.noteDelivery(deciding.id, eid);
+    return deciding;
+  };
 
   return {
     atomKind,
