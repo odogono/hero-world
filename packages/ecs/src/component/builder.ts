@@ -24,7 +24,7 @@ const columnBuilder = <
         value === undefined
           ? getDefault(column.type)
           : (value as CDefColumnInfo['default']);
-      return builder;
+      return builder as unknown as ColumnBuilder<TType, false, TValue, true>;
     },
     foreignKey: (foreignKey: string) => {
       column.foreignKey = foreignKey;

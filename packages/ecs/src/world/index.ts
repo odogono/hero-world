@@ -7,6 +7,7 @@ import {
   removeComponent,
   toTableName
 } from '../component';
+import type { ComponentInput } from '../component/types';
 import {
   DatabaseType,
   createDatabase,
@@ -263,9 +264,9 @@ export class World<TComponents extends Components> {
     return !!this.db;
   }
 
-  create(
-    initialComponents?: Partial<TComponents>
-  ): EntityWithComponents<TComponents, keyof TComponents> {
+  create(initialComponents?: {
+    [K in keyof TComponents]?: ComponentInput<TComponents[K]>;
+  }): EntityWithComponents<TComponents, keyof TComponents> {
     const eid = this.db.addEntity();
 
     const entity: GenericEntity<TComponents> & Record<string, unknown> = {
