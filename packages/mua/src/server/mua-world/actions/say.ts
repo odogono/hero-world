@@ -1,16 +1,16 @@
 import { getEntity } from '../queries/entity';
-import type { ActionContext, ActionResult } from './types';
+import { refused, type ActionContext, type ActionOutcome } from './types';
 
-export const sayAction = (ctx: ActionContext): ActionResult => {
+export const sayAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, text, world } = ctx;
 
   if (!text) {
-    return { message: 'What do you want to say?' };
+    return refused('What do you want to say?');
   }
 
   const player = getEntity(world, playerId, ['player', 'location']);
   if (!player) {
-    return { message: 'There is nobody here to hear you.' };
+    return refused('There is nobody here to hear you.');
   }
 
   return {
@@ -19,21 +19,22 @@ export const sayAction = (ctx: ActionContext): ActionResult => {
       message: `${player.player.name} says, "${text}"`,
       roomId: player.location.in
     },
+    kind: 'done',
     message: `You say, "${text}"`
   };
 };
 
-export const sayToAction = (ctx: ActionContext): ActionResult => {
+export const sayToAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, targetId, text, world } = ctx;
   const listener = getEntity(world, targetId, ['player']);
   if (!listener) {
-    return { message: "They can't hear you." };
+    return refused("They can't hear you.");
   }
   if (listener.id === playerId) {
-    return { message: 'You mutter to yourself.' };
+    return refused('You mutter to yourself.');
   }
   if (!text) {
-    return { message: 'What do you want to say?' };
+    return refused('What do you want to say?');
   }
 
   const speaker = getEntity(world, playerId, ['player', 'location']);
@@ -44,6 +45,7 @@ export const sayToAction = (ctx: ActionContext): ActionResult => {
       message: `${speaker.player.name} says to ${name}, "${text}"`,
       roomId: speaker.location.in
     },
+    kind: 'done',
     message: `You say to ${name}, "${text}"`
   };
 };

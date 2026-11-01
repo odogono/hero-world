@@ -1,4 +1,4 @@
-import { executeAction } from '../actions';
+import { dispatchCommand } from '../actions';
 import { getEntity } from '../queries/entity';
 import { createMuaSystem } from './create-mua-system';
 
@@ -21,7 +21,7 @@ export const actionSystem = createMuaSystem(
     } = entity.commandEvent;
 
     // Execute action
-    const result = executeAction({
+    const outcome = dispatchCommand({
       direction,
       indirect,
       indirectId: indirectId ?? undefined,
@@ -44,23 +44,29 @@ export const actionSystem = createMuaSystem(
       return;
     }
 
+    // dispatchCommand never passes: unhandled commands are refused
+    if (outcome.kind === 'pass') {
+      world.delete(entity);
+      return;
+    }
+
     // Create output event for player
     world.create({
       outputEvent: {
         broadcast: false,
-        message: label ? `${label}: ${result.message}` : result.message,
+        message: label ? `${label}: ${outcome.message}` : outcome.message,
         wsId: connection.connected.wsId
       }
     });
 
     // Create broadcast output event if needed
-    if (result.broadcast) {
+    if (outcome.kind === 'done' && outcome.broadcast) {
       world.create({
         outputEvent: {
           broadcast: true,
-          exclude: result.broadcast.exclude,
-          message: result.broadcast.message,
-          roomId: result.broadcast.roomId,
+          exclude: outcome.broadcast.exclude,
+          message: outcome.broadcast.message,
+          roomId: outcome.broadcast.roomId,
           wsId: '' // Will be resolved by output system
         }
       });

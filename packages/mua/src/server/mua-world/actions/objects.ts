@@ -2,7 +2,7 @@ import type { EntityId } from 'odgn-ecs/types';
 
 import { getEntity, getLocationOf } from '../queries/entity';
 import { getElements, theName } from '../queries/scope';
-import type { ActionContext, ActionResult } from './types';
+import { done, refused, type ActionContext, type ActionOutcome } from './types';
 
 const capitalise = (text: string) =>
   text.charAt(0).toUpperCase() + text.slice(1);
@@ -11,11 +11,11 @@ const listNames = (ids: { isPlayer: boolean; name: string }[]) =>
   ids.map(theName).join(', ');
 
 /** Name, description and, for an open container, what is inside */
-export const examineAction = (ctx: ActionContext): ActionResult => {
+export const examineAction = (ctx: ActionContext): ActionOutcome => {
   const { targetId, world } = ctx;
   const target = getEntity(world, targetId, ['location']);
   if (!target) {
-    return { message: 'Examine what?' };
+    return refused('Examine what?');
   }
   const described = getEntity(world, targetId, ['described']);
   const player = getEntity(world, targetId, ['player']);
@@ -38,7 +38,7 @@ export const examineAction = (ctx: ActionContext): ActionResult => {
       );
     }
   }
-  return { message: lines.join('\n') };
+  return done(lines.join('\n'));
 };
 
 const nameOf = (ctx: ActionContext, id: EntityId) => {
@@ -51,21 +51,21 @@ const actorName = (ctx: ActionContext) =>
 
 const roomOf = (ctx: ActionContext) => getLocationOf(ctx.world, ctx.playerId);
 
-export const takeAction = (ctx: ActionContext): ActionResult => {
+export const takeAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, targetId, world } = ctx;
   const target = getEntity(world, targetId, ['location'], true);
   if (!target) {
-    return { message: 'Take what?' };
+    return refused('Take what?');
   }
   if (target.location.in === playerId) {
-    return { message: 'You already have that.' };
+    return refused('You already have that.');
   }
   if (getEntity(world, target.id, ['player'])) {
-    return { message: "You can't take people." };
+    return refused("You can't take people.");
   }
   const item = getEntity(world, target.id, ['item']);
   if (!item?.item.isTakeable) {
-    return { message: "You can't take that." };
+    return refused("You can't take that.");
   }
 
   target.location = { in: playerId };
@@ -81,16 +81,17 @@ export const takeAction = (ctx: ActionContext): ActionResult => {
             message: `${actorName(ctx)} takes ${nameOf(ctx, target.id)}.`,
             roomId
           },
+    kind: 'done',
     message: 'Taken.'
   };
 };
 
-export const dropAction = (ctx: ActionContext): ActionResult => {
+export const dropAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, targetId, world } = ctx;
   const target = getEntity(world, targetId, ['location'], true);
   const roomId = roomOf(ctx);
   if (!target || roomId === undefined) {
-    return { message: 'Drop what?' };
+    return refused('Drop what?');
   }
 
   target.location = { in: roomId };
@@ -102,13 +103,15 @@ export const dropAction = (ctx: ActionContext): ActionResult => {
       message: `${actorName(ctx)} drops ${nameOf(ctx, target.id)}.`,
       roomId
     },
+    kind: 'done',
     message: 'Dropped.'
   };
 };
 
-export const inventoryAction = (ctx: ActionContext): ActionResult => {
+export const inventoryAction = (ctx: ActionContext): ActionOutcome => {
   const carried = getElements(ctx.world, ctx.playerId);
   return {
+    kind: 'done',
     message:
       carried.length > 0
         ? `You are carrying: ${listNames(carried)}.`
@@ -116,25 +119,25 @@ export const inventoryAction = (ctx: ActionContext): ActionResult => {
   };
 };
 
-const setClosed = (ctx: ActionContext, isClosed: boolean): ActionResult => {
+const setClosed = (ctx: ActionContext, isClosed: boolean): ActionOutcome => {
   const { playerId, targetId, world } = ctx;
   const target = getEntity(world, targetId, ['container'], true);
   const verb = isClosed ? 'close' : 'open';
   if (!target || getEntity(world, target.id, ['player'])) {
-    return { message: `You can't ${verb} that.` };
+    return refused(`You can't ${verb} that.`);
   }
   const name = nameOf(ctx, target.id);
   if (target.container.isClosed === isClosed) {
-    return {
-      message: `${capitalise(name)} is already ${isClosed ? 'closed' : 'open'}.`
-    };
+    return refused(
+      `${capitalise(name)} is already ${isClosed ? 'closed' : 'open'}.`
+    );
   }
 
   target.container = { ...target.container, isClosed };
   world.flush();
 
   const roomId = roomOf(ctx);
-  const result: ActionResult = {
+  const result = {
     broadcast:
       roomId === undefined
         ? undefined
@@ -143,6 +146,7 @@ const setClosed = (ctx: ActionContext, isClosed: boolean): ActionResult => {
             message: `${actorName(ctx)} ${verb}s ${name}.`,
             roomId
           },
+    kind: 'done' as const,
     message: isClosed ? 'Closed.' : 'Opened.'
   };
   if (!isClosed) {

@@ -1,18 +1,18 @@
 import { getEntity, getLocationOf } from '../queries/entity';
 import { findPlayersIn } from '../queries/player';
 import { getRoomContents, getRoomExits } from '../queries/room';
-import type { ActionContext, ActionResult } from './types';
+import { done, refused, type ActionContext, type ActionOutcome } from './types';
 
-export const lookAction = (ctx: ActionContext): ActionResult => {
+export const lookAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, world } = ctx;
   const roomId = getLocationOf(world, playerId);
   if (roomId === undefined) {
-    return { message: 'You are nowhere.' };
+    return refused('You are nowhere.');
   }
 
   const room = getEntity(world, roomId, ['described']);
   if (!room) {
-    return { message: 'You are in darkness.' };
+    return refused('You are in darkness.');
   }
 
   let message = `\n${room.described.name}\n${room.described.description}\n`;
@@ -42,5 +42,5 @@ export const lookAction = (ctx: ActionContext): ActionResult => {
     message += `\n\nExits: ${exits.map(e => e.portal.dir).join(', ')}`;
   }
 
-  return { message };
+  return done(message);
 };
