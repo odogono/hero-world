@@ -31,7 +31,9 @@ const toDirection = (word: string | undefined) => {
     return undefined;
   }
   const direction = DIRECTION_ALIASES[word] ?? word;
-  return DIRECTIONS.includes(direction) ? direction : undefined;
+  return (DIRECTIONS as readonly string[]).includes(direction)
+    ? direction
+    : undefined;
 };
 
 const toNounPhrase = (tokens: Token[]) => {

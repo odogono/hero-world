@@ -3,6 +3,8 @@ import { defineComponent, s } from 'odgn-ecs/component';
 import { eventComponent } from 'odgn-ecs/events';
 import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
 
+import type { DIRECTIONS } from './commands/verbs';
+
 const connectedDef = defineComponent({
   id: 'connected',
   schema: {
@@ -55,6 +57,32 @@ const portalDef = defineComponent({
     msg: s.string().optional(),
     to: s.entityId().optional()
   }
+});
+
+/**
+ * A room's exits, by direction, expanded into exit entities when the world
+ * loads (see world/exits.ts). Each is the room it leads to, or a spec:
+ * `exits { north: $hall, south: { msg: "The windows are barred." },
+ *          down: { to: $cellar oneWay: true } }`.
+ * An exit to a room also makes the way back, unless that room already has an
+ * exit in the opposite direction or the exit is `oneWay`.
+ */
+const exitsDef = defineComponent({
+  id: 'exits',
+  schema: {
+    down: s.json().optional(),
+    east: s.json().optional(),
+    in: s.json().optional(),
+    north: s.json().optional(),
+    northeast: s.json().optional(),
+    northwest: s.json().optional(),
+    out: s.json().optional(),
+    south: s.json().optional(),
+    southeast: s.json().optional(),
+    southwest: s.json().optional(),
+    up: s.json().optional(),
+    west: s.json().optional()
+  } satisfies Record<(typeof DIRECTIONS)[number], unknown>
 });
 
 /** The words a player can use to refer to an entity, besides its name */
@@ -187,6 +215,7 @@ export const defs = [
   metaDef,
   locationComponent,
   portalDef,
+  exitsDef,
   describedDef,
   nounDef,
   responsesDef,
