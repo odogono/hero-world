@@ -1,0 +1,51 @@
+# A small world with non-player characters driven by Scripts
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom npc {
+  npc { active: true }
+}
+
+# Repeats whatever it hears
+atom parrot {
+  script { src: "scripts/parrot.talk" }
+}
+
+# Welcomes whoever arrives
+atom greeter {
+  script { src: "scripts/greeter.talk" }
+}
+
+# Wanders off east a while after the world starts
+atom cat {
+  script { src: "scripts/cat.talk" }
+}
+
+entity west_of_house : room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Square" description: "A busy town square." }
+  exits { east: $market }
+}
+
+entity market : room {
+  described { name: "Market" description: "Stalls line the street." }
+}
+
+entity polly : npc parrot {
+  described { name: "Parrot" description: "A green parrot." }
+  noun { words: ["parrot", "polly"] }
+  location { in: $west_of_house }
+}
+
+entity tom : npc cat {
+  described { name: "Cat" description: "A ginger cat." }
+  noun { words: ["cat"] }
+  location { in: $west_of_house }
+}
+
+entity trader : npc greeter {
+  described { name: "Trader" description: "A cheerful trader." }
+  location { in: $market }
+}

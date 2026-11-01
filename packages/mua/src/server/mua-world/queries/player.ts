@@ -1,3 +1,4 @@
+import type { EntityId } from 'odgn-ecs/types';
 import type { World } from 'odgn-ecs/world';
 
 import type { MuaComponents } from '../coms';
@@ -43,4 +44,12 @@ export const findPlayersIn = (world: World<MuaComponents>, placeId: number) =>
     args: [placeId],
     where: 'location.in = ?1',
     with: ['player', 'location']
+  });
+
+/** The NPCs located in an entity */
+export const findNpcsIn = (world: World<MuaComponents>, placeId: EntityId) =>
+  world.queryAll({
+    args: [placeId],
+    where: 'location.in = ?1',
+    with: ['described', 'location', 'npc']
   });

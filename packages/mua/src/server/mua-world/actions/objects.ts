@@ -1,6 +1,10 @@
 import type { EntityId } from 'odgn-ecs/types';
 
-import { getEntity, getLocationOf } from '../queries/entity';
+import {
+  nameOf as entityName,
+  getEntity,
+  getLocationOf
+} from '../queries/entity';
 import { getElements, theName } from '../queries/scope';
 import { messageFor } from './messages';
 import { done, refused, type ActionContext, type ActionOutcome } from './types';
@@ -19,12 +23,16 @@ export const examineAction = (ctx: ActionContext): ActionOutcome => {
     return refused('Examine what?');
   }
   const described = getEntity(world, targetId, ['described']);
-  const player = getEntity(world, targetId, ['player']);
+  const player =
+    getEntity(world, targetId, ['player']) ??
+    getEntity(world, targetId, ['npc']);
   const container = getEntity(world, targetId, ['container']);
 
   const lines = [
     described?.described.description ??
-      (player ? `You see ${player.player.name}.` : 'You see nothing special.')
+      (player
+        ? `You see ${entityName(world, targetId)}.`
+        : 'You see nothing special.')
   ];
 
   if (container && !player) {

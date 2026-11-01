@@ -1,5 +1,5 @@
 import { getEntity, getLocationOf } from '../queries/entity';
-import { findPlayersIn } from '../queries/player';
+import { findNpcsIn, findPlayersIn } from '../queries/player';
 import { getRoomContents, getRoomExits } from '../queries/room';
 import {
   refused,
@@ -51,9 +51,14 @@ export const lookAction = (ctx: ActionContext): ActionOutcome => {
       .filter(e => e.item || e.container)
       .map(e => e.described.name),
     name: room.described.name,
-    players: findPlayersIn(world, room.id)
-      .filter(p => p.id !== playerId)
-      .map(p => p.player.name)
+    players: [
+      ...findPlayersIn(world, room.id)
+        .filter(p => p.id !== playerId)
+        .map(p => p.player.name),
+      ...findNpcsIn(world, room.id)
+        .filter(n => n.id !== playerId)
+        .map(n => n.described.name)
+    ]
   };
 
   return {

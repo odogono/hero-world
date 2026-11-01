@@ -1,4 +1,5 @@
 import { stepCommand } from '../actions';
+import { entitiesIn } from '../queries/entity';
 import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
 import { createMuaSystem } from './create-mua-system';
 import { tell } from './output';
@@ -70,6 +71,16 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
           label ? `${label}: ${outcome.message}` : outcome.message,
           { room: outcome.kind === 'done' ? outcome.room : undefined }
         );
+      }
+
+      // Let the scripted things there notice it (speech, arrivals)
+      const notices = outcome.kind === 'done' ? outcome.notices : [];
+      for (const notice of notices ?? []) {
+        for (const watcher of entitiesIn(world, notice.to)) {
+          if (watcher !== playerId && scripts.hasScript(watcher)) {
+            scripts.notify(watcher, notice.message, notice.args);
+          }
+        }
       }
 
       // Tell everyone else who saw it
