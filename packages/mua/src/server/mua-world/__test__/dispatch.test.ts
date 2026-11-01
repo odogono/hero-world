@@ -115,7 +115,8 @@ describe('Dispatch', () => {
     const silent: ScriptRunner = {
       forget: () => {},
       hasScript: () => true,
-      offer: () => ({ kind: 'waiting' })
+      offer: () => ({ kind: 'waiting' }),
+      settled: () => 0
     };
 
     it('waits while a Script has not answered', () => {

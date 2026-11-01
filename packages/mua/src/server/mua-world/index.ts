@@ -10,15 +10,22 @@ import { createLog } from 'odgn-helpers/log';
 import { defs, type MuaComponents } from './coms';
 import { findPlayerByConnection } from './queries/player';
 import { loadScripts } from './scripts/load';
-import { createScriptRunner } from './scripts/runner';
+import {
+  NO_SCRIPTS,
+  createScriptRunner,
+  type ScriptRunner
+} from './scripts/runner';
 
 const log = createLog('mua-world');
 
-/**
- * How often the game loop ticks. A command takes one tick, plus one for each
- * Script it is offered to.
- */
+/** How often the game loop ticks. A command is answered within one tick. */
 const TICK_MS = 100;
+
+/**
+ * The most extra passes one tick runs while Scripts keep answering. Each
+ * Script a command is offered to needs one, so this bounds a tick's work.
+ */
+const MAX_PASSES_PER_TICK = 10;
 
 type MuaWorldOptions = {
   mainEDL?: string;
@@ -30,6 +37,8 @@ export class MuaWorld {
   loop: GameLoop<MuaComponents> | null = null;
   updateLoopInterval: ReturnType<typeof setInterval> | null = null;
   lastUpdateTime: number = 0;
+  private scripts: ScriptRunner = NO_SCRIPTS;
+  private isTicking = false;
   private connections = new Map<string, MuaConnection>();
 
   constructor(options: MuaWorldOptions = {}) {
@@ -71,6 +80,7 @@ export class MuaWorld {
     const ecsTalk = createEcsTalk(this.world);
     const scriptedAtoms = await loadScripts(this.world, ecsTalk);
     const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
+    this.scripts = scripts;
 
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
@@ -80,7 +90,7 @@ export class MuaWorld {
     const { createOutputSystem } = await import('./systems/outputSystem');
 
     // Each system's priority sets its order: highest runs first. The Script
-    // Group's Pump runs last, so a Script answers by the next tick.
+    // Group's Pump runs last; `tick` runs extra passes for its replies.
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
     this.loop.addSystem('action', createActionSystem(scripts));
@@ -91,15 +101,46 @@ export class MuaWorld {
     // Start the update loop
     this.lastUpdateTime = performance.now();
     this.updateLoopInterval = setInterval(() => {
-      if (this.loop) {
-        const currentTime = performance.now();
-        const deltaTime = currentTime - this.lastUpdateTime;
-        this.lastUpdateTime = currentTime;
-        this.loop.update(deltaTime);
-      }
+      const currentTime = performance.now();
+      const deltaTime = currentTime - this.lastUpdateTime;
+      this.lastUpdateTime = currentTime;
+      this.tick(deltaTime).catch(error => {
+        log.error('Tick failed', error);
+      });
     }, TICK_MS);
 
     log.info(`Started update loop running every ${TICK_MS}ms`);
+  }
+
+  /**
+   * Runs one tick: a pass of the game loop, then further passes for as long
+   * as Scripts keep answering, so a command offered to several Scripts is
+   * still answered within the tick. A Script that never answers costs nothing.
+   */
+  async tick(deltaTime: number) {
+    if (!this.loop || this.isTicking) {
+      return;
+    }
+    this.isTicking = true;
+    try {
+      this.loop.update(deltaTime);
+      // a pass after an answer may raise events (such as a `show`), so run
+      // one more pass after the last one that saw an answer
+      let wasAnswered = false;
+      for (let pass = 0; pass < MAX_PASSES_PER_TICK; pass++) {
+        const before = this.scripts.settled();
+        // Script replies settle once the Pump's promises run
+        await Bun.sleep(0);
+        const isAnswered = this.scripts.settled() !== before;
+        if (!isAnswered && !wasAnswered) {
+          break;
+        }
+        wasAnswered = isAnswered;
+        this.loop.update(0);
+      }
+    } finally {
+      this.isTicking = false;
+    }
   }
 
   async close() {

@@ -43,13 +43,16 @@ export type ScriptRunner = {
     role: string,
     actorId: EntityId
   ) => ScriptReply;
+  /** How many requests have been answered so far; grows by one per answer */
+  settled: () => number;
 };
 
 /** A runner for worlds without Scripts: nothing has one */
 export const NO_SCRIPTS: ScriptRunner = {
   forget: () => {},
   hasScript: () => false,
-  offer: () => ({ kind: 'passed' })
+  offer: () => ({ kind: 'passed' }),
+  settled: () => 0
 };
 
 export const createScriptRunner = (
@@ -58,6 +61,7 @@ export const createScriptRunner = (
   scriptedAtoms: ReadonlySet<string>
 ): ScriptRunner => {
   const replies = new Map<string, ScriptReply>();
+  let settled = 0;
 
   /** Is a scripted atom anywhere in these bases or their own lineages? */
   const reachesScript = (bases: string[], seen: Set<string>): boolean =>
@@ -93,10 +97,12 @@ export const createScriptRunner = (
     );
     request.result.then(
       value => {
+        settled++;
         const message = value.asText();
         replies.set(key, { kind: 'replied', message });
       },
       (error: unknown) => {
+        settled++;
         if (isUnhandled(error)) {
           replies.set(key, { kind: 'passed' });
           return;
@@ -113,6 +119,7 @@ export const createScriptRunner = (
       replies.delete(key);
     },
     hasScript,
-    offer
+    offer,
+    settled: () => settled
   };
 };
