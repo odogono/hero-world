@@ -10,7 +10,14 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
         return;
       }
 
-      const { broadcast, exclude, message, roomId, wsId } = entity.outputEvent;
+      const { broadcast, exclude, message, room, roomId, wsId } =
+        entity.outputEvent;
+      // a room view rides along with the text for clients that show it
+      const payload = JSON.stringify({
+        data: message,
+        ...(room ? { room } : {}),
+        success: true
+      });
 
       if (broadcast && roomId) {
         // Send to all players in room
@@ -22,13 +29,13 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
             'connected'
           ]);
           const ws = conn && connections.get(conn.connected.wsId);
-          ws?.send(JSON.stringify({ data: message, success: true }));
+          ws?.send(payload);
         }
       } else {
         // Send to specific connection
         const ws = connections.get(wsId);
         if (ws) {
-          ws.send(JSON.stringify({ data: message, success: true }));
+          ws.send(payload);
         }
       }
 

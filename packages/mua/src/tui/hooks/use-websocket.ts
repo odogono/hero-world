@@ -6,6 +6,14 @@ const log = createLog('useWebSocket');
 
 export type ServerMessage = {
   data?: string;
+  /** What the player can see of a room, sent with `look` */
+  room?: {
+    description: string;
+    exits: string[];
+    items: string[];
+    name: string;
+    players: string[];
+  };
   success?: boolean;
 };
 

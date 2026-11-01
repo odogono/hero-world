@@ -75,19 +75,21 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
           outputEvent: {
             broadcast: false,
             message: label ? `${label}: ${outcome.message}` : outcome.message,
+            room: outcome.kind === 'done' ? outcome.room : undefined,
             wsId: connection.connected.wsId
           }
         });
       }
 
-      // Create broadcast output event if needed
-      if (outcome.kind === 'done' && outcome.broadcast) {
+      // Tell everyone else who saw it
+      const broadcasts = outcome.kind === 'done' ? outcome.broadcasts : [];
+      for (const { exclude, message, roomId } of broadcasts ?? []) {
         world.create({
           outputEvent: {
             broadcast: true,
-            exclude: outcome.broadcast.exclude,
-            message: outcome.broadcast.message,
-            roomId: outcome.broadcast.roomId,
+            exclude,
+            message,
+            roomId,
             wsId: '' // Will be resolved by output system
           }
         });

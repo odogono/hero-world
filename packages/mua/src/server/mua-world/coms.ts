@@ -81,6 +81,21 @@ const responsesDef = defineComponent({
   }
 });
 
+/**
+ * Messages that replace a built-in action's defaults, by who sees them and
+ * the verb's handler (see actions/messages.ts), e.g.
+ * `messages { msg: { take: "You heft {the target}." } }`.
+ * - `msg`  what the actor is told
+ * - `omsg` what everyone else in the room is told
+ */
+const messagesDef = defineComponent({
+  id: 'messages',
+  schema: {
+    msg: s.json().optional(),
+    omsg: s.json().optional()
+  }
+});
+
 /** A NorthTalk Script owned by an atom; `src` is resolved against the EDL */
 const scriptDef = defineComponent({
   id: 'script',
@@ -148,6 +163,8 @@ const outputEventDef = defineComponent({
     broadcast: s.boolean().default(false),
     exclude: s.entityId().optional(),
     message: s.string(),
+    /** What the player can see of a room, for clients to show (see look) */
+    room: s.json().optional(),
     roomId: s.entityId().optional(),
     wsId: s.string()
   }
@@ -168,6 +185,7 @@ export const defs = [
   describedDef,
   nounDef,
   responsesDef,
+  messagesDef,
   scriptDef,
   eventComponent,
   itemDef

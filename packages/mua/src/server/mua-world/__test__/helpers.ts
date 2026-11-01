@@ -2,17 +2,24 @@ import { expect } from 'bun:test';
 
 import { MuaWorld, type MuaConnection } from '../index';
 
-export type TestConnection = MuaConnection & { messages: string[] };
+export type TestConnection = MuaConnection & {
+  messages: string[];
+  /** Everything sent, as parsed JSON, including fields besides the text */
+  payloads: Record<string, unknown>[];
+};
 
 const createConnection = (id: string): TestConnection => {
   const messages: string[] = [];
+  const payloads: Record<string, unknown>[] = [];
   return {
     close: () => {},
     id,
     messages,
+    payloads,
     send: data => {
-      const { data: message } = JSON.parse(String(data)) as { data: string };
-      messages.push(message);
+      const payload = JSON.parse(String(data)) as Record<string, unknown>;
+      payloads.push(payload);
+      messages.push(payload.data as string);
       return 1;
     }
   };

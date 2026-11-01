@@ -1,8 +1,33 @@
 import { getEntity, getLocationOf } from '../queries/entity';
 import { findPlayersIn } from '../queries/player';
 import { getRoomContents, getRoomExits } from '../queries/room';
-import { done, refused, type ActionContext, type ActionOutcome } from './types';
+import {
+  refused,
+  type ActionContext,
+  type ActionOutcome,
+  type RoomView
+} from './types';
 
+/** The room as text, in the order a player reads it */
+const describeRoom = (room: RoomView, things: { containers: string[] }) => {
+  let message = `\n${room.name}\n${room.description}\n`;
+  const items = room.items.filter(i => !things.containers.includes(i));
+  if (items.length > 0) {
+    message += `\nYou see: ${items.join(', ')}`;
+  }
+  if (things.containers.length > 0) {
+    message += `\nThere is: ${things.containers.join(', ')}`;
+  }
+  if (room.players.length > 0) {
+    message += `\nAlso here: ${room.players.join(', ')}`;
+  }
+  if (room.exits.length > 0) {
+    message += `\n\nExits: ${room.exits.join(', ')}`;
+  }
+  return message;
+};
+
+/** Describes the actor's room, as text and as a RoomView for clients */
 export const lookAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, world } = ctx;
   const roomId = getLocationOf(world, playerId);
@@ -15,32 +40,25 @@ export const lookAction = (ctx: ActionContext): ActionOutcome => {
     return refused('You are in darkness.');
   }
 
-  let message = `\n${room.described.name}\n${room.described.description}\n`;
-
-  // List contents
   const contents = getRoomContents(world, room.id);
-  if (contents.length > 0) {
-    const items = contents.filter(e => e.item);
-    const containers = contents.filter(e => e.container);
+  const containers = contents
+    .filter(e => e.container)
+    .map(c => c.described.name);
+  const view: RoomView = {
+    description: room.described.description,
+    exits: getRoomExits(world, room.id).map(e => e.portal.dir),
+    items: contents
+      .filter(e => e.item || e.container)
+      .map(e => e.described.name),
+    name: room.described.name,
+    players: findPlayersIn(world, room.id)
+      .filter(p => p.id !== playerId)
+      .map(p => p.player.name)
+  };
 
-    if (items.length > 0) {
-      message += `\nYou see: ${items.map(i => i.described.name).join(', ')}`;
-    }
-    if (containers.length > 0) {
-      message += `\nThere is: ${containers.map(c => c.described.name).join(', ')}`;
-    }
-  }
-
-  const others = findPlayersIn(world, room.id).filter(p => p.id !== playerId);
-  if (others.length > 0) {
-    message += `\nAlso here: ${others.map(p => p.player.name).join(', ')}`;
-  }
-
-  // List exits
-  const exits = getRoomExits(world, room.id);
-  if (exits.length > 0) {
-    message += `\n\nExits: ${exits.map(e => e.portal.dir).join(', ')}`;
-  }
-
-  return done(message);
+  return {
+    kind: 'done',
+    message: describeRoom(view, { containers }),
+    room: view
+  };
 };
