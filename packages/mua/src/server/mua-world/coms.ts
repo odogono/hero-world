@@ -64,6 +64,22 @@ const nounDef = defineComponent({
   }
 });
 
+/**
+ * Fixed replies that refuse a command, by the role the entity plays in it
+ * and the verb's handler, e.g. `target: { take: "It's bolted down." }`.
+ * - `target`   the entity is the thing acted on
+ * - `indirect` the entity is the second object (`unlock door with key`)
+ * - `room`     the command happens inside the entity
+ */
+const responsesDef = defineComponent({
+  id: 'responses',
+  schema: {
+    indirect: s.json().optional(),
+    room: s.json().optional(),
+    target: s.json().optional()
+  }
+});
+
 const describedDef = defineComponent({
   id: 'described',
   schema: {
@@ -138,6 +154,7 @@ export const defs = [
   portalDef,
   describedDef,
   nounDef,
+  responsesDef,
   itemDef
 ];
 

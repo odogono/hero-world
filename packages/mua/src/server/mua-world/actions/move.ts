@@ -1,33 +1,38 @@
 import { getEntity } from '../queries/entity';
 import { findExitByDirection } from '../queries/room';
 import { lookAction } from './look';
-import type { ActionContext, ActionResult } from './types';
+import {
+  messageOf,
+  refused,
+  type ActionContext,
+  type ActionOutcome
+} from './types';
 
-export const moveAction = (ctx: ActionContext): ActionResult => {
+export const moveAction = (ctx: ActionContext): ActionOutcome => {
   const { direction, playerId, world } = ctx;
 
   if (!direction) {
-    return { message: 'Which direction?' };
+    return refused('Which direction?');
   }
 
   const player = getEntity(world, playerId, ['location'], true);
   if (!player) {
-    return { message: 'You are nowhere.' };
+    return refused('You are nowhere.');
   }
 
   const currentRoom = player.location.in;
   const exit = findExitByDirection(world, currentRoom, direction);
 
   if (!exit) {
-    return { message: `You can't go ${direction} from here.` };
+    return refused(`You can't go ${direction} from here.`);
   }
 
   if (!exit.portal.to && exit.portal.msg) {
-    return { message: exit.portal.msg };
+    return refused(exit.portal.msg);
   }
 
   if (!exit.portal.to) {
-    return { message: 'That exit leads nowhere.' };
+    return refused('That exit leads nowhere.');
   }
 
   // Move player
@@ -43,6 +48,7 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
       message: `${getEntity(world, playerId, ['player'])?.player.name ?? 'Someone'} arrives.`,
       roomId: exit.portal.to
     },
-    message: lookResult.message
+    kind: 'done',
+    message: messageOf(lookResult) ?? ''
   };
 };

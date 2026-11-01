@@ -51,3 +51,34 @@ entity anvil {
   described { name: "Anvil" description: "A very heavy anvil." }
   location { in: $west_of_house }
 }
+
+# ==========
+# Responses: fixed replies that refuse a command
+# ==========
+
+atom exit {
+}
+
+atom bolted {
+  responses { target: { take: "It's bolted to the floor." } }
+}
+
+entity statue : item bolted {
+  described { name: "Statue" description: "A marble statue." }
+  location { in: $west_of_house }
+}
+
+entity plinth {
+  described { name: "Plinth" description: "A stone plinth." }
+  responses { indirect: { open: "The plinth is not a key." } }
+  location { in: $west_of_house }
+}
+
+entity vault : room {
+  described { name: "Vault" description: "A silent stone vault." }
+  responses { room: { drop: "The floor is too sacred to drop things on.", say: "The silence swallows your words." } }
+}
+
+entity workshop_east : exit {
+  location { in: $west_of_house } portal { dir: "east" to: $vault }
+}
