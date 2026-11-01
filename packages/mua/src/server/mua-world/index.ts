@@ -1,3 +1,6 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+
 import { createEcsTalk, type DueTimer } from 'ecs-talk';
 import { createGameLoop } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
@@ -11,6 +14,7 @@ import { listVerbs, vocabularyOf } from './commands/verbs';
 import { defs, type MuaComponents } from './coms';
 import { getEntity } from './queries/entity';
 import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
+import { findRoomByMetaId } from './queries/room';
 import { createCommandContexts } from './scripts/commands';
 import { loadScripts } from './scripts/load';
 import {
@@ -26,7 +30,7 @@ import {
   recordHomes,
   type Lifecycle
 } from './world/lifecycle';
-import { ensurePlaces, type Places } from './world/places';
+import { LIMBO_META_ID, ensurePlaces, type Places } from './world/places';
 import { createMuaTimers } from './world/timers';
 import { loadVerbs } from './world/verbs';
 
@@ -42,6 +46,11 @@ const TICK_MS = 100;
 const MAX_PASSES_PER_TICK = 10;
 
 type MuaWorldOptions = {
+  /**
+   * Where the world is kept: a SQLite file, so it survives a restart. The
+   * EDL builds it only when the file is new. Defaults to memory.
+   */
+  dbPath?: string;
   mainEDL?: string;
 };
 
@@ -68,14 +77,23 @@ export class MuaWorld {
     const mainFile = Bun.file(mainPath);
     const mainEDL = (await mainFile.exists()) ? await mainFile.text() : '';
 
+    const dbPath = this.options.dbPath ?? ':memory:';
+    if (dbPath !== ':memory:') {
+      mkdirSync(dirname(dbPath), { recursive: true });
+    }
     this.world = await createWorld(defs, {
-      path: ':memory:',
+      path: dbPath,
       type: DatabaseType.BUN
     });
 
-    // World is already opened and initialized by createWorld
+    // a world that has been opened before has Limbo; its EDL already ran
+    // (a query that finds nothing gives null)
+    const isResumed = Boolean(findRoomByMetaId(this.world, LIMBO_META_ID));
+    if (isResumed) {
+      log.info(`Resumed the world from ${dbPath}`);
+    }
 
-    if (mainEDL) {
+    if (mainEDL && !isResumed) {
       // load the edl from the file path
       // const dump = this.world.db.dump();
       // console.log(dump);
@@ -90,9 +108,12 @@ export class MuaWorld {
       }
       log.info(`Loaded main EDL from ${mainPath}`);
       expandExits(this.world);
-      loadVerbs(this.world);
     }
+    loadVerbs(this.world);
     this.places = ensurePlaces(this.world);
+    if (isResumed) {
+      this.settleAfterRestart();
+    }
     recordHomes(this.world);
 
     // under `bun test`, a system's error fails the test that caused it
@@ -399,6 +420,43 @@ export class MuaWorld {
     }
 
     return true;
+  }
+
+  /**
+   * Tidies a world resumed from its file: the connections it remembers are
+   * gone, so their players wait in Limbo until they log in again, and any
+   * commands or output left half-done are dropped.
+   */
+  private settleAfterRestart() {
+    const world = this.world;
+    if (!world) {
+      return;
+    }
+    for (const player of world.queryAll({ with: ['player'] })) {
+      if (
+        player.player.connectedId !== undefined &&
+        player.player.connectedId !== null
+      ) {
+        const proxy = getEntity(world, player.id, ['player'], true);
+        if (proxy) {
+          proxy.player = { ...proxy.player, connectedId: undefined };
+        }
+        world.flush();
+        this.sendToLimbo(player.id);
+      }
+    }
+    for (const component of [
+      'connected',
+      'inputEvent',
+      'commandEvent',
+      'npcInput',
+      'outputEvent'
+    ] as const) {
+      for (const stale of world.queryAll({ with: [component] })) {
+        world.delete(stale);
+      }
+    }
+    world.flush();
   }
 
   /** A player who leaves waits in Limbo, out of the world */
