@@ -40,9 +40,10 @@ This file is for agentic coding tools (Codex/Claude/Cursor/etc.) working in this
 
 ### Root
 
-- Install: `bun install`
+- Install: `bun install` (also turns on the git hooks in `.githooks/`)
+- Everything CI runs: `bun run check`; typecheck is a per-file ratchet, see `docs/agents/checks.md`
+- Commit subjects and changelog fragments: `docs/agents/commits.md`
 - Check outdated deps: `bun run outdated`
-- Typecheck (ad-hoc): `bunx tsc -p tsconfig.json --noEmit`
 
 ### `packages/ecs`
 
