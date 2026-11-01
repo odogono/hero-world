@@ -1,0 +1,8 @@
+on start actor
+  ask clock to now
+  tell timer to schedule "wander", it + 10 s, "wander", []
+end start
+
+on wander
+  tell mua to act the target, "east"
+end wander

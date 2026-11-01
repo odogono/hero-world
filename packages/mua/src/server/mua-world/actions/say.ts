@@ -1,4 +1,4 @@
-import { getEntity } from '../queries/entity';
+import { getEntity, getLocationOf, nameOf } from '../queries/entity';
 import { refused, type ActionContext, type ActionOutcome } from './types';
 
 export const sayAction = (ctx: ActionContext): ActionOutcome => {
@@ -8,9 +8,8 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
     return refused('What do you want to say?');
   }
 
-  const player = getEntity(world, playerId, ['player', 'location']);
-  const room = player?.location.in;
-  if (!player || room === undefined) {
+  const room = getLocationOf(world, playerId);
+  if (room === undefined) {
     return refused('There is nobody here to hear you.');
   }
 
@@ -18,43 +17,57 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
     broadcasts: [
       {
         exclude: playerId,
-        message: `${player.player.name} says, "${text}"`,
+        message: `${nameOf(world, playerId)} says, "${text}"`,
         to: room
       }
     ],
     kind: 'done',
-    message: `You say, "${text}"`
+    message: `You say, "${text}"`,
+    notices: [
+      { args: [{ entity: playerId }, text], message: 'heard', to: room }
+    ]
   };
 };
 
 export const sayToAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, targetId, text, world } = ctx;
-  const listener = getEntity(world, targetId, ['player']);
-  if (!listener) {
+  const isListener =
+    getEntity(world, targetId, ['player']) ??
+    getEntity(world, targetId, ['npc']);
+  if (!isListener || targetId === undefined) {
     return refused("They can't hear you.");
   }
-  if (listener.id === playerId) {
+  if (targetId === playerId) {
     return refused('You mutter to yourself.');
   }
   if (!text) {
     return refused('What do you want to say?');
   }
 
-  const speaker = getEntity(world, playerId, ['player', 'location']);
-  const room = speaker?.location.in;
-  const { name } = listener.player;
+  const room = getLocationOf(world, playerId);
+  const name = nameOf(world, targetId);
   return {
     broadcasts:
-      speaker && room !== undefined
-        ? [
+      room === undefined
+        ? undefined
+        : [
             {
               exclude: playerId,
-              message: `${speaker.player.name} says to ${name}, "${text}"`,
+              message: `${nameOf(world, playerId)} says to ${name}, "${text}"`,
+              to: room
+            }
+          ],
+    kind: 'done',
+    message: `You say to ${name}, "${text}"`,
+    notices:
+      room === undefined
+        ? undefined
+        : [
+            {
+              args: [{ entity: playerId }, text],
+              message: 'heard',
               to: room
             }
           ]
-        : undefined,
-    kind: 'done',
-    message: `You say to ${name}, "${text}"`
   };
 };

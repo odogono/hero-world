@@ -25,3 +25,22 @@ export const getLocationOf = (
   world: World<MuaComponents>,
   id: EntityId | undefined
 ): EntityId | undefined => getEntity(world, id, ['location'])?.location.in;
+
+/** What to call an entity in a message: a player's name, or its own */
+export const nameOf = (
+  world: World<MuaComponents>,
+  id: EntityId | undefined
+): string =>
+  getEntity(world, id, ['player'])?.player.name ??
+  getEntity(world, id, ['described'])?.described.name ??
+  'Someone';
+
+/** The ids of the entities located directly in a place */
+export const entitiesIn = (world: World<MuaComponents>, placeId: EntityId) =>
+  world
+    .queryAll({
+      args: [placeId],
+      where: 'location.in = ?1',
+      with: ['location']
+    })
+    .map(e => e.id);

@@ -79,6 +79,10 @@ export const moveAction = (ctx: ActionContext): ActionOutcome => {
     ],
     kind: 'done',
     message: [passing, seen?.message].filter(Boolean).join('\n'),
+    notices: [
+      { args: [{ entity: playerId }], message: 'departed', to: currentRoom },
+      { args: [{ entity: playerId }], message: 'arrived', to: exit.portal.to }
+    ],
     room: seen?.room
   };
 };

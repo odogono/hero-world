@@ -107,6 +107,7 @@ export class MuaWorld {
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
     const { parseSystem } = await import('./systems/parseSystem');
+    const { npcSystem } = await import('./systems/npcSystem');
     const { createActionSystem } = await import('./systems/actionSystem');
     const { showSystem } = await import('./systems/showSystem');
     const { createOutputSystem } = await import('./systems/outputSystem');
@@ -116,6 +117,7 @@ export class MuaWorld {
     this.loop.addSystem('clock', this.clock.system);
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
+    this.loop.addSystem('npcs', npcSystem);
     this.loop.addSystem(
       'timers',
       createTimerSystem(this.clock, this.lifecycle, scripts, this.places)

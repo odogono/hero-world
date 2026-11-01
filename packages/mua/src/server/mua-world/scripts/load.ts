@@ -3,6 +3,7 @@ import type { World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
 import type { MuaComponents } from '../coms';
+import { createMuaCapability } from './mua-capability';
 
 const log = createLog('scripts');
 
@@ -16,6 +17,7 @@ export const loadScripts = async (
   ecsTalk: EcsTalk<MuaComponents>
 ): Promise<Set<string>> => {
   const scripted = new Set<string>();
+  const mua = createMuaCapability(world, ecsTalk);
   for (const owner of world.getScriptOwners()) {
     if (owner.kind !== 'atom') {
       log.warn(
@@ -28,7 +30,9 @@ export const loadScripts = async (
     if (!(await file.exists())) {
       throw new Error(`Script for atom ${owner.name} not found: ${owner.src}`);
     }
-    ecsTalk.loadAtomScript(owner.name, await file.text());
+    ecsTalk.loadAtomScript(owner.name, await file.text(), {
+      grants: { mua: mua.grant(['act'], undefined) }
+    });
     scripted.add(owner.name);
     log.info(`Loaded Script for atom ${owner.name} from ${owner.src}`);
   }

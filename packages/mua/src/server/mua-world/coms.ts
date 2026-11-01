@@ -1,4 +1,4 @@
-import { locationComponent } from 'ecs-talk';
+import { locationComponent, talkTimerComponent } from 'ecs-talk';
 import { defineComponent, s } from 'odgn-ecs/component';
 import { eventComponent } from 'odgn-ecs/events';
 import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
@@ -104,6 +104,28 @@ const timersDef = defineComponent({
   schema: {
     due: s.json().optional(),
     every: s.json()
+  }
+});
+
+/**
+ * A non-player character: an entity that acts through commands, as a player
+ * does, driven by its Scripts (see npcs.ts). Give it `described` and a
+ * `location`, and a Script that tells `mua` to `act`.
+ */
+const npcDef = defineComponent({
+  id: 'npc',
+  schema: {
+    /** Set false to leave it standing still: its commands are ignored */
+    active: s.boolean().default(true)
+  }
+});
+
+/** A command an NPC's Script asked it to carry out, parsed next tick */
+const npcInputDef = defineComponent({
+  id: 'npcInput',
+  schema: {
+    actorId: s.entityId(),
+    text: s.string()
   }
 });
 
@@ -253,6 +275,9 @@ export const defs = [
   portalDef,
   exitsDef,
   homeDef,
+  npcDef,
+  npcInputDef,
+  talkTimerComponent,
   clockDef,
   timersDef,
   describedDef,

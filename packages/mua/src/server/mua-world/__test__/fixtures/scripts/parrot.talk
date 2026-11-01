@@ -1,0 +1,3 @@
+on heard speaker, words
+  tell mua to act the target, "say " & words
+end heard

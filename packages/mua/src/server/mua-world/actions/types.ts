@@ -2,6 +2,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import type { World } from 'odgn-ecs/world';
 
 import type { MuaComponents } from '../coms';
+import type { ScriptArg } from '../scripts/runner';
 
 export type ActionContext = {
   direction?: string;
@@ -21,6 +22,17 @@ export type ActionContext = {
 export type Broadcast = {
   /** Someone inside who should not receive the message */
   exclude?: EntityId;
+  message: string;
+  to: EntityId;
+};
+
+/**
+ * Something the scripted things in a place should notice, such as speech or
+ * an arrival: `message` with `args` goes to the Scripts of every entity
+ * located in `to`, except the actor (see actionSystem).
+ */
+export type Notice = {
+  args: ScriptArg[];
   message: string;
   to: EntityId;
 };
@@ -47,6 +59,7 @@ export type ActionOutcome =
       broadcasts?: Broadcast[];
       kind: 'done';
       message: string;
+      notices?: Notice[];
       room?: RoomView;
     }
   | { kind: 'pass' }
