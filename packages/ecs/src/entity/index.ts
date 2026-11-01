@@ -97,11 +97,11 @@ export type QueryOptions<T extends Components> = {
   limit?: number;
   // Optionally include these components if present on the entity.
   // They are not required to exist and will be omitted if missing.
-  maybe?: (keyof T)[];
+  maybe?: readonly (keyof T)[];
   offset?: number;
   where?: string;
-  with?: (keyof T)[];
-  without?: (keyof T)[];
+  with?: readonly (keyof T)[];
+  without?: readonly (keyof T)[];
 };
 
 const rewriteJsonDotPaths = <T extends Components>(
@@ -266,7 +266,7 @@ export const mapRowToEntity = <T extends Components>(
   world: World<T>,
   componentsToInclude: (keyof T)[],
   row: unknown,
-  maybe?: (keyof T)[]
+  maybe?: readonly (keyof T)[]
 ) => {
   const entity: Entity<keyof Components> = {
     id: (row as { eid: number }).eid,
