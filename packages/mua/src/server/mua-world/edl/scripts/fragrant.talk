@@ -1,0 +1,10 @@
+-- A place that smells of something when you sniff the air
+on smell role, actor
+  if role is "room" then
+    ask mua to command
+    if the target of it is nothing then
+      return "The air is thick with the scent of roses."
+    end if
+  end if
+  pass smell
+end smell
