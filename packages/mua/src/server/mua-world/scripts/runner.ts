@@ -6,6 +6,7 @@ import { createLog } from 'odgn-helpers/log';
 import { text } from '@northtalk/ts';
 
 import type { MuaComponents } from '../coms';
+import type { CommandContext, CommandContexts } from './commands';
 
 const log = createLog('scripts');
 
@@ -41,7 +42,8 @@ export type ScriptRunner = {
     key: string,
     id: EntityId,
     message: string,
-    args: ScriptArg[]
+    args: ScriptArg[],
+    context?: CommandContext
   ) => ScriptReply;
   /** Forget a command's request, e.g. once it has been answered */
   forget: (key: string) => void;
@@ -62,7 +64,9 @@ export type ScriptRunner = {
     key: string,
     id: EntityId,
     message: string,
-    args: ScriptArg[]
+    args: ScriptArg[],
+    /** The command, for the Script to ask about (`mua`'s `command`) */
+    context?: CommandContext
   ) => ScriptReply;
   /** How many requests have been answered so far; grows by one per answer */
   settled: () => number;
@@ -81,9 +85,23 @@ export const NO_SCRIPTS: ScriptRunner = {
 export const createScriptRunner = (
   world: World<MuaComponents>,
   ecsTalk: EcsTalk<MuaComponents>,
-  scriptedAtoms: ReadonlySet<string>
+  scriptedAtoms: ReadonlySet<string>,
+  contexts?: CommandContexts
 ): ScriptRunner => {
   const replies = new Map<string, ScriptReply>();
+  /** The Delivery each request key made, to drop its command when forgotten */
+  const deliveries = new Map<string, string>();
+
+  const noteContext = (
+    key: string,
+    delivery: string,
+    context: CommandContext | undefined
+  ) => {
+    if (context && contexts) {
+      contexts.note(delivery, context);
+      deliveries.set(key, delivery);
+    }
+  };
   let settled = 0;
 
   /** Is a scripted atom anywhere in these bases or their own lineages? */
@@ -125,9 +143,11 @@ export const createScriptRunner = (
     replies.set(key, reply);
   };
 
-  const decide: ScriptRunner['decide'] = (key, id, message, args) =>
+  const decide: ScriptRunner['decide'] = (key, id, message, args, context) =>
     once(key, () => {
-      ecsTalk.decide(id, message, ...toValues(args)).decided.then(
+      const deciding = ecsTalk.decide(id, message, ...toValues(args));
+      noteContext(key, deciding.id, context);
+      deciding.decided.then(
         decided => {
           if (decided.verdict === 'vetoed') {
             const reason = decided.vetoes[0]?.reason;
@@ -147,9 +167,10 @@ export const createScriptRunner = (
       );
     });
 
-  const offer: ScriptRunner['offer'] = (key, id, message, args) =>
+  const offer: ScriptRunner['offer'] = (key, id, message, args, context) =>
     once(key, () => {
       const request = ecsTalk.request(id, message, ...toValues(args));
+      noteContext(key, request.id, context);
       request.result.then(
         value => {
           settle(key, { kind: 'replied', message: value.asText() });
@@ -183,6 +204,11 @@ export const createScriptRunner = (
     decide,
     forget: key => {
       replies.delete(key);
+      const delivery = deliveries.get(key);
+      if (delivery !== undefined) {
+        contexts?.drop(delivery);
+        deliveries.delete(key);
+      }
     },
     hasScript,
     notify,

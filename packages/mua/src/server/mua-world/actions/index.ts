@@ -180,7 +180,15 @@ export const stepCommand = (
         requestKey,
         question.id,
         question.message,
-        question.args
+        question.args,
+        {
+          actor: ctx.playerId,
+          direction: ctx.direction,
+          indirect: ctx.indirectId,
+          target: ctx.targetId,
+          text: ctx.text,
+          verb: ctx.verb
+        }
       );
       if (reply.kind === 'waiting') {
         const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
