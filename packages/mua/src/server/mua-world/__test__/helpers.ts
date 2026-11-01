@@ -29,8 +29,8 @@ const createConnection = (id: string): TestConnection => {
  * Opens a MuaWorld that is driven by hand rather than on its interval,
  * with helpers to log players in and send commands.
  */
-export const openTestWorld = async (mainEDL?: string) => {
-  const muaWorld = new MuaWorld({ mainEDL });
+export const openTestWorld = async (mainEDL?: string, dbPath?: string) => {
+  const muaWorld = new MuaWorld({ dbPath, mainEDL });
   await muaWorld.open();
   clearInterval(muaWorld.updateLoopInterval!);
 

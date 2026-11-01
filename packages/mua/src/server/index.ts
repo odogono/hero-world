@@ -42,7 +42,8 @@ export const createServer = async ({
     ]
   });
 
-  muaWorld = new MuaWorld();
+  // the world lives in a file, so it survives a restart
+  muaWorld = new MuaWorld({ dbPath: process.env.MUA_DB ?? 'data/world.db' });
   muaWorld.open();
 
   const app = new Elysia().use(
