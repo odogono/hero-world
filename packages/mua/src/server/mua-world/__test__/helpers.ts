@@ -53,5 +53,26 @@ export const openTestWorld = async (mainEDL?: string) => {
     return conn.messages.join('\n');
   };
 
-  return { login, muaWorld, send };
+  /**
+   * Sends a command and keeps ticking, letting Script replies settle between
+   * ticks, until the sender has been told something (or `ticks` run out).
+   */
+  const sendAndWait = async (
+    conn: TestConnection,
+    text: string,
+    ticks = 10
+  ) => {
+    conn.messages.length = 0;
+    muaWorld.onConnectionCommand(conn, text);
+    for (let ii = 0; ii < ticks && conn.messages.length === 0; ii++) {
+      tick(1);
+      await Bun.sleep(0);
+    }
+    // one more tick for anything that follows the reply, such as a show
+    tick(1);
+    await Bun.sleep(0);
+    return conn.messages.join('\n');
+  };
+
+  return { login, muaWorld, send, sendAndWait, tick };
 };

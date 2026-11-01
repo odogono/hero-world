@@ -67,4 +67,14 @@ describe('Gameplay', () => {
     send(conn, 'north');
     expect(send(conn, 'again')).toContain("You can't go north from here.");
   });
+
+  it('answers a command within one tick', async () => {
+    const conn = await login('bob');
+    conn.messages.length = 0;
+
+    world.muaWorld.onConnectionCommand(conn, 'look');
+    world.tick(1);
+
+    expect(conn.messages.join('\n')).toContain('West of house');
+  });
 });

@@ -150,7 +150,7 @@ export const parseSystem = createMuaSystem(
   },
   {
     frequency: 1,
-    priority: 20,
+    priority: 30,
     with: ['inputEvent']
   }
 );

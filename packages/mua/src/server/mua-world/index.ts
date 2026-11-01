@@ -1,3 +1,4 @@
+import { createEcsTalk } from 'ecs-talk';
 import { createGameLoop } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
 import { EDLParseError } from 'odgn-ecs/edl';
@@ -8,8 +9,16 @@ import { createLog } from 'odgn-helpers/log';
 
 import { defs, type MuaComponents } from './coms';
 import { findPlayerByConnection } from './queries/player';
+import { loadScripts } from './scripts/load';
+import { createScriptRunner } from './scripts/runner';
 
 const log = createLog('mua-world');
+
+/**
+ * How often the game loop ticks. A command takes one tick, plus one for each
+ * Script it is offered to.
+ */
+const TICK_MS = 100;
 
 type MuaWorldOptions = {
   mainEDL?: string;
@@ -45,7 +54,7 @@ export class MuaWorld {
       // const dump = this.world.db.dump();
       // console.log(dump);
       try {
-        this.world.executeEDL(mainEDL);
+        this.world.executeEDL(mainEDL, { path: mainPath });
       } catch (error) {
         if (error instanceof EDLParseError) {
           const msg = `${error.message}\nFile: ${mainPath}`;
@@ -58,19 +67,28 @@ export class MuaWorld {
 
     this.loop = createGameLoop(this.world);
 
+    // NorthTalk Scripts, attached to atoms by their EDL `script` component
+    const ecsTalk = createEcsTalk(this.world);
+    const scriptedAtoms = await loadScripts(this.world, ecsTalk);
+    const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
+
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
     const { parseSystem } = await import('./systems/parseSystem');
-    const { actionSystem } = await import('./systems/actionSystem');
+    const { createActionSystem } = await import('./systems/actionSystem');
+    const { showSystem } = await import('./systems/showSystem');
     const { createOutputSystem } = await import('./systems/outputSystem');
 
-    // Register systems in priority order
+    // Each system's priority sets its order: highest runs first. The Script
+    // Group's Pump runs last, so a Script answers by the next tick.
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
-    this.loop.addSystem('action', actionSystem);
+    this.loop.addSystem('action', createActionSystem(scripts));
+    this.loop.addSystem('show', showSystem);
     this.loop.addSystem('output', createOutputSystem(this.connections));
+    this.loop.addSystem('talk', ecsTalk.system);
 
-    // Start the update loop that runs every second (1000ms)
+    // Start the update loop
     this.lastUpdateTime = performance.now();
     this.updateLoopInterval = setInterval(() => {
       if (this.loop) {
@@ -79,9 +97,9 @@ export class MuaWorld {
         this.lastUpdateTime = currentTime;
         this.loop.update(deltaTime);
       }
-    }, 1000);
+    }, TICK_MS);
 
-    log.info('Started update loop running every 1000');
+    log.info(`Started update loop running every ${TICK_MS}ms`);
   }
 
   async close() {
