@@ -195,7 +195,7 @@ export class MuaWorld {
         const startRoom = findRoomByMetaId(this.world!, 'west_of_house');
         log.debug('Start room found?', !!startRoom, startRoom?.id);
 
-        player = this.world?.create({
+        player = this.world!.create({
           container: {
             capacity: 10,
             isClosed: false
