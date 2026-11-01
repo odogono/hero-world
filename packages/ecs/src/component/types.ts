@@ -2,24 +2,25 @@ import type { CDefColumnInfo, CDefColumnType } from '../types';
 
 export type ColumnBuilder<
   TType extends CDefColumnType,
-  TOptional extends boolean = false
+  TOptional extends boolean = false,
+  TValue = ValueFromType<TType>
 > = {
   readonly __optional?: TOptional;
   // Phantom type anchors for inference only
   readonly __type?: TType;
+  readonly __value?: TValue;
   build: (props: { name: string }) => CDefColumnInfo;
-  default: (
-    value?: string | number | boolean | undefined
-  ) => ColumnBuilder<TType, TOptional>;
-  foreignKey: (foreignKey: string) => ColumnBuilder<TType, TOptional>;
-  indexed: () => ColumnBuilder<TType, TOptional>;
-  optional: () => ColumnBuilder<TType, true>;
-  unique: () => ColumnBuilder<TType, TOptional>;
+  default: (value?: unknown) => ColumnBuilder<TType, TOptional, TValue>;
+  foreignKey: (foreignKey: string) => ColumnBuilder<TType, TOptional, TValue>;
+  indexed: () => ColumnBuilder<TType, TOptional, TValue>;
+  optional: () => ColumnBuilder<TType, true, TValue>;
+  unique: () => ColumnBuilder<TType, TOptional, TValue>;
 };
 
 export type DefineComponentSchema = Record<
   string,
-  ColumnBuilder<CDefColumnType, boolean>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any value type
+  ColumnBuilder<CDefColumnType, boolean, any>
 >;
 
 export type DefineComponentProps<
@@ -32,18 +33,29 @@ export type DefineComponentProps<
   tableName?: string;
 };
 
-export type ValueFromType<T> = T extends 'string' | 'email'
+/**
+ * The value a column holds, as read back from the database: `datetime` is
+ * parsed into a Date, `json` and `array` are parsed from JSON, and `date`
+ * and `time` stay the strings they were stored as.
+ */
+export type ValueFromType<T> = T extends
+  'string' | 'email' | 'enum' | 'uuid' | 'date' | 'time'
   ? string
-  : T extends 'int' | 'float'
+  : T extends 'int' | 'float' | 'pk' | 'timestamp'
     ? number
     : T extends 'boolean'
       ? boolean
-      : T extends 'datetime' | 'date' | 'time' | 'timestamp'
+      : T extends 'datetime'
         ? Date
-        : string | number | boolean;
+        : T extends 'array'
+          ? unknown[]
+          : unknown;
 
 export type OptionalKeysFromSchema<S extends DefineComponentSchema> = {
-  [K in keyof S]: S[K] extends ColumnBuilder<CDefColumnType, true> ? K : never;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any value type
+  [K in keyof S]: S[K] extends ColumnBuilder<CDefColumnType, true, any>
+    ? K
+    : never;
 }[keyof S];
 export type RequiredKeysFromSchema<S extends DefineComponentSchema> = Exclude<
   keyof S,
@@ -52,18 +64,20 @@ export type RequiredKeysFromSchema<S extends DefineComponentSchema> = Exclude<
 
 export type InferFromSchema<S extends DefineComponentSchema> = {
   [K in RequiredKeysFromSchema<S>]: S[K] extends ColumnBuilder<
-    infer Type,
-    boolean
+    CDefColumnType,
+    boolean,
+    infer Value
   >
-    ? ValueFromType<Type>
-    : string | number | boolean;
+    ? Value
+    : unknown;
 } & {
   [K in OptionalKeysFromSchema<S>]?: S[K] extends ColumnBuilder<
-    infer Type,
-    boolean
+    CDefColumnType,
+    boolean,
+    infer Value
   >
-    ? ValueFromType<Type>
-    : string | number | boolean;
+    ? Value
+    : unknown;
 };
 
 export type InferComponentType<T> = T extends { __schema: infer S }

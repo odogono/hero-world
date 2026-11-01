@@ -211,7 +211,7 @@ export class MuaWorld {
 
       // Mark as authenticated and remove authenticating
       connectionEntity.authenticated = {
-        authenticatedAt: new Date().toISOString()
+        authenticatedAt: new Date()
       };
       // Remove authenticating by setting to undefined (null doesn't work)
       delete connectionEntity.authenticating;
@@ -281,12 +281,16 @@ export class MuaWorld {
     // Handle game commands if authenticated
     if (connectionEntity.authenticated) {
       const text = typeof command === 'string' ? command : command.text;
+      if (text === undefined) {
+        log.warn('Command without text', conn.id);
+        return true;
+      }
 
       // Create input event
       this.world?.create({
         inputEvent: {
           text,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           wsId: conn.id
         }
       });
@@ -306,7 +310,7 @@ export class MuaWorld {
     // create an entity with the connection component
     this.world?.create({
       authenticating: { attempts: 0 },
-      connected: { wsId: conn.id }
+      connected: { connectedAt: new Date(), wsId: conn.id }
     });
 
     // the server now expects an authentication message

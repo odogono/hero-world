@@ -39,7 +39,7 @@ const toCandidate = (
   entity: ReturnType<typeof queryElements>[number]
 ): Candidate | undefined => {
   const name = entity.described?.name ?? entity.player?.name;
-  if (!name) {
+  if (!name || entity.location.in === undefined) {
     return undefined;
   }
   const nameWords = name.toLowerCase().split(/\s+/);

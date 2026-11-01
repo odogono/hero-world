@@ -12,11 +12,11 @@ export const moveAction = (ctx: ActionContext): ActionOutcome => {
   }
 
   const player = getEntity(world, playerId, ['location'], true);
-  if (!player) {
+  const currentRoom = player?.location.in;
+  if (!player || currentRoom === undefined) {
     return refused('You are nowhere.');
   }
 
-  const currentRoom = player.location.in;
   const exit = findExitByDirection(world, currentRoom, direction);
 
   if (!exit) {
