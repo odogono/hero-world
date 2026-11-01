@@ -299,7 +299,7 @@ export class MuaWorld {
 
       // Send welcome message
       // with the words that start a command, for the client to complete
-      const message = `Welcome, ${username}! Type 'look' to begin.`;
+      const message = `Welcome, ${username}! Type 'look' to begin, or 'help' for the commands.`;
       conn.send(
         JSON.stringify({
           data: message,

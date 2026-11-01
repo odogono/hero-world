@@ -176,6 +176,14 @@ const verbsDef = defineComponent({
   }
 });
 
+/** Something with writing on it, for `read`: `readable { text: "..." }` */
+const readableDef = defineComponent({
+  id: 'readable',
+  schema: {
+    text: s.string()
+  }
+});
+
 /** Where a thing belongs, so a reset can put it back (see lifecycle.ts) */
 const homeDef = defineComponent({
   id: 'home',
@@ -324,6 +332,7 @@ export const defs = [
   portalDef,
   exitsDef,
   homeDef,
+  readableDef,
   verbsDef,
   doorDef,
   lockableDef,

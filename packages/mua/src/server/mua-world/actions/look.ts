@@ -11,21 +11,22 @@ import {
 
 /** The room as text, in the order a player reads it */
 const describeRoom = (room: RoomView, things: { containers: string[] }) => {
-  let message = `\n${room.name}\n${room.description}\n`;
   const items = room.items.filter(i => !things.containers.includes(i));
-  if (items.length > 0) {
-    message += `\nYou see: ${items.join(', ')}`;
-  }
-  if (things.containers.length > 0) {
-    message += `\nThere is: ${things.containers.join(', ')}`;
-  }
-  if (room.players.length > 0) {
-    message += `\nAlso here: ${room.players.join(', ')}`;
-  }
-  if (room.exits.length > 0) {
-    message += `\n\nExits: ${room.exits.join(', ')}`;
-  }
-  return message;
+  const lines = [
+    items.length > 0 ? `You see: ${items.join(', ')}` : undefined,
+    things.containers.length > 0
+      ? `There is: ${things.containers.join(', ')}`
+      : undefined,
+    room.players.length > 0
+      ? `Also here: ${room.players.join(', ')}`
+      : undefined,
+    room.exits.length > 0 ? `Exits: ${room.exits.join(', ')}` : undefined
+  ].filter(Boolean);
+  return [
+    room.name,
+    room.description,
+    ...(lines.length > 0 ? ['', ...lines] : [])
+  ].join('\n');
 };
 
 /** Describes the actor's room, as text and as a RoomView for clients */

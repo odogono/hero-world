@@ -120,6 +120,15 @@ export const VERBS: VerbDef[] = [
     names: ['drop']
   },
   {
+    forms: [{ handler: 'read', pattern: 'obj' }],
+    incomplete: 'What do you want to read?',
+    names: ['read']
+  },
+  {
+    forms: [{ handler: 'help', pattern: '' }],
+    names: ['help', 'commands']
+  },
+  {
     forms: [{ handler: 'inventory', pattern: '' }],
     names: ['inventory', 'inv', 'i']
   },
