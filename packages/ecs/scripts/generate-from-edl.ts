@@ -20,6 +20,7 @@ import { parseEDL } from '@edl';
 import { cdefToSql } from '@schema/cdef-to-sql';
 import { cdefToTypes } from '@schema/cdef-to-types';
 import { cdefToZod } from '@schema/cdef-to-zod';
+import { hashComponentDefinition } from '@schema/component-hash';
 import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
 
 import { defToTableName } from '../src';
@@ -67,7 +68,7 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
     zodNoImports: false
   };
   for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
+    const a = argv[i]!; // i < argv.length
     if (a === '--help' || a === '-h') {
       return 'help';
     }
@@ -147,7 +148,8 @@ const mapComponentsToCDefs = (defs: EDLParsed): CDef[] => {
                 ? Number(col.default)
                 : col.default
     }));
-    cdefs.push({ columns, id: d.id, tableName: d.tableName });
+    const def = { columns, id: d.id, tableName: d.tableName };
+    cdefs.push({ ...def, hash: hashComponentDefinition(def) });
   }
   return cdefs;
 };
