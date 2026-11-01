@@ -394,10 +394,10 @@ export const executeEDL = <T extends Components>(
 
   // Record Lineage: each atom's and entity's ordered base atoms
   for (const [name, atom] of rawAtoms.entries()) {
-    world.atomLineage.set(name, [...atom.extends]);
+    world.setAtomLineage(name, atom.extends);
   }
   for (const [eid, plan] of entityPlansById.entries()) {
-    world.entityLineage.set(eid, [...plan.extends]);
+    world.setEntityLineage(eid, plan.extends);
   }
 
   // Record Script owners: only atoms and entities that declare `script`
@@ -405,13 +405,13 @@ export const executeEDL = <T extends Components>(
   for (const [name, atom] of rawAtoms.entries()) {
     const path = scriptPath(atom.own, options.path);
     if (path) {
-      world.atomScripts.set(name, path);
+      world.setScriptOwner('atom', name, path);
     }
   }
   for (const [eid, plan] of entityPlansById.entries()) {
     const path = scriptPath(plan.own, options.path);
     if (path) {
-      world.entityScripts.set(eid, path);
+      world.setScriptOwner('entity', eid, path);
     }
   }
 

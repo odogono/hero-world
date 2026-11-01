@@ -225,6 +225,40 @@ export class World<TComponents extends Components> {
     ];
   }
 
+  /**
+   * Record the base atoms an atom extends, and save them, so a world opened
+   * from its database knows them without running its EDL again.
+   */
+  setAtomLineage(name: string, bases: string[]) {
+    this.atomLineage.set(name, [...bases]);
+    this.db.exec(
+      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
+      ['atom', name, JSON.stringify(bases)]
+    );
+  }
+
+  /** Record, and save, the base atoms an entity was built from */
+  setEntityLineage(eid: number, bases: string[]) {
+    this.entityLineage.set(eid, [...bases]);
+    this.db.exec(
+      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
+      ['entity', String(eid), JSON.stringify(bases)]
+    );
+  }
+
+  /** Record, and save, the Script an atom (by name) or entity (by id) owns */
+  setScriptOwner(kind: 'atom' | 'entity', name: string | number, src: string) {
+    if (kind === 'atom') {
+      this.atomScripts.set(String(name), src);
+    } else {
+      this.entityScripts.set(Number(name), src);
+    }
+    this.db.exec(
+      'INSERT OR REPLACE INTO tbl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
+      [kind, String(name), src]
+    );
+  }
+
   /** The ordered base atoms an entity was built from (empty if none) */
   getEntityLineage(eid: number): string[] {
     return [...(this.entityLineage.get(eid) ?? [])];
@@ -741,6 +775,33 @@ export async function createWorld(
   return world;
 }
 
+/** Reads the saved Lineage and Script owners into the world's maps */
+const loadLineage = <TComponents extends Components>(
+  world: World<TComponents>
+) => {
+  const lineage = world.db.query(
+    'SELECT kind, name, bases FROM tbl_lineage'
+  ) as { bases: string; kind: string; name: string }[];
+  for (const { bases, kind, name } of lineage) {
+    const parsed = JSON.parse(bases) as string[];
+    if (kind === 'atom') {
+      world.atomLineage.set(name, parsed);
+    } else {
+      world.entityLineage.set(Number(name), parsed);
+    }
+  }
+  const owners = world.db.query(
+    'SELECT kind, name, src FROM tbl_script_owner'
+  ) as { kind: string; name: string; src: string }[];
+  for (const { kind, name, src } of owners) {
+    if (kind === 'atom') {
+      world.atomScripts.set(name, src);
+    } else {
+      world.entityScripts.set(Number(name), src);
+    }
+  }
+};
+
 const initialiseWorldDb = async <TComponents extends Components>(
   world: World<TComponents>,
   componentDefs: readonly CDef[],
@@ -761,6 +822,15 @@ const initialiseWorldDb = async <TComponents extends Components>(
   const sql =
     'CREATE TABLE IF NOT EXISTS tbl_entity (id INTEGER PRIMARY KEY AUTOINCREMENT)';
   world.db.exec(sql);
+
+  // Lineage and Script owners, recorded by EDL, and loaded back on open
+  world.db.exec(
+    `CREATE TABLE IF NOT EXISTS tbl_lineage (kind TEXT NOT NULL, name TEXT NOT NULL, bases TEXT NOT NULL, PRIMARY KEY (kind, name))`
+  );
+  world.db.exec(
+    `CREATE TABLE IF NOT EXISTS tbl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name))`
+  );
+  loadLineage(world);
 
   // Initialize component metadata table for compatibility checking
   initializeComponentMetadataTable(world.db);
