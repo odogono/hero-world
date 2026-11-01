@@ -21,10 +21,10 @@ describe('useGameState', () => {
     });
 
     expect(result.current.messages.length).toBe(1);
-    expect(result.current.messages[0].content).toBe('Hello world');
-    expect(result.current.messages[0].type).toBe('game');
-    expect(result.current.messages[0].id).toBeDefined();
-    expect(result.current.messages[0].timestamp).toBeDefined();
+    expect(result.current.messages[0]!.content).toBe('Hello world');
+    expect(result.current.messages[0]!.type).toBe('game');
+    expect(result.current.messages[0]!.id).toBeDefined();
+    expect(result.current.messages[0]!.timestamp).toBeDefined();
   });
 
   it('adds multiple messages with different types', () => {
@@ -38,10 +38,10 @@ describe('useGameState', () => {
     });
 
     expect(result.current.messages.length).toBe(4);
-    expect(result.current.messages[0].type).toBe('game');
-    expect(result.current.messages[1].type).toBe('error');
-    expect(result.current.messages[2].type).toBe('success');
-    expect(result.current.messages[3].type).toBe('system');
+    expect(result.current.messages[0]!.type).toBe('game');
+    expect(result.current.messages[1]!.type).toBe('error');
+    expect(result.current.messages[2]!.type).toBe('success');
+    expect(result.current.messages[3]!.type).toBe('system');
   });
 
   it('limits messages to MAX_MESSAGES (100)', () => {
@@ -55,8 +55,8 @@ describe('useGameState', () => {
 
     expect(result.current.messages.length).toBe(100);
     // First 10 should be dropped, so first message should be 'msg10'
-    expect(result.current.messages[0].content).toBe('msg10');
-    expect(result.current.messages[99].content).toBe('msg109');
+    expect(result.current.messages[0]!.content).toBe('msg10');
+    expect(result.current.messages[99]!.content).toBe('msg109');
   });
 
   it('extracts room data from room descriptions', () => {

@@ -7,21 +7,12 @@ type MessageLineProps = {
 };
 
 export const MessageLine = ({ message, roomData }: MessageLineProps) => {
-  let displayContent = message.content;
-
-  // Apply color coding based on room data (exits, items, npcs)
-  if (roomData && message.type === 'game') {
-    displayContent = colorizeMessage(message.content, roomData);
-  }
-
-  // Apply type-based coloring for errors/success
-  if (
-    message.type === 'error' ||
-    message.type === 'success' ||
-    message.type === 'system'
-  ) {
-    displayContent = colorByType(displayContent, message.type);
-  }
+  // game text colours the room's exits, items and NPCs; errors, successes
+  // and system lines are coloured whole
+  const displayContent =
+    message.type === 'game'
+      ? colorizeMessage(message.content, roomData)
+      : colorByType(message.content, message.type);
 
   return (
     <box

@@ -91,7 +91,7 @@ describe('useCommandHistory', () => {
       result.current.addCommand('cmd3');
     });
 
-    let cmd;
+    let cmd = null as string | null;
 
     // First getPrevious should return last command
     act(() => {
@@ -141,7 +141,7 @@ describe('useCommandHistory', () => {
       result.current.addCommand('cmd3');
     });
 
-    let cmd;
+    let cmd = null as string | null;
 
     // Go back twice
     act(() => {
@@ -163,7 +163,7 @@ describe('useCommandHistory', () => {
       result.current.addCommand('cmd1');
     });
 
-    let cmd;
+    let cmd = null as string | null;
     act(() => {
       cmd = result.current.getNext(); // Already at end
     });
@@ -173,7 +173,7 @@ describe('useCommandHistory', () => {
   it('returns null when getPrevious called on empty history', () => {
     const { result } = renderHook(() => useCommandHistory());
 
-    let cmd;
+    let cmd = null as string | null;
     act(() => {
       cmd = result.current.getPrevious();
     });
@@ -183,7 +183,7 @@ describe('useCommandHistory', () => {
   it('returns null when getNext called on empty history', () => {
     const { result } = renderHook(() => useCommandHistory());
 
-    let cmd;
+    let cmd = null as string | null;
     act(() => {
       cmd = result.current.getNext();
     });
@@ -231,7 +231,7 @@ describe('useCommandHistory', () => {
       result.current.addCommand('cmd3');
     });
 
-    let cmd;
+    let cmd = null as string | null;
 
     // Navigate back through all commands
     act(() => {

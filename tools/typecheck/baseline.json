@@ -6,21 +6,6 @@
   },
   "packages/ecs-talk": {},
   "packages/helpers": {},
-  "packages/mua": {
-    "packages/mua/src/server/index.ts": 3,
-    "packages/mua/src/server/orpc/router.ts": 1,
-    "packages/mua/src/server/plugins/auth.ts": 2,
-    "packages/mua/src/tui/__test__/hooks/use-command-history.test.ts": 9,
-    "packages/mua/src/tui/__test__/hooks/use-game-state.test.ts": 10,
-    "packages/mua/src/tui/__test__/hooks/use-websocket.test.ts": 1,
-    "packages/mua/src/tui/__test__/index.test.tsx": 7,
-    "packages/mua/src/tui/components/CommandInput.tsx": 1,
-    "packages/mua/src/tui/components/DebugPanel.tsx": 5,
-    "packages/mua/src/tui/components/GameOutput.tsx": 1,
-    "packages/mua/src/tui/components/StatusBar.tsx": 4,
-    "packages/mua/src/tui/utils/color-utils.ts": 12,
-    "packages/mua/src/tui/utils/message-parser.ts": 2,
-    "packages/mua/src/tui/utils/verb-completer.ts": 2
-  },
+  "packages/mua": {},
   "tools": {}
 }

@@ -52,18 +52,15 @@ export const authPlugin = new Elysia({ name: 'auth' })
       }
     }
   )
-  .macro(({ onBeforeHandle }) => ({
-    requireAuth(enabled: boolean = true) {
-      if (!enabled) {
-        return;
-      }
-
-      onBeforeHandle(({ set, user }) => {
-        log.info('requireAuth', { enabled, user });
+  .macro({
+    /** `{ requireAuth: true }` refuses a request without a valid token with
+     * 401, and gives the handler a `user` that is set */
+    requireAuth: {
+      resolve: ({ status, user }) => {
         if (!user) {
-          set.status = 401;
-          return { error: 'Unauthorized' };
+          return status(401, { error: 'Unauthorized' });
         }
-      });
+        return { user };
+      }
     }
-  }));
+  });

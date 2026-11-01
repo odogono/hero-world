@@ -1,4 +1,4 @@
-import { fg } from '@opentui/core';
+import { StyledText, fg, stringToStyledText } from '@opentui/core';
 
 type StatusBarProps = {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
@@ -14,12 +14,12 @@ export const StatusBar = ({
   location
 }: StatusBarProps) => {
   // Connection status indicator
-  const statusDot =
+  const dotColor =
     connectionStatus === 'connected'
-      ? fg('#9ece6a', '●') // Green
+      ? '#9ece6a' // Green
       : connectionStatus === 'connecting'
-        ? fg('#e0af68', '●') // Yellow
-        : fg('#f7768e', '●'); // Red
+        ? '#e0af68' // Yellow
+        : '#f7768e'; // Red
 
   // Build status line
   const parts: string[] = [];
@@ -34,20 +34,20 @@ export const StatusBar = ({
     parts.push(`Level: ${level}`);
   }
 
-  parts.push(`${statusDot}${connectionStatus}`);
-
-  const statusLine = parts.map(p => `[${p}]`).join(' ');
+  // the connection part ends the line, with a coloured dot before it
+  const before = [...parts.map(p => `[${p}]`), '['].join(' ');
+  const statusLine = new StyledText([
+    ...stringToStyledText(before).chunks,
+    fg(dotColor)('●'),
+    ...stringToStyledText(`${connectionStatus}]`).chunks
+  ]);
 
   return (
     <box
       style={{
         backgroundColor: '#1a1b26',
-        border: true,
-        borderBottom: false,
-        borderLeft: false,
-        borderRight: false,
+        border: ['top'],
         borderStyle: 'single',
-        borderTop: true,
         height: 1,
         paddingLeft: 1,
         paddingRight: 1

@@ -36,8 +36,11 @@ export const extractRoomData = (content: string): RoomData | null => {
 
   // Find where "You see:" or "Exits:" starts
   let descEndIndex = lines.length;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].startsWith('You see:') || lines[i].startsWith('Exits:')) {
+  for (const [i, line] of lines.entries()) {
+    if (i === 0) {
+      continue;
+    }
+    if (line.startsWith('You see:') || line.startsWith('Exits:')) {
       descEndIndex = i;
       break;
     }

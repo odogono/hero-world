@@ -72,10 +72,13 @@ export const findPlanet = os
   .route({ method: 'GET', path: '/planets/{id}' })
   .input(z.object({ id: z.coerce.number().int().min(1) }))
   .output(PlanetSchema)
-  .handler(async ({ input }) =>
-    // your find code here
-    planets.find(planet => planet.id === input.id)
-  );
+  .handler(async ({ input }) => {
+    const planet = planets.find(p => p.id === input.id);
+    if (!planet) {
+      throw new ORPCError('NOT_FOUND');
+    }
+    return planet;
+  });
 
 export const createPlanet = os
   .$context<{ headers: IncomingHttpHeaders }>()

@@ -58,7 +58,7 @@ describe('TUI App Integration', () => {
       // Verify message format
       const sentMessages = ws.getSentMessages();
       expect(sentMessages.length).toBe(1);
-      expect(JSON.parse(sentMessages[0])).toEqual({
+      expect(JSON.parse(sentMessages[0]!)).toEqual({
         payload: 'look',
         type: 'cmd'
       });
@@ -141,7 +141,7 @@ describe('TUI App Integration', () => {
       expect(historyResult.current.history.length).toBe(3);
 
       // Navigate up (backward)
-      let cmd;
+      let cmd = null as string | null;
       act(() => {
         cmd = historyResult.current.getPrevious();
       });
@@ -363,7 +363,7 @@ Exits: south, west`;
       // Verify command was sent
       const sentMessages = ws.getSentMessages();
       expect(sentMessages.length).toBe(1);
-      expect(JSON.parse(sentMessages[0])).toEqual({
+      expect(JSON.parse(sentMessages[0]!)).toEqual({
         payload: 'look',
         type: 'cmd'
       });
@@ -420,8 +420,8 @@ Exits: north, south`,
 
       // Verify error message was added
       const lastMessage = gameStateResult.current.messages.at(-1);
-      expect(lastMessage.type).toBe('error');
-      expect(lastMessage.content).toBe('Unknown command');
+      expect(lastMessage?.type).toBe('error');
+      expect(lastMessage?.content).toBe('Unknown command');
     });
   });
 

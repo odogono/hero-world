@@ -74,8 +74,7 @@ export const createServer = async ({
           return response ?? new Response('Not Found', { status: 404 });
         },
         {
-          parse: 'none', // Disable Elysia body parser to prevent "body already used" error
-          requireAuth: false
+          parse: 'none' // Disable Elysia body parser to prevent "body already used" error
         }
       )
       .ws('/ws', wsHandler({ muaWorld }))
