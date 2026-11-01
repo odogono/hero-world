@@ -92,7 +92,7 @@ export const toKebabCase = (str: string, joinChar: string = '-') => {
 
   const filtered: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    const cur = tokens[i];
+    const cur = tokens[i]!;
     const next = tokens[i + 1];
     // Drop single-letter+digits version pair (e.g., V 2) between words
     if (RE_SINGLE_LETTER.test(cur) && next && RE_NUM.test(next)) {
@@ -135,10 +135,12 @@ export const toCapitalized = (s: string) =>
 export const toCamelCase = (str: string, joinChar: string = '') => {
   const tokens = splitIntoWords(str);
   if (tokens.length === 0) return '';
-  if (tokens.length === 1 && RE_NUM.test(tokens[0])) return tokens[0];
+  const first = tokens[0]!;
+  const last = tokens.at(-1)!;
+  if (tokens.length === 1 && RE_NUM.test(first)) return first;
 
-  const startsWithNumber = RE_NUM.test(tokens[0]);
-  const endsWithNumber = tokens.length > 1 && RE_NUM.test(tokens[tokens.length - 1]);
+  const startsWithNumber = RE_NUM.test(first);
+  const endsWithNumber = tokens.length > 1 && RE_NUM.test(last);
 
   // Build alpha/symbol portion: drop numeric-only tokens for camel body, strip digits from mixed tokens
   const bodyTokens = tokens
@@ -150,13 +152,13 @@ export const toCamelCase = (str: string, joinChar: string = '') => {
   const camelAlpha = pascal ? pascal.charAt(0).toLowerCase() + pascal.slice(1) : '';
 
   if (startsWithNumber && endsWithNumber) {
-    return `${tokens[0]}_${camelAlpha}${camelAlpha ? '_' : ''}${tokens[tokens.length - 1]}`;
+    return `${first}_${camelAlpha}${camelAlpha ? '_' : ''}${last}`;
   }
   if (startsWithNumber) {
-    return camelAlpha ? `${tokens[0]}_${camelAlpha}` : tokens[0];
+    return camelAlpha ? `${first}_${camelAlpha}` : first;
   }
   if (endsWithNumber) {
-    return camelAlpha ? `${camelAlpha}_${tokens[tokens.length - 1]}` : tokens[tokens.length - 1];
+    return camelAlpha ? `${camelAlpha}_${last}` : last;
   }
   return camelAlpha;
 };

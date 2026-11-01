@@ -23,5 +23,8 @@
   },
   "peerDependencies": {
     "typescript": "^6"
+  },
+  "scripts": {
+    "test": "bun test src"
   }
 }
