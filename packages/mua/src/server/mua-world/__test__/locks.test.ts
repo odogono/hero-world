@@ -84,7 +84,10 @@ describe.each([
       "You'll have to close the strongbox first."
     );
     await send('close box');
-    expect(await send('lock box')).toContain('You lock the strongbox');
+    // the strongbox's own message for locking
+    expect(await send('lock box')).toBe(
+      "(with the iron key)\nThe strongbox's bolts slide home."
+    );
     expect(await send('lock box')).toBe('The strongbox is already locked.');
   });
 

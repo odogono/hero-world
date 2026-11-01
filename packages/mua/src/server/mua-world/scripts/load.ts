@@ -8,6 +8,11 @@ import { createMuaCapability } from './mua-capability';
 
 const log = createLog('scripts');
 
+/** mua's own Libraries, by the name Scripts `use` them from */
+const LIBRARIES: Record<string, string> = {
+  things: new URL('../behaviours/lib/things.talk', import.meta.url).pathname
+};
+
 /**
  * Loads the Script of every atom whose EDL declares a `script` component,
  * and returns the names of those atoms. Scripts owned by a single entity
@@ -20,6 +25,12 @@ export const loadScripts = async (
 ): Promise<Set<string>> => {
   const scripted = new Set<string>();
   const mua = createMuaCapability(world, ecsTalk, contexts);
+
+  // the Libraries every Script may `use`
+  for (const [name, path] of Object.entries(LIBRARIES)) {
+    ecsTalk.addLibrary(name, await Bun.file(path).text());
+    log.info(`Loaded Library ${name} from ${path}`);
+  }
   for (const owner of world.getScriptOwners()) {
     if (owner.kind !== 'atom') {
       log.warn(
@@ -33,7 +44,9 @@ export const loadScripts = async (
       throw new Error(`Script for atom ${owner.name} not found: ${owner.src}`);
     }
     ecsTalk.loadAtomScript(owner.name, await file.text(), {
-      grants: { mua: mua.grant(['act', 'announce', 'command'], undefined) }
+      grants: {
+        mua: mua.grant(['act', 'announce', 'command', 'message'], undefined)
+      }
     });
     scripted.add(owner.name);
     log.info(`Loaded Script for atom ${owner.name} from ${owner.src}`);

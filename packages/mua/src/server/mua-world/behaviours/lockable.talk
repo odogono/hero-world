@@ -8,23 +8,7 @@
 --     script { src: "behaviours/lockable.talk" }
 --   }
 
-function nameOf thing
-  return lower(the name of the described of thing)
-end nameOf
-
-function actorName actor
-  if the player of actor is nothing then
-    return the name of the described of actor
-  end if
-  return the name of the player of actor
-end actorName
-
-function fits candidate, lockName
-  if the key of candidate is nothing then
-    return false
-  end if
-  return lockName is in the opens of the key of candidate
-end fits
+use nameOf, actorName, fits from things
 
 -- a locked thing won't open
 on open role, actor
@@ -40,44 +24,17 @@ on unlock role, actor
   if role is not "target" or the lockable of the target is nothing then
     pass unlock
   end if
-  put the lockable of the target into state
-  if not the isLocked of state then
+  if not the isLocked of the lockable of the target then
     return `The ${nameOf(the target)} is already unlocked.`
   end if
-
-  -- the key named, or one the actor carries that fits
-  ask mua to command
-  put the indirect of it into k
-  put "" into chosen
-  if k is nothing then
-    ask world to find actor, "key"
-    repeat for each candidate in it
-      if k is nothing and fits(candidate, the lock of state) then
-        put candidate into k
-      end if
-    end repeat
-    if k is nothing then
-      return `You need a key to unlock the ${nameOf(the target)}.`
-    end if
-    put `(with the ${nameOf(k)})\n` into chosen
-  else if the key of k is nothing then
-    return "You can't unlock anything with that."
-  else if not fits(k, the lock of state) then
-    return `The ${nameOf(k)} doesn't fit.`
-  end if
-
-  set the lockable of the target to {isLocked: false, lock: the lock of state}
-  ask world to resolve the in of the location of actor
-  tell mua to announce it, `${actorName(actor)} unlocks the ${nameOf(the target)}.`, actor
-  return `${chosen}You unlock the ${nameOf(the target)} with the ${nameOf(k)}.`
+  return turnKey("unlock", actor, false)
 end unlock
 
 on lock role, actor
   if role is not "target" or the lockable of the target is nothing then
     pass lock
   end if
-  put the lockable of the target into state
-  if the isLocked of state then
+  if the isLocked of the lockable of the target then
     return `The ${nameOf(the target)} is already locked.`
   end if
   if the container of the target is not nothing then
@@ -85,29 +42,37 @@ on lock role, actor
       return `You'll have to close the ${nameOf(the target)} first.`
     end if
   end if
+  return turnKey("lock", actor, true)
+end lock
 
+-- locks or unlocks the target with the key named, or one the actor carries
+on turnKey verb, actor, locking
+  put the lock of the lockable of the target into lockName
   ask mua to command
   put the indirect of it into k
   put "" into chosen
   if k is nothing then
     ask world to find actor, "key"
     repeat for each candidate in it
-      if k is nothing and fits(candidate, the lock of state) then
+      if k is nothing and fits(candidate, lockName) then
         put candidate into k
       end if
     end repeat
     if k is nothing then
-      return `You need a key to lock the ${nameOf(the target)}.`
+      return `You need a key to ${verb} the ${nameOf(the target)}.`
     end if
     put `(with the ${nameOf(k)})\n` into chosen
   else if the key of k is nothing then
-    return "You can't lock anything with that."
-  else if not fits(k, the lock of state) then
+    return `You can't ${verb} anything with that.`
+  else if not fits(k, lockName) then
     return `The ${nameOf(k)} doesn't fit.`
   end if
 
-  set the lockable of the target to {isLocked: true, lock: the lock of state}
+  set the lockable of the target to {isLocked: locking, lock: lockName}
+  ask mua to message verb, "omsg", k
+  put it into others
   ask world to resolve the in of the location of actor
-  tell mua to announce it, `${actorName(actor)} locks the ${nameOf(the target)}.`, actor
-  return `${chosen}You lock the ${nameOf(the target)} with the ${nameOf(k)}.`
-end lock
+  tell mua to announce it, others, actor
+  ask mua to message verb, "msg", k
+  return chosen & it
+end turnKey
