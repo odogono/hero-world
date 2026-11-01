@@ -8,22 +8,34 @@ export const actionSystem = createMuaSystem(
       return;
     }
 
-    const { direction, indirect, playerId, target, text, verb } =
-      entity.commandEvent;
+    const {
+      direction,
+      indirect,
+      indirectId,
+      label,
+      playerId,
+      target,
+      targetId,
+      text,
+      verb
+    } = entity.commandEvent;
 
     // Execute action
     const result = executeAction({
       direction,
       indirect,
+      indirectId: indirectId ?? undefined,
       playerId,
       target,
+      targetId: targetId ?? undefined,
       text,
       verb,
       world
     });
 
     // Get player's connection
-    const player = getEntity(world, playerId, ['player'], true);
+    // read-only: parseSystem owns writes to the player this frame
+    const player = getEntity(world, playerId, ['player']);
     const connection = getEntity(world, player?.player.connectedId, [
       'connected'
     ]);
@@ -36,7 +48,7 @@ export const actionSystem = createMuaSystem(
     world.create({
       outputEvent: {
         broadcast: false,
-        message: result.message,
+        message: label ? `${label}: ${result.message}` : result.message,
         wsId: connection.connected.wsId
       }
     });
@@ -53,9 +65,6 @@ export const actionSystem = createMuaSystem(
         }
       });
     }
-
-    // Update player stats
-    player.player.lastCommandAt = new Date().toISOString();
 
     // Remove command event
     world.delete(entity);

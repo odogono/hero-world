@@ -1,61 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { MuaWorld, type MuaConnection } from '../index';
-
-type TestConnection = MuaConnection & { messages: string[] };
-
-const createConnection = (id: string): TestConnection => {
-  const messages: string[] = [];
-  return {
-    close: () => {},
-    id,
-    messages,
-    send: data => {
-      const { data: message } = JSON.parse(String(data)) as { data: string };
-      messages.push(message);
-      return 1;
-    }
-  };
-};
+import { openTestWorld } from './helpers';
 
 describe('Gameplay', () => {
-  let muaWorld: MuaWorld;
+  let world: Awaited<ReturnType<typeof openTestWorld>>;
 
   beforeEach(async () => {
-    muaWorld = new MuaWorld();
-    await muaWorld.open();
-    // drive the loop by hand rather than on the 1s interval
-    clearInterval(muaWorld.updateLoopInterval!);
+    world = await openTestWorld();
   });
 
   afterEach(async () => {
-    await muaWorld.close();
+    await world.muaWorld.close();
   });
 
-  const tick = (count = 3) => {
-    for (let ii = 0; ii < count; ii++) {
-      muaWorld.loop!.update(1000);
-    }
-  };
-
-  const login = async (name: string) => {
-    const conn = createConnection(`ws-${name}`);
-    muaWorld.onConnectionOpened(conn);
-    muaWorld.onConnectionCommand(conn, { data: { username: name } });
-    // handleLogin is fire-and-forget; wait for its welcome message
-    for (let ii = 0; ii < 50 && conn.messages.length === 0; ii++) {
-      await Bun.sleep(1);
-    }
-    expect(conn.messages.at(-1)).toContain(`Welcome, ${name}`);
-    return conn;
-  };
-
-  const send = (conn: TestConnection, text: string) => {
-    conn.messages.length = 0;
-    muaWorld.onConnectionCommand(conn, text);
-    tick();
-    return conn.messages.join('\n');
-  };
+  const login = (name: string) => world.login(name);
+  const send: typeof world.send = (conn, text) => world.send(conn, text);
 
   it('looks at the starting room', async () => {
     const conn = await login('bob');
