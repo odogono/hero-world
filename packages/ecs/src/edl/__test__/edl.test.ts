@@ -59,6 +59,23 @@ describe('Entity Definition Language', () => {
       ]);
     });
 
+    it('reads object and array values with or without commas', () => {
+      const withCommas =
+        'atom a { meta { props: { to: 1, oneWay: true, tags: ["x", "y"] } } }';
+      const without = `atom a {
+        meta { props: { to: 1 oneWay: true tags: ["x" "y"] } }
+      }`;
+      const trailing =
+        'atom a { meta { props: { to: 1, oneWay: true, tags: ["x", "y",], } } }';
+      const props = { oneWay: true, tags: ['x', 'y'], to: 1 };
+
+      for (const edl of [withCommas, without, trailing]) {
+        expect(parseEDL(edl)).toEqual([
+          { components: { meta: { props } }, id: 'a', type: 'atom' }
+        ]);
+      }
+    });
+
     it('should parse an empty entity', () => {
       const edl = 'entity {}';
       const parsed = parseEDL(edl);
