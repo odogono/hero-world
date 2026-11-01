@@ -62,7 +62,7 @@ const report = (
     broadcasts:
       roomId === undefined || !others
         ? undefined
-        : [{ exclude: ctx.playerId, message: others, roomId }],
+        : [{ exclude: ctx.playerId, message: others, to: roomId }],
     kind: 'done',
     message: message ?? messageFor(ctx, handler, 'msg') ?? ''
   };

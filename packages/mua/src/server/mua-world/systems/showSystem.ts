@@ -3,7 +3,7 @@ import { createEventSystem } from 'odgn-ecs/events';
 import type { World } from 'odgn-ecs/world';
 
 import type { MuaComponents } from '../coms';
-import { getEntity } from '../queries/entity';
+import { tell } from './output';
 
 const parsePayload = (payload: unknown): TalkShowPayload | undefined => {
   const value =
@@ -29,25 +29,7 @@ export const showSystem = {
     if (!show) {
       return;
     }
-    const mua = world as World<MuaComponents>;
-    const connected = getEntity(mua, show.actor, ['player']);
-    const connection = getEntity(mua, connected?.player.connectedId, [
-      'connected'
-    ]);
-    mua.create({
-      outputEvent: connected
-        ? {
-            broadcast: false,
-            message: show.text,
-            wsId: connection?.connected.wsId ?? ''
-          }
-        : {
-            broadcast: true,
-            message: show.text,
-            roomId: show.actor,
-            wsId: ''
-          }
-    });
+    tell(world as World<MuaComponents>, show.actor, show.text);
   }),
   // after actions, before output
   priority: 15

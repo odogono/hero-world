@@ -157,16 +157,21 @@ const commandEventDef = defineComponent({
   }
 });
 
+/**
+ * A message for an entity. Sent to a player's connection when `to` is a
+ * player, otherwise to every player inside `to` (so a room hears it). `wsId`
+ * addresses a connection directly, for before a player is known.
+ */
 const outputEventDef = defineComponent({
   id: 'outputEvent',
   schema: {
-    broadcast: s.boolean().default(false),
+    /** A player inside `to` who should not hear it */
     exclude: s.entityId().optional(),
     message: s.string(),
     /** What the player can see of a room, for clients to show (see look) */
     room: s.json().optional(),
-    roomId: s.entityId().optional(),
-    wsId: s.string()
+    to: s.entityId().optional(),
+    wsId: s.string().optional()
   }
 });
 

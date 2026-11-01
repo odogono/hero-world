@@ -18,7 +18,7 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
       {
         exclude: playerId,
         message: `${player.player.name} says, "${text}"`,
-        roomId: player.location.in
+        to: player.location.in
       }
     ],
     kind: 'done',
@@ -46,7 +46,7 @@ export const sayToAction = (ctx: ActionContext): ActionOutcome => {
       {
         exclude: playerId,
         message: `${speaker.player.name} says to ${name}, "${text}"`,
-        roomId: speaker.location.in
+        to: speaker.location.in
       }
     ],
     kind: 'done',

@@ -1,7 +1,7 @@
 import { stepCommand } from '../actions';
-import { getEntity } from '../queries/entity';
 import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
 import { createMuaSystem } from './create-mua-system';
+import { tell } from './output';
 
 export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
   createMuaSystem(
@@ -52,47 +52,26 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
       }
       const { outcome } = step;
 
-      // Get player's connection
-      // read-only: parseSystem owns writes to the player this frame
-      const player = getEntity(world, playerId, ['player']);
-      const connection = getEntity(world, player?.player.connectedId, [
-        'connected'
-      ]);
-      if (!player || !connection) {
-        world.delete(entity);
-        return;
-      }
-
       // dispatchCommand never passes: unhandled commands are refused
       if (outcome.kind === 'pass') {
         world.delete(entity);
         return;
       }
 
-      // Create output event for player; a Script may reply with nothing
+      // Tell the player; a Script may reply with nothing
       if (outcome.message) {
-        world.create({
-          outputEvent: {
-            broadcast: false,
-            message: label ? `${label}: ${outcome.message}` : outcome.message,
-            room: outcome.kind === 'done' ? outcome.room : undefined,
-            wsId: connection.connected.wsId
-          }
-        });
+        tell(
+          world,
+          playerId,
+          label ? `${label}: ${outcome.message}` : outcome.message,
+          { room: outcome.kind === 'done' ? outcome.room : undefined }
+        );
       }
 
       // Tell everyone else who saw it
       const broadcasts = outcome.kind === 'done' ? outcome.broadcasts : [];
-      for (const { exclude, message, roomId } of broadcasts ?? []) {
-        world.create({
-          outputEvent: {
-            broadcast: true,
-            exclude,
-            message,
-            roomId,
-            wsId: '' // Will be resolved by output system
-          }
-        });
+      for (const { exclude, message, to } of broadcasts ?? []) {
+        tell(world, to, message, { exclude });
       }
 
       // Remove command event
