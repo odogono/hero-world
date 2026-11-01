@@ -59,9 +59,11 @@ export const createGameLoop = <TComponents extends Components>(
 
   const addSystem = (
     id: string,
-    system: System<TComponents>,
+    anySystem: System<TComponents> | System<Components>,
     options?: SystemOptions<TComponents>
   ): GameLoop<TComponents> => {
+    // a system made without a world type works on any world
+    const system = anySystem as System<TComponents>;
     if (systems.has(id)) {
       log.warn(`System '${id}' already exists, replacing`);
     }

@@ -9,6 +9,7 @@ describe('CDef to Zod schema (text output)', () => {
   test('generates pasteable Zod schema with tableName', () => {
     const cdef: CDef = {
       id: 'user',
+      hash: '',
       tableName: 'tbl_users',
       columns: [
         { name: 'id', type: 'pk' },
@@ -38,6 +39,7 @@ describe('CDef to Zod schema (text output)', () => {
   test('maps types, defaults, and metadata', () => {
     const cdef: CDef = {
       id: 'user',
+      hash: '',
       columns: [
         { name: 'name', type: 'string', optional: false },
         { name: 'email', type: 'email', isUnique: true, optional: false },
@@ -88,6 +90,7 @@ describe('CDef to Zod schema (text output)', () => {
   test('does not duplicate auto id when provided explicitly', () => {
     const cdef: CDef = {
       id: 'thing',
+      hash: '',
       columns: [
         { name: 'id', type: 'pk' },
         { name: 'title', type: 'string' }
@@ -107,6 +110,7 @@ describe('CDef to Zod schema (text output)', () => {
     const userDef: CDef[] = [
       {
         id: 'user',
+        hash: '',
         columns: [
           { name: 'id', type: 'pk' },
           { name: 'name', type: 'string' }
@@ -116,6 +120,7 @@ describe('CDef to Zod schema (text output)', () => {
     const describableDef: CDef[] = [
       {
         id: 'describable',
+        hash: '',
         columns: [
           { name: 'name', type: 'string' },
           { name: 'description', type: 'string' }

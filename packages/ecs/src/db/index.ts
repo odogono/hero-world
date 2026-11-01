@@ -92,7 +92,7 @@ export const createDatabase = async (
 
 // Convenience functions for common use cases
 export const createAlasqlDatabase = async (
-  options: CreateDatabaseOptions
+  options: Omit<CreateDatabaseOptions, 'type'> = {}
 ): Promise<Database> =>
   createDatabase({
     ...options,
@@ -100,7 +100,7 @@ export const createAlasqlDatabase = async (
   });
 
 export const createBunDatabase = async (
-  options: CreateDatabaseOptions
+  options: Omit<CreateDatabaseOptions, 'type'> = {}
 ): Promise<Database> =>
   createDatabase({
     ...options,
@@ -108,7 +108,7 @@ export const createBunDatabase = async (
   });
 
 export const createWasmDatabase = async (
-  options: CreateDatabaseOptions
+  options: Omit<CreateDatabaseOptions, 'type'> = {}
 ): Promise<Database> =>
   createDatabase({
     ...options,

@@ -64,9 +64,13 @@ export type SystemPerformance = {
 };
 
 export type GameLoop<TComponents extends Components> = {
+  /**
+   * Add a system for this world, or one made without a world type
+   * (`createSystem(() => …)`), which runs on any world.
+   */
   addSystem: (
     id: string,
-    system: System<TComponents>,
+    system: System<TComponents> | System<Components>,
     options?: SystemOptions<TComponents>
   ) => GameLoop<TComponents>;
   disableSystem: (id: string) => GameLoop<TComponents>;

@@ -96,7 +96,7 @@ describe('Component Compatibility System - Simple Tests', () => {
     const metadata = getStoredComponentMetadata(testDb);
     expect(metadata).toHaveLength(1);
     expect(metadata[0]!.defId).toBe('playerTest4'); // table name with tbl_ prefix
-    expect(metadata[0].hash).toBeTruthy();
+    expect(metadata[0]?.hash).toBeTruthy();
 
     await cleanupDb();
   });

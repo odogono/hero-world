@@ -143,8 +143,8 @@ describe('GameLoop', () => {
     type C = ExtractWorldComponents<typeof world>;
     const gameLoop = createGameLoop(world);
 
-    let receivedWorld: World<C>;
-    let receivedDeltaTime: number;
+    let receivedWorld: World<C> | undefined;
+    let receivedDeltaTime: number | undefined;
 
     const testSystem = createSystem(({ deltaTime, world }) => {
       receivedWorld = world;

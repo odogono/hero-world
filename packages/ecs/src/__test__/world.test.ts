@@ -72,7 +72,7 @@ describe('World', () => {
     world.flush();
 
     // Test component removal
-    entity.stats = undefined;
+    (entity as Record<string, unknown>).stats = undefined;
     expect(entity.stats).toBeUndefined();
 
     world.flush();

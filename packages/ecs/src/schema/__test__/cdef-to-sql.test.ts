@@ -137,6 +137,7 @@ describe('Component Definitions to SQL', () => {
 
   test('should convert an enum component definition to a SQL table', () => {
     const cdef: CDef = {
+      hash: '',
       id: 'user',
       columns: [
         { name: 'name', type: 'string' },
