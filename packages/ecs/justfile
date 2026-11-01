@@ -10,7 +10,7 @@ default:
 # Examples:
 #   just generate-schemas
 #   just generate-schemas src/components.ts
-#   just generate-schemas ../tank-world/src/components.ts
+#   just generate-schemas path/to/components.ts
 generate-schemas path="__test__/definitions.ts":
     bun run scripts/generate-schemas.ts {{path}}
 

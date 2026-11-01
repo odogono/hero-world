@@ -15,7 +15,6 @@ import { join, relative, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dir, '../..');
 const BASELINE = join(import.meta.dir, 'baseline.json');
 
-// tank-world is left out until it moves to the current odgn-ecs API.
 const PROJECTS = [
   'packages/ecs',
   'packages/ecs-talk',
