@@ -29,7 +29,7 @@ import {
 } from '@northtalk/ts';
 
 import { toComponentShape, type ComponentShape } from './component-shape';
-import { createTalkTimers } from './timer';
+import { createTalkTimers, type DueTimer } from './timer';
 
 const log = createLog('ecs-talk');
 
@@ -53,6 +53,11 @@ export type EcsTalkOptions = {
   name?: string;
   /** Called with each Pump's result */
   onPump?: (result: PumpResult) => void;
+  /**
+   * Called with each timer as it falls due; return true to handle it here
+   * instead of delivering it to Scripts (see `schedule`)
+   */
+  onTimer?: (timer: DueTimer) => boolean;
   /** Called with Message Path warnings */
   warn?: (message: string) => void;
 };
@@ -370,7 +375,8 @@ export const createEcsTalk = <TComponents extends Components>(
   const timers = createTalkTimers(world, {
     deliver: (eid, message, args) =>
       group.deliver(handle(eid), { args, name: message }),
-    entityValue: eid => (isLive(eid) ? handle(eid).value : undefined)
+    entityValue: eid => (isLive(eid) ? handle(eid).value : undefined),
+    onTimer: options.onTimer
   });
 
   /** The scripted atom a Message Path climbs to from these bases, if any */
@@ -547,6 +553,8 @@ export const createEcsTalk = <TComponents extends Components>(
     loadAtomScript,
     pump,
     request,
+    /** Stores a durable timer for an entity, as `timer`'s `schedule` does */
+    schedule: timers.schedule,
     script: (atom: string) => scripts.get(atom),
     /** Atoms and entities whose EDL declares a `script`, with source paths */
     scriptOwners: () => world.getScriptOwners(),

@@ -94,15 +94,14 @@ const clockDef = defineComponent({
 });
 
 /**
- * Messages sent to an entity on a schedule of world time (see timers.ts),
- * e.g. `timers { every: { reset: 300 } }` resets a place every five minutes.
- * - `every` seconds between each message, by message name
- * - `due`   when each is next due, in world milliseconds (kept by the world)
+ * Messages sent to an entity on a schedule of world time, e.g.
+ * `timers { every: { reset: 300 } }` resets a place every five minutes.
+ * `every` is the seconds between each message, by message name. When each
+ * is next due is kept in ecs-talk's timer store (see world/timers.ts).
  */
 const timersDef = defineComponent({
   id: 'timers',
   schema: {
-    due: s.json().optional(),
     every: s.json()
   }
 });

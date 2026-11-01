@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { getEntity, getLocationOf } from '../queries/entity';
 import { findRoomByMetaId } from '../queries/room';
+import { MUA_TIMERS } from '../world/timers';
 import { openTestWorld, type TestConnection } from './helpers';
 
 const FIXTURE = 'src/server/mua-world/__test__/fixtures/timers.edl';
@@ -68,5 +69,16 @@ describe('World clock and timers', () => {
 
     await runFor(3);
     expect(heard('The candles flicker into life.')).toBe(1);
+  });
+
+  it("keeps its timers in ecs-talk's timer store", () => {
+    const stored = world.muaWorld
+      .world!.queryAll({ with: ['talkTimer'] })
+      .map(t => t.talkTimer)
+      .filter(t => t.script === MUA_TIMERS)
+      .map(t => t.message)
+      .toSorted();
+
+    expect(stored).toEqual(['chime', 'reset']);
   });
 });

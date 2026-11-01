@@ -6,6 +6,7 @@ import {
   ScriptError,
   decodeValue,
   encodeValue,
+  list,
   timerCapability,
   type Value
 } from '@northtalk/ts';
@@ -48,6 +49,16 @@ type TimerRow = {
 
 type TimerEntity = { id: number; talkTimer: TimerRow };
 
+/** A timer as stored, handed to the Host's `onTimer` when it falls due */
+export type DueTimer = {
+  args: Value[];
+  at: bigint;
+  message: string;
+  name: string;
+  owner: number;
+  script: string;
+};
+
 export type TalkTimers = {
   /** The `timer` Capability, granted only when the World has `talkTimer` */
   capability: ReturnType<typeof timerCapability> | undefined;
@@ -55,6 +66,12 @@ export type TalkTimers = {
   fireDue: (now: bigint) => void;
   /** Remembers which entity a Host Delivery went to */
   noteDelivery: (delivery: string, eid: number) => void;
+  /**
+   * Stores a timer for an entity, replacing one with the same owner, script
+   * and name. A Host uses its own `script` name for timers it handles itself
+   * in `onTimer`.
+   */
+  schedule: (timer: Omit<DueTimer, 'args'> & { args?: Value[] }) => void;
 };
 
 type TimerHost = {
@@ -62,6 +79,11 @@ type TimerHost = {
   deliver: (eid: number, message: string, args: Value[]) => string;
   /** The Value an `entity` Host Object reader names, for decoding args */
   entityValue: (eid: number) => Value | undefined;
+  /**
+   * Called with each timer as it falls due, before it is delivered. Return
+   * true when the Host has handled it, and it isn't delivered to Scripts.
+   */
+  onTimer?: (timer: DueTimer) => boolean;
 };
 
 /**
@@ -120,6 +142,42 @@ export const createTalkTimers = <TComponents extends Components>(
     return owner;
   };
 
+  const store = (
+    owner: number,
+    script: string,
+    name: string,
+    at: bigint,
+    message: string,
+    args: Value
+  ) => {
+    remove(find(owner, script, name));
+    timerWorld.create({
+      talkTimer: {
+        args: { encoded: encodeValue(args) },
+        at: at.toString(),
+        message,
+        name,
+        owner,
+        script
+      }
+    } as never);
+    timerWorld.flush();
+  };
+
+  const schedule: TalkTimers['schedule'] = timer => {
+    if (!world.defs.has(TALK_TIMER)) {
+      throw new Error('Register talkTimerComponent to schedule timers');
+    }
+    store(
+      timer.owner,
+      timer.script,
+      timer.name,
+      timer.at,
+      timer.message,
+      list(...(timer.args ?? []))
+    );
+  };
+
   const capability = world.defs.has(TALK_TIMER)
     ? timerCapability(
         {
@@ -133,18 +191,7 @@ export const createTalkTimers = <TComponents extends Components>(
             if (micros === undefined) {
               throw new ScriptError('invalid value', 'at must be an Instant');
             }
-            remove(find(owner, call.scriptName, name));
-            timerWorld.create({
-              talkTimer: {
-                args: { encoded: encodeValue(args) },
-                at: micros.toString(),
-                message,
-                name,
-                owner,
-                script: call.scriptName
-              }
-            } as never);
-            timerWorld.flush();
+            store(owner, call.scriptName, name, micros, message, args);
           }
         },
         { cancel: { fuel: 1 }, schedule: { fuel: 1 } }
@@ -178,10 +225,21 @@ export const createTalkTimers = <TComponents extends Components>(
       const args = Array.from({ length: decoded.length }, (_, ii) =>
         decoded.index(ii + 1)
       );
+      const due: DueTimer = {
+        args,
+        at: BigInt(talkTimer.at),
+        message: talkTimer.message,
+        name: talkTimer.name,
+        owner: talkTimer.owner,
+        script: talkTimer.script
+      };
+      if (host.onTimer?.(due)) {
+        continue;
+      }
       const delivery = host.deliver(talkTimer.owner, talkTimer.message, args);
       noteDelivery(delivery, talkTimer.owner);
     }
   };
 
-  return { capability, fireDue, noteDelivery };
+  return { capability, fireDue, noteDelivery, schedule };
 };
