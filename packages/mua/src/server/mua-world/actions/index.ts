@@ -2,7 +2,11 @@ import type { EntityId } from 'odgn-ecs/types';
 import { createLog } from 'odgn-helpers/log';
 
 import { getEntity, getLocationOf } from '../queries/entity';
-import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
+import {
+  NO_SCRIPTS,
+  type ScriptArg,
+  type ScriptRunner
+} from '../scripts/runner';
 import { lookAction } from './look';
 import { moveAction } from './move';
 import {
@@ -21,6 +25,7 @@ import {
   type ActionContext,
   type ActionOutcome
 } from './types';
+import { vetoesFor } from './vetoes';
 
 export * from './types';
 
@@ -46,18 +51,19 @@ export type Role = 'indirect' | 'room' | 'target';
 
 const CANNOT = "You can't do that.";
 
-/** A fixed reply for this role and verb from the entity's `responses` */
+/** A fixed reply from the entity's `responses`, by role (or `veto`) and key */
 const responseFrom = (
   ctx: ActionContext,
   id: EntityId,
-  role: Role
+  role: Role | 'veto',
+  key: string = ctx.verb
 ): string | undefined => {
   const entity = getEntity(ctx.world, id, ['responses']);
   const table: unknown = entity?.responses[role];
   if (typeof table !== 'object' || table === null) {
     return undefined;
   }
-  const reply = (table as Record<string, unknown>)[ctx.verb];
+  const reply = (table as Record<string, unknown>)[key];
   return typeof reply === 'string' ? reply : undefined;
 };
 
@@ -101,55 +107,96 @@ export type StepOptions = {
   state?: DispatchState;
 };
 
-/**
- * Moves a command along its receivers, and the first that handles it wins:
- * the room it happens in, then the second object, then the thing acted on,
- * then the built-in action. At each receiver a fixed response is checked,
- * then its Scripts. A Script answers on a later tick, so the step may stop
- * and wait; call it again on the next tick with the state it returned.
- */
-export const stepCommand = (
-  ctx: ActionContext,
-  { key, scripts = NO_SCRIPTS, state = { stage: 0, waitTicks: 0 } }: StepOptions
-): DispatchStep => {
+/** One thing dispatch asks, in turn: a receiver, or a veto question */
+type Question = {
+  args: ScriptArg[];
+  /** A command is offered as a request; a veto question is a Decision */
+  asks: 'decide' | 'offer';
+  id: EntityId;
+  message: string;
+  /** What a reply means: the command is handled, or the action is vetoed */
+  onReply: (message: string | undefined) => ActionOutcome;
+  /** A fixed reply from `responses`, if any */
+  response: string | undefined;
+};
+
+const receiverQuestions = (ctx: ActionContext): Question[] => {
   const receivers: [Role, EntityId | undefined][] = [
     ['room', getLocationOf(ctx.world, ctx.playerId)],
     ['indirect', ctx.indirectId],
     ['target', ctx.targetId]
   ];
+  return receivers
+    .filter((r): r is [Role, EntityId] => r[1] !== undefined)
+    .map(([role, id]) => ({
+      args: [role, { entity: ctx.playerId }],
+      asks: 'offer' as const,
+      id,
+      message: ctx.verb,
+      onReply: message => done(message ?? ''),
+      response: responseFrom(ctx, id, role)
+    }));
+};
 
-  for (let stage = state.stage; stage < receivers.length; stage++) {
-    const [role, id] = receivers[stage]!;
-    if (id === undefined) {
-      continue;
-    }
-    const response = responseFrom(ctx, id, role);
-    if (response !== undefined) {
-      return finished(refused(response));
-    }
-    if (!scripts.hasScript(id)) {
-      continue;
-    }
+const vetoQuestions = (ctx: ActionContext): Question[] =>
+  vetoesFor(ctx).map(({ event, id, subject }) => ({
+    args: [{ entity: ctx.playerId }, { entity: subject }],
+    asks: 'decide' as const,
+    id,
+    message: event,
+    onReply: message => refused(message || CANNOT),
+    response: responseFrom(ctx, id, 'veto', event)
+  }));
 
-    const requestKey = `${key}:${stage}`;
-    const reply = scripts.offer(requestKey, id, ctx.verb, role, ctx.playerId);
-    if (reply.kind === 'waiting') {
-      const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
-      if (waitTicks <= MAX_WAIT_TICKS) {
-        return { kind: 'waiting', state: { stage, waitTicks } };
+/**
+ * Moves a command along the questions dispatch asks, and stops at the first
+ * that settles it:
+ * 1. the receivers — the room it happens in, the second object, the thing
+ *    acted on — any of which may handle the command;
+ * 2. the veto questions of the built-in action (see vetoes.ts), any of
+ *    which may refuse it;
+ * 3. the built-in action itself.
+ * Each question is answered by a fixed response, else by Scripts. A Script
+ * answers on a later pass, so the step may stop and wait; call it again
+ * with the state it returned.
+ */
+export const stepCommand = (
+  ctx: ActionContext,
+  { key, scripts = NO_SCRIPTS, state = { stage: 0, waitTicks: 0 } }: StepOptions
+): DispatchStep => {
+  const questions = [...receiverQuestions(ctx), ...vetoQuestions(ctx)];
+
+  for (let stage = state.stage; stage < questions.length; stage++) {
+    const question = questions[stage]!;
+    if (question.response !== undefined) {
+      return finished(refused(question.response));
+    }
+    if (scripts.hasScript(question.id)) {
+      const requestKey = `${key}:${stage}`;
+      const reply = scripts[question.asks](
+        requestKey,
+        question.id,
+        question.message,
+        question.args
+      );
+      if (reply.kind === 'waiting') {
+        const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
+        if (waitTicks <= MAX_WAIT_TICKS) {
+          return { kind: 'waiting', state: { stage, waitTicks } };
+        }
+        log.warn(`Gave up waiting for a Script to answer ${question.message}`);
+        scripts.forget(requestKey);
+        return finished(refused('Nothing happens.'));
       }
-      log.warn(`Gave up waiting for a Script to answer ${ctx.verb}`);
       scripts.forget(requestKey);
-      return finished(refused('Nothing happens.'));
+      if (reply.kind === 'replied') {
+        return finished(question.onReply(reply.message));
+      }
+      if (reply.kind === 'failed') {
+        return finished(refused('Something went wrong.'));
+      }
+      // passed: on to the next question
     }
-    scripts.forget(requestKey);
-    if (reply.kind === 'replied') {
-      return finished(done(reply.message ?? ''));
-    }
-    if (reply.kind === 'failed') {
-      return finished(refused('Something went wrong.'));
-    }
-    // passed: on to the next receiver
   }
 
   return finished(runBuiltIn(ctx));

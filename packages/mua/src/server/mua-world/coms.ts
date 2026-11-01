@@ -99,13 +99,17 @@ const nounDef = defineComponent({
  * - `target`   the entity is the thing acted on
  * - `indirect` the entity is the second object (`unlock door with key`)
  * - `room`     the command happens inside the entity
+ * - `veto`     answers a veto question asked of the entity, by event
+ *              (see actions/vetoes.ts),
+ *              e.g. `veto: { beforeEnter: "The vault door is sealed." }`
  */
 const responsesDef = defineComponent({
   id: 'responses',
   schema: {
     indirect: s.json().optional(),
     room: s.json().optional(),
-    target: s.json().optional()
+    target: s.json().optional(),
+    veto: s.json().optional()
   }
 });
 

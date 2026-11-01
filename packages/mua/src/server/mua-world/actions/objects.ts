@@ -68,9 +68,10 @@ const report = (
   };
 };
 
-export const takeAction = (ctx: ActionContext): ActionOutcome => {
+/** Why the target can't be taken, or undefined if it can */
+export const takeRefusal = (ctx: ActionContext): ActionOutcome | undefined => {
   const { playerId, targetId, world } = ctx;
-  const target = getEntity(world, targetId, ['location'], true);
+  const target = getEntity(world, targetId, ['location']);
   if (!target) {
     return refused('Take what?');
   }
@@ -84,9 +85,18 @@ export const takeAction = (ctx: ActionContext): ActionOutcome => {
   if (!item?.item.isTakeable) {
     return refused("You can't take that.");
   }
+  return undefined;
+};
 
-  target.location = { in: playerId };
-  world.flush();
+export const takeAction = (ctx: ActionContext): ActionOutcome => {
+  const refusal = takeRefusal(ctx);
+  const target = getEntity(ctx.world, ctx.targetId, ['location'], true);
+  if (refusal || !target) {
+    return refusal ?? refused('Take what?');
+  }
+
+  target.location = { in: ctx.playerId };
+  ctx.world.flush();
 
   return report(ctx, 'take');
 };
