@@ -23,7 +23,7 @@
   "dependencies": {
     "@elysiajs/bearer": "^1.4.4",
     "@elysiajs/cors": "^1.4.2",
-    "@northtalk/ts": "^0.5.0",
+    "@northtalk/ts": "^0.6.0",
     "@opentui/core": "^0.8.1",
     "@opentui/react": "^0.8.1",
     "@orpc/contract": "^1.16.1",

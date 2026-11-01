@@ -50,7 +50,7 @@
     "packages/ecs-talk": {
       "name": "ecs-talk",
       "dependencies": {
-        "@northtalk/ts": "^0.5.0",
+        "@northtalk/ts": "^0.6.0",
         "odgn-ecs": "workspace:*",
         "odgn-helpers": "workspace:*",
       },
@@ -77,7 +77,7 @@
       "dependencies": {
         "@elysiajs/bearer": "^1.4.4",
         "@elysiajs/cors": "^1.4.2",
-        "@northtalk/ts": "^0.5.0",
+        "@northtalk/ts": "^0.6.0",
         "@opentui/core": "^0.8.1",
         "@opentui/react": "^0.8.1",
         "@orpc/contract": "^1.16.1",
@@ -258,7 +258,7 @@
 
     "@nkzw/eslint-plugin": ["@nkzw/eslint-plugin@2.0.0", "", { "peerDependencies": { "eslint": ">= 9" } }, "sha512-IoU8kOqHfnf7se2dGxMD/7RPm6WVjzjOjWSo7FulRx3lJzuZvXioSkT5Nd82l66DH3Pl2whw74lPT1di3KMwFA=="],
 
-    "@northtalk/ts": ["@northtalk/ts@0.5.0", "", {}, "sha512-5Xjn9eF031JWhRUE+RF8RYoz9jh8wB9asYecfUNtD95kWO5J2BemhyxX2RHe3A47Z0RvVdPXW0Lo0V4wY4i9hg=="],
+    "@northtalk/ts": ["@northtalk/ts@0.6.0", "", {}, "sha512-5rMhHL0j+gVqVKeBl2WZvMqM94MnpKD606aL24v6C/eMtwgYbk3Ek+Fwl7aDY6/kMBUak2KFNba3EHiqoiTa7Q=="],
 
     "@opentui/core": ["@opentui/core@0.8.1", "", { "dependencies": { "bun-ffi-structs": "0.3.1", "diff": "9.0.0", "marked": "17.0.1", "string-width": "7.2.0" }, "optionalDependencies": { "@opentui/core-darwin-arm64": "0.8.1", "@opentui/core-darwin-x64": "0.8.1", "@opentui/core-linux-arm64": "0.8.1", "@opentui/core-linux-arm64-musl": "0.8.1", "@opentui/core-linux-x64": "0.8.1", "@opentui/core-linux-x64-musl": "0.8.1", "@opentui/core-win32-arm64": "0.8.1", "@opentui/core-win32-x64": "0.8.1" }, "peerDependencies": { "web-tree-sitter": "0.25.10" } }, "sha512-WmnpnVZn2MdyYNEahQNn4k3OrIkQKfcwPVrX/DjguLtl/S2g5fPeXCqHZjCg2GLMf1N4HJap0LEkTPJEvfrDXw=="],
 
