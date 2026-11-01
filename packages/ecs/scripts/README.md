@@ -27,7 +27,7 @@ just generate-schemas
 
 # Run with a specific component file
 just generate-schemas src/components.ts
-just generate-schemas ../tank-world/src/components.ts
+just generate-schemas path/to/components.ts
 
 # Show help
 just generate-schemas-help

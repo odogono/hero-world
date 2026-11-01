@@ -8,7 +8,6 @@ A Bun workspace of game libraries and the games built on them. Package `AGENTS.m
 - `packages/ecs-talk`: NorthTalk Host Adapter that lets Scripts drive an `odgn-ecs` World. See `packages/ecs-talk/README.md`.
 - `packages/mua`: text-adventure server (Elysia + `mua-world` ECS) and OpenTUI client. See `packages/mua/AGENTS.md`.
 - `packages/helpers` (`odgn-helpers`): logging, strings, `trycatch`.
-- `packages/tank-world`: Vite + React demo on an old `odgn-ecs` API; outside `bun run check`. See `packages/tank-world/AGENTS.md`.
 - `tools/`: commit, changelog and typecheck-ratchet scripts.
 - `GLOSSARY.md` and `docs/adr/`: domain terms and decisions (`docs/agents/domain.md`).
 
