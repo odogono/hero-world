@@ -1,0 +1,113 @@
+-- Locks and keys, written as a Script: the pilot for writing behaviours in
+-- NorthTalk rather than TypeScript. It does what actions/locks.ts does, so
+-- a world can use either; the same tests run against both.
+--
+-- Put it on an atom with a `lockable` component:
+--   atom chest {
+--     lockable { is_locked: true lock: "chest" }
+--     script { src: "behaviours/lockable.talk" }
+--   }
+
+function nameOf thing
+  return lower(the name of the described of thing)
+end nameOf
+
+function actorName actor
+  if the player of actor is nothing then
+    return the name of the described of actor
+  end if
+  return the name of the player of actor
+end actorName
+
+function fits candidate, lockName
+  if the key of candidate is nothing then
+    return false
+  end if
+  return lockName is in the opens of the key of candidate
+end fits
+
+-- a locked thing won't open
+on open role, actor
+  if role is "target" and the lockable of the target is not nothing then
+    if the isLocked of the lockable of the target then
+      return `The ${nameOf(the target)} is locked.`
+    end if
+  end if
+  pass open
+end open
+
+on unlock role, actor
+  if role is not "target" or the lockable of the target is nothing then
+    pass unlock
+  end if
+  put the lockable of the target into state
+  if not the isLocked of state then
+    return `The ${nameOf(the target)} is already unlocked.`
+  end if
+
+  -- the key named, or one the actor carries that fits
+  ask mua to command
+  put the indirect of it into k
+  put "" into chosen
+  if k is nothing then
+    ask world to find actor, "key"
+    repeat for each candidate in it
+      if k is nothing and fits(candidate, the lock of state) then
+        put candidate into k
+      end if
+    end repeat
+    if k is nothing then
+      return `You need a key to unlock the ${nameOf(the target)}.`
+    end if
+    put `(with the ${nameOf(k)})\n` into chosen
+  else if the key of k is nothing then
+    return "You can't unlock anything with that."
+  else if not fits(k, the lock of state) then
+    return `The ${nameOf(k)} doesn't fit.`
+  end if
+
+  set the lockable of the target to {isLocked: false, lock: the lock of state}
+  ask world to resolve the in of the location of actor
+  tell mua to announce it, `${actorName(actor)} unlocks the ${nameOf(the target)}.`, actor
+  return `${chosen}You unlock the ${nameOf(the target)} with the ${nameOf(k)}.`
+end unlock
+
+on lock role, actor
+  if role is not "target" or the lockable of the target is nothing then
+    pass lock
+  end if
+  put the lockable of the target into state
+  if the isLocked of state then
+    return `The ${nameOf(the target)} is already locked.`
+  end if
+  if the container of the target is not nothing then
+    if not the isClosed of the container of the target then
+      return `You'll have to close the ${nameOf(the target)} first.`
+    end if
+  end if
+
+  ask mua to command
+  put the indirect of it into k
+  put "" into chosen
+  if k is nothing then
+    ask world to find actor, "key"
+    repeat for each candidate in it
+      if k is nothing and fits(candidate, the lock of state) then
+        put candidate into k
+      end if
+    end repeat
+    if k is nothing then
+      return `You need a key to lock the ${nameOf(the target)}.`
+    end if
+    put `(with the ${nameOf(k)})\n` into chosen
+  else if the key of k is nothing then
+    return "You can't lock anything with that."
+  else if not fits(k, the lock of state) then
+    return `The ${nameOf(k)} doesn't fit.`
+  end if
+
+  set the lockable of the target to {isLocked: true, lock: the lock of state}
+  ask world to resolve the in of the location of actor
+  tell mua to announce it, `${actorName(actor)} locks the ${nameOf(the target)}.`, actor
+  return `${chosen}You lock the ${nameOf(the target)} with the ${nameOf(k)}.`
+end lock
