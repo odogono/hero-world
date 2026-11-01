@@ -8,6 +8,7 @@ import {
   type ScriptReply,
   type ScriptRunner
 } from '../scripts/runner';
+import { helpAction, readAction } from './help';
 import { lockAction, unlockAction } from './locks';
 import { lookAction } from './look';
 import { moveAction } from './move';
@@ -39,11 +40,13 @@ const BUILT_IN: Record<string, Handler> = {
   close: closeAction,
   drop: dropAction,
   examine: examineAction,
+  help: helpAction,
   inventory: inventoryAction,
   lock: lockAction,
   look: lookAction,
   move: moveAction,
   open: openAction,
+  read: readAction,
   say: sayAction,
   sayTo: sayToAction,
   take: takeAction,

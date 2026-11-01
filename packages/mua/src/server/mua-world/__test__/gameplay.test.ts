@@ -87,4 +87,28 @@ describe('Gameplay', () => {
     );
     expect(welcome?.verbs).toEqual(listVerbs());
   });
+
+  it('starts a look with the room, with no stray blank lines', async () => {
+    const conn = await login('bob');
+
+    expect(send(conn, 'look')).toMatch(
+      /^West of house\n.+\n\nThere is: Mailbox\nExits: north, south$/
+    );
+  });
+
+  it('lists the commands for help', async () => {
+    const conn = await login('bob');
+
+    const help = send(conn, 'help');
+    expect(help).toContain('Commands: look, move, take');
+    expect(help).toContain('read');
+  });
+
+  it('reads what is written on a thing', async () => {
+    const conn = await login('bob');
+    send(conn, 'open mailbox');
+
+    expect(send(conn, 'read leaflet')).toStartWith('WELCOME TO MUA!');
+    expect(send(conn, 'read mailbox')).toBe("There's nothing written on it.");
+  });
 });
