@@ -55,7 +55,8 @@ export const prngShuffle = <T>(seed: number, array: T[]): [number, T[]] => {
   for (let i = result.length - 1; i > 0; i--) {
     const [next, j] = prngIntRange(seed, 0, i);
     seed = next;
-    [result[i], result[j]] = [result[j], result[i]];
+    // i and j are both within the array
+    [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return [seed, result];
 };

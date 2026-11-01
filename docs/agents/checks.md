@@ -1,6 +1,6 @@
 # Checks
 
-`bun run check` runs everything CI's `check` job runs: lint, format, the typecheck ratchet and the tests of `ecs`, `ecs-talk`, `mua` and `tools/`. The `pre-push` hook runs it after the commit checks in [commits.md](commits.md). `bun install` turns the hooks in [`.githooks/`](../../.githooks/) on.
+`bun run check` runs everything CI's `check` job runs: lint, format, the typecheck ratchet and the tests of `ecs`, `ecs-talk`, `helpers`, `mua` and `tools/`. The `pre-push` hook runs it after the commit checks in [commits.md](commits.md). `bun install` turns the hooks in [`.githooks/`](../../.githooks/) on.
 
 ## The typecheck ratchet
 

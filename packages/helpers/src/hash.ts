@@ -1,6 +1,6 @@
 export const generateHash = (data: unknown): string => {
   const dataString =
-    typeof data === 'string' ? data : JSON.stringify(data) || 'undefined';
+    typeof data === "string" ? data : JSON.stringify(data) || "undefined";
   let hash = 0;
   for (let i = 0; i < dataString.length; i++) {
     const char = dataString.charCodeAt(i);
@@ -12,16 +12,16 @@ export const generateHash = (data: unknown): string => {
 
 export const fastHash = async (
   data: unknown,
-  algorithm: 'SHA-1' | 'SHA-256' = 'SHA-1'
+  algorithm: "SHA-1" | "SHA-256" = "SHA-1",
 ): Promise<string> => {
-  const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+  const dataString = typeof data === "string" ? data : JSON.stringify(data);
   const hash = await crypto.subtle.digest(
     algorithm,
-    new TextEncoder().encode(dataString)
+    new TextEncoder().encode(dataString),
   );
   return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 };
 
 export const murmurHash = (data: unknown, seed = 0): string => {
@@ -58,21 +58,21 @@ export const murmurhash3_32_gc = (key: string, seed = 0): number => {
   }
 
   let k1 = 0;
-  switch (remainder) {
-    case 3:
-      k1 ^= (key.charCodeAt(i + 2) & 0xff) << 16;
-    case 2:
-      k1 ^= (key.charCodeAt(i + 1) & 0xff) << 8;
-    case 1:
-      k1 ^= key.charCodeAt(i) & 0xff;
-      k1 =
-        ((k1 & 0xffff) * c1 + ((((k1 >>> 16) * c1) & 0xffff) << 16)) &
-        0xffffffff;
-      k1 = (k1 << 15) | (k1 >>> 17);
-      k1 =
-        ((k1 & 0xffff) * c2 + ((((k1 >>> 16) * c2) & 0xffff) << 16)) &
-        0xffffffff;
-      h1 ^= k1;
+  // the tail: 1 to 3 bytes left over after the 4-byte blocks
+  if (remainder >= 3) {
+    k1 ^= (key.charCodeAt(i + 2) & 0xff) << 16;
+  }
+  if (remainder >= 2) {
+    k1 ^= (key.charCodeAt(i + 1) & 0xff) << 8;
+  }
+  if (remainder >= 1) {
+    k1 ^= key.charCodeAt(i) & 0xff;
+    k1 =
+      ((k1 & 0xffff) * c1 + ((((k1 >>> 16) * c1) & 0xffff) << 16)) & 0xffffffff;
+    k1 = (k1 << 15) | (k1 >>> 17);
+    k1 =
+      ((k1 & 0xffff) * c2 + ((((k1 >>> 16) * c2) & 0xffff) << 16)) & 0xffffffff;
+    h1 ^= k1;
   }
 
   h1 ^= key.length;

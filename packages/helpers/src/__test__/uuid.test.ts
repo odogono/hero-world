@@ -30,7 +30,7 @@ describe('uuidv7', () => {
     // Should be 8, 9, A, or B (binary 10xx)
     const variantChar = uuid[19]?.toLowerCase();
     expect(variantChar).toBeDefined();
-    expect(['8', '9', 'a', 'b']).toContain(variantChar);
+    expect(['8', '9', 'a', 'b']).toContain(variantChar!);
   });
 
   test('should generate unique values', () => {
