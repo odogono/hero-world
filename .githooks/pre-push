@@ -1,0 +1,8 @@
+#!/bin/sh
+# Runs the checks CI runs: the branch's changelog fragments and ADR numbers
+# against a fresh origin/main, then lint, format, typecheck and tests
+# (docs/agents/checks.md).
+set -e
+git fetch -q origin main || echo "pre-push: fetch failed; checking against the last origin/main" >&2
+bun tools/commits/check.ts branch
+bun run check
