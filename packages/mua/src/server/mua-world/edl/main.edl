@@ -50,6 +50,11 @@ entity west_of_house : room {
     name: "West of house"
     description: "This is an open field west of a white house, with a boarded front door."
   }
+  # Paths round the house are one way: their ways back go elsewhere
+  exits {
+    north: { to: $north_of_house oneWay: true }
+    south: { to: $south_of_house oneWay: true }
+  }
 }
 
 
@@ -59,6 +64,10 @@ entity north_of_house : room {
     name: "North of house"
     description: "You are facing the north side of a white house.  There is no door here, and all the windows are barred."
   }
+  exits {
+    east: $behind_house
+    south: { msg: "The windows are all barred" }
+  }
 }
 
 entity south_of_house : room {
@@ -66,6 +75,11 @@ entity south_of_house : room {
   described {
     name: "South of House"
     description: "You are facing the south side of a white house.  There is no door here, and all the windows are barred."
+  }
+  exits {
+    west: { to: $west_of_house oneWay: true }
+    east: $behind_house
+    north: { msg: "The windows are all barred" }
   }
 }
 
@@ -75,35 +89,14 @@ entity behind_house : room {
     name: "Behind House"
     description: "You are behind the white house.  In one corner of the house there is a small window which is slightly ajar."
   }
+  exits {
+    west: { msg: "The window is closed" }
+    north: $north_of_house
+    south: $south_of_house
+  }
 }
 
 # !set $behind_house.mua.id "behind_house"
-
-entity west_of_house_north : exit {  
-  location { in: $west_of_house } portal { dir: "north" to: $north_of_house } }
-entity west_of_house_south : exit {  
-  location { in: $west_of_house } portal { dir: "south" to: $south_of_house } }
-
-entity north_of_house_east : exit {  
-  location { in: $north_of_house } portal { dir: "east" to: $behind_house } }
-entity north_of_house_south : exit {  
-  location { in: $north_of_house } portal { dir: "south" msg: "The windows are all barred" } }
-
-entity south_of_house_west : exit {  
-  location { in: $south_of_house } portal { dir: "west" to: $west_of_house } }
-entity south_of_house_east : exit {  
-  location { in: $south_of_house } portal { dir: "east" to: $behind_house } }
-entity south_of_house_north : exit {  
-  location { in: $south_of_house } portal { dir: "north" msg: "The windows are all barred" } }
-
-
-entity behind_house_west : exit {  
-  location { in: $behind_house } portal { dir: "west" msg: "The window is closed" } }
-entity behind_house_north : exit {  
-  location { in: $behind_house } portal { dir: "north" to: $north_of_house } }
-entity behind_house_south : exit {  
-  location { in: $behind_house } portal { dir: "south" to: $south_of_house } }
-
 
 # ==========
 # Items

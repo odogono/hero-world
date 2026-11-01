@@ -15,6 +15,7 @@ import {
   createScriptRunner,
   type ScriptRunner
 } from './scripts/runner';
+import { expandExits } from './world/exits';
 
 const log = createLog('mua-world');
 
@@ -72,6 +73,7 @@ export class MuaWorld {
         throw error;
       }
       log.info(`Loaded main EDL from ${mainPath}`);
+      expandExits(this.world);
     }
 
     // under `bun test`, a system's error fails the test that caused it

@@ -60,7 +60,23 @@ export const DIRECTIONS = [
   'down',
   'in',
   'out'
-];
+] as const;
+
+/** The direction that leads back the way you came */
+export const OPPOSITE_DIRECTIONS: Record<string, string> = {
+  down: 'up',
+  east: 'west',
+  in: 'out',
+  north: 'south',
+  northeast: 'southwest',
+  northwest: 'southeast',
+  out: 'in',
+  south: 'north',
+  southeast: 'northwest',
+  southwest: 'northeast',
+  up: 'down',
+  west: 'east'
+};
 
 /** Words dropped from noun phrases: `get the lamp` targets `lamp` */
 export const ARTICLES = ['a', 'an', 'the'];
