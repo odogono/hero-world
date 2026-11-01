@@ -231,15 +231,17 @@ Reference
       );
     }
 
+// Commas between elements are optional, as between component properties
 Array
-  = '[' _ first:Value tail:(_ ',' _ Value)* _ ']' {
+  = '[' _ first:Value tail:(_ ','? _ Value)* _ (',' _)? ']' {
       return [first, ...tail.map(t => t[3])];
     }
   / '[' _ ']' { return []; }
 
-// JSON-like object literal for property values
+// JSON-like object literal for property values; commas between pairs are
+// optional, as between component properties
 Object
-  = '{' _ head:Pair tail:(_ ',' _ Pair)* _ '}' {
+  = '{' _ head:Pair tail:(_ ','? _ Pair)* _ (',' _)? '}' {
       const out: Record<string, unknown> = {};
       out[head[0]] = head[1];
       for (const t of tail) {

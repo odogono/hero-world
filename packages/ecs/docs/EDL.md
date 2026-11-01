@@ -6,6 +6,7 @@ EDL is a compact, declarative syntax for defining atoms (reusable templates), en
 
 - Define reusable data with `atom` blocks; define entities with `entity` blocks.
 - Atoms and entities contain component blocks: `componentName { key: value ... }`.
+- A value can be an object or array, as in JSON, but commas between entries are optional: `props: { to: $hall oneWay: true tags: ["a" "b"] }`.
 - Atoms and entities can extend one or more bases using `:`. Rightmost base wins on conflicts.
 - Inline component schemas can be declared with `def <name> { ... }`.
 - Lines starting with `!` are commands executed after parsing; see `src/edl/COMMANDS.md`.
