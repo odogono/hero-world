@@ -406,12 +406,15 @@ export const createEcsTalk = <TComponents extends Components>(
     if (existing) {
       return existing;
     }
-    const created = group.object(entityKind, String(eid), { eid });
+    // The parent is set as the Handle is made, so a Script that reaches the
+    // entity inside a Run can send to it in that Run (odgn-talk ADR 0152).
+    const created = group.object(
+      entityKind,
+      String(eid),
+      { eid },
+      { parent: parentOfEntity(eid) }
+    );
     handles.set(eid, created);
-    const parent = parentOfEntity(eid);
-    if (parent) {
-      group.setParent(created, parent);
-    }
     return created;
   };
 
@@ -466,26 +469,12 @@ export const createEcsTalk = <TComponents extends Components>(
   /**
    * Drop the Handles of entities whose deletion has been flushed. One only
    * marked for deletion stays, and reads as Nothing until it is dropped.
-   *
-   * Then make a Handle for every live entity built from a scripted atom.
-   * `setParent` is queued Host input that applies when the next Pump admits
-   * it, so a Handle first made inside a Run has no Message Path for that
-   * Run, and a `send` to it is lost. Making them here, before the Pump,
-   * means a Script can always message an entity it reaches.
    */
   const sync = () => {
     for (const [eid, obj] of handles) {
       if (world.get(eid) === null) {
         handles.delete(eid);
         group.dispose(obj);
-      }
-    }
-    if (atomObjects.size === 0) {
-      return;
-    }
-    for (const eid of world.entityLineage.keys()) {
-      if (!handles.has(eid) && isLive(eid) && parentOfEntity(eid)) {
-        handle(eid);
       }
     }
   };

@@ -246,6 +246,46 @@ describe('ecs-talk', () => {
     expect(events[0]!.payload).toEqual({ actor: hero, text: 'moved 1' });
   });
 
+  it('routes a send to a Handle first made inside the same Run', async () => {
+    const { byName, ecsTalk, loop, world } = await setup();
+    world.executeEDL(`
+      entity yard {
+        meta { props: { id: "yard" } }
+      }
+
+      entity rat: thing {
+        meta { props: { id: "rat" } }
+        location { in: $yard }
+      }
+    `);
+    ecsTalk.loadAtomScript(
+      'thing',
+      talk`
+        on scan place
+          send hail to element 1 of place
+        end scan
+
+        on hail
+          show the target, "hailed"
+        end hail
+      `
+    );
+
+    // The rat's Handle is first made by `element 1 of place`, inside the
+    // hero's Run.
+    ecsTalk.request(
+      byName('hero'),
+      'scan',
+      ecsTalk.handle(byName('yard')).value
+    );
+    tick(loop);
+
+    const events = getAllEvents(world as never, TALK_SHOW_EVENT);
+    expect(events.map(e => e.payload)).toEqual([
+      { actor: byName('rat'), text: 'hailed' }
+    ]);
+  });
+
   it('drops the Handle of a deleted entity', async () => {
     const { byName, ecsTalk, loop, world } = await setup();
     ecsTalk.loadAtomScript(

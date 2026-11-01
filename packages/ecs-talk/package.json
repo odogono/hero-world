@@ -15,7 +15,7 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "@northtalk/ts": "^0.5.1",
+    "@northtalk/ts": "^0.6.0",
     "odgn-ecs": "workspace:*",
     "odgn-helpers": "workspace:*"
   },
