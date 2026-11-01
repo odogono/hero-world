@@ -15,6 +15,7 @@ import { getEntity } from '../queries/entity';
 import { findPlayerByConnection } from '../queries/player';
 import { getInScope } from '../queries/scope';
 import { createMuaSystem } from './create-mua-system';
+import { tell } from './output';
 
 type PlayerUpdate = {
   lastCommandAt?: string;
@@ -34,7 +35,12 @@ export const parseSystem = createMuaSystem(
 
     const finish = (message?: string) => {
       if (message !== undefined) {
-        world.create({ outputEvent: { broadcast: false, message, wsId } });
+        // before the player is known, answer the connection itself
+        if (player) {
+          tell(world, player.id, message);
+        } else {
+          world.create({ outputEvent: { message, wsId } });
+        }
       }
       if (player && Object.keys(update).length > 0) {
         const target = getEntity(world, player.id, ['player'], true);

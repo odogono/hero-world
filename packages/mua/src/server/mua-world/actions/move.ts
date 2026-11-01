@@ -46,11 +46,9 @@ export const moveAction = (ctx: ActionContext): ActionOutcome => {
 
   return {
     broadcasts: [
-      ...(left
-        ? [{ exclude: playerId, message: left, roomId: currentRoom }]
-        : []),
+      ...(left ? [{ exclude: playerId, message: left, to: currentRoom }] : []),
       ...(arrived
-        ? [{ exclude: playerId, message: arrived, roomId: exit.portal.to }]
+        ? [{ exclude: playerId, message: arrived, to: exit.portal.to }]
         : [])
     ],
     kind: 'done',

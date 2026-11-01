@@ -1,7 +1,26 @@
+import type { EntityId } from 'odgn-ecs/types';
+import type { World } from 'odgn-ecs/world';
+
+import type { MuaComponents } from '../coms';
 import type { MuaConnection } from '../index';
 import { getEntity } from '../queries/entity';
 import { findPlayersIn } from '../queries/player';
 import { createMuaSystem } from './create-mua-system';
+
+/** The connections that hear something said to an entity */
+const listenersOf = (
+  world: World<MuaComponents>,
+  to: EntityId,
+  exclude: EntityId | undefined
+) => {
+  const player = getEntity(world, to, ['player']);
+  const players = player ? [player] : findPlayersIn(world, to);
+  return players
+    .filter(p => p.id !== exclude)
+    .map(p => getEntity(world, p.player.connectedId, ['connected']))
+    .map(conn => conn?.connected.wsId)
+    .filter(Boolean);
+};
 
 export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
   createMuaSystem(
@@ -10,8 +29,7 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
         return;
       }
 
-      const { broadcast, exclude, message, room, roomId, wsId } =
-        entity.outputEvent;
+      const { exclude, message, room, to, wsId } = entity.outputEvent;
       // a room view rides along with the text for clients that show it
       const payload = JSON.stringify({
         data: message,
@@ -19,27 +37,16 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
         success: true
       });
 
-      if (broadcast && roomId) {
-        // Send to all players in room
-        for (const player of findPlayersIn(world, roomId)) {
-          if (player.id === exclude) {
-            continue;
-          }
-          const conn = getEntity(world, player.player.connectedId, [
-            'connected'
-          ]);
-          const ws = conn && connections.get(conn.connected.wsId);
-          ws?.send(payload);
-        }
-      } else {
-        // Send to specific connection
-        const ws = connections.get(wsId);
-        if (ws) {
-          ws.send(payload);
+      const wsIds =
+        to === undefined || to === null
+          ? [wsId]
+          : listenersOf(world, to, exclude ?? undefined);
+      for (const id of wsIds) {
+        if (id) {
+          connections.get(id)?.send(payload);
         }
       }
 
-      // Remove output event
       world.delete(entity);
     },
     {

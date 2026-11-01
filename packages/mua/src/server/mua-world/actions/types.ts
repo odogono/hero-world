@@ -17,11 +17,12 @@ export type ActionContext = {
   world: World<MuaComponents>;
 };
 
+/** A message for everyone inside an entity (usually a room) */
 export type Broadcast = {
-  /** Someone in the room who should not receive the message */
+  /** Someone inside who should not receive the message */
   exclude?: EntityId;
   message: string;
-  roomId: EntityId;
+  to: EntityId;
 };
 
 /** What the player can see of a room, sent with `look` for clients to show */
