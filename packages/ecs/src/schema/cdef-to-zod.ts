@@ -1,6 +1,6 @@
 import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
 
-import type { CDef, CDefColumnInfo, CDefColumnType } from '@types';
+import type { CDef, CDefColumnInfo, CDefColumnType } from '../types';
 
 const pascalCase = (str: string): string =>
   (toSnakeCase(str) || str)

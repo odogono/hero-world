@@ -1,5 +1,4 @@
-import type { CDefColumnInfo, CDefColumnType } from '@types';
-
+import type { CDefColumnInfo, CDefColumnType } from '../types';
 import { getDefault } from './defaults';
 import type { ColumnBuilder } from './types';
 

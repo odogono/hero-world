@@ -1,9 +1,8 @@
 import { toCamelCase } from 'odgn-helpers/string';
 
-import type { World } from '@world';
-
 import { isEntity } from '../entity';
 import type { Components } from '../types';
+import type { World } from '../world';
 import type { Database, LoadFromJSONOptions, SaveToJSONOptions } from './index';
 import { q } from './sql-helpers';
 

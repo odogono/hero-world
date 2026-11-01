@@ -5,17 +5,16 @@ import {
   applyComponentDefaults,
   makeTrackedComponent,
   removeComponent
-} from '@component';
+} from '../component';
+import { needsQuoting, q } from '../db/sql-helpers';
+import { SQLiteError } from '../error';
 import type {
   Components,
   Entity,
   EntityWithComponents,
   GenericEntity
-} from '@types';
-import type { World } from '@world';
-
-import { needsQuoting, q } from '../db/sql-helpers';
-import { SQLiteError } from '../error';
+} from '../types';
+import type { World } from '../world';
 
 // Overloads for type inference
 type CreateEntityOverloads = {

@@ -1,10 +1,9 @@
 import { getUnixTime } from 'odgn-helpers/time';
 
-import { defineComponent, s } from '@component';
-import { createSystem } from '@system';
-import type { Components, EntityWithComponents, World } from '@types';
-
+import { defineComponent, s } from '../component';
+import { createSystem } from '../system';
 import type { EntityExecProps } from '../system/types';
+import type { Components, EntityWithComponents, World } from '../types';
 
 // Event component definition
 export const eventComponent = defineComponent({

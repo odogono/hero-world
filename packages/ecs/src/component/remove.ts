@@ -1,4 +1,4 @@
-import type { Components, GenericEntity } from '@types';
+import type { Components, GenericEntity } from '../types';
 
 /**
  * Mark a component for deferred deletion (will be deleted on next flush)

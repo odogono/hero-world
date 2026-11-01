@@ -5,10 +5,9 @@ import {
   s,
   toTableName,
   type InferComponentType
-} from '@component';
-import type { Database } from '@db';
-import type { CDef } from '@types';
-
+} from '../component';
+import type { Database } from '../db';
+import type { CDef } from '../types';
 import { cdefToSql } from './cdef-to-sql';
 import { hashComponentDefinition } from './component-hash';
 

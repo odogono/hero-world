@@ -2,11 +2,10 @@ import { dirname, resolve } from 'node:path';
 
 import { toCamelCase } from 'odgn-helpers/string';
 
-import { addComponents } from '@component';
-import { parseEDL } from '@edl';
-import type { Components } from '@types';
-import { World } from '@world';
-
+import { parseEDL } from '.';
+import { addComponents } from '../component';
+import type { Components } from '../types';
+import { World } from '../world';
 import {
   EDLCircularReferenceError,
   EDLExecutionError,

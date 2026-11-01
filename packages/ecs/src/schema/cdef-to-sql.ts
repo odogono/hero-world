@@ -1,9 +1,8 @@
 import { toSnakeCase } from 'odgn-helpers/string';
 
-import { defToTableName } from '@component';
-import type { CDef, CDefColumnInfo } from '@types';
-
+import { defToTableName } from '../component';
 import { q } from '../db/sql-helpers';
+import type { CDef, CDefColumnInfo } from '../types';
 import type { StatementOptions } from './types';
 
 export type CDefToSqlInput = CDef | CDef[] | CDef[][];

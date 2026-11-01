@@ -1,4 +1,4 @@
-import type { CDefColumnInfo, CDefColumnType } from '@types';
+import type { CDefColumnInfo, CDefColumnType } from '../types';
 
 export type ColumnBuilder<
   TType extends CDefColumnType,

@@ -1,23 +1,6 @@
 import { createLog } from 'odgn-helpers/log';
 
 import {
-  DatabaseType,
-  createDatabase,
-  type CreateDatabaseOptions,
-  type Database,
-  type LoadFromJSONOptions,
-  type SaveToJSONOptions,
-  type Statement
-} from '@db';
-import { executeEDL, type ExecuteOptions } from '@edl';
-import { convertKeysToSnakeCase } from '@helpers/convert-keys';
-import {
-  initializeComponentMetadataTable,
-  updateComponentMetadata,
-  validateComponentCompatibility
-} from '@schema/component-metadata';
-
-import {
   addComponent,
   applyComponentDefaults,
   makeTrackedComponent,
@@ -25,9 +8,19 @@ import {
   toTableName
 } from '../component';
 import {
+  DatabaseType,
+  createDatabase,
+  type CreateDatabaseOptions,
+  type Database,
+  type LoadFromJSONOptions,
+  type SaveToJSONOptions,
+  type Statement
+} from '../db';
+import {
   loadFromJSON as sharedLoadFromJSON,
   saveToJSON as sharedSaveToJSON
 } from '../db/json-functions';
+import { executeEDL, type ExecuteOptions } from '../edl';
 import { parseDefsFromEDL } from '../edl/helpers';
 import {
   queryEntities,
@@ -41,11 +34,17 @@ import {
   createEntityNotFoundError,
   createWorldNotInitializedError
 } from '../error';
+import { convertKeysToSnakeCase } from '../helpers/convert-keys';
 import {
   cdefToSqlCreate,
   cdefToSqlInsert,
   cdefToSqlUpdate
 } from '../schema/cdef-to-sql';
+import {
+  initializeComponentMetadataTable,
+  updateComponentMetadata,
+  validateComponentCompatibility
+} from '../schema/component-metadata';
 import type {
   CDef,
   ComponentDef,
@@ -473,10 +472,13 @@ export class World<TComponents extends Components> {
    * @param options
    * @returns
    */
-  query<W extends readonly (keyof TComponents)[]>(
+  query<W extends readonly (keyof TComponents)[] = []>(
     options: QueryOptions<TComponents> & { with?: W }
-  ) {
-    return queryEntity(this, options);
+  ): EntityWithComponents<TComponents, W[number]> | null {
+    return queryEntity(this, options) as EntityWithComponents<
+      TComponents,
+      W[number]
+    > | null;
   }
 
   /**
@@ -484,10 +486,13 @@ export class World<TComponents extends Components> {
    * @param options
    * @returns
    */
-  queryAll(
-    options?: QueryOptions<TComponents> & { with?: (keyof TComponents)[] }
-  ) {
-    return queryEntities(this, options);
+  queryAll<W extends readonly (keyof TComponents)[] = []>(
+    options?: QueryOptions<TComponents> & { with?: W }
+  ): EntityWithComponents<TComponents, W[number]>[] {
+    return queryEntities(this, options) as EntityWithComponents<
+      TComponents,
+      W[number]
+    >[];
   }
 
   /**
@@ -495,8 +500,8 @@ export class World<TComponents extends Components> {
    * @param options
    * @returns
    */
-  queryIterator(
-    options: QueryOptions<TComponents> & { with: (keyof TComponents)[] }
+  queryIterator<W extends readonly (keyof TComponents)[]>(
+    options: QueryOptions<TComponents> & { with: W }
   ) {
     return queryEntitiesIterator(this, options);
   }
