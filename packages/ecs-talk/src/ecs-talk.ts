@@ -8,6 +8,7 @@ import {
   Decimal,
   ScriptError,
   clockCapability,
+  compileLibrary,
   defineCapability,
   defineObjectKind,
   fromValue,
@@ -20,6 +21,7 @@ import {
   type Grant,
   type Group,
   type HostObject,
+  type Library,
   type Limits,
   type ObjectKind,
   type PropDef,
@@ -448,6 +450,26 @@ export const createEcsTalk = <TComponents extends Components>(
     }
   };
 
+  /**
+   * Register a NorthTalk Library: stateless shared code that Scripts, and
+   * other Libraries, import with `use name from library`. Add a Library
+   * before the Scripts that use it. `imports` holds the Libraries it uses.
+   * It may call the `world`, `clock` and `timer` Capabilities of the Script
+   * that calls it.
+   */
+  const addLibrary = (
+    libraryName: string,
+    source: string,
+    imports: readonly Library[] = []
+  ): Library => {
+    const library = compileLibrary(
+      { name: libraryName, source, version: '1' },
+      imports
+    );
+    group.addLibrary(library);
+    return library;
+  };
+
   /** Load a Script owned by an atom; entities built from it climb to it */
   const loadAtomScript = (
     atom: string,
@@ -544,6 +566,7 @@ export const createEcsTalk = <TComponents extends Components>(
   };
 
   return {
+    addLibrary,
     atomKind,
     decide,
     deliver,

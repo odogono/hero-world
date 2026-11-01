@@ -24,6 +24,7 @@ entity strongbox : chest {
   described { name: "Strongbox" description: "An iron strongbox." }
   noun { words: ["box"] }
   lockable { is_locked: true lock: "strongbox" }
+  messages { msg: { lock: "The strongbox's bolts slide home." } }
   location { in: $west_of_house }
 }
 

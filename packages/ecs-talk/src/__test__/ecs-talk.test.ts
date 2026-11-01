@@ -452,3 +452,39 @@ describe('script owners', () => {
     ]);
   });
 });
+
+describe('Libraries', () => {
+  it('lets a Script use a function from a Library', async () => {
+    const world = await createWorld([
+      metaComponent,
+      statsComponent,
+      itemComponent,
+      locationComponent,
+      eventComponent
+    ]);
+    world.executeEDL(EDL);
+    const ecsTalk = createEcsTalk(world);
+    ecsTalk.addLibrary(
+      'health',
+      `function healthOf thing
+  return the hp of the stats of thing
+end healthOf`
+    );
+    ecsTalk.loadAtomScript(
+      'person',
+      `use healthOf from health
+
+on probe
+  return healthOf(the target)
+end probe`
+    );
+    const hero = world
+      .queryAll({ with: ['meta'] })
+      .find(e => (e.meta.props as { id: string }).id === 'hero')!.id;
+
+    const reply = ecsTalk.request(hero, 'probe');
+    ecsTalk.pump();
+
+    expect(show(await reply.result)).toBe('20');
+  });
+});
