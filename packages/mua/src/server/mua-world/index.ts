@@ -17,6 +17,8 @@ import {
   type ScriptRunner
 } from './scripts/runner';
 import { tell } from './systems/output';
+import { createTimerSystem } from './systems/timerSystem';
+import { createWorldClock, type WorldClock } from './world/clock';
 import { expandExits } from './world/exits';
 import {
   createLifecycle,
@@ -49,6 +51,7 @@ export class MuaWorld {
   private scripts: ScriptRunner = NO_SCRIPTS;
   places: Places | null = null;
   lifecycle: Lifecycle | null = null;
+  clock: WorldClock | null = null;
   private isTicking = false;
   private connections = new Map<string, MuaConnection>();
 
@@ -94,7 +97,8 @@ export class MuaWorld {
     });
 
     // NorthTalk Scripts, attached to atoms by their EDL `script` component
-    const ecsTalk = createEcsTalk(this.world);
+    this.clock = createWorldClock(this.world, this.places.system);
+    const ecsTalk = createEcsTalk(this.world, { clock: this.clock.micros });
     const scriptedAtoms = await loadScripts(this.world, ecsTalk);
     const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
     this.scripts = scripts;
@@ -109,8 +113,13 @@ export class MuaWorld {
 
     // Each system's priority sets its order: highest runs first. The Script
     // Group's Pump runs last; `tick` runs extra passes for its replies.
+    this.loop.addSystem('clock', this.clock.system);
     this.loop.addSystem('input', inputSystem);
     this.loop.addSystem('parse', parseSystem);
+    this.loop.addSystem(
+      'timers',
+      createTimerSystem(this.clock, this.lifecycle, scripts, this.places)
+    );
     this.loop.addSystem('action', createActionSystem(scripts));
     this.loop.addSystem('show', showSystem);
     this.loop.addSystem('output', createOutputSystem(this.connections));

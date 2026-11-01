@@ -1,0 +1,30 @@
+# A small world for the world clock and timers
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+# Chimes on a timer, and lights its candles a while after the world starts
+atom belfry {
+  script { src: "scripts/belfry.talk" }
+}
+
+entity west_of_house : room belfry {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Belfry" description: "A bell hangs overhead." }
+  exits { east: $hall }
+  timers { every: { chime: 10 reset: 60 } }
+}
+
+entity hall : room {
+  described { name: "Hall" description: "A long hall." }
+}
+
+entity lamp : item {
+  described { name: "Lamp" description: "A brass lamp." }
+  location { in: $west_of_house }
+}
