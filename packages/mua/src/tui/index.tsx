@@ -13,6 +13,7 @@ import { useCommandHistory } from './hooks/use-command-history';
 import { useDebugMode } from './hooks/use-debug-mode';
 import { useGameState } from './hooks/use-game-state';
 import { useWebSocket } from './hooks/use-websocket';
+import { mask, unmask } from './utils/masked-input';
 import { KNOWN_VERBS, completeVerb } from './utils/verb-completer';
 
 const log = createLog('tui');
@@ -26,8 +27,10 @@ export const App = () => {
   const [debugPanelVisible, setDebugPanelVisible] = useState(false);
   // the server's own verbs replace these once it sends them on login
   const [verbs, setVerbs] = useState<string[]>(KNOWN_VERBS);
-  // the server asked for a password: keep the next line out of the history
+  // the server asked for a password: mask it, and keep it out of the history
   const isPasswordNextRef = useRef(false);
+  const [isMasked, setIsMasked] = useState(false);
+  const passwordRef = useRef('');
 
   // Initialize hooks
   const gameState = useGameState();
@@ -42,6 +45,8 @@ export const App = () => {
       }
       // `look` sends the room as data too: prefer it to parsing the text
       isPasswordNextRef.current = data?.prompt === 'password';
+      setIsMasked(isPasswordNextRef.current);
+      passwordRef.current = '';
       if (data?.verbs) {
         setVerbs(data.verbs);
       }
@@ -63,7 +68,10 @@ export const App = () => {
   );
 
   const onSubmit = useCallback(
-    (value: string) => {
+    (shown: string) => {
+      const value = isPasswordNextRef.current ? passwordRef.current : shown;
+      passwordRef.current = '';
+      setIsMasked(false);
       const trimmed = value.trim();
       if (!trimmed) {
         return;
@@ -109,13 +117,19 @@ export const App = () => {
 
   const handleValueChange = useCallback(
     (newValue: string) => {
+      // a password shows only mask characters; the real text is kept aside
+      if (isMasked) {
+        passwordRef.current = unmask(passwordRef.current, newValue);
+        setValue(mask(passwordRef.current));
+        return;
+      }
       setValue(newValue);
       // Reset history index when user types
       if (newValue !== value) {
         commandHistory.reset();
       }
     },
-    [commandHistory, value]
+    [commandHistory, isMasked, value]
   );
 
   useKeyboard(key => {

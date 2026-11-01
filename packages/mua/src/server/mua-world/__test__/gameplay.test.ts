@@ -23,7 +23,7 @@ describe('Gameplay', () => {
     const output = send(conn, 'look');
 
     expect(output).toContain('West of house');
-    expect(output).toContain('Mailbox');
+    expect(output).toContain('the mailbox');
     expect(output).toContain('Exits: north, south');
   });
 
@@ -94,7 +94,7 @@ describe('Gameplay', () => {
     const conn = await login('bob');
 
     expect(send(conn, 'look')).toMatch(
-      /^West of house\n.+\n\nThere is: Mailbox\nExits: north, south$/
+      /^West of house\n.+\n\nThere is: the mailbox\nExits: north, south$/
     );
   });
 

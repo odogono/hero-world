@@ -9,13 +9,17 @@ import {
   type RoomView
 } from './types';
 
+/** Things read as "the mailbox", as they do everywhere else */
+const the = (names: string[]) =>
+  names.map(name => `the ${name.toLowerCase()}`).join(', ');
+
 /** The room as text, in the order a player reads it */
 const describeRoom = (room: RoomView, things: { containers: string[] }) => {
   const items = room.items.filter(i => !things.containers.includes(i));
   const lines = [
-    items.length > 0 ? `You see: ${items.join(', ')}` : undefined,
+    items.length > 0 ? `You see: ${the(items)}` : undefined,
     things.containers.length > 0
-      ? `There is: ${things.containers.join(', ')}`
+      ? `There is: ${the(things.containers)}`
       : undefined,
     room.players.length > 0
       ? `Also here: ${room.players.join(', ')}`
