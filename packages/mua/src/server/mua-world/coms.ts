@@ -85,6 +85,14 @@ const exitsDef = defineComponent({
   } satisfies Record<(typeof DIRECTIONS)[number], unknown>
 });
 
+/** Where a thing belongs, so a reset can put it back (see lifecycle.ts) */
+const homeDef = defineComponent({
+  id: 'home',
+  schema: {
+    in: s.entityId()
+  }
+});
+
 /** The words a player can use to refer to an entity, besides its name */
 const nounDef = defineComponent({
   id: 'noun',
@@ -155,7 +163,9 @@ const playerDef = defineComponent({
     lastTargetId: s.entityId().optional(),
     /** A command waiting for the player to say which object they meant */
     name: s.string(),
-    pending: s.json().optional()
+    pending: s.json().optional(),
+    /** The room a player was in when they left, to return them to it */
+    returnTo: s.entityId().optional()
   }
 });
 
@@ -220,6 +230,7 @@ export const defs = [
   locationComponent,
   portalDef,
   exitsDef,
+  homeDef,
   describedDef,
   nounDef,
   responsesDef,
