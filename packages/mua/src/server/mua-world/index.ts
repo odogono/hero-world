@@ -12,8 +12,19 @@ import { createLog } from 'odgn-helpers/log';
 
 import { listVerbs, vocabularyOf } from './commands/verbs';
 import { defs, type MuaComponents } from './coms';
+import {
+  MAX_LOGIN_ATTEMPTS,
+  MIN_PASSWORD_LENGTH,
+  hashPassword,
+  isValidName,
+  verifyPassword
+} from './login';
 import { getEntity } from './queries/entity';
-import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
+import {
+  findConnectionByWsId,
+  findPlayerByConnection,
+  findPlayerByName
+} from './queries/player';
 import { findRoomByMetaId } from './queries/room';
 import { createCommandContexts } from './scripts/commands';
 import { loadScripts } from './scripts/load';
@@ -52,6 +63,8 @@ type MuaWorldOptions = {
    */
   dbPath?: string;
   mainEDL?: string;
+  /** bcrypt's cost for hashing passwords (see login.ts) */
+  passwordCost?: number;
 };
 
 export class MuaWorld {
@@ -236,9 +249,113 @@ export class MuaWorld {
     });
   }
 
+  /**
+   * Takes a login step from a connection. A name is asked for first; then a
+   * returning player's password, or a new player's choice of one. A client
+   * may send both at once, as `{ data: { username, password } }`.
+   */
+  private async authenticate(
+    conn: MuaConnection,
+    command: MuaCommand
+  ): Promise<void> {
+    const world = this.world;
+    const connection = world?.query({
+      args: [conn.id],
+      asProxy: true,
+      where: 'connected.ws_id = ?1',
+      with: ['authenticating', 'connected']
+    });
+    if (!world || !connection) {
+      return;
+    }
+    const reply = (data: string, extra: Record<string, unknown> = {}) =>
+      conn.send(JSON.stringify({ data, success: true, ...extra }));
+    const askPassword = (data: string) => reply(data, { prompt: 'password' });
+    const setState = (state: Partial<typeof connection.authenticating>) => {
+      connection.authenticating = { ...connection.authenticating, ...state };
+      world.flush();
+    };
+    const credentialsOf = (name: string) => {
+      const player = findPlayerByName(world, name);
+      return player && getEntity(world, player.id, ['credentials']);
+    };
+
+    const both =
+      typeof command === 'object' && command.data?.username !== undefined
+        ? command.data
+        : undefined;
+    const text = (
+      both?.username ??
+      (typeof command === 'string' ? command : (command.text ?? ''))
+    ).trim();
+    const { attempts, stage, username } = connection.authenticating;
+
+    // a name, or a name and password together
+    if (both || stage === 'name' || !username) {
+      if (!isValidName(text)) {
+        reply(
+          'A name is 2 to 20 letters, digits, - or _, starting with a letter. Please enter your username:'
+        );
+        return;
+      }
+      const credentials = credentialsOf(text);
+      if (both?.password !== undefined) {
+        setState({
+          stage: credentials ? 'password' : 'newPassword',
+          username: text
+        });
+        return this.authenticate(conn, both.password);
+      }
+      setState({
+        stage: credentials ? 'password' : 'newPassword',
+        username: text
+      });
+      askPassword(
+        credentials
+          ? `Password for ${text}:`
+          : `Welcome, ${text}! Choose a password (at least ${MIN_PASSWORD_LENGTH} characters):`
+      );
+      return;
+    }
+
+    if (stage === 'newPassword') {
+      if (text.length < MIN_PASSWORD_LENGTH) {
+        askPassword(
+          `A password needs at least ${MIN_PASSWORD_LENGTH} characters. Choose a password:`
+        );
+        return;
+      }
+      const hash = await hashPassword(text, {
+        cost: this.options.passwordCost
+      });
+      await this.handleLogin(conn, username, hash);
+      return;
+    }
+
+    // a returning player's password
+    const credentials = credentialsOf(username);
+    if (
+      credentials &&
+      (await verifyPassword(text, credentials.credentials.hash))
+    ) {
+      await this.handleLogin(conn, username);
+      return;
+    }
+    const tries = (attempts ?? 0) + 1;
+    if (tries >= MAX_LOGIN_ATTEMPTS) {
+      reply('Too many wrong passwords. Goodbye.');
+      conn.close();
+      return;
+    }
+    setState({ attempts: tries });
+    askPassword('Wrong password. Password:');
+  }
+
   private async handleLogin(
     conn: MuaConnection,
-    username: string
+    username: string,
+    /** A newly chosen password, hashed, to keep for the player */
+    newHash?: string
   ): Promise<boolean> {
     try {
       log.debug('handleLogin start', username);
@@ -256,7 +373,6 @@ export class MuaWorld {
       }
 
       // Find or create player
-      const { findPlayerByName } = await import('./queries/player');
       const { findRoomByMetaId } = await import('./queries/room');
 
       let player = findPlayerByName(this.world!, username);
@@ -271,6 +387,7 @@ export class MuaWorld {
             capacity: 10,
             isClosed: false
           },
+          ...(newHash ? { credentials: { hash: newHash } } : {}),
           ...(startRoom ? { location: { in: startRoom.id } } : {}),
           player: {
             connectedId: connectionEntity.id,
@@ -280,6 +397,10 @@ export class MuaWorld {
         log.debug('Player created', player?.id);
       } else {
         player.player.connectedId = connectionEntity.id;
+        if (newHash) {
+          // a player from before passwords chooses one now
+          Object.assign(player, { credentials: { hash: newHash } });
+        }
         this.bringBack(player.id);
         log.debug('Player reconnected', player.id);
       }
@@ -341,16 +462,11 @@ export class MuaWorld {
       !!connectionEntity.authenticated
     );
 
-    // Handle login if authenticating
+    // Still logging in: a name, then a password
     if (connectionEntity.authenticating && !connectionEntity.authenticated) {
-      const username =
-        typeof command === 'string'
-          ? command
-          : command.data?.username || command.username;
-      log.debug('About to call handleLogin', username);
-      // Fire and forget - don't await to keep the method synchronous
-      this.handleLogin(conn, username as string).catch(error => {
-        log.error('handleLogin error', error);
+      // Fire and forget - hashing is async; keep this method synchronous
+      this.authenticate(conn, command).catch(error => {
+        log.error('authenticate error', error);
       });
       return true;
     }

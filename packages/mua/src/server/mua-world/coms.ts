@@ -13,10 +13,24 @@ const connectedDef = defineComponent({
   }
 });
 
+/**
+ * A connection still logging in (see login.ts): `stage` is what it was last
+ * asked for, a `name`, its `password`, or a `newPassword` to choose.
+ */
 const authenticatingDef = defineComponent({
   id: 'authenticating',
   schema: {
-    attempts: s.number().default(0)
+    attempts: s.number().default(0),
+    stage: s.string().default('name'),
+    username: s.string().optional()
+  }
+});
+
+/** A player's password, hashed */
+const credentialsDef = defineComponent({
+  id: 'credentials',
+  schema: {
+    hash: s.string()
   }
 });
 
@@ -322,6 +336,7 @@ export const defs = [
   connectedDef,
   authenticatingDef,
   authenticatedDef,
+  credentialsDef,
   playerDef,
   inputEventDef,
   commandEventDef,

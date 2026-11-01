@@ -30,7 +30,8 @@ const createConnection = (id: string): TestConnection => {
  * with helpers to log players in and send commands.
  */
 export const openTestWorld = async (mainEDL?: string, dbPath?: string) => {
-  const muaWorld = new MuaWorld({ dbPath, mainEDL });
+  // the cheapest password hashing, so logging in doesn't slow the tests
+  const muaWorld = new MuaWorld({ dbPath, mainEDL, passwordCost: 4 });
   await muaWorld.open();
   clearInterval(muaWorld.updateLoopInterval!);
 
@@ -43,7 +44,9 @@ export const openTestWorld = async (mainEDL?: string, dbPath?: string) => {
   const login = async (name: string) => {
     const conn = createConnection(`ws-${name}`);
     muaWorld.onConnectionOpened(conn);
-    muaWorld.onConnectionCommand(conn, { data: { username: name } });
+    muaWorld.onConnectionCommand(conn, {
+      data: { password: `secret-${name}`, username: name }
+    });
     // handleLogin is fire-and-forget; wait for its welcome message
     for (let ii = 0; ii < 50 && conn.messages.length === 0; ii++) {
       await Bun.sleep(1);
