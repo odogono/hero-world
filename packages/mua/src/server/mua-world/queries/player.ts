@@ -15,7 +15,7 @@ export const findConnectionByWsId = (
 export const findPlayerByConnection = (
   world: World<MuaComponents>,
   wsId: string,
-  asProxy = false
+  asProxy = true
 ) => {
   const connection = findConnectionByWsId(world, wsId);
   if (!connection) {

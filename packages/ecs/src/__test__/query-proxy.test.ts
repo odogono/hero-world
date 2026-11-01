@@ -24,17 +24,37 @@ const createTestWorld = async () =>
   await createWorld([statsComponent, locationComponent]);
 
 describe('queryEntity proxied option', () => {
-  test('default snapshot: add via assignment does not persist', async () => {
+  test('default: add via assignment persists', async () => {
+    const world = await createTestWorld();
+    world.create({
+      statsProxyTest: { health: 100, level: 1, mana: 50 }
+    });
+    world.flush();
+
+    const e = world.query({ with: ['statsProxyTest'] });
+    e!.locationProxyTest = { name: 'Forest', region: 'North' };
+    world.flush();
+
+    const found = world.query({
+      with: ['statsProxyTest', 'locationProxyTest']
+    });
+    expect(found?.locationProxyTest).toEqual({
+      name: 'Forest',
+      region: 'North'
+    });
+  });
+
+  test('asProxy false: add via assignment does not persist', async () => {
     const world = await createTestWorld();
     const e = world.create({
       statsProxyTest: { health: 100, level: 1, mana: 50 }
     });
     world.flush();
 
-    const snap = world.query({ with: ['statsProxyTest'] });
+    const snap = world.query({ asProxy: false, with: ['statsProxyTest'] });
     expect(snap).toBeDefined();
 
-    // Assigning a new component on a snapshot should not persist
+    // Assigning a new component on a plain object should not persist
     snap!.locationProxyTest = { name: 'Forest', region: 'North' };
     world.flush();
 
