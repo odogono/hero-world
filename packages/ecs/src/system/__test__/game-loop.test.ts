@@ -490,6 +490,20 @@ describe('GameLoop', () => {
     expect(otherSystemExecuted).toBe(true);
   });
 
+  test('rethrows a system error when throwErrors is set', async () => {
+    const world = await createTestWorld();
+    const gameLoop = createGameLoop(world, { throwErrors: true });
+
+    gameLoop.addSystem(
+      'error-system',
+      createSystem(() => {
+        throw new TypeError('Type error');
+      })
+    );
+
+    expect(() => gameLoop.update(16.67)).toThrow('Type error');
+  });
+
   test('should handle system that throws string error', async () => {
     const world = await createTestWorld();
     const gameLoop = createGameLoop(world);

@@ -88,8 +88,10 @@ export const isEntity = (val: unknown): val is Entity => {
 
 export type QueryOptions<T extends Components> = {
   args?: unknown[];
-  // If true, wrap the returned entity/entities in a proxy that intercepts
-  // component add/remove via property assignment, similar to createEntity
+  /**
+   * Results are proxies, so assigning a component adds it and assigning
+   * null removes it (saved on flush). Pass false for plain objects.
+   */
   asProxy?: boolean;
   entity?: GenericEntity<T>;
   limit?: number;
@@ -443,7 +445,7 @@ export function queryEntity<T extends Components>(
     ? mapRowToEntity(world, componentsToInclude, row, options?.maybe)
     : null;
   stmt.finalize();
-  if (result && options?.asProxy) {
+  if (result && (options?.asProxy ?? true)) {
     result = asProxiedEntity(result as GenericEntity<T>) as typeof result;
   }
   return result;
@@ -465,7 +467,7 @@ export function queryEntities<T extends Components>(
   options?: QueryOptions<T>
 ) {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
-  const asProxy = options?.asProxy ?? false;
+  const asProxy = options?.asProxy ?? true;
 
   const rows = world.db.query(sql, args);
 
@@ -503,7 +505,7 @@ export function queryEntitiesIterator<T extends Components>(
 ) {
   const { args, componentsToInclude, sql } = buildQuery(world, options);
   const stmt = world.db.prepare(sql);
-  const asProxy = options?.asProxy ?? false;
+  const asProxy = options?.asProxy ?? true;
   let finalized = false;
 
   const finalize = () => {

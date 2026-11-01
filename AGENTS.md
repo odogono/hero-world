@@ -31,5 +31,5 @@ A Bun workspace of game libraries and the games built on them. Package `AGENTS.m
 - Files: `kebab-case.ts` for modules, `PascalCase.tsx` for React components.
 - For a lightweight Result, use `trycatch` from `odgn-helpers/try-catch`, which returns `[data, error]`.
 - Tests sit in `src/**/__test__/*.test.ts(x)` and use `bun:test`.
-- ECS changes and flush: `packages/ecs/docs/api.md`. In short, field writes on any query result are saved by `world.flush()`, but adding or removing a component by assignment needs `asProxy: true`.
+- ECS changes and flush: `packages/ecs/docs/api.md`.
 - Keep a change to one package when you can.

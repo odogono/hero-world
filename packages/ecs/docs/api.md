@@ -44,15 +44,15 @@ const stats = defineComponent({
 All of these were checked against the code:
 
 - **Field writes on any result are saved.** Every queried component is change-tracked, so `e.stats.hp = 7` then `flush()` writes it.
-- **Adding or removing a component by assignment needs a proxy.** `e.tag = {…}` and `e.tag = null` work on `world.create` results and on `asProxy: true` query results. On a plain query result the assignment is silently lost.
+- **Assigning a component adds it; assigning `null` removes it.** `world.create` and query results are proxies that turn `e.tag = {…}` into `addComponent`. With `asProxy: false` a query returns plain objects, and such an assignment is lost.
 - **Queries see unflushed changes.** Entities are cached in `world.entityCache`, so a later query returns the pending value until the next flush.
 - The tracking lives in `component/helpers/make-tracked.ts`, and the dirty set is `world.dirtyEntities`.
 
 ## Systems and the game loop: `src/system/`
 
 - `createSystem(fn, opts)` (`system/index.ts`): with query options, `fn` runs once per matching entity as `{ entity, world, deltaTime }`; without them, once per update.
-- `createGameLoop(world)` (`system/game-loop.ts`): `addSystem(id, system, { priority, frequency, enabled })`. Systems run in descending `priority` (default 50), and ties run in the order they were added. `frequency: n` runs a system every n-th frame. `update(deltaTime)` runs the systems, then flushes once.
-- **A system that throws is logged and skipped.** `update` doesn't rethrow, so look for `System '<id>' threw an error` in the output when a test silently does nothing.
+- `createGameLoop(world)` (`system/game-loop.ts`): `addSystem(id, system, { priority, frequency, enabled })`. Systems run in descending `priority` (default 50), and ties run in the order they were added. `frequency: n` runs a system every n-th frame. `update(deltaTime)` runs the systems, then flushes once. Pass `createGameLoop(world, { throwErrors: true })` in tests.
+- **By default, a system that throws is logged and skipped**, so a test can pass or fail for the wrong reason. `throwErrors: true` rethrows instead; mua turns it on under `bun test`.
 
 ## Events: `src/events/index.ts`
 

@@ -8,13 +8,13 @@ type ComponentName = keyof MuaComponents;
 /**
  * Loads one entity with the given components, or undefined if it lacks any
  * of them. `world.get` only returns the id, so use this to read components.
- * Pass `asProxy` to change components by assignment (then `world.flush()`).
+ * Assign a component to add it, or null to remove it (then `world.flush()`).
  */
 export const getEntity = <const W extends ComponentName[]>(
   world: World<MuaComponents>,
   id: EntityId | undefined,
   components: W,
-  asProxy = false
+  asProxy = true
 ) =>
   id === undefined
     ? undefined

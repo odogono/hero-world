@@ -14,7 +14,12 @@ const log = createLog('game-loop');
 
 type GameLoopOptions = {
   execAdditional?: object;
-  logErrors?: boolean;
+  /**
+   * Rethrow an error from a system or the end-of-frame flush instead of
+   * logging it and carrying on. Turn it on in tests, where a logged error
+   * otherwise leaves the test to fail later for another reason, or pass.
+   */
+  throwErrors?: boolean;
 };
 
 /**
@@ -47,7 +52,7 @@ export const createGameLoop = <TComponents extends Components>(
   world: World<TComponents>,
   options: GameLoopOptions = {}
 ): GameLoop<TComponents> => {
-  const { execAdditional = {}, logErrors = false } = options;
+  const { execAdditional = {}, throwErrors = false } = options;
   const systems = new Map<string, SystemRegistration<TComponents>>();
   const perfMap = new Map<string, SystemPerformance>();
   let frameCount = 0;
@@ -176,9 +181,10 @@ export const createGameLoop = <TComponents extends Components>(
             perf.totalExecutionTime / perf.executionCount;
         }
       } catch (error) {
-        // if (logErrors) {
+        if (throwErrors) {
+          throw error;
+        }
         log.error(`System '${system.id}' threw an error:`, error);
-        // }
       }
     }
 
@@ -187,7 +193,9 @@ export const createGameLoop = <TComponents extends Components>(
       // Flush to persist any changes made by systems or event deletions
       world.flush();
     } catch (error) {
-      // Match per-system error handling behavior
+      if (throwErrors) {
+        throw error;
+      }
       log.error(`End-of-frame flush threw an error:`, error);
     }
   };

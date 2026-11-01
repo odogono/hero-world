@@ -84,7 +84,10 @@ const setup = async () => {
     onPump: result => reports.push(...result.reports),
     warn: msg => warnings.push(msg)
   });
-  const loop = createGameLoop(world).addSystem('talk', ecsTalk.system);
+  const loop = createGameLoop(world, { throwErrors: true }).addSystem(
+    'talk',
+    ecsTalk.system
+  );
 
   return { byName, ecsTalk, loop, reports, warnings, world };
 };

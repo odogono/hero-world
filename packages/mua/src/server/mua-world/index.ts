@@ -74,7 +74,10 @@ export class MuaWorld {
       log.info(`Loaded main EDL from ${mainPath}`);
     }
 
-    this.loop = createGameLoop(this.world);
+    // under `bun test`, a system's error fails the test that caused it
+    this.loop = createGameLoop(this.world, {
+      throwErrors: process.env.NODE_ENV === 'test'
+    });
 
     // NorthTalk Scripts, attached to atoms by their EDL `script` component
     const ecsTalk = createEcsTalk(this.world);
