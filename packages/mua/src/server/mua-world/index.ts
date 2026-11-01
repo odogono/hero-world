@@ -7,6 +7,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
+import { listVerbs } from './commands/verbs';
 import { defs, type MuaComponents } from './coms';
 import { getEntity } from './queries/entity';
 import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
@@ -266,11 +267,13 @@ export class MuaWorld {
       );
 
       // Send welcome message
+      // with the words that start a command, for the client to complete
       const message = `Welcome, ${username}! Type 'look' to begin.`;
       conn.send(
         JSON.stringify({
           data: message,
-          success: true
+          success: true,
+          verbs: listVerbs()
         })
       );
       log.debug('Welcome message sent', message);

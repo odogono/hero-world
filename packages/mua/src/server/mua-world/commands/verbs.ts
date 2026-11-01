@@ -139,3 +139,16 @@ export const VERBS: VerbDef[] = [
     names: ['say']
   }
 ];
+
+/**
+ * Every word that starts a command, for clients to complete: each verb's
+ * names, then the directions and their short forms, then `again`.
+ */
+export const listVerbs = (): string[] => [
+  ...new Set([
+    ...VERBS.flatMap(verb => verb.names),
+    ...DIRECTIONS,
+    ...Object.keys(DIRECTION_ALIASES),
+    ...AGAIN_WORDS
+  ])
+];

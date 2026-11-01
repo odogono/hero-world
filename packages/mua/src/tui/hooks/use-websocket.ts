@@ -15,6 +15,8 @@ export type ServerMessage = {
     players: string[];
   };
   success?: boolean;
+  /** The words that start a command, sent on login, for tab completion */
+  verbs?: string[];
 };
 
 export const useWebSocket = (

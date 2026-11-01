@@ -1,5 +1,5 @@
 /**
- * Known MUD verbs for tab completion
+ * Verbs for tab completion until the server sends its own list on login
  */
 export const KNOWN_VERBS = [
   'look',
