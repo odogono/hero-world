@@ -265,8 +265,10 @@ const commandEventDef = defineComponent({
     /** Set when one command acts on several objects: prefixes the reply */
     label: s.string().optional(),
     playerId: s.entityId(),
-    /** Which receiver dispatch has reached (see actions/index.ts) */
+    /** What the built-in action did, kept while `after` questions wait */
+    outcome: s.json().optional(),
     rawInput: s.string(),
+    /** Which question dispatch has reached (see actions/index.ts) */
     stage: s.int().default(0),
     target: s.string().optional(),
     targetId: s.entityId().optional(),
