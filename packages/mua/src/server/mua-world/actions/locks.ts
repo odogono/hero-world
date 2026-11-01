@@ -1,5 +1,6 @@
 import type { EntityId } from 'odgn-ecs/types';
 
+import { isClosed } from '../queries/doors';
 import { getEntity, getLocationOf } from '../queries/entity';
 import { getElements, theName } from '../queries/scope';
 import { messageFor } from './messages';
@@ -46,10 +47,7 @@ const setLocked = (ctx: ActionContext, isLocked: boolean): ActionOutcome => {
       `${capitalise(name)} is already ${isLocked ? 'locked' : 'unlocked'}.`
     );
   }
-  if (
-    isLocked &&
-    getEntity(ctx.world, target.id, ['container'])?.container.isClosed === false
-  ) {
+  if (isLocked && isClosed(ctx.world, target.id) === false) {
     return refused(`You'll have to close ${name} first.`);
   }
 

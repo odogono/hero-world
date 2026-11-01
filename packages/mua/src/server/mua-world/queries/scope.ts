@@ -2,6 +2,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import type { World } from 'odgn-ecs/world';
 
 import type { MuaComponents } from '../coms';
+import { doorsOf } from './doors';
 import { getLocationOf } from './entity';
 
 /**
@@ -98,8 +99,36 @@ export const getInScope = (
   const roomId = getLocationOf(world, actorId);
   const around =
     roomId === undefined ? [] : getElements(world, roomId, actorId);
-  return [...carried, ...around];
+  const doors = roomId === undefined ? [] : doorCandidates(world, roomId);
+  return [...carried, ...around, ...doors];
 };
+
+/** The doors of a room's exits, named as if they were in the room */
+const doorCandidates = (world: MuaWorld, roomId: EntityId): Candidate[] =>
+  doorsOf(world, roomId).flatMap(doorId => {
+    const door = world.query({
+      entity: { id: doorId, world },
+      maybe: ['noun'],
+      with: ['described', 'door']
+    });
+    if (!door) {
+      return [];
+    }
+    const name = door.described.name;
+    const nounWords = (door.noun?.words ?? []).map((w: string) =>
+      w.toLowerCase()
+    );
+    return [
+      {
+        id: door.id,
+        isPlayer: false,
+        isTakeable: false,
+        locationId: roomId,
+        name,
+        words: [...new Set([...nounWords, ...name.toLowerCase().split(/\s+/)])]
+      }
+    ];
+  });
 
 /** "the mailbox", or a player's name as written */
 export const theName = (candidate: Pick<Candidate, 'isPlayer' | 'name'>) =>

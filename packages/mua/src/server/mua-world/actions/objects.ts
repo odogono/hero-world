@@ -1,5 +1,6 @@
 import type { EntityId } from 'odgn-ecs/types';
 
+import { roomsOfDoor } from '../queries/doors';
 import {
   nameOf as entityName,
   getEntity,
@@ -19,7 +20,9 @@ const listNames = (ids: { isPlayer: boolean; name: string }[]) =>
 /** Name, description and, for an open container, what is inside */
 export const examineAction = (ctx: ActionContext): ActionOutcome => {
   const { targetId, world } = ctx;
-  const target = getEntity(world, targetId, ['location']);
+  const target =
+    getEntity(world, targetId, ['location']) ??
+    getEntity(world, targetId, ['door']);
   if (!target) {
     return refused('Examine what?');
   }
@@ -35,6 +38,18 @@ export const examineAction = (ctx: ActionContext): ActionOutcome => {
         ? `You see ${entityName(world, targetId)}.`
         : 'You see nothing special.')
   ];
+
+  const door = getEntity(world, targetId, ['door']);
+  if (door) {
+    const lockable = getEntity(world, door.id, ['lockable']);
+    lines.push(
+      !door.door.isClosed
+        ? 'It is open.'
+        : lockable?.lockable.isLocked
+          ? 'It is closed and locked.'
+          : 'It is closed.'
+    );
+  }
 
   if (container && !player) {
     if (container.container.isClosed) {
@@ -87,7 +102,10 @@ export const takeRefusal = (ctx: ActionContext): ActionOutcome | undefined => {
   const { playerId, targetId, world } = ctx;
   const target = getEntity(world, targetId, ['location']);
   if (!target) {
-    return refused('Take what?');
+    // a door is named from either room but lives in neither
+    return getEntity(world, targetId, ['door'])
+      ? refused("You can't take that.")
+      : refused('Take what?');
   }
   if (target.location.in === playerId) {
     return refused('You already have that.');
@@ -142,8 +160,12 @@ export const inventoryAction = (ctx: ActionContext): ActionOutcome => {
 
 const setClosed = (ctx: ActionContext, isClosed: boolean): ActionOutcome => {
   const { playerId, targetId, world } = ctx;
-  const target = getEntity(world, targetId, ['container'], true);
   const verb = isClosed ? 'close' : 'open';
+  const container = getEntity(world, targetId, ['container'], true);
+  const door = container
+    ? undefined
+    : getEntity(world, targetId, ['door'], true);
+  const target = container ?? door;
   if (!target || getEntity(world, target.id, ['player'])) {
     return refused(`You can't ${verb} that.`);
   }
@@ -152,23 +174,43 @@ const setClosed = (ctx: ActionContext, isClosed: boolean): ActionOutcome => {
   if (locked) {
     return locked;
   }
-  if (target.container.isClosed === isClosed) {
+  const wasClosed = container
+    ? container.container.isClosed
+    : (door?.door.isClosed ?? false);
+  if (wasClosed === isClosed) {
     return refused(
       `${capitalise(name)} is already ${isClosed ? 'closed' : 'open'}.`
     );
   }
 
-  target.container = { ...target.container, isClosed };
+  if (container) {
+    container.container = { ...container.container, isClosed };
+  } else if (door) {
+    door.door = { ...door.door, isClosed };
+  }
   world.flush();
 
-  const inside = isClosed ? [] : getElements(world, target.id);
-  return report(
+  const inside = isClosed || !container ? [] : getElements(world, target.id);
+  const outcome = report(
     ctx,
     verb,
     inside.length > 0
       ? `Opening ${name} reveals: ${listNames(inside)}.`
       : undefined
   );
+  // the other side of a door sees it move
+  if (door && outcome.kind === 'done') {
+    const here = getLocationOf(world, playerId);
+    const beyond = roomsOfDoor(world, door.id).filter(room => room !== here);
+    outcome.broadcasts = [
+      ...(outcome.broadcasts ?? []),
+      ...beyond.map(to => ({
+        message: `${capitalise(name)} ${isClosed ? 'closes' : 'opens'}.`,
+        to
+      }))
+    ];
+  }
+  return outcome;
 };
 
 export const openAction = (ctx: ActionContext) => setClosed(ctx, false);

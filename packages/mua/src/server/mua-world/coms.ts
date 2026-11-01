@@ -54,8 +54,23 @@ const portalDef = defineComponent({
   id: 'portal',
   schema: {
     dir: s.string(),
+    /** A door the exit goes through, shared with the exit back */
+    door: s.entityId().optional(),
     msg: s.string().optional(),
     to: s.entityId().optional()
+  }
+});
+
+/**
+ * A door: one entity that the exits on both sides of a doorway point to, so
+ * opening, closing or locking it from either side changes both. It needs no
+ * location; players refer to it from either room (see queries/scope.ts).
+ * Add `lockable` to make it lockable.
+ */
+const doorDef = defineComponent({
+  id: 'door',
+  schema: {
+    isClosed: s.boolean().default(true)
   }
 });
 
@@ -294,6 +309,7 @@ export const defs = [
   portalDef,
   exitsDef,
   homeDef,
+  doorDef,
   lockableDef,
   keyDef,
   npcDef,

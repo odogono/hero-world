@@ -1,5 +1,6 @@
 import type { EntityId } from 'odgn-ecs/types';
 
+import { isClosed } from '../queries/doors';
 import { getEntity, getLocationOf } from '../queries/entity';
 import { findExitByDirection } from '../queries/room';
 import { lookAction } from './look';
@@ -32,6 +33,11 @@ export const planMove = (
   const exit = findExitByDirection(world, from, direction);
   if (!exit) {
     return no(`You can't go ${direction} from here.`);
+  }
+  const doorId = exit.portal.door ?? undefined;
+  if (isClosed(world, doorId)) {
+    const name = getEntity(world, doorId, ['described'])?.described.name;
+    return no(`The ${(name ?? 'door').toLowerCase()} is closed.`);
   }
   const to = exit.portal.to ?? undefined;
   if (to === undefined) {
