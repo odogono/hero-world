@@ -154,9 +154,12 @@ const issueMoveOrder = (tankId: string, targetX: number, targetY: number) => {
     e => e.id === tank.id && world.entityCache.get(e.id)?.move_order
   );
 
-  if (existingOrder && world.entityCache.get(existingOrder.id)?.move_order) {
+  // a removed order's cache entry has no data until the next flush
+  const orderData = existingOrder
+    ? world.entityCache.get(existingOrder.id)?.move_order?.data
+    : undefined;
+  if (orderData) {
     // Update existing order
-    const orderData = world.entityCache.get(existingOrder.id)!.move_order!.data;
     orderData.xCoord = targetX;
     orderData.yCoord = targetY;
     orderData.timestamp = Date.now();

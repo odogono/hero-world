@@ -9,7 +9,8 @@ import type { World } from './world';
 export type EntityId = number;
 
 type ComponentCacheEntry<T> = {
-  data: T;
+  /** null once the component is removed, until the next flush */
+  data: T | null;
   exists: boolean;
 };
 
@@ -41,7 +42,8 @@ export type CDefColumnType =
   | 'uuid';
 
 export type CDefColumnInfo = {
-  default?: string | number | boolean | Date;
+  default?:
+    string | number | boolean | Date | unknown[] | Record<string, unknown>;
   enum?: string[];
   foreignKey?: string;
   isIndexed?: boolean;
@@ -57,6 +59,7 @@ export type CDef = {
   hash: string;
   id: string;
   statements?: Record<string, string>;
+  tableName?: string;
 };
 
 export type CDefWithSchema<

@@ -126,11 +126,10 @@ const parseCommands = (edl: string) => {
       continue;
     }
     const toks = tokenize(raw);
-    if (toks.length === 0) {
+    const [name, ...rawArgs] = toks;
+    if (name === undefined) {
       continue;
     }
-    const name = toks[0];
-    const rawArgs = toks.slice(1);
     commands.push({ name, rawArgs });
   }
 
@@ -147,13 +146,13 @@ export const executeEDL = <T extends Components>(
   const origLines = edl.split(/\r?\n/);
   const includeMap: Array<{ originalIndex: number; text: string }> = [];
   const parseLines: string[] = [];
-  for (let i = 0; i < origLines.length; i++) {
-    const stripped = stripComments(origLines[i]);
+  for (const [i, line] of origLines.entries()) {
+    const stripped = stripComments(line);
     const trimmed = stripped.trim();
     if (trimmed.length > 0 && trimmed[0] !== '!') {
       // Keep left whitespace intact in the parse buffer so columns align
       parseLines.push(stripped);
-      includeMap.push({ originalIndex: i, text: origLines[i] });
+      includeMap.push({ originalIndex: i, text: line });
     }
   }
   const edlForParse = parseLines.join('\n');
@@ -322,7 +321,7 @@ export const executeEDL = <T extends Components>(
     }
     seen.add(ref);
     const path = ref.slice(1).split('.');
-    const [entityName, componentName, ...propPath] = path;
+    const [entityName = '', componentName = '', ...propPath] = path;
     const targetId = entityIdsByName.get(entityName);
     if (targetId === undefined) {
       errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
@@ -433,7 +432,7 @@ export const executeEDL = <T extends Components>(
     }
     seen.add(ref);
     const path = ref.slice(1).split('.');
-    const [entityName, componentName, ...propPath] = path;
+    const [entityName = '', componentName = '', ...propPath] = path;
     const targetId = entityIdsByName.get(entityName);
     if (targetId === undefined) {
       errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
@@ -569,16 +568,16 @@ export const executeEDL = <T extends Components>(
   for (const cmd of commands) {
     if (cmd.name === '!set') {
       // !set $entity.component.prop value
-      if (cmd.rawArgs.length < 2) {
+      const [target, rawValue] = cmd.rawArgs;
+      if (target === undefined || rawValue === undefined) {
         continue;
       }
-      const target = cmd.rawArgs[0];
-      const value = toValue(cmd.rawArgs[1]);
+      const value = toValue(rawValue);
       if (!target.startsWith('$')) {
         continue;
       }
       const path = target.slice(1).split('.');
-      const [entityName, componentName, ...propPath] = path;
+      const [entityName = '', componentName = '', ...propPath] = path;
       const eid = entityIdsByName.get(entityName ?? '');
       if (eid === undefined) {
         errors.push(

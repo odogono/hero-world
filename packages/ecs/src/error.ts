@@ -183,7 +183,9 @@ export class SQLiteError extends ECSError {
       context: { originalError: originalError.toString(), ...options.context },
       sql,
       sqliteCode:
-        originalError instanceof Error ? originalError.code : undefined,
+        originalError instanceof Error
+          ? (originalError as Error & { code?: number }).code
+          : undefined,
       ...options
     });
   }

@@ -110,7 +110,7 @@ class AlasqlStatementWrapper implements Statement {
           }
         }
         if (tableMatch) {
-          const tableName = tableMatch[1];
+          const tableName = tableMatch[1]!; // the pattern has one group
 
           // Generate the next ID for this table
           const nextId = this.db.generateNextId(tableName, 'id');
@@ -484,7 +484,7 @@ export class AlasqlDatabaseWrapper implements Database {
         }
 
         const setClause = columnList
-          .map((col, index) => `${col} = ${valueList[index]}`)
+          .map((col: string, index: number) => `${col} = ${valueList[index]}`)
           .join(', ');
 
         return `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
