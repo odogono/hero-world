@@ -139,7 +139,17 @@ export const parseCommand = (rawInput: string): CommandParseResult => {
     const captures = matchForm(form, args, input);
     if (captures) {
       return {
-        command: { ...captures, rawInput, verb: form.handler },
+        command: {
+          ...captures,
+          ...(captures.target === undefined
+            ? {}
+            : { targetScope: form.scope ?? 'here' }),
+          ...(captures.indirect === undefined
+            ? {}
+            : { indirectScope: form.indirectScope ?? 'here' }),
+          rawInput,
+          verb: form.handler
+        },
         success: true
       };
     }

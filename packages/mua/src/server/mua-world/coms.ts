@@ -56,6 +56,14 @@ const portalDef = defineComponent({
   }
 });
 
+/** The words a player can use to refer to an entity, besides its name */
+const nounDef = defineComponent({
+  id: 'noun',
+  schema: {
+    words: s.array('string').optional()
+  }
+});
+
 const describedDef = defineComponent({
   id: 'described',
   schema: {
@@ -71,7 +79,11 @@ const playerDef = defineComponent({
     lastCommandAt: s.datetime().optional(),
     /** The last command typed, repeated by `again` */
     lastInput: s.string().optional(),
-    name: s.string()
+    /** The last single object acted on, referred to by `it` */
+    lastTargetId: s.entityId().optional(),
+    /** A command waiting for the player to say which object they meant */
+    name: s.string(),
+    pending: s.json().optional()
   }
 });
 
@@ -89,9 +101,13 @@ const commandEventDef = defineComponent({
   schema: {
     direction: s.string().optional(),
     indirect: s.string().optional(),
+    indirectId: s.entityId().optional(),
+    /** Set when one command acts on several objects: prefixes the reply */
+    label: s.string().optional(),
     playerId: s.entityId(),
     rawInput: s.string(),
     target: s.string().optional(),
+    targetId: s.entityId().optional(),
     text: s.string().optional(),
     verb: s.string()
   }
@@ -121,6 +137,7 @@ export const defs = [
   locationComponent,
   portalDef,
   describedDef,
+  nounDef,
   itemDef
 ];
 

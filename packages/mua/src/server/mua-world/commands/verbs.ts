@@ -12,10 +12,19 @@
  * - `text` the rest of the input, case preserved, captured as `text`
  *
  * An empty pattern matches the verb on its own.
+ *
+ * Noun phrases are bound to entities after parsing (see `bind.ts`), searching
+ * the form's scope: `inv` (carried), `room` (not carried) or `here` (both).
  */
+import type { Scope } from '../queries/scope';
+
 export type VerbForm = {
   handler: string;
+  /** Where to look for `obj2` (default `here`) */
+  indirectScope?: Scope;
   pattern: string;
+  /** Where to look for `obj` (default `here`) */
+  scope?: Scope;
 };
 
 export type VerbDef = {
@@ -63,8 +72,10 @@ export const VERBS: VerbDef[] = [
   {
     forms: [
       { handler: 'look', pattern: '' },
-      { handler: 'look', pattern: 'at obj' },
-      { handler: 'look', pattern: 'obj' }
+      { handler: 'look', pattern: 'around' },
+      { handler: 'examine', pattern: 'at obj' },
+      { handler: 'examine', pattern: 'in obj' },
+      { handler: 'examine', pattern: 'obj' }
     ],
     names: ['look', 'l', 'examine', 'x']
   },
@@ -77,7 +88,37 @@ export const VERBS: VerbDef[] = [
     names: ['move', 'go', 'walk']
   },
   {
-    forms: [{ handler: 'say', pattern: 'text' }],
+    forms: [
+      { handler: 'take', pattern: 'up obj' },
+      { handler: 'take', pattern: 'obj' }
+    ],
+    incomplete: 'What do you want to take?',
+    names: ['take', 'get', 'pick']
+  },
+  {
+    forms: [{ handler: 'drop', pattern: 'obj', scope: 'inv' }],
+    incomplete: 'What do you want to drop?',
+    names: ['drop']
+  },
+  {
+    forms: [{ handler: 'inventory', pattern: '' }],
+    names: ['inventory', 'inv', 'i']
+  },
+  {
+    forms: [{ handler: 'open', pattern: 'obj' }],
+    incomplete: 'What do you want to open?',
+    names: ['open']
+  },
+  {
+    forms: [{ handler: 'close', pattern: 'obj' }],
+    incomplete: 'What do you want to close?',
+    names: ['close', 'shut']
+  },
+  {
+    forms: [
+      { handler: 'sayTo', pattern: 'to obj text', scope: 'room' },
+      { handler: 'say', pattern: 'text' }
+    ],
     incomplete: 'What do you want to say?',
     names: ['say']
   }

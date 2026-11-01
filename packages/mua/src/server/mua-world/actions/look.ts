@@ -1,4 +1,5 @@
 import { getEntity, getLocationOf } from '../queries/entity';
+import { findPlayersIn } from '../queries/player';
 import { getRoomContents, getRoomExits } from '../queries/room';
 import type { ActionContext, ActionResult } from './types';
 
@@ -28,6 +29,11 @@ export const lookAction = (ctx: ActionContext): ActionResult => {
     if (containers.length > 0) {
       message += `\nThere is: ${containers.map(c => c.described.name).join(', ')}`;
     }
+  }
+
+  const others = findPlayersIn(world, room.id).filter(p => p.id !== playerId);
+  if (others.length > 0) {
+    message += `\nAlso here: ${others.map(p => p.player.name).join(', ')}`;
   }
 
   // List exits

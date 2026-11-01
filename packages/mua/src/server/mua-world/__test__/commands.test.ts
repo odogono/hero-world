@@ -29,11 +29,11 @@ describe('Command Parser', () => {
       }
     });
 
-    test('should parse "look mailbox" with target', () => {
+    test('should parse "look mailbox" as examine', () => {
       const result = parseCommand('look mailbox');
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.command.verb).toBe('look');
+        expect(result.command.verb).toBe('examine');
         expect(result.command.target).toBe('mailbox');
       }
     });
@@ -133,7 +133,7 @@ describe('Command Parser', () => {
     test('drops articles from noun phrases', () => {
       const result = parseCommand('look at the mailbox');
       expect(result).toMatchObject({
-        command: { target: 'mailbox', verb: 'look' },
+        command: { target: 'mailbox', verb: 'examine' },
         success: true
       });
     });
@@ -141,7 +141,7 @@ describe('Command Parser', () => {
     test('keeps multi-word noun phrases', () => {
       const result = parseCommand('examine small brass lamp');
       expect(result).toMatchObject({
-        command: { target: 'small brass lamp', verb: 'look' },
+        command: { target: 'small brass lamp', verb: 'examine' },
         success: true
       });
     });

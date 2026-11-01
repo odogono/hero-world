@@ -1,0 +1,53 @@
+# A small world for testing how players refer to objects
+
+atom room {
+  container { capacity: 100 is_closed: false }
+  described { name: "Room" description: "A room." }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom box {
+  container { capacity: 5 is_closed: false }
+}
+
+entity west_of_house : room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Workshop" description: "A cluttered workshop." }
+}
+
+entity brass_key : item {
+  described { name: "Brass key" description: "A small brass key." }
+  noun { words: ["key"] }
+  location { in: $west_of_house }
+}
+
+entity iron_key : item {
+  described { name: "Iron key" description: "A heavy iron key." }
+  noun { words: ["key"] }
+  location { in: $west_of_house }
+}
+
+entity lamp : item {
+  described { name: "Lamp" description: "A brass oil lamp." }
+  noun { words: ["light", "lantern"] }
+  location { in: $west_of_house }
+}
+
+entity crate : box {
+  described { name: "Crate" description: "A wooden crate." }
+  container { is_closed: true }
+  location { in: $west_of_house }
+}
+
+entity coin : item {
+  described { name: "Coin" description: "A gold coin." }
+  location { in: $crate }
+}
+
+entity anvil {
+  described { name: "Anvil" description: "A very heavy anvil." }
+  location { in: $west_of_house }
+}

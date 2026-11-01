@@ -10,7 +10,7 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
     return { message: 'Which direction?' };
   }
 
-  const player = getEntity(world, playerId, ['player', 'location'], true);
+  const player = getEntity(world, playerId, ['location'], true);
   if (!player) {
     return { message: 'You are nowhere.' };
   }
@@ -40,7 +40,7 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
   return {
     broadcast: {
       exclude: playerId,
-      message: `${player.player.name} arrives.`,
+      message: `${getEntity(world, playerId, ['player'])?.player.name ?? 'Someone'} arrives.`,
       roomId: exit.portal.to
     },
     message: lookResult.message
