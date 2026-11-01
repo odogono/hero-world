@@ -1,4 +1,4 @@
-import { fg } from '@opentui/core';
+import { StyledText, fg } from '@opentui/core';
 
 import { type DebugState } from '../types';
 
@@ -25,10 +25,10 @@ export const DebugPanel = ({
 
   const { isRecording, recordedCommands } = debugState;
 
-  const title = fg('#7aa2f7', '=== Debug Panel ===');
-  const statusText = isRecording
-    ? fg('#f7768e', '● RECORDING')
-    : fg('#9ece6a', '○ Stopped');
+  const title = new StyledText([fg('#7aa2f7')('=== Debug Panel ===')]);
+  const statusText = new StyledText([
+    isRecording ? fg('#f7768e')('● RECORDING') : fg('#9ece6a')('○ Stopped')
+  ]);
 
   const commandCount = `Commands: ${recordedCommands.length}`;
 

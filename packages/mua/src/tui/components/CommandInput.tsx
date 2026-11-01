@@ -1,3 +1,10 @@
+import type { TextareaOptions } from '@opentui/core';
+
+/** The event `TextareaOptions.onSubmit` is typed with */
+type TextareaSubmitEvent = Parameters<
+  NonNullable<TextareaOptions['onSubmit']>
+>[0];
+
 type CommandInputProps = {
   onHistoryNext: () => void;
   onHistoryPrevious: () => void;
@@ -19,7 +26,13 @@ export const CommandInput = ({
     <input
       focused
       onInput={onValueChange}
-      onSubmit={onSubmit}
+      // OpenTUI calls this with the input's value, but its types also
+      // inherit the textarea's (event: SubmitEvent) => void
+      onSubmit={(value: string | TextareaSubmitEvent) => {
+        if (typeof value === 'string') {
+          onSubmit(value);
+        }
+      }}
       placeholder="Type a command..."
       value={value}
     />

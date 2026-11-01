@@ -45,7 +45,7 @@ export const GameOutput = ({ currentRoom, messages }: GameOutputProps) => (
         <MessageLine
           key={message.id}
           message={message}
-          roomData={currentRoom}
+          roomData={currentRoom ?? undefined}
         />
       ))
     )}

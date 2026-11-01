@@ -44,7 +44,8 @@ export const completeVerb = (
 
   // Split input into words (only complete first word - the verb)
   const words = trimmed.split(/\s+/);
-  const firstWord = words[0];
+  // split always gives at least one item
+  const firstWord = words[0]!;
 
   // Find matching verbs
   const matches = verbs.filter(v => v.toLowerCase().startsWith(firstWord));
@@ -73,8 +74,8 @@ export const getMatchingVerbs = (
     return [];
   }
 
-  const words = trimmed.split(/\s+/);
-  const firstWord = words[0];
+  // split always gives at least one item
+  const firstWord = trimmed.split(/\s+/)[0]!;
 
   return verbs.filter(v => v.toLowerCase().startsWith(firstWord));
 };

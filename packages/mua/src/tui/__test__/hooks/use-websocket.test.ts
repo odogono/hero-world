@@ -129,7 +129,7 @@ describe('useWebSocket', () => {
 
     const sentMessages = lastInstance.getSentMessages();
     expect(sentMessages.length).toBe(1);
-    expect(JSON.parse(sentMessages[0])).toEqual({
+    expect(JSON.parse(sentMessages[0]!)).toEqual({
       payload: 'look',
       type: 'cmd'
     });
