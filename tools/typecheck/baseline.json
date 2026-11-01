@@ -1,12 +1,5 @@
 {
   "packages/ecs": {
-    "packages/ecs/examples/game-loop-example.ts": 19,
-    "packages/ecs/examples/not-has-query-example.ts": 1,
-    "packages/ecs/examples/property-assignment-demo.ts": 2,
-    "packages/ecs/examples/static-world-demo.ts": 1,
-    "packages/ecs/examples/static-world-simple.ts": 1,
-    "packages/ecs/examples/tank-battle.ts": 26,
-    "packages/ecs/examples/type-inference-demo.ts": 1,
     "packages/ecs/scripts/generate-edl-parser.ts": 1,
     "packages/ecs/scripts/generate-from-cdef.ts": 1,
     "packages/ecs/scripts/generate-from-edl.ts": 2

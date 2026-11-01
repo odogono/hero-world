@@ -59,7 +59,7 @@ export default [
     }
   },
   {
-    files: ['scripts/**', 'examples/**'],
+    files: ['scripts/**'],
     rules: {
       'no-console': 'off'
     }
