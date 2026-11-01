@@ -24,6 +24,8 @@ export const App = () => {
     'connected' | 'disconnected' | 'connecting'
   >('connecting');
   const [debugPanelVisible, setDebugPanelVisible] = useState(false);
+  // the server's own verbs replace these once it sends them on login
+  const [verbs, setVerbs] = useState<string[]>(KNOWN_VERBS);
 
   // Initialize hooks
   const gameState = useGameState();
@@ -37,6 +39,9 @@ export const App = () => {
         gameState.addMessage(data.data, data.success ? 'game' : 'error');
       }
       // `look` sends the room as data too: prefer it to parsing the text
+      if (data?.verbs) {
+        setVerbs(data.verbs);
+      }
       if (data?.room) {
         const { description, exits, items, name, players } = data.room;
         gameState.updateRoomData({
@@ -90,11 +95,11 @@ export const App = () => {
   }, [commandHistory]);
 
   const handleTabComplete = useCallback(() => {
-    const completed = completeVerb(value, KNOWN_VERBS);
+    const completed = completeVerb(value, verbs);
     if (completed) {
       setValue(completed);
     }
-  }, [value]);
+  }, [value, verbs]);
 
   const handleValueChange = useCallback(
     (newValue: string) => {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { parseCommand } from '../commands/parser';
+import { listVerbs } from '../commands/verbs';
 
 describe('Command Parser', () => {
   describe('Look command', () => {
@@ -198,5 +199,15 @@ describe('Command Parser', () => {
         expect(result.command.rawInput).toBe('LOOK Around');
       }
     });
+  });
+});
+
+describe('listVerbs', () => {
+  test('lists every word that starts a command, once', () => {
+    const verbs = listVerbs();
+
+    expect(verbs).toEqual(expect.arrayContaining(['look', 'x', 'take']));
+    expect(verbs).toEqual(expect.arrayContaining(['north', 'n', 'again']));
+    expect(new Set(verbs).size).toBe(verbs.length);
   });
 });

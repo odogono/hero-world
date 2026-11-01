@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { listVerbs } from '../commands/verbs';
 import { openTestWorld } from './helpers';
 
 describe('Gameplay', () => {
@@ -76,5 +77,14 @@ describe('Gameplay', () => {
     world.tick(1);
 
     expect(conn.messages.join('\n')).toContain('West of house');
+  });
+
+  it('sends the verbs to complete with the welcome', async () => {
+    const conn = await login('bob');
+
+    const welcome = conn.payloads.find(p =>
+      String(p.data).startsWith('Welcome')
+    );
+    expect(welcome?.verbs).toEqual(listVerbs());
   });
 });
