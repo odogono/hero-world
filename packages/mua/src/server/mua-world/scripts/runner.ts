@@ -48,6 +48,12 @@ export type ScriptRunner = {
   /** Does a Script sit on this entity's Message Path? */
   hasScript: (id: EntityId) => boolean;
   /**
+   * Send a message to an entity's Scripts without waiting for an answer, such
+   * as a lifecycle message. It still counts towards `settled` when its Run
+   * ends, so a tick runs the passes that deliver what the Script did.
+   */
+  notify: (id: EntityId, message: string, args: ScriptArg[]) => void;
+  /**
    * Send a message to an entity's Scripts, such as a command's verb or a
    * veto question. The first call for a key sends the request; later calls
    * report its state until it is forgotten.
@@ -67,6 +73,7 @@ export const NO_SCRIPTS: ScriptRunner = {
   decide: () => ({ kind: 'passed' }),
   forget: () => {},
   hasScript: () => false,
+  notify: () => {},
   offer: () => ({ kind: 'passed' }),
   settled: () => 0
 };
@@ -158,12 +165,27 @@ export const createScriptRunner = (
       );
     });
 
+  const notify: ScriptRunner['notify'] = (id, message, args) => {
+    ecsTalk.request(id, message, ...toValues(args)).result.then(
+      () => {
+        settled++;
+      },
+      (error: unknown) => {
+        settled++;
+        if (!isUnhandled(error)) {
+          log.error(`Script failed handling ${message}:`, error);
+        }
+      }
+    );
+  };
+
   return {
     decide,
     forget: key => {
       replies.delete(key);
     },
     hasScript,
+    notify,
     offer,
     settled: () => settled
   };

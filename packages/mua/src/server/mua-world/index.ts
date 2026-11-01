@@ -8,14 +8,22 @@ import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
 import { defs, type MuaComponents } from './coms';
-import { findPlayerByConnection } from './queries/player';
+import { getEntity } from './queries/entity';
+import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
 import { loadScripts } from './scripts/load';
 import {
   NO_SCRIPTS,
   createScriptRunner,
   type ScriptRunner
 } from './scripts/runner';
+import { tell } from './systems/output';
 import { expandExits } from './world/exits';
+import {
+  createLifecycle,
+  recordHomes,
+  type Lifecycle
+} from './world/lifecycle';
+import { ensurePlaces, type Places } from './world/places';
 
 const log = createLog('mua-world');
 
@@ -39,6 +47,8 @@ export class MuaWorld {
   updateLoopInterval: ReturnType<typeof setInterval> | null = null;
   lastUpdateTime: number = 0;
   private scripts: ScriptRunner = NO_SCRIPTS;
+  places: Places | null = null;
+  lifecycle: Lifecycle | null = null;
   private isTicking = false;
   private connections = new Map<string, MuaConnection>();
 
@@ -75,6 +85,8 @@ export class MuaWorld {
       log.info(`Loaded main EDL from ${mainPath}`);
       expandExits(this.world);
     }
+    this.places = ensurePlaces(this.world);
+    recordHomes(this.world);
 
     // under `bun test`, a system's error fails the test that caused it
     this.loop = createGameLoop(this.world, {
@@ -86,6 +98,7 @@ export class MuaWorld {
     const scriptedAtoms = await loadScripts(this.world, ecsTalk);
     const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
     this.scripts = scripts;
+    this.lifecycle = createLifecycle(this.world, scripts, this.places);
 
     // Import and register game systems
     const { inputSystem } = await import('./systems/inputSystem');
@@ -102,6 +115,9 @@ export class MuaWorld {
     this.loop.addSystem('show', showSystem);
     this.loop.addSystem('output', createOutputSystem(this.connections));
     this.loop.addSystem('talk', ecsTalk.system);
+
+    // Scripts hear `start` in the first tick
+    this.lifecycle.start();
 
     // Start the update loop
     this.lastUpdateTime = performance.now();
@@ -211,6 +227,7 @@ export class MuaWorld {
         log.debug('Player created', player?.id);
       } else {
         player.player.connectedId = connectionEntity.id;
+        this.bringBack(player.id);
         log.debug('Player reconnected', player.id);
       }
 
@@ -337,9 +354,61 @@ export class MuaWorld {
     if (player) {
       player.player.connectedId = undefined;
       this.world?.flush();
+      this.sendToLimbo(player.id);
+    }
+
+    // the connection is gone: forget it, so its id can't be mistaken later
+    const connection = this.world && findConnectionByWsId(this.world, conn.id);
+    if (connection) {
+      this.world?.delete(connection);
+      this.world?.flush();
     }
 
     return true;
+  }
+
+  /** A player who leaves waits in Limbo, out of the world */
+  private sendToLimbo(playerId: EntityId) {
+    const world = this.world;
+    const limbo = this.places?.limbo;
+    const player =
+      world && getEntity(world, playerId, ['location', 'player'], true);
+    if (!world || limbo === undefined || !player) {
+      return;
+    }
+    const room = player.location.in ?? undefined;
+    if (room === undefined || room === limbo) {
+      return;
+    }
+    player.player = { ...player.player, returnTo: room };
+    player.location = { in: limbo };
+    world.flush();
+    tell(world, room, `${player.player.name} fades from view.`);
+  }
+
+  /** A player who comes back returns to where they left */
+  private bringBack(playerId: EntityId) {
+    const world = this.world;
+    const player =
+      world && getEntity(world, playerId, ['location', 'player'], true);
+    const room = player?.player.returnTo ?? undefined;
+    if (
+      !world ||
+      !player ||
+      room === undefined ||
+      player.location.in !== this.places?.limbo
+    ) {
+      return;
+    }
+    player.location = { in: room };
+    player.player = { ...player.player, returnTo: undefined };
+    world.flush();
+    tell(world, room, `${player.player.name} appears.`, { exclude: playerId });
+  }
+
+  /** Puts a place's strayed things back (see world/lifecycle.ts) */
+  resetPlace(placeId: EntityId) {
+    return this.lifecycle?.reset(placeId) ?? 0;
   }
 }
 

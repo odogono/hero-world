@@ -116,6 +116,7 @@ describe('Dispatch', () => {
       decide: () => ({ kind: 'waiting' }),
       forget: () => {},
       hasScript: () => true,
+      notify: () => {},
       offer: () => ({ kind: 'waiting' }),
       settled: () => 0
     };
