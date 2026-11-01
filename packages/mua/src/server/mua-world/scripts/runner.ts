@@ -27,21 +27,36 @@ const isUnhandled = (error: unknown) =>
   (error as { code?: unknown }).code === 'send failed' &&
   (error as { reason?: unknown }).reason === 'unhandled';
 
+/** An argument sent to a Script: text, or an entity (sent as its Handle) */
+export type ScriptArg = string | { entity: EntityId };
+
 export type ScriptRunner = {
+  /**
+   * Ask an entity's Scripts whether something may happen, as a NorthTalk
+   * Decision: a `, deciding` handler that vetoes gives `replied` with the
+   * veto's reason; one that allows, passes to the end of the Message Path or
+   * isn't there gives `passed`; an undecided Decision gives `failed`.
+   */
+  decide: (
+    key: string,
+    id: EntityId,
+    message: string,
+    args: ScriptArg[]
+  ) => ScriptReply;
   /** Forget a command's request, e.g. once it has been answered */
   forget: (key: string) => void;
   /** Does a Script sit on this entity's Message Path? */
   hasScript: (id: EntityId) => boolean;
   /**
-   * Offer a command to an entity's Scripts. The first call for a key sends
-   * the request; later calls report its state until it is forgotten.
+   * Send a message to an entity's Scripts, such as a command's verb or a
+   * veto question. The first call for a key sends the request; later calls
+   * report its state until it is forgotten.
    */
   offer: (
     key: string,
     id: EntityId,
-    verb: string,
-    role: string,
-    actorId: EntityId
+    message: string,
+    args: ScriptArg[]
   ) => ScriptReply;
   /** How many requests have been answered so far; grows by one per answer */
   settled: () => number;
@@ -49,6 +64,7 @@ export type ScriptRunner = {
 
 /** A runner for worlds without Scripts: nothing has one */
 export const NO_SCRIPTS: ScriptRunner = {
+  decide: () => ({ kind: 'passed' }),
   forget: () => {},
   hasScript: () => false,
   offer: () => ({ kind: 'passed' }),
@@ -80,41 +96,70 @@ export const createScriptRunner = (
     scriptedAtoms.size > 0 &&
     reachesScript(world.getEntityLineage(id), new Set());
 
-  const offer: ScriptRunner['offer'] = (key, id, verb, role, actorId) => {
+  const toValues = (args: ScriptArg[]) =>
+    args.map(arg =>
+      typeof arg === 'string' ? text(arg) : ecsTalk.handle(arg.entity).value
+    );
+
+  /** Starts a request for a key once, then reports what is known */
+  const once = (key: string, start: () => void): ScriptReply => {
     const existing = replies.get(key);
     if (existing) {
       return existing;
     }
-
     const waiting: ScriptReply = { kind: 'waiting' };
     replies.set(key, waiting);
-
-    const request = ecsTalk.request(
-      id,
-      verb,
-      text(role),
-      ecsTalk.handle(actorId).value
-    );
-    request.result.then(
-      value => {
-        settled++;
-        const message = value.asText();
-        replies.set(key, { kind: 'replied', message });
-      },
-      (error: unknown) => {
-        settled++;
-        if (isUnhandled(error)) {
-          replies.set(key, { kind: 'passed' });
-          return;
-        }
-        log.error(`Script failed handling ${verb}:`, error);
-        replies.set(key, { kind: 'failed' });
-      }
-    );
+    start();
     return waiting;
   };
 
+  const settle = (key: string, reply: ScriptReply) => {
+    settled++;
+    replies.set(key, reply);
+  };
+
+  const decide: ScriptRunner['decide'] = (key, id, message, args) =>
+    once(key, () => {
+      ecsTalk.decide(id, message, ...toValues(args)).decided.then(
+        decided => {
+          if (decided.verdict === 'vetoed') {
+            const reason = decided.vetoes[0]?.reason;
+            const text = reason?.kind === 'text' ? reason.asText() : undefined;
+            settle(key, { kind: 'replied', message: text });
+          } else if (decided.verdict === 'allowed') {
+            settle(key, { kind: 'passed' });
+          } else {
+            log.error(`Script left ${message} undecided:`, decided.undecided);
+            settle(key, { kind: 'failed' });
+          }
+        },
+        (error: unknown) => {
+          log.error(`Script failed deciding ${message}:`, error);
+          settle(key, { kind: 'failed' });
+        }
+      );
+    });
+
+  const offer: ScriptRunner['offer'] = (key, id, message, args) =>
+    once(key, () => {
+      const request = ecsTalk.request(id, message, ...toValues(args));
+      request.result.then(
+        value => {
+          settle(key, { kind: 'replied', message: value.asText() });
+        },
+        (error: unknown) => {
+          if (isUnhandled(error)) {
+            settle(key, { kind: 'passed' });
+            return;
+          }
+          log.error(`Script failed handling ${message}:`, error);
+          settle(key, { kind: 'failed' });
+        }
+      );
+    });
+
   return {
+    decide,
     forget: key => {
       replies.delete(key);
     },

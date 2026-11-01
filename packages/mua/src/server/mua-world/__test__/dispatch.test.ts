@@ -113,6 +113,7 @@ describe('Dispatch', () => {
 
   describe('waiting on Scripts', () => {
     const silent: ScriptRunner = {
+      decide: () => ({ kind: 'waiting' }),
       forget: () => {},
       hasScript: () => true,
       offer: () => ({ kind: 'waiting' }),
