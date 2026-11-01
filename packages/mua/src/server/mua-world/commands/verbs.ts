@@ -132,6 +132,22 @@ export const VERBS: VerbDef[] = [
   },
   {
     forms: [
+      { handler: 'lock', indirectScope: 'inv', pattern: 'obj with obj2' },
+      { handler: 'lock', pattern: 'obj' }
+    ],
+    incomplete: 'What do you want to lock?',
+    names: ['lock']
+  },
+  {
+    forms: [
+      { handler: 'unlock', indirectScope: 'inv', pattern: 'obj with obj2' },
+      { handler: 'unlock', pattern: 'obj' }
+    ],
+    incomplete: 'What do you want to unlock?',
+    names: ['unlock']
+  },
+  {
+    forms: [
       { handler: 'sayTo', pattern: 'to obj text', scope: 'room' },
       { handler: 'say', pattern: 'text' }
     ],

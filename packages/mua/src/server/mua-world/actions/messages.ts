@@ -23,9 +23,17 @@ export const DEFAULT_MESSAGES: Record<
   arrive: { omsg: '{actor} arrives.' },
   close: { msg: 'Closed.', omsg: '{actor} closes {the target}.' },
   drop: { msg: 'Dropped.', omsg: '{actor} drops {the target}.' },
+  lock: {
+    msg: 'You lock {the target} with {the indirect}.',
+    omsg: '{actor} locks {the target}.'
+  },
   move: { omsg: '{actor} goes {dir}.' },
   open: { msg: 'Opened.', omsg: '{actor} opens {the target}.' },
-  take: { msg: 'Taken.', omsg: '{actor} takes {the target}.' }
+  take: { msg: 'Taken.', omsg: '{actor} takes {the target}.' },
+  unlock: {
+    msg: 'You unlock {the target} with {the indirect}.',
+    omsg: '{actor} unlocks {the target}.'
+  }
 };
 
 export type TemplateValues = Partial<

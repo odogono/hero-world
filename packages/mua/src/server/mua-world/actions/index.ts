@@ -7,6 +7,7 @@ import {
   type ScriptArg,
   type ScriptRunner
 } from '../scripts/runner';
+import { lockAction, unlockAction } from './locks';
 import { lookAction } from './look';
 import { moveAction } from './move';
 import {
@@ -38,12 +39,14 @@ const BUILT_IN: Record<string, Handler> = {
   drop: dropAction,
   examine: examineAction,
   inventory: inventoryAction,
+  lock: lockAction,
   look: lookAction,
   move: moveAction,
   open: openAction,
   say: sayAction,
   sayTo: sayToAction,
-  take: takeAction
+  take: takeAction,
+  unlock: unlockAction
 };
 
 /** The part an entity plays in a command */
@@ -177,7 +180,15 @@ export const stepCommand = (
         requestKey,
         question.id,
         question.message,
-        question.args
+        question.args,
+        {
+          actor: ctx.playerId,
+          direction: ctx.direction,
+          indirect: ctx.indirectId,
+          target: ctx.targetId,
+          text: ctx.text,
+          verb: ctx.verb
+        }
       );
       if (reply.kind === 'waiting') {
         const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;

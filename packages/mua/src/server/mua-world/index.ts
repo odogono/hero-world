@@ -11,6 +11,7 @@ import { listVerbs } from './commands/verbs';
 import { defs, type MuaComponents } from './coms';
 import { getEntity } from './queries/entity';
 import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
+import { createCommandContexts } from './scripts/commands';
 import { loadScripts } from './scripts/load';
 import {
   NO_SCRIPTS,
@@ -105,8 +106,15 @@ export class MuaWorld {
       clock: this.clock.micros,
       onTimer: timer => hooks.onTimer?.(timer) ?? false
     });
-    const scriptedAtoms = await loadScripts(this.world, ecsTalk);
-    const scripts = createScriptRunner(this.world, ecsTalk, scriptedAtoms);
+    // the command each Script is offered, for it to ask about
+    const contexts = createCommandContexts();
+    const scriptedAtoms = await loadScripts(this.world, ecsTalk, contexts);
+    const scripts = createScriptRunner(
+      this.world,
+      ecsTalk,
+      scriptedAtoms,
+      contexts
+    );
     this.scripts = scripts;
     const lifecycle = createLifecycle(this.world, scripts, this.places);
     this.lifecycle = lifecycle;
