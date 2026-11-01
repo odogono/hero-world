@@ -1,5 +1,4 @@
-import type { Components, EntityWithComponents, GenericEntity } from '@types';
-
+import type { Components, EntityWithComponents, GenericEntity } from '../types';
 import { applyComponentDefaults } from './defaults';
 import { makeTrackedComponent } from './helpers/make-tracked';
 

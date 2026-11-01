@@ -1,11 +1,10 @@
-import type { Statement } from '@db';
-import type { World } from '@world';
-
 import type {
   DefineComponentSchema,
   InferComponentType
 } from './component/types';
+import type { Statement } from './db';
 import type { ColumnInfo } from './schema/types';
+import type { World } from './world';
 
 export type EntityId = number;
 

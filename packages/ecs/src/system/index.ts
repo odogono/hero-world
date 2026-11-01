@@ -1,7 +1,6 @@
-import { queryEntitiesIterator, type QueryOptions } from '@entity';
-import type { Components } from '@types';
-import type { World } from '@world';
-
+import { queryEntitiesIterator, type QueryOptions } from '../entity';
+import type { Components } from '../types';
+import type { World } from '../world';
 import type { ExecProps, System, SystemFunction, SystemOptions } from './types';
 
 // Export event-aware system functionality

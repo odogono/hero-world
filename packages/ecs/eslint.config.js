@@ -38,6 +38,27 @@ export default [
     }
   },
   {
+    // Other packages typecheck these files with their own tsconfig, where
+    // this package's path aliases don't exist; tests and examples may use them.
+    files: ['src/**/*.ts'],
+    ignores: ['src/**/__test__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              message:
+                'Use a relative import: other packages typecheck odgn-ecs source without its tsconfig aliases.',
+              regex:
+                '^@(/|types|component|db|edl|entity|events|helpers|schema|system|world)(/|$)'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     files: ['scripts/**', 'examples/**'],
     rules: {
       'no-console': 'off'

@@ -1,8 +1,7 @@
 import { createLog } from 'odgn-helpers/log';
 
-import type { Components } from '@types';
-import { World } from '@world';
-
+import type { Components } from '../types';
+import { World } from '../world';
 import type {
   GameLoop,
   System,

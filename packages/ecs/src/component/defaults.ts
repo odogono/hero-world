@@ -6,7 +6,7 @@ import type {
   CDefColumnType,
   Components,
   World
-} from '@types';
+} from '../types';
 
 const log = createLog('defaults');
 

@@ -1,4 +1,4 @@
-import type { Components, GenericEntity } from '@types';
+import type { Components, GenericEntity } from '../../types';
 
 export const makeTrackedComponent = <
   TWorldComponents extends Components,
