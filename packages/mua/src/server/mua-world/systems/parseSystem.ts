@@ -10,7 +10,7 @@ import {
 } from '../commands/bind';
 import { parseCommand } from '../commands/parser';
 import type { CommandParseResult } from '../commands/types';
-import { AGAIN_WORDS } from '../commands/verbs';
+import { AGAIN_WORDS, vocabularyOf } from '../commands/verbs';
 import { getEntity } from '../queries/entity';
 import { findPlayerByConnection } from '../queries/player';
 import { getInScope } from '../queries/scope';
@@ -90,7 +90,7 @@ export const parseSystem = createMuaSystem(
         return;
       }
 
-      let parsed: CommandParseResult = parseCommand(input);
+      let parsed: CommandParseResult = parseCommand(input, vocabularyOf(world));
 
       // `bob hello` means "say to bob hello"
       if (!parsed.success) {
@@ -99,7 +99,7 @@ export const parseSystem = createMuaSystem(
           c => c.isPlayer && matchesWords(c, [first!])
         );
         if (isListener) {
-          parsed = parseCommand(`say to ${input.trim()}`);
+          parsed = parseCommand(`say to ${input.trim()}`, vocabularyOf(world));
         }
       }
 

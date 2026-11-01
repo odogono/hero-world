@@ -7,7 +7,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
-import { listVerbs } from './commands/verbs';
+import { listVerbs, vocabularyOf } from './commands/verbs';
 import { defs, type MuaComponents } from './coms';
 import { getEntity } from './queries/entity';
 import { findConnectionByWsId, findPlayerByConnection } from './queries/player';
@@ -28,6 +28,7 @@ import {
 } from './world/lifecycle';
 import { ensurePlaces, type Places } from './world/places';
 import { createMuaTimers } from './world/timers';
+import { loadVerbs } from './world/verbs';
 
 const log = createLog('mua-world');
 
@@ -89,6 +90,7 @@ export class MuaWorld {
       }
       log.info(`Loaded main EDL from ${mainPath}`);
       expandExits(this.world);
+      loadVerbs(this.world);
     }
     this.places = ensurePlaces(this.world);
     recordHomes(this.world);
@@ -281,7 +283,7 @@ export class MuaWorld {
         JSON.stringify({
           data: message,
           success: true,
-          verbs: listVerbs()
+          verbs: listVerbs(vocabularyOf(this.world!))
         })
       );
       log.debug('Welcome message sent', message);
