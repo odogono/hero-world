@@ -3,24 +3,41 @@ import type { CDefColumnInfo, CDefColumnType } from '../types';
 export type ColumnBuilder<
   TType extends CDefColumnType,
   TOptional extends boolean = false,
-  TValue = ValueFromType<TType>
+  TValue = ValueFromType<TType>,
+  TDefault extends boolean = false
 > = {
-  readonly __optional?: TOptional;
   // Phantom type anchors for inference only
+  readonly __default?: TDefault;
+  readonly __optional?: TOptional;
   readonly __type?: TType;
   readonly __value?: TValue;
   build: (props: { name: string }) => CDefColumnInfo;
-  default: (value?: unknown) => ColumnBuilder<TType, TOptional, TValue>;
-  foreignKey: (foreignKey: string) => ColumnBuilder<TType, TOptional, TValue>;
-  indexed: () => ColumnBuilder<TType, TOptional, TValue>;
-  optional: () => ColumnBuilder<TType, true, TValue>;
-  unique: () => ColumnBuilder<TType, TOptional, TValue>;
+  default: (value?: unknown) => ColumnBuilder<TType, TOptional, TValue, true>;
+  foreignKey: (
+    foreignKey: string
+  ) => ColumnBuilder<TType, TOptional, TValue, TDefault>;
+  indexed: () => ColumnBuilder<TType, TOptional, TValue, TDefault>;
+  optional: () => ColumnBuilder<TType, true, TValue, TDefault>;
+  unique: () => ColumnBuilder<TType, TOptional, TValue, TDefault>;
 };
+
+/**
+ * A type-only key on an inferred component type that holds the shape
+ * `world.create` accepts for it: fields with a default may be left out.
+ */
+export declare const COMPONENT_INPUT: unique symbol;
+
+/** What `world.create` accepts for a component of type `T`. */
+export type ComponentInput<T> = T extends {
+  readonly [COMPONENT_INPUT]?: infer I;
+}
+  ? I
+  : T;
 
 export type DefineComponentSchema = Record<
   string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any value type
-  ColumnBuilder<CDefColumnType, boolean, any>
+  ColumnBuilder<CDefColumnType, boolean, any, boolean>
 >;
 
 export type DefineComponentProps<
@@ -52,32 +69,38 @@ export type ValueFromType<T> = T extends
           : unknown;
 
 export type OptionalKeysFromSchema<S extends DefineComponentSchema> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any value type
-  [K in keyof S]: S[K] extends ColumnBuilder<CDefColumnType, true, any>
-    ? K
-    : never;
+  [K in keyof S]: S[K] extends { readonly __optional?: true } ? K : never;
 }[keyof S];
+
+/** Keys `world.create` may leave out: optional, or with a default */
+type InputOptionalKeysFromSchema<S extends DefineComponentSchema> = {
+  [K in keyof S]: S[K] extends { readonly __optional?: true }
+    ? K
+    : S[K] extends { readonly __default?: true }
+      ? K
+      : never;
+}[keyof S];
+
+type ValueOf<B> = B extends { readonly __value?: infer Value }
+  ? Value
+  : unknown;
+
+type InferInputFromSchema<S extends DefineComponentSchema> = {
+  [K in Exclude<keyof S, InputOptionalKeysFromSchema<S>>]: ValueOf<S[K]>;
+} & {
+  [K in InputOptionalKeysFromSchema<S>]?: ValueOf<S[K]>;
+};
 export type RequiredKeysFromSchema<S extends DefineComponentSchema> = Exclude<
   keyof S,
   OptionalKeysFromSchema<S>
 >;
 
 export type InferFromSchema<S extends DefineComponentSchema> = {
-  [K in RequiredKeysFromSchema<S>]: S[K] extends ColumnBuilder<
-    CDefColumnType,
-    boolean,
-    infer Value
-  >
-    ? Value
-    : unknown;
+  [K in RequiredKeysFromSchema<S>]: ValueOf<S[K]>;
 } & {
-  [K in OptionalKeysFromSchema<S>]?: S[K] extends ColumnBuilder<
-    CDefColumnType,
-    boolean,
-    infer Value
-  >
-    ? Value
-    : unknown;
+  [K in OptionalKeysFromSchema<S>]?: ValueOf<S[K]>;
+} & {
+  readonly [COMPONENT_INPUT]?: InferInputFromSchema<S>;
 };
 
 export type InferComponentType<T> = T extends { __schema: infer S }
