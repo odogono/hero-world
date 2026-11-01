@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createLog } from 'odgn-helpers/log';
 
@@ -26,6 +26,8 @@ export const App = () => {
   const [debugPanelVisible, setDebugPanelVisible] = useState(false);
   // the server's own verbs replace these once it sends them on login
   const [verbs, setVerbs] = useState<string[]>(KNOWN_VERBS);
+  // the server asked for a password: keep the next line out of the history
+  const isPasswordNextRef = useRef(false);
 
   // Initialize hooks
   const gameState = useGameState();
@@ -39,6 +41,7 @@ export const App = () => {
         gameState.addMessage(data.data, data.success ? 'game' : 'error');
       }
       // `look` sends the room as data too: prefer it to parsing the text
+      isPasswordNextRef.current = data?.prompt === 'password';
       if (data?.verbs) {
         setVerbs(data.verbs);
       }
@@ -69,8 +72,11 @@ export const App = () => {
       // CRITICAL FIX: Send correct message format for server
       send({ payload: trimmed, type: 'cmd' });
 
-      // Add to command history
-      commandHistory.addCommand(trimmed);
+      // Add to command history, unless it was a password
+      if (!isPasswordNextRef.current) {
+        commandHistory.addCommand(trimmed);
+      }
+      isPasswordNextRef.current = false;
 
       // Clear input
       setValue('');

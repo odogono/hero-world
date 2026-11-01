@@ -6,6 +6,8 @@ const log = createLog('useWebSocket');
 
 export type ServerMessage = {
   data?: string;
+  /** `password` when the server is asking for one: don't keep the answer */
+  prompt?: string;
   /** What the player can see of a room, sent with `look` */
   room?: {
     description: string;
