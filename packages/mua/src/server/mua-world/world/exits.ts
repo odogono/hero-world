@@ -9,6 +9,8 @@ import { findExitByDirection } from '../queries/room';
 const log = createLog('exits');
 
 type ExitSpec = {
+  /** A door the exit goes through; the way back goes through it too */
+  door?: EntityId;
   /** Said when someone tries an exit that leads nowhere */
   msg?: string;
   /** Don't make the way back */
@@ -30,13 +32,13 @@ const addExit = (
   world: World<MuaComponents>,
   roomId: EntityId,
   dir: string,
-  { msg, to }: ExitSpec
+  { door, msg, to }: ExitSpec
 ) => {
   // an exit already there wins, whether declared as an entity or made earlier
   if (findExitByDirection(world, roomId, dir)) {
     return false;
   }
-  world.create({ location: { in: roomId }, portal: { dir, msg, to } });
+  world.create({ location: { in: roomId }, portal: { dir, door, msg, to } });
   world.flush();
   return true;
 };
@@ -65,7 +67,7 @@ export const expandExits = (world: World<MuaComponents>) => {
       }
       const back = OPPOSITE_DIRECTIONS[dir];
       if (spec.to !== undefined && spec.to !== null && !spec.oneWay && back) {
-        waysBack.push([spec.to, back, { to: room.id }]);
+        waysBack.push([spec.to, back, { door: spec.door, to: room.id }]);
       }
     }
   }

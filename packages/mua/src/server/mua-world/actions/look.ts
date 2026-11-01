@@ -1,3 +1,4 @@
+import { isClosed } from '../queries/doors';
 import { getEntity, getLocationOf } from '../queries/entity';
 import { findNpcsIn, findPlayersIn } from '../queries/player';
 import { getRoomContents, getRoomExits } from '../queries/room';
@@ -46,7 +47,11 @@ export const lookAction = (ctx: ActionContext): ActionOutcome => {
     .map(c => c.described.name);
   const view: RoomView = {
     description: room.described.description,
-    exits: getRoomExits(world, room.id).map(e => e.portal.dir),
+    exits: getRoomExits(world, room.id).map(e =>
+      isClosed(world, e.portal.door ?? undefined)
+        ? `${e.portal.dir} (closed)`
+        : e.portal.dir
+    ),
     items: contents
       .filter(e => e.item || e.container)
       .map(e => e.described.name),
