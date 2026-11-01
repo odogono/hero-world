@@ -163,6 +163,19 @@ const keyDef = defineComponent({
   }
 });
 
+/**
+ * Verbs a world adds, in the shape of commands/verbs.ts's `VERBS`, read when
+ * the world loads (see world/verbs.ts). A verb with no built-in action is
+ * for Scripts to handle, e.g.
+ * `verbs { defs: [{ names: ["pray"] forms: [{ handler: "pray" pattern: "" }] }] }`.
+ */
+const verbsDef = defineComponent({
+  id: 'verbs',
+  schema: {
+    defs: s.json()
+  }
+});
+
 /** Where a thing belongs, so a reset can put it back (see lifecycle.ts) */
 const homeDef = defineComponent({
   id: 'home',
@@ -311,6 +324,7 @@ export const defs = [
   portalDef,
   exitsDef,
   homeDef,
+  verbsDef,
   doorDef,
   lockableDef,
   keyDef,

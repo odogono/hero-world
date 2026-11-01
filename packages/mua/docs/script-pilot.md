@@ -36,14 +36,17 @@ indirect` renders the built-in message for the command, from the thing's
    room, second object and target are sent `after<Verb>` (`afterExamine`),
    and any text they return is added to the reply: `on afterExamine role,
 actor` can return "It hums faintly."
-5. **Verbs stay in TypeScript.** `lock X with Y` is parser data. Still open.
+5. **New verbs** — _done._ A world declares verbs in EDL with a `verbs`
+   component, in the built-in verbs' shape; a handler with no built-in
+   action is for Scripts, and a verb sharing a built-in's name adds forms to
+   it (`look under obj`).
 6. **Gotchas met:** `"\n"` is not an escape in a double-quoted string (use
    `` `\n` ``); fire-and-forget operations need `tell`, not `ask`; `exit` and
    `add` are reserved words.
 
 ## Recommendation
 
-With (1) to (3) done, a behaviour as a Script is shorter than the TypeScript,
-uses the same messages, and can be edited by world authors. New behaviours
-can reasonably be written as Scripts, with TypeScript kept for what Scripts
-can't yet do: new verbs.
+With every gap closed, a behaviour as a Script is shorter than the
+TypeScript, uses the same messages, can add to built-in replies, and can
+bring its own verbs, so world authors can write behaviours without touching
+TypeScript. New behaviours can reasonably be written as Scripts.

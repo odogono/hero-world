@@ -15,6 +15,9 @@
  *
  * Noun phrases are bound to entities after parsing (see `bind.ts`), searching
  * the form's scope: `inv` (carried), `room` (not carried) or `here` (both).
+ *
+ * A world adds verbs of its own with a `verbs` component (see
+ * world/verbs.ts); a handler with no built-in action is for Scripts.
  */
 import type { Scope } from '../queries/scope';
 
@@ -156,13 +159,61 @@ export const VERBS: VerbDef[] = [
   }
 ];
 
+/** The verbs a world understands, by each name they answer to */
+export type Vocabulary = {
+  byName: ReadonlyMap<string, VerbDef>;
+  defs: readonly VerbDef[];
+};
+
+/**
+ * The built-in verbs plus a world's own. A world verb that shares a name
+ * with another verb adds its forms, which are tried first: a world can add
+ * `look under obj` without replacing `look`.
+ */
+export const createVocabulary = (
+  extra: readonly VerbDef[] = []
+): Vocabulary => {
+  const byName = new Map<string, VerbDef>();
+  for (const def of [...VERBS, ...extra]) {
+    for (const name of def.names) {
+      const existing = byName.get(name);
+      byName.set(
+        name,
+        existing
+          ? {
+              ...existing,
+              forms: [...def.forms, ...existing.forms],
+              incomplete: def.incomplete ?? existing.incomplete
+            }
+          : def
+      );
+    }
+  }
+  return { byName, defs: [...VERBS, ...extra] };
+};
+
+export const BUILT_IN_VOCABULARY = createVocabulary();
+
+const vocabularies = new WeakMap<object, Vocabulary>();
+
+/** Gives a world its own vocabulary (see world/verbs.ts) */
+export const setVocabulary = (world: object, vocabulary: Vocabulary) => {
+  vocabularies.set(world, vocabulary);
+};
+
+/** The verbs a world understands: the built-ins, unless it has its own */
+export const vocabularyOf = (world: object): Vocabulary =>
+  vocabularies.get(world) ?? BUILT_IN_VOCABULARY;
+
 /**
  * Every word that starts a command, for clients to complete: each verb's
  * names, then the directions and their short forms, then `again`.
  */
-export const listVerbs = (): string[] => [
+export const listVerbs = (
+  vocabulary: Vocabulary = BUILT_IN_VOCABULARY
+): string[] => [
   ...new Set([
-    ...VERBS.flatMap(verb => verb.names),
+    ...vocabulary.defs.flatMap(verb => verb.names),
     ...DIRECTIONS,
     ...Object.keys(DIRECTION_ALIASES),
     ...AGAIN_WORDS

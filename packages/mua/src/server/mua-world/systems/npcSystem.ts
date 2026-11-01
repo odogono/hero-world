@@ -2,6 +2,7 @@ import { createLog } from 'odgn-helpers/log';
 
 import { bindCommand } from '../commands/bind';
 import { parseCommand } from '../commands/parser';
+import { vocabularyOf } from '../commands/verbs';
 import { getEntity } from '../queries/entity';
 import { createMuaSystem } from './create-mua-system';
 
@@ -26,7 +27,7 @@ export const npcSystem = createMuaSystem(
     if (!npc?.npc.active) {
       return;
     }
-    const parsed = parseCommand(text);
+    const parsed = parseCommand(text, vocabularyOf(world));
     if (!parsed.success) {
       log.debug(`NPC ${actorId} can't ${text}: ${parsed.error}`);
       return;

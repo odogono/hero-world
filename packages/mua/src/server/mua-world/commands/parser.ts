@@ -1,11 +1,11 @@
 import type { CommandParseResult, ParsedCommand } from './types';
 import {
   ARTICLES,
+  BUILT_IN_VOCABULARY,
   DIRECTIONS,
   DIRECTION_ALIASES,
-  VERBS,
-  type VerbDef,
-  type VerbForm
+  type VerbForm,
+  type Vocabulary
 } from './verbs';
 
 type Token = { end: number; start: number; word: string };
@@ -14,10 +14,6 @@ type Captures = Pick<
   ParsedCommand,
   'direction' | 'indirect' | 'target' | 'text'
 >;
-
-const verbsByName = new Map<string, VerbDef>(
-  VERBS.flatMap(def => def.names.map(name => [name, def] as const))
-);
 
 const tokenize = (input: string): Token[] =>
   [...input.matchAll(/\S+/g)].map(match => ({
@@ -114,7 +110,10 @@ const expandSayShorthand = (input: string) => {
   return match ? `say ${match[2]}` : input;
 };
 
-export const parseCommand = (rawInput: string): CommandParseResult => {
+export const parseCommand = (
+  rawInput: string,
+  vocabulary: Vocabulary = BUILT_IN_VOCABULARY
+): CommandParseResult => {
   const input = expandSayShorthand(rawInput);
   const tokens = tokenize(input);
   const [first, ...args] = tokens;
@@ -132,7 +131,7 @@ export const parseCommand = (rawInput: string): CommandParseResult => {
     };
   }
 
-  const verb = verbsByName.get(first.word);
+  const verb = vocabulary.byName.get(first.word);
   if (!verb) {
     return { error: `Unknown command: "${first.word}"`, success: false };
   }
