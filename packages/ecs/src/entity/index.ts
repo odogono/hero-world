@@ -120,7 +120,7 @@ const rewriteJsonDotPaths = <T extends Components>(
     if (!def) {
       continue;
     }
-    const alias = toSnakeCase(def.name);
+    const alias = toSnakeCase(def.name) ?? def.name;
     const jsonCols = new Set(
       (def.schema?.columns ?? [])
         .filter(col => col.type === 'json')
@@ -351,7 +351,13 @@ export const mapRowToEntity = <T extends Components>(
       continue;
     }
 
-    entity[c] = makeTrackedComponent(entity, c as string, data, true, 'read');
+    (entity as Record<PropertyKey, unknown>)[c] = makeTrackedComponent(
+      entity,
+      c as string,
+      data,
+      true,
+      'read'
+    );
   }
 
   return entity;
@@ -521,8 +527,9 @@ export function queryEntitiesIterator<T extends Components>(
   };
 
   // Use Bun's iterate capability for incremental results
-  const iterator =
-    args && args.length > 0 ? stmt.iterate(args) : stmt.iterate();
+  const iterator = (
+    args && args.length > 0 ? stmt.iterate(args) : stmt.iterate()
+  ) as Iterable<unknown>;
 
   return {
     [Symbol.dispose]: () => {

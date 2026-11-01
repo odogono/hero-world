@@ -201,8 +201,8 @@ export class LuaVM {
     try {
       // Set arguments as global variables for the coroutine
       if (args.length > 0) {
-        for (let i = 0; i < args.length; i++) {
-          this.setGlobal(`arg${i + 1}`, args[i]);
+        for (const [i, arg] of args.entries()) {
+          this.setGlobal(`arg${i + 1}`, arg);
         }
       }
 

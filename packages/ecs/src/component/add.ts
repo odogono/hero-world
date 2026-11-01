@@ -26,14 +26,14 @@ export const addComponent = <
   const dataWithDefaults = applyComponentDefaults(
     world,
     componentName as string,
-    data
+    data as Record<string, unknown>
   );
 
   (entity as Record<PropertyKey, unknown>)[componentName] =
     makeTrackedComponent(
       entity,
       componentName,
-      dataWithDefaults,
+      dataWithDefaults as TWorldComponents[TComponentName],
       isUpdate // mark as existing if updating, new if adding
     ) as TWorldComponents[TComponentName];
 
@@ -53,7 +53,10 @@ export const addComponents = <
 >(
   entity: GenericEntity<TWorldComponents>,
   components: TComponentData
-): EntityWithComponents<TWorldComponents, keyof TComponentData> => {
+): EntityWithComponents<
+  TWorldComponents,
+  keyof TComponentData & keyof TWorldComponents
+> => {
   const { id, world } = entity;
 
   // Ensure id is defined
@@ -79,5 +82,8 @@ export const addComponents = <
     world.dirtyEntities.get(id)!.add(componentName);
   }
 
-  return entity as EntityWithComponents<TWorldComponents, keyof TComponentData>;
+  return entity as EntityWithComponents<
+    TWorldComponents,
+    keyof TComponentData & keyof TWorldComponents
+  >;
 };

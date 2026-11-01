@@ -19,9 +19,8 @@ export const removeComponent = <
   }
 
   // Mark component for deletion in cache
-  const cache = world.entityCache.get(id);
-  if (cache && cache[componentName as string]) {
-    const cacheEntry = cache[componentName as string];
+  const cacheEntry = world.entityCache.get(id)?.[componentName as string];
+  if (cacheEntry) {
     cacheEntry.exists = false; // Mark as deleted
     cacheEntry.data = null; // Clear the data
   }

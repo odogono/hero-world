@@ -164,7 +164,12 @@ export const createWasmDatabaseInstance = async (
 ): Promise<Database> => {
   const { enableTracing = false, path = ':memory:' } = options;
   const sqliteWasm = await import('@sqlite.org/sqlite-wasm');
-  const sqlite3 = await sqliteWasm.default({
+  // the package declares init() with no arguments, but its runtime takes
+  // Emscripten module options such as print and printErr
+  const init = sqliteWasm.default as unknown as (
+    options: Record<string, unknown>
+  ) => ReturnType<typeof sqliteWasm.default>;
+  const sqlite3 = await init({
     print: () => {},
     printErr: () => {}
   });

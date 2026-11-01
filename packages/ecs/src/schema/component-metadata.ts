@@ -20,7 +20,11 @@ export const componentMetadata = defineComponent({
   }
 });
 
-export type ComponentMetadata = InferComponentType<typeof componentMetadata>;
+/** A stored row: the component's fields plus the row's id and creation time */
+export type ComponentMetadata = InferComponentType<typeof componentMetadata> & {
+  createdAt: string;
+  id: number;
+};
 
 /**
  * Initializes the component metadata table in the database
@@ -80,7 +84,13 @@ export const getStoredComponentMetadata = (
   `);
 
   const result: ComponentMetadata[] = [];
-  const query = selectStmt.all();
+  const query = selectStmt.all() as {
+    created_at: string;
+    def_id: string;
+    hash: string;
+    id: number;
+    version: number;
+  }[];
 
   for (const row of query) {
     result.push({

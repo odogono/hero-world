@@ -1,15 +1,19 @@
 import { getUnixTime } from 'odgn-helpers/time';
 
-import { defineComponent, s } from '../component';
+import { defineComponent, s, type InferComponentType } from '../component';
+import type { ColumnBuilder } from '../component/types';
 import { createSystem } from '../system';
 import type { EntityExecProps } from '../system/types';
-import type { Components, EntityWithComponents, World } from '../types';
+import type { Components, EntityWithComponents } from '../types';
+import type { World } from '../world';
 
 // Event component definition
 export const eventComponent = defineComponent({
   id: 'event' as const,
   schema: {
-    payload: s.string(), //object().default({}).meta({ type: 'json' }), // JSON stringified payload
+    // Any value: stored as text and parsed back on read. The column stays a
+    // string, so its definition hash, which saved worlds check, is unchanged.
+    payload: s.string() as ColumnBuilder<'string', false, unknown>,
     scheduledAt: s.number(), // timestamp in seconds (float)
     type: s.string().indexed(),
     // eslint-disable-next-line perfectionist/sort-objects
@@ -17,10 +21,10 @@ export const eventComponent = defineComponent({
   }
 });
 
-export type EventComponent = z.infer<typeof eventComponent.schema>;
-export type EventComponentWithPayload = EventComponent & {
-  payload: Record<string, unknown>;
-};
+export type EventComponent = InferComponentType<typeof eventComponent>;
+/** An event read back by `getEvents` and friends, with its payload's type */
+export type EventComponentWithPayload<TPayload = Record<string, unknown>> =
+  EventComponent & { payload: TPayload };
 
 type EventExecProps<
   TComponents extends Components & { event: EventComponent }
@@ -81,14 +85,13 @@ export const scheduleEvent = <
 ): EntityWithComponents<TComponents, 'event'> => {
   const when = scheduledAt ?? getUnixTime();
 
-  const e = world.create({
-    event: {
-      createdAt: new Date().toISOString(),
-      payload,
-      scheduledAt: when,
-      type
-    }
-  } as Partial<TComponents>);
+  const event: EventComponent = {
+    createdAt: new Date(),
+    payload,
+    scheduledAt: when,
+    type
+  };
+  const e = world.create({ event } as Parameters<typeof world.create>[0]);
 
   return e as EntityWithComponents<TComponents, 'event'>;
 };
@@ -101,13 +104,14 @@ export const scheduleEvent = <
  * @returns
  */
 export const getEvents = <
+  TPayload = Record<string, unknown>,
   TComponents extends Components & { event: EventComponent } = Components & {
     event: EventComponent;
   }
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponentWithPayload> => {
+): Array<EventComponentWithPayload<TPayload>> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = world.queryAll({
@@ -116,21 +120,22 @@ export const getEvents = <
     with: ['event'] as const
   });
 
+  // the caller says what the stored payloads are
   return entities.map(e => ({
-    ...e.event!,
-    payload: e.event!.payload
+    ...e.event,
+    payload: e.event.payload as TPayload
   }));
 };
 
 export const getAllEvents = <
-  TPayload = unknown,
+  TPayload = Record<string, unknown>,
   TComponents extends Components & { event: EventComponent } = Components & {
     event: EventComponent;
   }
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponentWithPayload> => {
+): Array<EventComponentWithPayload<TPayload>> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = world.queryAll({
@@ -139,20 +144,22 @@ export const getAllEvents = <
     with: ['event'] as const
   });
 
+  // the caller says what the stored payloads are
   return entities.map(e => ({
-    ...e.event!,
-    payload: e.event!.payload
+    ...e.event,
+    payload: e.event.payload as TPayload
   }));
 };
 
 export const getPendingEvents = <
+  TPayload = Record<string, unknown>,
   TComponents extends Components & { event: EventComponent } = Components & {
     event: EventComponent;
   }
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponentWithPayload> => {
+): Array<EventComponentWithPayload<TPayload>> => {
   const { args, clause } = buildTypeWhereClause(type);
 
   const entities = world.queryAll({
@@ -162,9 +169,10 @@ export const getPendingEvents = <
     with: ['event'] as const
   });
 
+  // the caller says what the stored payloads are
   return entities.map(e => ({
-    ...e.event!,
-    payload: e.event!.payload
+    ...e.event,
+    payload: e.event.payload as TPayload
   }));
 };
 
@@ -200,6 +208,12 @@ const buildTypeWhereClause = (
   }
 
   // Combine with OR across patterns/literals
-  const clause = clauses.length > 1 ? `(${clauses.join(' OR ')})` : clauses[0];
+  // no types given: match no events
+  const clause =
+    clauses.length === 0
+      ? '0'
+      : clauses.length > 1
+        ? `(${clauses.join(' OR ')})`
+        : clauses[0]!;
   return { args, clause };
 };

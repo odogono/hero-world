@@ -45,7 +45,7 @@ export class BunDatabaseWrapper implements Database {
         : this.db.query(sql).run(args as unknown as SQLQueryBindings);
     } catch (error) {
       throw createSqliteError(error, sql, {
-        args
+        context: { args }
       });
     }
   }
@@ -146,7 +146,7 @@ export class BunDatabaseWrapper implements Database {
       WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
       ORDER BY type='table' DESC, type, name;`
       )
-      .all();
+      .all() as { sql: string }[];
 
     for (const { sql } of schema) {
       dump.push(sql + ';');
@@ -157,15 +157,19 @@ export class BunDatabaseWrapper implements Database {
       .query(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
       )
-      .all();
+      .all() as { name: string }[];
 
     for (const { name } of tables) {
-      const rows = this.db.query(`SELECT * FROM ${name}`).all();
-      if (rows.length === 0) {
+      const rows = this.db.query(`SELECT * FROM ${name}`).all() as Record<
+        string,
+        unknown
+      >[];
+      const [first] = rows;
+      if (!first) {
         continue;
       }
 
-      const cols = Object.keys(rows[0]);
+      const cols = Object.keys(first);
 
       for (const row of rows) {
         const values = cols

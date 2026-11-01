@@ -4,11 +4,14 @@ import type {
   CDef,
   CDefColumnInfo,
   CDefColumnType,
-  Components,
-  World
+  Components
 } from '../types';
+import type { World } from '../world';
 
 const log = createLog('defaults');
+
+/** A column's default: a scalar, or an empty array or object */
+type DefaultValue = NonNullable<CDefColumnInfo['default']>;
 
 /**
  * Apply default values from a Zod schema to component data
@@ -69,12 +72,10 @@ export const getDefaults = (def: CDef) =>
       // Optional without default is omitted
       return acc;
     },
-    {} as Record<string, string | number | boolean | Date>
+    {} as Record<string, DefaultValue>
   );
 
-export const getDefaultForObject = (
-  column: CDefColumnInfo
-): string | number | boolean | Date => {
+export const getDefaultForObject = (column: CDefColumnInfo): DefaultValue => {
   if (column.default !== undefined) {
     if (
       typeof column.default === 'string' &&
