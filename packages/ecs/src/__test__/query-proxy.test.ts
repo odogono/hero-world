@@ -86,7 +86,7 @@ describe('queryEntity proxied option', () => {
     expect(persisted!.locationProxyTest).toBeDefined();
 
     // Removing via null should also persist deletion
-    proxy.locationProxyTest = null;
+    (proxy as Record<string, unknown>).locationProxyTest = null;
     world.flush();
 
     const removed = world.query({

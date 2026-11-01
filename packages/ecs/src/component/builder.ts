@@ -55,10 +55,13 @@ const date = () => columnBuilder('date');
 const datetime = () => columnBuilder('datetime');
 const email = () => columnBuilder('email');
 const entityId = () => columnBuilder('int').optional().foreignKey('tbl_entity');
-const enumBuilder = (values: string[]) => {
-  const builder = columnBuilder('string');
+/** A string limited to `values`, typed as their union */
+const enumBuilder = <const TValues extends readonly string[]>(
+  values: TValues
+) => {
+  const builder = columnBuilder<'string', TValues[number]>('string');
   const column = builder.build({ name: 'temp' });
-  column.enum = values;
+  column.enum = [...values];
 
   const modifiedBuilder = {
     ...builder,

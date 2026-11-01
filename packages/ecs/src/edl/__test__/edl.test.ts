@@ -620,7 +620,7 @@ entity lockable_chest: chest {
       !examine $chest.thing.weight $chest arg_1 13 true "a medium sized chest" $chest.thing.id
       `;
 
-      const examine = mock(() => {});
+      const examine = mock((..._args: unknown[]) => {});
 
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl, { commands: { '!examine': examine } });
@@ -641,7 +641,7 @@ entity lockable_chest: chest {
       !examine $chest.thing._exists
     `;
 
-      const examine = mock(() => {});
+      const examine = mock((..._args: unknown[]) => {});
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl, { commands: { '!examine': examine } });
 
@@ -654,7 +654,7 @@ entity lockable_chest: chest {
       !examine $chest.thing.id $chest._count
     `;
 
-      const examine = mock(() => {});
+      const examine = mock((..._args: unknown[]) => {});
       const world = await createWorld([thingComponent]);
       world.executeEDL(edl, { commands: { '!examine': examine } });
 

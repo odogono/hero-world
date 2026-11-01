@@ -38,7 +38,9 @@ describe('Entity Basic', () => {
     expectTypeOf(entity.position.x).toEqualTypeOf<number>();
     expectTypeOf(entity.position.y).toEqualTypeOf<number>();
     expectTypeOf(entity.position.z).toEqualTypeOf<number>();
-    expectTypeOf(entity.status.status).toEqualTypeOf<string>();
+    expectTypeOf(entity.status.status).toEqualTypeOf<
+      'idle' | 'walking' | 'fighting' | 'dead'
+    >();
 
     expect(entity.position.x).toBe(10);
     expect(entity.position.y).toBe(20);

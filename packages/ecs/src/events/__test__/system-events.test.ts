@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test';
 import { defineComponent, s } from '@component';
 import { DatabaseType } from '@db';
 import { createGameLoop, createSystem } from '@system';
+import type { EntityExecProps } from '@system/types';
+import type { Components } from '@types';
 import { createWorld } from '@world';
 
 import { eventComponent } from '..';
@@ -34,7 +36,7 @@ describe('System Events Integration', () => {
     const processedEntities: unknown[] = [];
 
     const entitySystem = createSystem(
-      ({ deltaTime, entity, world }) => {
+      ({ entity }: EntityExecProps<unknown, Components>) => {
         processedEntities.push(entity);
       },
       { with: ['systemTest'] }

@@ -33,14 +33,15 @@ describe('Entity', () => {
 
       world.flush();
 
-      const e = world.query({ with: ['name', 'inventory'] });
+      const e = world.query({ with: ['name', 'inventory'] })!;
       expect(e.name.nickname).toBe('conan');
       expect(e.inventory.items).toEqual([{ id: 'sword', name: 'Sword' }]);
 
       // console.log(e);
-      const fe = world.get(e.id);
-      expect(fe.name).not.toBeDefined();
-      expect(fe.inventory).not.toBeDefined();
+      // world.get loads no components
+      const fe = world.get(e.id) as Record<string, unknown> | null;
+      expect(fe?.name).not.toBeDefined();
+      expect(fe?.inventory).not.toBeDefined();
     });
   });
 

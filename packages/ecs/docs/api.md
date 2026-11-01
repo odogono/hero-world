@@ -16,6 +16,7 @@ const stats = defineComponent({
 - The schema builders are `s` in `component/builder.ts`: `int`, `float`, `number`, `string`, `boolean`, `enum`, `json`, `array`, `entityId`, `date`, `datetime`, `time`, `timestamp`, `now`, `uuid`, `email`, `pk`.
 - Field types are what a read from the database returns: `datetime` is a `Date`; `date` and `time` are strings; `timestamp` is a number. Write those types too: a write stays in the cache as given until the next query reloads it.
 - `s.json<T>()` types the value as `T`, `unknown` without it. `s.array('string')` types the items, but neither is checked at runtime.
+- `s.enum(['idle', 'walking'])` types the field as `'idle' | 'walking'`.
 - `world.create` may leave out fields that have a `.default()`; reads still type them as present.
 - camelCase fields become snake_case columns; `id` and `eid` are reserved field names.
 - `addComponent` / `removeComponent` (`component/add.ts`, `remove.ts`) are the function forms of assigning to an entity.
@@ -51,7 +52,7 @@ All of these were checked against the code:
 ## Systems and the game loop: `src/system/`
 
 - `createSystem(fn, opts)` (`system/index.ts`): with query options, `fn` runs once per matching entity as `{ entity, world, deltaTime }`; without them, once per update.
-- `createGameLoop(world)` (`system/game-loop.ts`): `addSystem(id, system, { priority, frequency, enabled })`. Systems run in descending `priority` (default 50), and ties run in the order they were added. `frequency: n` runs a system every n-th frame. `update(deltaTime)` runs the systems, then flushes once. Pass `createGameLoop(world, { throwErrors: true })` in tests.
+- `createGameLoop(world)` (`system/game-loop.ts`): `addSystem(id, system, { priority, frequency, enabled })`. A system made without a world type (`createSystem(() => …)`) can be added to any world's loop. Systems run in descending `priority` (default 50), and ties run in the order they were added. `frequency: n` runs a system every n-th frame. `update(deltaTime)` runs the systems, then flushes once. Pass `createGameLoop(world, { throwErrors: true })` in tests.
 - **By default, a system that throws is logged and skipped**, so a test can pass or fail for the wrong reason. `throwErrors: true` rethrows instead; mua turns it on under `bun test`.
 
 ## Events: `src/events/index.ts`

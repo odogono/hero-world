@@ -53,7 +53,7 @@ describe('Database JSON functions', () => {
     const entitiesData = world.saveToJSON({ asComponents: false });
 
     expect(Array.isArray(entitiesData)).toBe(true);
-    const entities = entitiesData;
+    const entities = entitiesData as { id: number }[];
     expect(entities).toHaveLength(2);
 
     // Make a deep copy of the data to avoid any test framework interference

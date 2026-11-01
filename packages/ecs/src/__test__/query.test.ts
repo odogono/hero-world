@@ -2,7 +2,7 @@ import { describe, expect, it, test } from 'bun:test';
 
 import { defineComponent, removeComponent, s } from '@component';
 import { DatabaseType } from '@db';
-import type { Components, GenericEntity } from '@types';
+import type { ExtractWorldComponents, GenericEntity } from '@types';
 import { createWorld } from '@world';
 
 const statusComponent = defineComponent({
@@ -499,7 +499,7 @@ describe('query', () => {
       const fakeEntity = {
         id: 999,
         world
-      } as unknown as GenericEntity<Components>;
+      } as unknown as GenericEntity<ExtractWorldComponents<typeof world>>;
 
       world.flush();
 
@@ -705,7 +705,7 @@ describe('query', () => {
         with: ['status']
       });
       expect(result).not.toBeNull();
-      expect(['walking', 'fighting']).toContain(result?.status.status);
+      expect(['walking', 'fighting']).toContain(result!.status.status);
     });
 
     test('should query single entity with camelCase component properties', async () => {
@@ -768,7 +768,7 @@ describe('query', () => {
 
       world.create({
         testState: {
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
           isComplete: false,
           status: 'pending'
         }

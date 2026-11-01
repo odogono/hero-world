@@ -10,7 +10,10 @@ import { s } from '../builder';
 import { createComponent } from '../create';
 import { defineComponent } from '../define';
 import { removeComponent } from '../remove';
-import type { InferComponentType } from '../types';
+import type { COMPONENT_INPUT, InferComponentType } from '../types';
+
+/** A component's fields, without the type-only key that holds its create input */
+type Fields<T> = Omit<T, typeof COMPONENT_INPUT>;
 
 const worldOpts = {
   clearExisting: true,
@@ -321,7 +324,7 @@ describe('Component (next)', () => {
       expect(e.statsTest).toBeDefined();
 
       // Delete location component by setting to null
-      entity.locationTest = undefined;
+      (entity as Record<string, unknown>).locationTest = undefined;
 
       world.flush();
 
@@ -360,7 +363,7 @@ describe('Component (next)', () => {
       expect(e.statsTest).toBeDefined();
 
       // Delete stats component by setting to undefined
-      entity.statsTest = undefined;
+      (entity as Record<string, unknown>).statsTest = undefined;
 
       world.flush();
 
@@ -400,7 +403,7 @@ describe('Component (next)', () => {
       expect(e.statsTest).toBeDefined();
 
       // Delete one component and modify another
-      entity.locationTest = undefined;
+      (entity as Record<string, unknown>).locationTest = undefined;
       entity.statsTest = {
         health: 75,
         level: 2,
@@ -542,6 +545,7 @@ describe('Component (next)', () => {
 
       // removeComponent doesn't throw for non-existent components
       expect(() => {
+        // @ts-expect-error: the world has no such component
         removeComponent(entity, 'nonexistent');
       }).not.toThrow();
     });
@@ -788,7 +792,10 @@ describe('Component (next)', () => {
 
       const com = createComponent(def, { email: 'test@test.com' });
 
-      expectTypeOf(com).toEqualTypeOf<{ email: string; name: string }>();
+      expectTypeOf<Fields<typeof com>>().toEqualTypeOf<{
+        email: string;
+        name: string;
+      }>();
       expectTypeOf(com).toEqualTypeOf<defType>();
 
       expect(com).toMatchObject({
@@ -819,7 +826,7 @@ describe('Component (next)', () => {
 
       type expectedType = { age?: number; height?: number };
 
-      expectTypeOf(com).toEqualTypeOf<expectedType>();
+      expectTypeOf<Fields<typeof com>>().toEqualTypeOf<expectedType>();
       expectTypeOf(com).toEqualTypeOf<defType>();
 
       expect(com).toMatchObject({
@@ -883,7 +890,7 @@ describe('Component (next)', () => {
 
       const com = createComponent(def, { name: 'John Doe', status: 'active' });
 
-      expectTypeOf(com).toEqualTypeOf<{
+      expectTypeOf<Fields<typeof com>>().toEqualTypeOf<{
         name: string;
         status: 'active' | 'inactive';
       }>();
