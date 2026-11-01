@@ -1,3 +1,4 @@
+import { getEntity } from '../queries/entity';
 import { findExitByDirection } from '../queries/room';
 import { lookAction } from './look';
 import type { ActionContext, ActionResult } from './types';
@@ -9,12 +10,12 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
     return { message: 'Which direction?' };
   }
 
-  const player = world.get(playerId);
-  if (!player?.player?.location) {
+  const player = getEntity(world, playerId, ['player', 'location'], true);
+  if (!player) {
     return { message: 'You are nowhere.' };
   }
 
-  const currentRoom = player.player.location;
+  const currentRoom = player.location.in;
   const exit = findExitByDirection(world, currentRoom, direction);
 
   if (!exit) {
@@ -30,13 +31,15 @@ export const moveAction = (ctx: ActionContext): ActionResult => {
   }
 
   // Move player
-  player.player.location = exit.portal.to;
+  player.location = { in: exit.portal.to };
+  world.flush();
 
   // Auto-look at new room
   const lookResult = lookAction(ctx);
 
   return {
     broadcast: {
+      exclude: playerId,
       message: `${player.player.name} arrives.`,
       roomId: exit.portal.to
     },

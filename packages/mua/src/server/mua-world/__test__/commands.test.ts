@@ -129,6 +129,67 @@ describe('Command Parser', () => {
     });
   });
 
+  describe('Verb forms', () => {
+    test('drops articles from noun phrases', () => {
+      const result = parseCommand('look at the mailbox');
+      expect(result).toMatchObject({
+        command: { target: 'mailbox', verb: 'look' },
+        success: true
+      });
+    });
+
+    test('keeps multi-word noun phrases', () => {
+      const result = parseCommand('examine small brass lamp');
+      expect(result).toMatchObject({
+        command: { target: 'small brass lamp', verb: 'look' },
+        success: true
+      });
+    });
+
+    test('accepts extended directions', () => {
+      expect(parseCommand('ne')).toMatchObject({
+        command: { direction: 'northeast', verb: 'move' }
+      });
+      expect(parseCommand('go up')).toMatchObject({
+        command: { direction: 'up', verb: 'move' }
+      });
+    });
+
+    test('rejects a word that is not a direction', () => {
+      const result = parseCommand('go banana');
+      expect(result).toMatchObject({
+        error: 'Where do you want to go?',
+        success: false
+      });
+    });
+  });
+
+  describe('Say', () => {
+    test('captures the rest of the input with its case', () => {
+      const result = parseCommand('say Hello  there, Bob');
+      expect(result).toMatchObject({
+        command: { text: 'Hello  there, Bob', verb: 'say' },
+        success: true
+      });
+    });
+
+    test('treats a leading quote as say', () => {
+      expect(parseCommand("'Hi all")).toMatchObject({
+        command: { text: 'Hi all', verb: 'say' }
+      });
+      expect(parseCommand('"Hi all"')).toMatchObject({
+        command: { text: 'Hi all', verb: 'say' }
+      });
+    });
+
+    test('asks what to say when there is nothing', () => {
+      expect(parseCommand('say')).toMatchObject({
+        error: 'What do you want to say?',
+        success: false
+      });
+    });
+  });
+
   describe('Raw input preservation', () => {
     test('should preserve original input', () => {
       const result = parseCommand('LOOK Around');

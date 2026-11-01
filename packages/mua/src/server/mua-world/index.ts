@@ -7,6 +7,7 @@ import { createWorld, type World } from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
 import { defs, type MuaComponents } from './coms';
+import { findPlayerByConnection } from './queries/player';
 
 const log = createLog('mua-world');
 
@@ -94,11 +95,11 @@ export class MuaWorld {
     await this.world?.close();
   }
 
-  getContents(containedIn: EntityId) {
+  getContents(locationId: EntityId) {
     return this.world?.queryAll({
-      args: [containedIn],
-      where: 'contained.in = ?1',
-      with: ['contained', 'described']
+      args: [locationId],
+      where: 'location.in = ?1',
+      with: ['location', 'described']
     });
   }
 
@@ -137,9 +138,9 @@ export class MuaWorld {
             capacity: 10,
             isClosed: false
           },
+          ...(startRoom ? { location: { in: startRoom.id } } : {}),
           player: {
             connectedId: connectionEntity.id,
-            location: startRoom?.id,
             name: username
           }
         });
@@ -262,15 +263,8 @@ export class MuaWorld {
     this.connections.delete(conn.id);
 
     // Unlink player from connection
-    const player = this.world?.query({
-      args: [conn.id],
-      where: `player.connected_id IN (
-        SELECT id FROM entity WHERE id IN (
-          SELECT id FROM connected WHERE connected.ws_id = ?1
-        )
-      )`,
-      with: ['player']
-    });
+    const player =
+      this.world && findPlayerByConnection(this.world, conn.id, true);
 
     if (player) {
       player.player.connectedId = undefined;

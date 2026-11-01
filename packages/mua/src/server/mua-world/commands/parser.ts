@@ -1,47 +1,152 @@
-import { directionAliases, directions, verbAliases } from './registry';
-import type { CommandParseResult } from './types';
+import type { CommandParseResult, ParsedCommand } from './types';
+import {
+  ARTICLES,
+  DIRECTIONS,
+  DIRECTION_ALIASES,
+  VERBS,
+  type VerbDef,
+  type VerbForm
+} from './verbs';
 
-export const parseCommand = (input: string): CommandParseResult => {
-  const trimmed = input.trim().toLowerCase();
-  if (!trimmed) {
+type Token = { end: number; start: number; word: string };
+
+type Captures = Pick<
+  ParsedCommand,
+  'direction' | 'indirect' | 'target' | 'text'
+>;
+
+const verbsByName = new Map<string, VerbDef>(
+  VERBS.flatMap(def => def.names.map(name => [name, def] as const))
+);
+
+const tokenize = (input: string): Token[] =>
+  [...input.matchAll(/\S+/g)].map(match => ({
+    end: match.index + match[0].length,
+    start: match.index,
+    word: match[0].toLowerCase()
+  }));
+
+const toDirection = (word: string | undefined) => {
+  if (word === undefined) {
+    return undefined;
+  }
+  const direction = DIRECTION_ALIASES[word] ?? word;
+  return DIRECTIONS.includes(direction) ? direction : undefined;
+};
+
+const toNounPhrase = (tokens: Token[]) => {
+  const words = tokens.map(t => t.word).filter(w => !ARTICLES.includes(w));
+  return words.length > 0 ? words.join(' ') : undefined;
+};
+
+/**
+ * Matches the argument tokens against a form's pattern. Noun phrases are
+ * tried shortest first so that a following preposition can still match:
+ * in `obj in obj2`, `red box in bag` gives `red box` and `bag`.
+ */
+const matchPattern = (
+  slots: string[],
+  tokens: Token[],
+  input: string
+): Captures | undefined => {
+  const [slot, ...restSlots] = slots;
+
+  if (slot === undefined) {
+    return tokens.length === 0 ? {} : undefined;
+  }
+  const [first] = tokens;
+  if (first === undefined) {
+    return undefined;
+  }
+
+  switch (slot) {
+    case 'dir': {
+      const direction = toDirection(first.word);
+      if (!direction) {
+        return undefined;
+      }
+      const rest = matchPattern(restSlots, tokens.slice(1), input);
+      return rest && { ...rest, direction };
+    }
+    case 'text':
+      // text always takes everything that is left
+      return restSlots.length === 0
+        ? { text: input.slice(first.start).trim() }
+        : undefined;
+    case 'obj':
+    case 'obj2': {
+      for (let end = 1; end <= tokens.length; end++) {
+        const phrase = toNounPhrase(tokens.slice(0, end));
+        if (!phrase) {
+          continue;
+        }
+        const rest = matchPattern(restSlots, tokens.slice(end), input);
+        if (rest) {
+          return slot === 'obj'
+            ? { ...rest, target: phrase }
+            : { ...rest, indirect: phrase };
+        }
+      }
+      return undefined;
+    }
+    default: {
+      // a literal word, such as a preposition
+      if (first.word !== slot) {
+        return undefined;
+      }
+      return matchPattern(restSlots, tokens.slice(1), input);
+    }
+  }
+};
+
+const matchForm = (form: VerbForm, args: Token[], input: string) => {
+  const slots = form.pattern.split(/\s+/).filter(Boolean);
+  return matchPattern(slots, args, input);
+};
+
+/**
+ * Splits off a leading `'` or `"` so that `'hello` and `"hello"` say hello.
+ */
+const expandSayShorthand = (input: string) => {
+  const match = /^\s*(["'])(.*?)\1?\s*$/.exec(input);
+  return match ? `say ${match[2]}` : input;
+};
+
+export const parseCommand = (rawInput: string): CommandParseResult => {
+  const input = expandSayShorthand(rawInput);
+  const tokens = tokenize(input);
+  const [first, ...args] = tokens;
+
+  if (first === undefined) {
     return { error: 'Please enter a command.', success: false };
   }
 
-  const tokens = trimmed.split(/\s+/);
-  const firstToken = tokens[0]!;
-  const verb = verbAliases[firstToken] ?? firstToken;
-
-  // Handle standalone directions (e.g., "north" → "move north")
-  if (directions.includes(firstToken) || directionAliases[firstToken]) {
-    const direction = directionAliases[firstToken] ?? firstToken;
+  // A direction on its own means "go <direction>"
+  const direction = args.length === 0 ? toDirection(first.word) : undefined;
+  if (direction) {
     return {
-      command: { direction, rawInput: input, verb: 'move' },
+      command: { direction, rawInput, verb: 'move' },
       success: true
     };
   }
 
-  const restTokens = tokens.slice(1);
+  const verb = verbsByName.get(first.word);
+  if (!verb) {
+    return { error: `Unknown command: "${first.word}"`, success: false };
+  }
 
-  switch (verb) {
-    case 'move': {
-      const direction = directionAliases[restTokens[0]!] ?? restTokens[0];
-      if (!direction || !directions.includes(direction)) {
-        return { error: 'Where do you want to go?', success: false };
-      }
-      return { command: { direction, rawInput: input, verb }, success: true };
-    }
-
-    case 'look':
+  for (const form of verb.forms) {
+    const captures = matchForm(form, args, input);
+    if (captures) {
       return {
-        command: {
-          rawInput: input,
-          target: restTokens.join(' ') || undefined,
-          verb
-        },
+        command: { ...captures, rawInput, verb: form.handler },
         success: true
       };
-
-    default:
-      return { error: `Unknown command: "${firstToken}"`, success: false };
+    }
   }
+
+  return {
+    error: verb.incomplete ?? `I don't understand "${input.trim()}".`,
+    success: false
+  };
 };

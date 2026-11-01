@@ -1,35 +1,29 @@
-import { createSystem } from 'odgn-ecs/system';
-
 import type { MuaConnection } from '../index';
+import { getEntity } from '../queries/entity';
+import { findPlayersIn } from '../queries/player';
+import { createMuaSystem } from './create-mua-system';
 
 export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
-  createSystem(
+  createMuaSystem(
     ({ entity, world }) => {
       if (!entity.outputEvent) {
         return;
       }
 
-      const { broadcast, message, roomId, wsId } = entity.outputEvent;
+      const { broadcast, exclude, message, roomId, wsId } = entity.outputEvent;
 
       if (broadcast && roomId) {
         // Send to all players in room
-        const playersInRoom = world.queryAll({
-          args: [roomId],
-          where: 'player.location = ?1',
-          with: ['player']
-        });
-
-        playersInRoom.forEach(player => {
-          if (player.player.connectedId) {
-            const conn = world.get(player.player.connectedId);
-            if (conn?.connected) {
-              const ws = connections.get(conn.connected.wsId);
-              if (ws) {
-                ws.send(JSON.stringify({ data: message, success: true }));
-              }
-            }
+        for (const player of findPlayersIn(world, roomId)) {
+          if (player.id === exclude) {
+            continue;
           }
-        });
+          const conn = getEntity(world, player.player.connectedId, [
+            'connected'
+          ]);
+          const ws = conn && connections.get(conn.connected.wsId);
+          ws?.send(JSON.stringify({ data: message, success: true }));
+        }
       } else {
         // Send to specific connection
         const ws = connections.get(wsId);
@@ -39,7 +33,7 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
       }
 
       // Remove output event
-      world.remove(entity.id);
+      world.delete(entity);
     },
     {
       frequency: 1,
