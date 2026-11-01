@@ -5,6 +5,7 @@ import { getEntity, getLocationOf } from '../queries/entity';
 import {
   NO_SCRIPTS,
   type ScriptArg,
+  type ScriptReply,
   type ScriptRunner
 } from '../scripts/runner';
 import { lockAction, unlockAction } from './locks';
@@ -75,7 +76,12 @@ export const MAX_WAIT_TICKS = 50;
 
 /** How far dispatch has got with a command */
 export type DispatchState = {
-  /** The receiver reached: an index into the receivers, then the built-in */
+  /** What the built-in action did, once it has run */
+  outcome?: ActionOutcome;
+  /**
+   * The question reached: an index into the receivers and vetoes, then the
+   * built-in, then the `after` questions
+   */
   stage: number;
   /** Ticks spent waiting on a Script at this stage */
   waitTicks: number;
@@ -163,54 +169,146 @@ const vetoQuestions = (ctx: ActionContext): Question[] =>
  * answers on a later pass, so the step may stop and wait; call it again
  * with the state it returned.
  */
+/**
+ * Where the `after` questions' stages start. The questions before the
+ * built-in are worked out from the world as it is, so once the built-in has
+ * changed it (a taken thing has no more veto questions), their count can
+ * change: `after` stages are numbered from here instead.
+ */
+const AFTER_STAGE = 1000;
+
+/** `afterExamine`, `afterTake`: the message sent once a built-in succeeds */
+const afterMessage = (verb: string) =>
+  `after${verb.charAt(0).toUpperCase()}${verb.slice(1)}`;
+
+type Asked =
+  | { kind: 'answered'; reply: Exclude<ScriptReply, { kind: 'waiting' }> }
+  | { kind: 'gave up' }
+  | { kind: 'waiting'; state: DispatchState };
+
+/** Asks one question of a Script, keeping track of how long it has waited */
+const ask = (
+  ctx: ActionContext,
+  question: Question,
+  stage: number,
+  { key, scripts, state }: Required<StepOptions>
+): Asked => {
+  const requestKey = `${key}:${stage}`;
+  const reply = scripts[question.asks](
+    requestKey,
+    question.id,
+    question.message,
+    question.args,
+    {
+      actor: ctx.playerId,
+      direction: ctx.direction,
+      indirect: ctx.indirectId,
+      target: ctx.targetId,
+      text: ctx.text,
+      verb: ctx.verb
+    }
+  );
+  if (reply.kind === 'waiting') {
+    const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
+    if (waitTicks <= MAX_WAIT_TICKS) {
+      return {
+        kind: 'waiting',
+        state: { outcome: state.outcome, stage, waitTicks }
+      };
+    }
+    log.warn(`Gave up waiting for a Script to answer ${question.message}`);
+    scripts.forget(requestKey);
+    return { kind: 'gave up' };
+  }
+  scripts.forget(requestKey);
+  return { kind: 'answered', reply };
+};
+
+/**
+ * Moves a command along the questions dispatch asks:
+ * 1. the receivers — the room it happens in, the second object, the thing
+ *    acted on — any of which may handle the command;
+ * 2. the veto questions of the built-in action (see vetoes.ts), any of
+ *    which may refuse it;
+ * 3. the built-in action itself;
+ * 4. once it has succeeded, `after<Verb>` (`afterExamine`) to the same
+ *    receivers, whose replies are added to the built-in's.
+ * Each question is answered by a fixed response, else by Scripts. A Script
+ * answers on a later pass, so the step may stop and wait; call it again
+ * with the state it returned.
+ */
 export const stepCommand = (
   ctx: ActionContext,
   { key, scripts = NO_SCRIPTS, state = { stage: 0, waitTicks: 0 } }: StepOptions
 ): DispatchStep => {
+  const options = { key, scripts, state };
   const questions = [...receiverQuestions(ctx), ...vetoQuestions(ctx)];
 
-  for (let stage = state.stage; stage < questions.length; stage++) {
-    const question = questions[stage]!;
-    if (question.response !== undefined) {
-      return finished(refused(question.response));
-    }
-    if (scripts.hasScript(question.id)) {
-      const requestKey = `${key}:${stage}`;
-      const reply = scripts[question.asks](
-        requestKey,
-        question.id,
-        question.message,
-        question.args,
-        {
-          actor: ctx.playerId,
-          direction: ctx.direction,
-          indirect: ctx.indirectId,
-          target: ctx.targetId,
-          text: ctx.text,
-          verb: ctx.verb
-        }
-      );
-      if (reply.kind === 'waiting') {
-        const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
-        if (waitTicks <= MAX_WAIT_TICKS) {
-          return { kind: 'waiting', state: { stage, waitTicks } };
-        }
-        log.warn(`Gave up waiting for a Script to answer ${question.message}`);
-        scripts.forget(requestKey);
+  if (state.outcome === undefined) {
+    for (let stage = state.stage; stage < questions.length; stage++) {
+      const question = questions[stage]!;
+      if (question.response !== undefined) {
+        return finished(refused(question.response));
+      }
+      if (!scripts.hasScript(question.id)) {
+        continue;
+      }
+      const asked = ask(ctx, question, stage, options);
+      if (asked.kind === 'waiting') {
+        return asked;
+      }
+      if (asked.kind === 'gave up') {
         return finished(refused('Nothing happens.'));
       }
-      scripts.forget(requestKey);
-      if (reply.kind === 'replied') {
-        return finished(question.onReply(reply.message));
+      if (asked.reply.kind === 'replied') {
+        return finished(question.onReply(asked.reply.message));
       }
-      if (reply.kind === 'failed') {
+      if (asked.reply.kind === 'failed') {
         return finished(refused('Something went wrong.'));
       }
       // passed: on to the next question
     }
   }
 
-  return finished(runBuiltIn(ctx));
+  // the built-in runs once; its outcome is kept while `after` waits
+  const outcome = state.outcome ?? runBuiltIn(ctx);
+  if (outcome.kind !== 'done') {
+    return finished(outcome);
+  }
+
+  const afters = receiverQuestions(ctx).map(q => ({
+    ...q,
+    message: afterMessage(ctx.verb)
+  }));
+  const first = AFTER_STAGE;
+  let message = outcome.message;
+  for (
+    let stage = Math.max(state.stage, first);
+    stage < first + afters.length;
+    stage++
+  ) {
+    const question = afters[stage - first]!;
+    if (!scripts.hasScript(question.id)) {
+      continue;
+    }
+    const asked = ask(ctx, question, stage, {
+      ...options,
+      state: { ...state, outcome: { ...outcome, message } }
+    });
+    if (asked.kind === 'waiting') {
+      return asked;
+    }
+    if (
+      asked.kind === 'answered' &&
+      asked.reply.kind === 'replied' &&
+      asked.reply.message
+    ) {
+      message = message
+        ? `${message}\n${asked.reply.message}`
+        : asked.reply.message;
+    }
+  }
+  return finished({ ...outcome, message });
 };
 
 /** Dispatches a command that no Script can delay, in one step */

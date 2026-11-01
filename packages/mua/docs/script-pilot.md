@@ -32,9 +32,10 @@ indirect` renders the built-in message for the command, from the thing's
    `things` Library: `use nameOf, actorName, fits from things`.
 3. **Lock and unlock duplicated each other** — _done._ Both call one local
    Handler, `turnKey`, which keeps `the target`.
-4. **A Script can't add to a built-in reply.** `examine` saying "It is closed
-   and locked." stays in TypeScript, reading the same component: a Script
-   either replaces a reply or passes. Still open.
+4. **Adding to a built-in reply** — _done._ Once a built-in succeeds, the
+   room, second object and target are sent `after<Verb>` (`afterExamine`),
+   and any text they return is added to the reply: `on afterExamine role,
+actor` can return "It hums faintly."
 5. **Verbs stay in TypeScript.** `lock X with Y` is parser data. Still open.
 6. **Gotchas met:** `"\n"` is not an escape in a double-quoted string (use
    `` `\n` ``); fire-and-forget operations need `tell`, not `ask`; `exit` and
@@ -45,4 +46,4 @@ indirect` renders the built-in message for the command, from the thing's
 With (1) to (3) done, a behaviour as a Script is shorter than the TypeScript,
 uses the same messages, and can be edited by world authors. New behaviours
 can reasonably be written as Scripts, with TypeScript kept for what Scripts
-can't yet do: adding to a built-in reply, and new verbs.
+can't yet do: new verbs.

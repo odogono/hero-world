@@ -1,4 +1,4 @@
-import { stepCommand } from '../actions';
+import { stepCommand, type ActionOutcome } from '../actions';
 import { entitiesIn } from '../queries/entity';
 import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
 import { createMuaSystem } from './create-mua-system';
@@ -16,6 +16,7 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
         indirect,
         indirectId,
         label,
+        outcome: kept,
         playerId,
         stage,
         target,
@@ -45,7 +46,11 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
         {
           key: `command:${entity.id}`,
           scripts,
-          state: { stage, waitTicks }
+          state: {
+            outcome: (kept ?? undefined) as ActionOutcome | undefined,
+            stage,
+            waitTicks
+          }
         }
       );
 
@@ -53,6 +58,7 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
       if (step.kind === 'waiting') {
         entity.commandEvent.stage = step.state.stage;
         entity.commandEvent.waitTicks = step.state.waitTicks;
+        entity.commandEvent.outcome = step.state.outcome;
         return;
       }
       const { outcome } = step;
