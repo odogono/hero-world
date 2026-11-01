@@ -24,7 +24,23 @@ _Avoid_: parent, container (as a relation)
 The entities whose Location is a given entity. Named ones can be looked up by name, and all of them are counted and indexed.
 _Avoid_: contents, children
 
+**Limbo**:
+The place that holds what is out of play: stored things, and players who have left until they return.
+_Avoid_: void, storage room
+
+**System actor**:
+The entity that acts when no player did, such as for resets and lifecycle messages.
+_Avoid_: admin, root
+
 ## Behaviour
+
+**NPC**:
+An entity that acts by issuing commands as a player does, driven by its Scripts.
+_Avoid_: mob, bot, monster
+
+**Veto**:
+A refusal, by an entity asked before an action changes the world, that stops the action.
+_Avoid_: block, cancel
 
 **Handle**:
 The Host Object that stands for one entity inside a Script Group.
