@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { dispatchCommand } from '../actions';
+import { MAX_WAIT_TICKS, dispatchCommand, stepCommand } from '../actions';
 import { getInScope } from '../queries/scope';
+import type { ScriptRunner } from '../scripts/runner';
 import { openTestWorld, type TestConnection } from './helpers';
 
 const FIXTURE = 'src/server/mua-world/__test__/fixtures/objects.edl';
@@ -106,6 +107,42 @@ describe('Dispatch', () => {
       expect(outcome).toEqual({
         kind: 'refused',
         message: "You can't do that."
+      });
+    });
+  });
+
+  describe('waiting on Scripts', () => {
+    const silent: ScriptRunner = {
+      forget: () => {},
+      hasScript: () => true,
+      offer: () => ({ kind: 'waiting' })
+    };
+
+    it('waits while a Script has not answered', () => {
+      const step = stepCommand(
+        { playerId: playerId(), verb: 'look', world: muaWorld() },
+        { key: 'test', scripts: silent }
+      );
+
+      expect(step).toEqual({
+        kind: 'waiting',
+        state: { stage: 0, waitTicks: 1 }
+      });
+    });
+
+    it('gives up on a Script that never answers', () => {
+      const step = stepCommand(
+        { playerId: playerId(), verb: 'look', world: muaWorld() },
+        {
+          key: 'test',
+          scripts: silent,
+          state: { stage: 0, waitTicks: MAX_WAIT_TICKS }
+        }
+      );
+
+      expect(step).toEqual({
+        kind: 'finished',
+        outcome: { kind: 'refused', message: 'Nothing happens.' }
       });
     });
   });

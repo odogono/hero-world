@@ -1,5 +1,6 @@
 import { locationComponent } from 'ecs-talk';
 import { defineComponent, s } from 'odgn-ecs/component';
+import { eventComponent } from 'odgn-ecs/events';
 import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
 
 const connectedDef = defineComponent({
@@ -80,6 +81,14 @@ const responsesDef = defineComponent({
   }
 });
 
+/** A NorthTalk Script owned by an atom; `src` is resolved against the EDL */
+const scriptDef = defineComponent({
+  id: 'script',
+  schema: {
+    src: s.string()
+  }
+});
+
 const describedDef = defineComponent({
   id: 'described',
   schema: {
@@ -121,11 +130,15 @@ const commandEventDef = defineComponent({
     /** Set when one command acts on several objects: prefixes the reply */
     label: s.string().optional(),
     playerId: s.entityId(),
+    /** Which receiver dispatch has reached (see actions/index.ts) */
     rawInput: s.string(),
+    stage: s.int().default(0),
     target: s.string().optional(),
     targetId: s.entityId().optional(),
     text: s.string().optional(),
-    verb: s.string()
+    verb: s.string(),
+    /** Ticks spent waiting on a Script's reply at the current stage */
+    waitTicks: s.int().default(0)
   }
 });
 
@@ -155,6 +168,8 @@ export const defs = [
   describedDef,
   nounDef,
   responsesDef,
+  scriptDef,
+  eventComponent,
   itemDef
 ];
 

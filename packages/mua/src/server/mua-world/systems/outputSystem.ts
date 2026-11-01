@@ -37,7 +37,7 @@ export const createOutputSystem = (connections: Map<string, MuaConnection>) =>
     },
     {
       frequency: 1,
-      priority: 40,
+      priority: 10,
       with: ['outputEvent']
     }
   );

@@ -2,6 +2,7 @@ import type { EntityId } from 'odgn-ecs/types';
 import { createLog } from 'odgn-helpers/log';
 
 import { getEntity, getLocationOf } from '../queries/entity';
+import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
 import { lookAction } from './look';
 import { moveAction } from './move';
 import {
@@ -13,7 +14,13 @@ import {
   takeAction
 } from './objects';
 import { sayAction, sayToAction } from './say';
-import { PASS, refused, type ActionContext, type ActionOutcome } from './types';
+import {
+  PASS,
+  done,
+  refused,
+  type ActionContext,
+  type ActionOutcome
+} from './types';
 
 export * from './types';
 
@@ -54,18 +61,20 @@ const responseFrom = (
   return typeof reply === 'string' ? reply : undefined;
 };
 
-/** Offers the command to one entity in one role */
-const offer = (
-  ctx: ActionContext,
-  id: EntityId | undefined,
-  role: Role
-): ActionOutcome => {
-  if (id === undefined) {
-    return PASS;
-  }
-  const reply = responseFrom(ctx, id, role);
-  return reply === undefined ? PASS : refused(reply);
+/** Most ticks to wait for a Script's reply before giving up on it */
+export const MAX_WAIT_TICKS = 50;
+
+/** How far dispatch has got with a command */
+export type DispatchState = {
+  /** The receiver reached: an index into the receivers, then the built-in */
+  stage: number;
+  /** Ticks spent waiting on a Script at this stage */
+  waitTicks: number;
 };
+
+export type DispatchStep =
+  | { kind: 'finished'; outcome: ActionOutcome }
+  | { kind: 'waiting'; state: DispatchState };
 
 const runBuiltIn = (ctx: ActionContext): ActionOutcome => {
   const handler = BUILT_IN[ctx.verb];
@@ -80,24 +89,74 @@ const runBuiltIn = (ctx: ActionContext): ActionOutcome => {
   }
 };
 
+const finished = (outcome: ActionOutcome): DispatchStep => ({
+  kind: 'finished',
+  outcome: outcome.kind === 'pass' ? refused(CANNOT) : outcome
+});
+
+export type StepOptions = {
+  /** Identifies this command's Script requests across ticks */
+  key: string;
+  scripts?: ScriptRunner;
+  state?: DispatchState;
+};
+
 /**
- * Dispatches a command. Each receiver in turn may handle it, and the first
- * that does wins: the room it happens in, then the second object, then the
- * thing acted on, then the built-in action. A receiver that passes lets the
- * command go on to the next.
+ * Moves a command along its receivers, and the first that handles it wins:
+ * the room it happens in, then the second object, then the thing acted on,
+ * then the built-in action. At each receiver a fixed response is checked,
+ * then its Scripts. A Script answers on a later tick, so the step may stop
+ * and wait; call it again on the next tick with the state it returned.
  */
-export const dispatchCommand = (ctx: ActionContext): ActionOutcome => {
+export const stepCommand = (
+  ctx: ActionContext,
+  { key, scripts = NO_SCRIPTS, state = { stage: 0, waitTicks: 0 } }: StepOptions
+): DispatchStep => {
   const receivers: [Role, EntityId | undefined][] = [
     ['room', getLocationOf(ctx.world, ctx.playerId)],
     ['indirect', ctx.indirectId],
     ['target', ctx.targetId]
   ];
-  for (const [role, id] of receivers) {
-    const outcome = offer(ctx, id, role);
-    if (outcome.kind !== 'pass') {
-      return outcome;
+
+  for (let stage = state.stage; stage < receivers.length; stage++) {
+    const [role, id] = receivers[stage]!;
+    if (id === undefined) {
+      continue;
     }
+    const response = responseFrom(ctx, id, role);
+    if (response !== undefined) {
+      return finished(refused(response));
+    }
+    if (!scripts.hasScript(id)) {
+      continue;
+    }
+
+    const requestKey = `${key}:${stage}`;
+    const reply = scripts.offer(requestKey, id, ctx.verb, role, ctx.playerId);
+    if (reply.kind === 'waiting') {
+      const waitTicks = stage === state.stage ? state.waitTicks + 1 : 1;
+      if (waitTicks <= MAX_WAIT_TICKS) {
+        return { kind: 'waiting', state: { stage, waitTicks } };
+      }
+      log.warn(`Gave up waiting for a Script to answer ${ctx.verb}`);
+      scripts.forget(requestKey);
+      return finished(refused('Nothing happens.'));
+    }
+    scripts.forget(requestKey);
+    if (reply.kind === 'replied') {
+      return finished(done(reply.message ?? ''));
+    }
+    if (reply.kind === 'failed') {
+      return finished(refused('Something went wrong.'));
+    }
+    // passed: on to the next receiver
   }
-  const outcome = runBuiltIn(ctx);
-  return outcome.kind === 'pass' ? refused(CANNOT) : outcome;
+
+  return finished(runBuiltIn(ctx));
+};
+
+/** Dispatches a command that no Script can delay, in one step */
+export const dispatchCommand = (ctx: ActionContext): ActionOutcome => {
+  const step = stepCommand(ctx, { key: 'sync' });
+  return step.kind === 'finished' ? step.outcome : refused(CANNOT);
 };

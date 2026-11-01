@@ -8,7 +8,7 @@ export const inputSystem = createMuaSystem(
   },
   {
     frequency: 1,
-    priority: 10,
+    priority: 40,
     with: ['inputEvent']
   }
 );
