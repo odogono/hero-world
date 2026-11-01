@@ -36,6 +36,17 @@ export const App = () => {
       if (data && data.data) {
         gameState.addMessage(data.data, data.success ? 'game' : 'error');
       }
+      // `look` sends the room as data too: prefer it to parsing the text
+      if (data?.room) {
+        const { description, exits, items, name, players } = data.room;
+        gameState.updateRoomData({
+          description,
+          exits,
+          items,
+          name,
+          npcs: players
+        });
+      }
     },
     status => {
       // Handle connection status changes

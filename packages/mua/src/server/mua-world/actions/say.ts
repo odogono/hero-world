@@ -14,11 +14,13 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
   }
 
   return {
-    broadcast: {
-      exclude: playerId,
-      message: `${player.player.name} says, "${text}"`,
-      roomId: player.location.in
-    },
+    broadcasts: [
+      {
+        exclude: playerId,
+        message: `${player.player.name} says, "${text}"`,
+        roomId: player.location.in
+      }
+    ],
     kind: 'done',
     message: `You say, "${text}"`
   };
@@ -40,11 +42,13 @@ export const sayToAction = (ctx: ActionContext): ActionOutcome => {
   const speaker = getEntity(world, playerId, ['player', 'location']);
   const { name } = listener.player;
   return {
-    broadcast: speaker && {
-      exclude: playerId,
-      message: `${speaker.player.name} says to ${name}, "${text}"`,
-      roomId: speaker.location.in
-    },
+    broadcasts: speaker && [
+      {
+        exclude: playerId,
+        message: `${speaker.player.name} says to ${name}, "${text}"`,
+        roomId: speaker.location.in
+      }
+    ],
     kind: 'done',
     message: `You say to ${name}, "${text}"`
   };

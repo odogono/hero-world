@@ -2,6 +2,7 @@ import type { EntityId } from 'odgn-ecs/types';
 
 import { getEntity, getLocationOf } from '../queries/entity';
 import { getElements, theName } from '../queries/scope';
+import { messageFor } from './messages';
 import { done, refused, type ActionContext, type ActionOutcome } from './types';
 
 const capitalise = (text: string) =>
@@ -46,10 +47,26 @@ const nameOf = (ctx: ActionContext, id: EntityId) => {
   return theName({ isPlayer: false, name: described?.described.name ?? 'it' });
 };
 
-const actorName = (ctx: ActionContext) =>
-  getEntity(ctx.world, ctx.playerId, ['player'])?.player.name ?? 'Someone';
-
-const roomOf = (ctx: ActionContext) => getLocationOf(ctx.world, ctx.playerId);
+/**
+ * Finishes a built-in action with its messages: `msg` for the actor (or
+ * `message` when given) and `omsg` for everyone else in the room.
+ */
+const report = (
+  ctx: ActionContext,
+  handler: string,
+  message?: string
+): ActionOutcome => {
+  const roomId = getLocationOf(ctx.world, ctx.playerId);
+  const others = messageFor(ctx, handler, 'omsg');
+  return {
+    broadcasts:
+      roomId === undefined || !others
+        ? undefined
+        : [{ exclude: ctx.playerId, message: others, roomId }],
+    kind: 'done',
+    message: message ?? messageFor(ctx, handler, 'msg') ?? ''
+  };
+};
 
 export const takeAction = (ctx: ActionContext): ActionOutcome => {
   const { playerId, targetId, world } = ctx;
@@ -71,25 +88,13 @@ export const takeAction = (ctx: ActionContext): ActionOutcome => {
   target.location = { in: playerId };
   world.flush();
 
-  const roomId = roomOf(ctx);
-  return {
-    broadcast:
-      roomId === undefined
-        ? undefined
-        : {
-            exclude: playerId,
-            message: `${actorName(ctx)} takes ${nameOf(ctx, target.id)}.`,
-            roomId
-          },
-    kind: 'done',
-    message: 'Taken.'
-  };
+  return report(ctx, 'take');
 };
 
 export const dropAction = (ctx: ActionContext): ActionOutcome => {
-  const { playerId, targetId, world } = ctx;
+  const { targetId, world } = ctx;
   const target = getEntity(world, targetId, ['location'], true);
-  const roomId = roomOf(ctx);
+  const roomId = getLocationOf(world, ctx.playerId);
   if (!target || roomId === undefined) {
     return refused('Drop what?');
   }
@@ -97,15 +102,7 @@ export const dropAction = (ctx: ActionContext): ActionOutcome => {
   target.location = { in: roomId };
   world.flush();
 
-  return {
-    broadcast: {
-      exclude: playerId,
-      message: `${actorName(ctx)} drops ${nameOf(ctx, target.id)}.`,
-      roomId
-    },
-    kind: 'done',
-    message: 'Dropped.'
-  };
+  return report(ctx, 'drop');
 };
 
 export const inventoryAction = (ctx: ActionContext): ActionOutcome => {
@@ -136,26 +133,14 @@ const setClosed = (ctx: ActionContext, isClosed: boolean): ActionOutcome => {
   target.container = { ...target.container, isClosed };
   world.flush();
 
-  const roomId = roomOf(ctx);
-  const result = {
-    broadcast:
-      roomId === undefined
-        ? undefined
-        : {
-            exclude: playerId,
-            message: `${actorName(ctx)} ${verb}s ${name}.`,
-            roomId
-          },
-    kind: 'done' as const,
-    message: isClosed ? 'Closed.' : 'Opened.'
-  };
-  if (!isClosed) {
-    const inside = getElements(world, target.id);
-    if (inside.length > 0) {
-      result.message = `Opening ${name} reveals: ${listNames(inside)}.`;
-    }
-  }
-  return result;
+  const inside = isClosed ? [] : getElements(world, target.id);
+  return report(
+    ctx,
+    verb,
+    inside.length > 0
+      ? `Opening ${name} reveals: ${listNames(inside)}.`
+      : undefined
+  );
 };
 
 export const openAction = (ctx: ActionContext) => setClosed(ctx, false);

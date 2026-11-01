@@ -82,3 +82,22 @@ entity vault : room {
 entity workshop_east : exit {
   location { in: $west_of_house } portal { dir: "east" to: $vault }
 }
+
+# Messages that replace the built-in defaults, set directly or inherited
+atom fragile {
+  messages { omsg: { drop: "{actor} sets {the target} down very gently." } }
+}
+
+entity vase : item fragile {
+  described { name: "Vase" description: "A thin porcelain vase." }
+  messages { msg: { take: "You lift {the target} with both hands." } }
+  location { in: $west_of_house }
+}
+
+entity trapdoor : exit {
+  location { in: $vault } portal { dir: "down" to: $west_of_house }
+  messages {
+    msg: { move: "You drop through the trapdoor." }
+    omsg: { move: "{actor} vanishes through the trapdoor.", arrive: "{actor} tumbles out of the ceiling." }
+  }
+}

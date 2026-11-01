@@ -1,12 +1,8 @@
 import { getEntity } from '../queries/entity';
 import { findExitByDirection } from '../queries/room';
 import { lookAction } from './look';
-import {
-  messageOf,
-  refused,
-  type ActionContext,
-  type ActionOutcome
-} from './types';
+import { messageFor } from './messages';
+import { refused, type ActionContext, type ActionOutcome } from './types';
 
 export const moveAction = (ctx: ActionContext): ActionOutcome => {
   const { direction, playerId, world } = ctx;
@@ -39,16 +35,26 @@ export const moveAction = (ctx: ActionContext): ActionOutcome => {
   player.location = { in: exit.portal.to };
   world.flush();
 
+  // the exit's `messages` can replace what is said as the actor passes
+  const passing = messageFor(ctx, 'move', 'msg', exit.id);
+  const left = messageFor(ctx, 'move', 'omsg', exit.id);
+  const arrived = messageFor(ctx, 'arrive', 'omsg', exit.id);
+
   // Auto-look at new room
-  const lookResult = lookAction(ctx);
+  const look = lookAction(ctx);
+  const seen = look.kind === 'done' ? look : undefined;
 
   return {
-    broadcast: {
-      exclude: playerId,
-      message: `${getEntity(world, playerId, ['player'])?.player.name ?? 'Someone'} arrives.`,
-      roomId: exit.portal.to
-    },
+    broadcasts: [
+      ...(left
+        ? [{ exclude: playerId, message: left, roomId: currentRoom }]
+        : []),
+      ...(arrived
+        ? [{ exclude: playerId, message: arrived, roomId: exit.portal.to }]
+        : [])
+    ],
     kind: 'done',
-    message: messageOf(lookResult) ?? ''
+    message: [passing, seen?.message].filter(Boolean).join('\n'),
+    room: seen?.room
   };
 };

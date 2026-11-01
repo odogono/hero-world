@@ -24,6 +24,17 @@ export type Broadcast = {
   roomId: EntityId;
 };
 
+/** What the player can see of a room, sent with `look` for clients to show */
+export type RoomView = {
+  description: string;
+  exits: string[];
+  /** Things in the room */
+  items: string[];
+  name: string;
+  /** Other players in the room */
+  players: string[];
+};
+
 /**
  * What a handler did with a command:
  * - `done`    it acted; the world may have changed
@@ -31,12 +42,22 @@ export type Broadcast = {
  * - `pass`    not mine: offer the command to the next handler
  */
 export type ActionOutcome =
-  | { broadcast?: Broadcast; kind: 'done'; message: string }
+  | {
+      broadcasts?: Broadcast[];
+      kind: 'done';
+      message: string;
+      room?: RoomView;
+    }
   | { kind: 'pass' }
   | { kind: 'refused'; message: string };
 
-export const done = (message: string, broadcast?: Broadcast): ActionOutcome =>
-  broadcast ? { broadcast, kind: 'done', message } : { kind: 'done', message };
+export const done = (
+  message: string,
+  broadcasts?: Broadcast[]
+): ActionOutcome =>
+  broadcasts
+    ? { broadcasts, kind: 'done', message }
+    : { kind: 'done', message };
 
 export const refused = (message: string): ActionOutcome => ({
   kind: 'refused',
