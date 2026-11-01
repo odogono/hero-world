@@ -350,7 +350,7 @@ export const mapRowToEntity = <T extends Components>(
       continue;
     }
 
-    entity[c] = makeTrackedComponent(entity, c as string, data);
+    entity[c] = makeTrackedComponent(entity, c as string, data, true, 'read');
   }
 
   return entity;
