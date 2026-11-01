@@ -19,7 +19,7 @@ const createConnection = (id: string): TestConnection => {
 };
 
 /**
- * Opens a MuaWorld that is driven by hand rather than on the 1s interval,
+ * Opens a MuaWorld that is driven by hand rather than on its interval,
  * with helpers to log players in and send commands.
  */
 export const openTestWorld = async (mainEDL?: string) => {
@@ -53,24 +53,11 @@ export const openTestWorld = async (mainEDL?: string) => {
     return conn.messages.join('\n');
   };
 
-  /**
-   * Sends a command and keeps ticking, letting Script replies settle between
-   * ticks, until the sender has been told something (or `ticks` run out).
-   */
-  const sendAndWait = async (
-    conn: TestConnection,
-    text: string,
-    ticks = 10
-  ) => {
+  /** Sends a command, runs one full tick (Scripts included), and returns what the sender was told */
+  const sendAndWait = async (conn: TestConnection, text: string) => {
     conn.messages.length = 0;
     muaWorld.onConnectionCommand(conn, text);
-    for (let ii = 0; ii < ticks && conn.messages.length === 0; ii++) {
-      tick(1);
-      await Bun.sleep(0);
-    }
-    // one more tick for anything that follows the reply, such as a show
-    tick(1);
-    await Bun.sleep(0);
+    await muaWorld.tick(1000);
     return conn.messages.join('\n');
   };
 

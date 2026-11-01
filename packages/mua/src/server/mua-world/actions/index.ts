@@ -61,7 +61,7 @@ const responseFrom = (
   return typeof reply === 'string' ? reply : undefined;
 };
 
-/** Most ticks to wait for a Script's reply before giving up on it */
+/** Most game-loop passes to wait for a Script's reply before giving up on it (about one pass per tick while it stays silent) */
 export const MAX_WAIT_TICKS = 50;
 
 /** How far dispatch has got with a command */
