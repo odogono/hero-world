@@ -128,6 +128,26 @@ const npcInputDef = defineComponent({
   }
 });
 
+/**
+ * Something that can be locked: `lock` names its lock, and any key whose
+ * `key.opens` lists that name fits it, e.g. `lockable { lock: "cellar" }`.
+ */
+const lockableDef = defineComponent({
+  id: 'lockable',
+  schema: {
+    isLocked: s.boolean().default(false),
+    lock: s.string()
+  }
+});
+
+/** A key: the names of the locks it fits, e.g. `key { opens: ["cellar"] }` */
+const keyDef = defineComponent({
+  id: 'key',
+  schema: {
+    opens: s.array('string')
+  }
+});
+
 /** Where a thing belongs, so a reset can put it back (see lifecycle.ts) */
 const homeDef = defineComponent({
   id: 'home',
@@ -274,6 +294,8 @@ export const defs = [
   portalDef,
   exitsDef,
   homeDef,
+  lockableDef,
+  keyDef,
   npcDef,
   npcInputDef,
   talkTimerComponent,

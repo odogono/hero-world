@@ -6,6 +6,7 @@ import {
   getLocationOf
 } from '../queries/entity';
 import { getElements, theName } from '../queries/scope';
+import { lockedRefusal } from './locks';
 import { messageFor } from './messages';
 import { done, refused, type ActionContext, type ActionOutcome } from './types';
 
@@ -37,7 +38,12 @@ export const examineAction = (ctx: ActionContext): ActionOutcome => {
 
   if (container && !player) {
     if (container.container.isClosed) {
-      lines.push('It is closed.');
+      const lockable = getEntity(world, container.id, ['lockable']);
+      lines.push(
+        lockable?.lockable.isLocked
+          ? 'It is closed and locked.'
+          : 'It is closed.'
+      );
     } else {
       const inside = getElements(world, container.id);
       lines.push(
@@ -142,6 +148,10 @@ const setClosed = (ctx: ActionContext, isClosed: boolean): ActionOutcome => {
     return refused(`You can't ${verb} that.`);
   }
   const name = nameOf(ctx, target.id);
+  const locked = isClosed ? undefined : lockedRefusal(ctx, target.id);
+  if (locked) {
+    return locked;
+  }
   if (target.container.isClosed === isClosed) {
     return refused(
       `${capitalise(name)} is already ${isClosed ? 'closed' : 'open'}.`
