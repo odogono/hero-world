@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { listVerbs } from '../commands/verbs';
+import { listVerbs, vocabularyOf } from '../commands/verbs';
 import { openTestWorld } from './helpers';
 
 describe('Gameplay', () => {
@@ -85,7 +85,9 @@ describe('Gameplay', () => {
     const welcome = conn.payloads.find(p =>
       String(p.data).startsWith('Welcome')
     );
-    expect(welcome?.verbs).toEqual(listVerbs());
+    expect(welcome?.verbs).toEqual(
+      listVerbs(vocabularyOf(world.muaWorld.world!))
+    );
   });
 
   it('starts a look with the room, with no stray blank lines', async () => {
