@@ -30,7 +30,7 @@ const parseArgs = (argv: string[]): Flags | 'help' | 'invalid' => {
     zodNoImports: false
   };
   for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
+    const a = argv[i]!; // i < argv.length
     if (a === '--help' || a === '-h') {
       return 'help';
     }

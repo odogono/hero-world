@@ -8,7 +8,7 @@ A Bun workspace of game libraries and the games built on them. Package `AGENTS.m
 - `packages/ecs-talk`: NorthTalk Host Adapter that lets Scripts drive an `odgn-ecs` World. See `packages/ecs-talk/README.md`.
 - `packages/mua`: text-adventure server (Elysia + `mua-world` ECS) and OpenTUI client. See `packages/mua/AGENTS.md`.
 - `packages/helpers` (`odgn-helpers`): logging, strings, `trycatch`.
-- `tools/`: commit, changelog and typecheck-ratchet scripts.
+- `tools/`: commit, changelog and typecheck scripts.
 - `GLOSSARY.md` and `docs/adr/`: domain terms and decisions (`docs/agents/domain.md`).
 
 ## Sources outside this repo
@@ -19,7 +19,7 @@ A Bun workspace of game libraries and the games built on them. Package `AGENTS.m
 ## Workflow
 
 - Install: `bun install` at the root, which also turns on the git hooks in `.githooks/`.
-- Everything CI runs: `bun run check`. Typecheck is a per-file ratchet: `docs/agents/checks.md`.
+- Everything CI runs: `bun run check` (`docs/agents/checks.md`).
 - Commit subjects and changelog fragments: `docs/agents/commits.md`.
 - Package scripts (`test`, `lint`, `format`) live in each `package.json`; run them from the package directory.
 - Issues: GitHub Issues on `odogono/hero-world` (`docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`).
