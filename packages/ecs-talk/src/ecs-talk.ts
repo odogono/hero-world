@@ -326,6 +326,18 @@ export const createEcsTalk = <TComponents extends Components>(
       },
       mode: 'immediate'
     },
+    resolve: {
+      args: [shape.number],
+      cost: COST,
+      do: (_call, id) => {
+        const eid = Number(id);
+        return Number.isInteger(eid) && isLive(eid)
+          ? handle(eid).value
+          : nothing;
+      },
+      mode: 'immediate',
+      result: shape.optional(entityArg)
+    },
     show: {
       args: [entityArg, shape.text],
       command: true,
@@ -394,12 +406,15 @@ export const createEcsTalk = <TComponents extends Components>(
     if (existing) {
       return existing;
     }
-    const created = group.object(entityKind, String(eid), { eid });
+    // The parent is set as the Handle is made, so a Script that reaches the
+    // entity inside a Run can send to it in that Run (odgn-talk ADR 0152).
+    const created = group.object(
+      entityKind,
+      String(eid),
+      { eid },
+      { parent: parentOfEntity(eid) }
+    );
     handles.set(eid, created);
-    const parent = parentOfEntity(eid);
-    if (parent) {
-      group.setParent(created, parent);
-    }
     return created;
   };
 
@@ -430,7 +445,10 @@ export const createEcsTalk = <TComponents extends Components>(
     try {
       const script = group.load({
         grants: {
-          world: worldCapability.grant(['find', 'moveTo', 'show'], undefined),
+          world: worldCapability.grant(
+            ['find', 'moveTo', 'resolve', 'show'],
+            undefined
+          ),
           ...loadOptions.grants
         },
         limits: loadOptions.limits,
@@ -452,7 +470,7 @@ export const createEcsTalk = <TComponents extends Components>(
    * Drop the Handles of entities whose deletion has been flushed. One only
    * marked for deletion stays, and reads as Nothing until it is dropped.
    */
-  const sweep = () => {
+  const sync = () => {
     for (const [eid, obj] of handles) {
       if (world.get(eid) === null) {
         handles.delete(eid);
@@ -463,7 +481,7 @@ export const createEcsTalk = <TComponents extends Components>(
 
   /** Pump the Script Group once */
   const pump = (): PumpResult => {
-    sweep();
+    sync();
     const result = group.pump(clock());
     onPump?.(result);
     return result;
@@ -486,8 +504,12 @@ export const createEcsTalk = <TComponents extends Components>(
   const request = (eid: number, message: string, ...args: Value[]) =>
     group.request(handle(eid), { args, name: message });
 
+  const decide = (eid: number, message: string, ...args: Value[]) =>
+    group.decide(handle(eid), { args, name: message });
+
   return {
     atomKind,
+    decide,
     deliver,
     entityKind,
     group,

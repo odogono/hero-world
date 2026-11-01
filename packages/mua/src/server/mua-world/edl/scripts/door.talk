@@ -1,0 +1,8 @@
+-- Owned by the `door` atom, whose parent is the `exit` atom's Script.
+
+-- Refuse passage while the door is locked
+on beforeTraverse actor, deciding
+  if the isLocked of the door of the target then
+    veto the msg of the portal of the target otherwise "The door is locked."
+  end if
+end beforeTraverse

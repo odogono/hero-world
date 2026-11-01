@@ -27,9 +27,11 @@ export const openTestWorld = async (mainEDL?: string) => {
   await muaWorld.open();
   clearInterval(muaWorld.updateLoopInterval!);
 
-  const tick = (count = 3) => {
+  // Script Runs settle through promises, so let them resolve between ticks
+  const tick = async (count = 6) => {
     for (let ii = 0; ii < count; ii++) {
       muaWorld.loop!.update(1000);
+      await Bun.sleep(0);
     }
   };
 
@@ -46,10 +48,10 @@ export const openTestWorld = async (mainEDL?: string) => {
   };
 
   /** Sends a command and returns everything the sender was told */
-  const send = (conn: TestConnection, text: string) => {
+  const send = async (conn: TestConnection, text: string) => {
     conn.messages.length = 0;
     muaWorld.onConnectionCommand(conn, text);
-    tick();
+    await tick();
     return conn.messages.join('\n');
   };
 

@@ -1,5 +1,6 @@
 import { locationComponent } from 'ecs-talk';
 import { defineComponent, s } from 'odgn-ecs/component';
+import { eventComponent } from 'odgn-ecs/events';
 import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
 
 const connectedDef = defineComponent({
@@ -29,6 +30,21 @@ const containerDef = defineComponent({
   schema: {
     capacity: s.number().default(10),
     isClosed: s.boolean().default(false)
+  }
+});
+
+/** A NorthTalk Script that an atom or entity owns; `src` is relative to the EDL file */
+const scriptDef = defineComponent({
+  id: 'script',
+  schema: {
+    src: s.string()
+  }
+});
+
+const doorDef = defineComponent({
+  id: 'door',
+  schema: {
+    isLocked: s.boolean().default(false)
   }
 });
 
@@ -152,6 +168,9 @@ export const defs = [
   metaDef,
   locationComponent,
   portalDef,
+  doorDef,
+  scriptDef,
+  eventComponent,
   describedDef,
   nounDef,
   responsesDef,

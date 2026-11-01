@@ -32,17 +32,17 @@ describe('Dispatch', () => {
   });
 
   describe('target responses', () => {
-    it('refuse instead of the built-in action, inherited from an atom', () => {
-      expect(send('take statue')).toBe("It's bolted to the floor.");
-      expect(send('i')).toBe('You are empty-handed.');
+    it('refuse instead of the built-in action, inherited from an atom', async () => {
+      expect(await send('take statue')).toBe("It's bolted to the floor.");
+      expect(await send('i')).toBe('You are empty-handed.');
     });
 
-    it('only apply to their own verb', () => {
-      expect(send('examine statue')).toBe('A marble statue.');
+    it('only apply to their own verb', async () => {
+      expect(await send('examine statue')).toBe('A marble statue.');
     });
 
-    it('apply to each object of a multi-object command', () => {
-      expect(send('take lamp and statue')).toBe(
+    it('apply to each object of a multi-object command', async () => {
+      expect(await send('take lamp and statue')).toBe(
         "Lamp: Taken.\nStatue: It's bolted to the floor."
       );
     });
@@ -51,26 +51,26 @@ describe('Dispatch', () => {
   describe('room responses', () => {
     it('refuse commands made inside the room', async () => {
       const alice = await world.login('alice');
-      send('take lamp');
-      send('east');
+      await send('take lamp');
+      await send('east');
       alice.messages.length = 0;
 
-      expect(send('drop lamp')).toBe(
+      expect(await send('drop lamp')).toBe(
         'The floor is too sacred to drop things on.'
       );
-      expect(send('say hello')).toBe('The silence swallows your words.');
-      expect(send('i')).toBe('You are carrying: the lamp.');
+      expect(await send('say hello')).toBe('The silence swallows your words.');
+      expect(await send('i')).toBe('You are carrying: the lamp.');
       expect(alice.messages).toEqual([]);
     });
 
-    it('do not apply in other rooms', () => {
-      send('take lamp');
-      expect(send('drop lamp')).toBe('Dropped.');
+    it('do not apply in other rooms', async () => {
+      await send('take lamp');
+      expect(await send('drop lamp')).toBe('Dropped.');
     });
   });
 
   describe('order', () => {
-    it('asks the second object before the thing acted on', () => {
+    it('asks the second object before the thing acted on', async () => {
       const outcome = dispatchCommand({
         indirectId: idOf('Plinth'),
         playerId: playerId(),
@@ -85,7 +85,7 @@ describe('Dispatch', () => {
       });
     });
 
-    it('falls through to the built-in action when nobody responds', () => {
+    it('falls through to the built-in action when nobody responds', async () => {
       const outcome = dispatchCommand({
         playerId: playerId(),
         targetId: idOf('Crate'),
@@ -96,7 +96,7 @@ describe('Dispatch', () => {
       expect(outcome).toMatchObject({ kind: 'done' });
     });
 
-    it('refuses a verb that nothing handles', () => {
+    it('refuses a verb that nothing handles', async () => {
       const outcome = dispatchCommand({
         playerId: playerId(),
         verb: 'dance',

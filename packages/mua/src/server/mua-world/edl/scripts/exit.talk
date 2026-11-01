@@ -1,0 +1,25 @@
+-- Owned by the `exit` atom. `the target` is the exit being traversed.
+
+-- Move the actor through the portal and tell the players already there.
+-- mua shows the mover the new room once the Request settles.
+on traverse actor
+  put the portal of the target into portal
+  if the to of portal is nothing then
+    show actor, the msg of portal otherwise "That exit leads nowhere."
+    return
+  end if
+
+  ask world to resolve the to of portal
+  put it into dest
+  if dest is nothing then
+    show actor, "That exit leads nowhere."
+    return
+  end if
+
+  ask world to find dest, "player"
+  put it into others
+  moveTo actor, dest
+  repeat for each other in others
+    show other, the name of the player of actor & " arrives."
+  end repeat
+end traverse
