@@ -30,10 +30,21 @@ export const ensurePlaces = (world: World<MuaComponents>): Places => {
   const system =
     findRoomByMetaId(world, SYSTEM_META_ID)?.id ??
     world.create({
+      clock: { now: 0 },
       described: { description: 'The world itself.', name: 'The world' },
       location: { in: limbo },
       meta: { props: { id: SYSTEM_META_ID } }
     }).id;
+  // the system actor keeps the world's clock
+  const actor = world.query({
+    asProxy: true,
+    entity: { id: system, world },
+    maybe: ['clock'],
+    with: ['meta']
+  });
+  if (actor && !actor.clock) {
+    actor.clock = { now: 0 };
+  }
   world.flush();
   return { limbo, system };
 };
