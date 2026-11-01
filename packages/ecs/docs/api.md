@@ -14,7 +14,9 @@ const stats = defineComponent({
 ```
 
 - The schema builders are `s` in `component/builder.ts`: `int`, `float`, `number`, `string`, `boolean`, `enum`, `json`, `array`, `entityId`, `date`, `datetime`, `time`, `timestamp`, `now`, `uuid`, `email`, `pk`.
-- `s.array(type)` ignores `type`: items are stored as JSON and aren't checked.
+- Field types are what a read from the database returns: `datetime` is a `Date`; `date` and `time` are strings; `timestamp` is a number. Write those types too: a write stays in the cache as given until the next query reloads it.
+- `s.json<T>()` types the value as `T`, `unknown` without it. `s.array('string')` types the items, but neither is checked at runtime.
+- `.default()` doesn't make a field optional when creating an entity, though the default is applied.
 - camelCase fields become snake_case columns; `id` and `eid` are reserved field names.
 - `addComponent` / `removeComponent` (`component/add.ts`, `remove.ts`) are the function forms of assigning to an entity.
 

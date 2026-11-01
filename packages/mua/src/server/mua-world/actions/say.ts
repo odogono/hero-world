@@ -9,7 +9,8 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
   }
 
   const player = getEntity(world, playerId, ['player', 'location']);
-  if (!player) {
+  const room = player?.location.in;
+  if (!player || room === undefined) {
     return refused('There is nobody here to hear you.');
   }
 
@@ -18,7 +19,7 @@ export const sayAction = (ctx: ActionContext): ActionOutcome => {
       {
         exclude: playerId,
         message: `${player.player.name} says, "${text}"`,
-        to: player.location.in
+        to: room
       }
     ],
     kind: 'done',
@@ -40,15 +41,19 @@ export const sayToAction = (ctx: ActionContext): ActionOutcome => {
   }
 
   const speaker = getEntity(world, playerId, ['player', 'location']);
+  const room = speaker?.location.in;
   const { name } = listener.player;
   return {
-    broadcasts: speaker && [
-      {
-        exclude: playerId,
-        message: `${speaker.player.name} says to ${name}, "${text}"`,
-        to: speaker.location.in
-      }
-    ],
+    broadcasts:
+      speaker && room !== undefined
+        ? [
+            {
+              exclude: playerId,
+              message: `${speaker.player.name} says to ${name}, "${text}"`,
+              to: room
+            }
+          ]
+        : undefined,
     kind: 'done',
     message: `You say to ${name}, "${text}"`
   };

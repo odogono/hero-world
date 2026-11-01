@@ -23,6 +23,10 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
         verb,
         waitTicks
       } = entity.commandEvent;
+      if (playerId === undefined) {
+        world.delete(entity);
+        return;
+      }
 
       // Execute action
       const step = stepCommand(

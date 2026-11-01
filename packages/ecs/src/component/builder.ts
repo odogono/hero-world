@@ -1,26 +1,29 @@
 import type { CDefColumnInfo, CDefColumnType } from '../types';
 import { getDefault } from './defaults';
-import type { ColumnBuilder } from './types';
+import type { ColumnBuilder, ValueFromType } from './types';
 
-const columnBuilder = <TType extends CDefColumnType>(
+const columnBuilder = <
+  TType extends CDefColumnType,
+  TValue = ValueFromType<TType>
+>(
   type: TType
-): ColumnBuilder<TType, false> => {
+): ColumnBuilder<TType, false, TValue> => {
   const column: CDefColumnInfo = {
     name: 'unknown',
     optional: false,
     type
   };
 
-  const builder: ColumnBuilder<TType, false> = {
+  const builder: ColumnBuilder<TType, false, TValue> = {
     build: (props: { name: string }) => {
       column.name = props.name;
       return column;
     },
-    default: (
-      value?:
-        string | number | boolean | Array<string | number | boolean> | undefined
-    ) => {
-      column.default = value === undefined ? getDefault(column.type) : value;
+    default: (value?: unknown) => {
+      column.default =
+        value === undefined
+          ? getDefault(column.type)
+          : (value as CDefColumnInfo['default']);
       return builder;
     },
     foreignKey: (foreignKey: string) => {
@@ -33,7 +36,7 @@ const columnBuilder = <TType extends CDefColumnType>(
     },
     optional: () => {
       column.optional = true;
-      return builder as unknown as ColumnBuilder<TType, true>;
+      return builder as unknown as ColumnBuilder<TType, true, TValue>;
     },
     unique: () => {
       column.isUnique = true;
@@ -44,7 +47,9 @@ const columnBuilder = <TType extends CDefColumnType>(
   return builder;
 };
 
-const array = (type: CDefColumnType) => columnBuilder('array');
+/** An array stored as JSON; `type` types the items but isn't checked. */
+const array = <TItem extends CDefColumnType>(_type: TItem) =>
+  columnBuilder<'array', ValueFromType<TItem>[]>('array');
 const boolean = () => columnBuilder('boolean');
 const date = () => columnBuilder('date');
 const datetime = () => columnBuilder('datetime');
@@ -67,7 +72,8 @@ const enumBuilder = (values: string[]) => {
 };
 const float = () => columnBuilder('float');
 const int = () => columnBuilder('int');
-const json = () => columnBuilder('json');
+/** A JSON value; pass its type, as in `s.json<PendingCommand>()`. */
+const json = <TValue = unknown>() => columnBuilder<'json', TValue>('json');
 const now = () => 'current_timestamp';
 const number = () => columnBuilder('float');
 const pk = () => columnBuilder('pk');

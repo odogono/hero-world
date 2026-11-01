@@ -18,7 +18,7 @@ import { createMuaSystem } from './create-mua-system';
 import { tell } from './output';
 
 type PlayerUpdate = {
-  lastCommandAt?: string;
+  lastCommandAt?: Date;
   lastInput?: string;
   lastTargetId?: EntityId;
   pending?: null | PendingCommand;
@@ -109,7 +109,7 @@ export const parseSystem = createMuaSystem(
       }
 
       update.lastInput = input;
-      update.lastCommandAt = new Date().toISOString();
+      update.lastCommandAt = new Date();
       bound = bindCommand({
         actorId: player.id,
         command: parsed.command,
