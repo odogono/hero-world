@@ -1,3 +1,4 @@
+import { locationComponent } from 'ecs-talk';
 import { defineComponent, s } from 'odgn-ecs/component';
 import type { InferComponentsFromCDefs } from 'odgn-ecs/types';
 
@@ -28,13 +29,6 @@ const containerDef = defineComponent({
   schema: {
     capacity: s.number().default(10),
     isClosed: s.boolean().default(false)
-  }
-});
-
-const containedDef = defineComponent({
-  id: 'contained',
-  schema: {
-    in: s.entityId().optional()
   }
 });
 
@@ -75,7 +69,8 @@ const playerDef = defineComponent({
   schema: {
     connectedId: s.entityId().optional(),
     lastCommandAt: s.datetime().optional(),
-    location: s.entityId().optional(),
+    /** The last command typed, repeated by `again` */
+    lastInput: s.string().optional(),
     name: s.string()
   }
 });
@@ -93,9 +88,11 @@ const commandEventDef = defineComponent({
   id: 'commandEvent',
   schema: {
     direction: s.string().optional(),
+    indirect: s.string().optional(),
     playerId: s.entityId(),
     rawInput: s.string(),
     target: s.string().optional(),
+    text: s.string().optional(),
     verb: s.string()
   }
 });
@@ -104,6 +101,7 @@ const outputEventDef = defineComponent({
   id: 'outputEvent',
   schema: {
     broadcast: s.boolean().default(false),
+    exclude: s.entityId().optional(),
     message: s.string(),
     roomId: s.entityId().optional(),
     wsId: s.string()
@@ -120,7 +118,7 @@ export const defs = [
   outputEventDef,
   containerDef,
   metaDef,
-  containedDef,
+  locationComponent,
   portalDef,
   describedDef,
   itemDef

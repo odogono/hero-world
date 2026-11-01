@@ -1,8 +1,8 @@
-import { createSystem } from 'odgn-ecs/system';
+import { createMuaSystem } from './create-mua-system';
 
 // No-op system - input events created directly by onConnectionCommand
 // This system just logs for debugging
-export const inputSystem = createSystem(
+export const inputSystem = createMuaSystem(
   ({ entity }) => {
     // Input events are processed by parseSystem
   },

@@ -1,62 +1,56 @@
-import { createSystem } from 'odgn-ecs/system';
-
 import { parseCommand } from '../commands/parser';
+import { AGAIN_WORDS } from '../commands/verbs';
 import { findPlayerByConnection } from '../queries/player';
+import { createMuaSystem } from './create-mua-system';
 
-export const parseSystem = createSystem(
+export const parseSystem = createMuaSystem(
   ({ entity, world }) => {
-    if (!entity.inputEvent) {
-      return;
-    }
-
     const { text, wsId } = entity.inputEvent;
 
+    const reply = (message: string) => {
+      world.create({ outputEvent: { broadcast: false, message, wsId } });
+      world.delete(entity);
+    };
+
     // Find player for this connection
-    const player = findPlayerByConnection(world, wsId);
-
+    const player = findPlayerByConnection(world, wsId, true);
     if (!player) {
-      // Create output event with error
-      world.create({
-        outputEvent: {
-          broadcast: false,
-          message: 'Player not found. Please login.',
-          wsId
-        }
-      });
-      world.remove(entity.id);
+      reply('Player not found. Please login.');
       return;
     }
 
-    // Parse command
-    const parseResult = parseCommand(text);
+    // `again` / `g` repeats the previous command
+    const isAgain = AGAIN_WORDS.includes(text.trim().toLowerCase());
+    const input = isAgain ? player.player.lastInput : text;
+    // unset optional fields read back from the database as null
+    if (input === undefined || input === null) {
+      reply('There is nothing to repeat.');
+      return;
+    }
 
+    const parseResult = parseCommand(input);
     if (!parseResult.success) {
-      // Create output event with parse error
-      world.create({
-        outputEvent: {
-          broadcast: false,
-          message: parseResult.error,
-          wsId
-        }
-      });
-      world.remove(entity.id);
+      reply(parseResult.error);
       return;
     }
 
-    // Create command event
-    const { direction, rawInput, target, verb } = parseResult.command;
+    player.player.lastInput = input;
+
+    const { direction, indirect, rawInput, target, verb } = parseResult.command;
     world.create({
       commandEvent: {
         direction,
+        indirect,
         playerId: player.id,
         rawInput,
         target,
+        text: parseResult.command.text,
         verb
       }
     });
 
     // Remove input event
-    world.remove(entity.id);
+    world.delete(entity);
   },
   {
     frequency: 1,

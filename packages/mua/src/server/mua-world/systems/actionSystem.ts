@@ -1,34 +1,34 @@
-import { createSystem } from 'odgn-ecs/system';
-
 import { executeAction } from '../actions';
+import { getEntity } from '../queries/entity';
+import { createMuaSystem } from './create-mua-system';
 
-export const actionSystem = createSystem(
+export const actionSystem = createMuaSystem(
   ({ entity, world }) => {
     if (!entity.commandEvent) {
       return;
     }
 
-    const { direction, playerId, target, verb } = entity.commandEvent;
+    const { direction, indirect, playerId, target, text, verb } =
+      entity.commandEvent;
 
     // Execute action
     const result = executeAction({
       direction,
+      indirect,
       playerId,
       target,
+      text,
       verb,
       world
     });
 
     // Get player's connection
-    const player = world.get(playerId);
-    if (!player?.player?.connectedId) {
-      world.remove(entity.id);
-      return;
-    }
-
-    const connection = world.get(player.player.connectedId);
-    if (!connection?.connected) {
-      world.remove(entity.id);
+    const player = getEntity(world, playerId, ['player'], true);
+    const connection = getEntity(world, player?.player.connectedId, [
+      'connected'
+    ]);
+    if (!player || !connection) {
+      world.delete(entity);
       return;
     }
 
@@ -46,6 +46,7 @@ export const actionSystem = createSystem(
       world.create({
         outputEvent: {
           broadcast: true,
+          exclude: result.broadcast.exclude,
           message: result.broadcast.message,
           roomId: result.broadcast.roomId,
           wsId: '' // Will be resolved by output system
@@ -57,7 +58,7 @@ export const actionSystem = createSystem(
     player.player.lastCommandAt = new Date().toISOString();
 
     // Remove command event
-    world.remove(entity.id);
+    world.delete(entity);
   },
   {
     frequency: 1,

@@ -1,16 +1,16 @@
+import { getEntity, getLocationOf } from '../queries/entity';
 import { getRoomContents, getRoomExits } from '../queries/room';
 import type { ActionContext, ActionResult } from './types';
 
 export const lookAction = (ctx: ActionContext): ActionResult => {
   const { playerId, world } = ctx;
-  const player = world.get(playerId);
-
-  if (!player?.player?.location) {
+  const roomId = getLocationOf(world, playerId);
+  if (roomId === undefined) {
     return { message: 'You are nowhere.' };
   }
 
-  const room = world.get(player.player.location);
-  if (!room?.described) {
+  const room = getEntity(world, roomId, ['described']);
+  if (!room) {
     return { message: 'You are in darkness.' };
   }
 

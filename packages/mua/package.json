@@ -30,6 +30,7 @@
     "@orpc/server": "^1.16.1",
     "@orpc/zod": "^1.16.1",
     "dotenv": "^18.0.9",
+    "ecs-talk": "workspace:*",
     "elysia": "^1.4.30",
     "jose": "^6.2.14",
     "odgn-ecs": "workspace:*",
