@@ -1,0 +1,52 @@
+# locks.edl, with locks handled by behaviours/lockable.talk
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+# A lockable chest; each chest names its own lock
+atom chest {
+  script { src: "../../behaviours/lockable.talk" }
+  container { capacity: 5 is_closed: true }
+  lockable { is_locked: true lock: "chest" }
+}
+
+entity west_of_house : room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Vault" description: "A dim vault." }
+}
+
+entity strongbox : chest {
+  described { name: "Strongbox" description: "An iron strongbox." }
+  noun { words: ["box"] }
+  lockable { is_locked: true lock: "strongbox" }
+  location { in: $west_of_house }
+}
+
+entity gold : item {
+  described { name: "Gold" description: "A heap of gold." }
+  location { in: $strongbox }
+}
+
+entity iron_key : item {
+  described { name: "Iron key" description: "A heavy iron key." }
+  noun { words: ["key"] }
+  key { opens: ["strongbox"] }
+  location { in: $west_of_house }
+}
+
+entity tin_key : item {
+  described { name: "Tin key" description: "A flimsy tin key." }
+  noun { words: ["key"] }
+  key { opens: ["shed"] }
+  location { in: $west_of_house }
+}
+
+entity spoon : item {
+  described { name: "Spoon" description: "A bent spoon." }
+  location { in: $west_of_house }
+}
