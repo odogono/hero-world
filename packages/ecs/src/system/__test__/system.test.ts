@@ -1,16 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { queryEntitiesIterator } from '@entity';
-import { createSystem } from '@system';
+import { createSystem } from '..';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { queryEntitiesIterator } from '../../entity';
 import type {
   Components,
   EntityWithComponents,
   ExtractWorldComponents
-} from '@types';
-import { createWorld } from '@world';
-
+} from '../../types';
+import { createWorld } from '../../world';
 import type { EntityExecProps } from '../types';
 
 const constitutionComponent = defineComponent({

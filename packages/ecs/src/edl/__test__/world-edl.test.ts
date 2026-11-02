@@ -1,8 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 describe('World EDL', () => {
   it('should create a world with defs from edl', async () => {

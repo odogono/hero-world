@@ -13,7 +13,8 @@ This library infers component types end‑to‑end so that worlds, entities, and
 ## Minimal Example
 
 ```ts
-import { defineComponent, s } from '@component';
+import { defineComponent, s } from 'odgn-ecs/component';
+
 import { createWorld } from '@world';
 
 const position = defineComponent({

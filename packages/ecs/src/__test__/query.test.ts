@@ -1,9 +1,9 @@
 import { describe, expect, it, test } from 'bun:test';
 
-import { defineComponent, removeComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import type { ExtractWorldComponents, GenericEntity } from '@types';
-import { createWorld } from '@world';
+import { defineComponent, removeComponent, s } from '../component';
+import { DatabaseType } from '../db';
+import type { ExtractWorldComponents, GenericEntity } from '../types';
+import { createWorld } from '../world';
 
 const statusComponent = defineComponent({
   id: 'status' as const,

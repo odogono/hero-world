@@ -1,8 +1,8 @@
 import { describe, expect, it, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 // Component definitions using new system
 const statsComponent = defineComponent({

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../component';
+import { createWorld } from '../world';
 
 const statsComponent = defineComponent({
   id: 'statsProxyTest',

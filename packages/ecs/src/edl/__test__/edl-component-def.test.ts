@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { parseEDL } from '@edl';
+import { parseEDL } from '..';
 
 describe('EDL Component Definitions', () => {
   it('should parse multiple component definitions mixed with atoms/entities', () => {

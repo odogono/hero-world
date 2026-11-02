@@ -5,7 +5,7 @@ Where things are, and the behaviour the signatures don't show. Read the source f
 ## Components: `src/component/`
 
 ```ts
-import { defineComponent, s } from '@component'; // 'odgn-ecs/component' outside the package
+import { defineComponent, s } from 'odgn-ecs/component';
 
 const stats = defineComponent({
   id: 'stats',

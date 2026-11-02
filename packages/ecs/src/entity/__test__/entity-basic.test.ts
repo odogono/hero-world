@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-
+import { defineComponent, s } from '../../component';
 import { createWorld } from '../../world';
 
 describe('Entity Basic', () => {

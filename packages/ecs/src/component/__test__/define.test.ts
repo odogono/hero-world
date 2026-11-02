@@ -1,8 +1,7 @@
 import { describe, expect, it, test } from 'bun:test';
 
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
-
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 import { s } from '../builder';
 import { defineComponent } from '../define';
 

@@ -1,7 +1,6 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, it, mock } from 'bun:test';
 
-import { defineComponent, s } from '@component';
 import {
   EDLErrorCodes,
   EDLExecutionError,
@@ -9,8 +8,9 @@ import {
   EDLUnknownEntityReferenceError,
   executeEDL,
   parseEDL
-} from '@edl';
-import { createWorld } from '@world';
+} from '..';
+import { defineComponent, s } from '../../component';
+import { createWorld } from '../../world';
 
 const describedComponent = defineComponent({
   id: 'described',

@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
-import { DatabaseType } from '@db';
-import { eventComponent, getEvents, scheduleEvent } from '@events';
-import { createWorld } from '@world';
+import { eventComponent, getEvents, scheduleEvent } from '..';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;
 

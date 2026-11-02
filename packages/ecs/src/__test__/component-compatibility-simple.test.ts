@@ -1,9 +1,8 @@
 /* eslint-disable perfectionist/sort-objects */
 import { beforeEach, describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType, createDatabase, type Database } from '@db';
-
+import { defineComponent, s } from '../component';
+import { DatabaseType, createDatabase, type Database } from '../db';
 import { hashComponentDefinition } from '../schema/component-hash';
 import {
   getStoredComponentMetadata,
