@@ -34,6 +34,9 @@ type CreateEntityOverloads = {
 //   ? I
 //   : never;
 
+/** The suffix of the field that says whether a joined component is there */
+const PRESENT = '__present';
+
 export const createEntity: CreateEntityOverloads = <
   TComponents extends Components,
   C extends Partial<TComponents>
@@ -195,6 +198,9 @@ const buildQuery = <T extends Components>(
         : 'LEFT JOIN';
     const join = `${joinType} ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
     joins.push(join);
+    // whether the entity has the component, read apart from its fields
+    // (a missing boolean field would otherwise read as false)
+    fields.push(`${alias}.eid AS ${alias}${PRESENT}`);
     def.columns.forEach(column => {
       const name = column.name;
       const field = `${alias}.${q(name)} AS ${alias}_${name}`;
@@ -344,10 +350,12 @@ export const mapRowToEntity = <T extends Components>(
     }
 
     const isMaybe = (maybe ?? []).includes(c);
-    const hasAnyValue = Object.values(data).some(
-      v => v !== null && v !== undefined
-    );
-    if (isMaybe && !hasAnyValue) {
+    const presence = (row as Record<string, unknown>)[`${defName}${PRESENT}`];
+    const isPresent =
+      presence === undefined
+        ? Object.values(data).some(v => v !== null && v !== undefined)
+        : presence !== null;
+    if (isMaybe && !isPresent) {
       // Component not present on this entity; omit it
       continue;
     }
