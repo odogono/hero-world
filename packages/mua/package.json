@@ -6,6 +6,7 @@
   "scripts": {
     "server": "bun run --hot src/server/index.ts",
     "tui": "bun run --hot src/tui/index.tsx",
+    "world:migrate": "bun run src/server/migrate-world.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint --cache .",
