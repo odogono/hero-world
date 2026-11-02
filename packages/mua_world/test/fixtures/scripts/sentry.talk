@@ -1,0 +1,6 @@
+on beforeExit actor, destination, deciding
+  if the name of the described of destination is "Courtyard" then
+    veto "The sentry steps in front of you."
+  end if
+  pass beforeExit
+end beforeExit

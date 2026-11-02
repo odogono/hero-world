@@ -1,0 +1,56 @@
+# A small world whose atoms have NorthTalk Scripts
+
+atom room {
+  container { capacity: 100 is_closed: false }
+  described { name: "Room" description: "A room." }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom exit {
+}
+
+# Blocks leaving and grunts when anyone speaks in the room
+atom guarded {
+  script { src: "scripts/guard.talk" }
+}
+
+# Answers being examined, and lets itself be taken
+atom talking_statue {
+  script { src: "scripts/statue.talk" }
+}
+
+# Fails whenever it is examined
+atom crumbling {
+  script { src: "scripts/crumbling.talk" }
+}
+
+entity west_of_house : room guarded {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Guardroom" description: "A bare guardroom." }
+}
+
+entity hall : room {
+  described { name: "Hall" description: "A long hall." }
+}
+
+entity guardroom_north : exit {
+  location { in: $west_of_house } portal { dir: "north" to: $hall }
+}
+
+entity statue : item talking_statue {
+  described { name: "Statue" description: "A marble statue." }
+  location { in: $west_of_house }
+}
+
+entity tablet : item crumbling {
+  described { name: "Tablet" description: "A clay tablet." }
+  location { in: $west_of_house }
+}
+
+entity rock : item {
+  described { name: "Rock" description: "A plain rock." }
+  location { in: $west_of_house }
+}

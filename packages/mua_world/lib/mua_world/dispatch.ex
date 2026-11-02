@@ -8,7 +8,9 @@ defmodule MuaWorld.Dispatch do
      and a reply handles it;
   2. the veto Decisions of the action, any of which may refuse it;
   3. the action: a built-in (`MuaWorld.Actions`), or for `look` and `move` a
-     request to one of mua's Service Scripts.
+     request to one of mua's Service Scripts;
+  4. once it has succeeded, `after<Verb>` (`afterTake`) to the same
+     receivers, whose replies are added to the action's.
 
   Each question is answered by a fixed reply from the entity's `responses`
   first, else by its Scripts. The World process asks them
@@ -27,6 +29,12 @@ defmodule MuaWorld.Dispatch do
 
   @doc "The questions asked before the action runs, in order."
   def questions(world, ctx), do: receivers(world, ctx) ++ vetoes(world, ctx)
+
+  @doc "The `after<Verb>` questions, asked of the receivers once the action has succeeded."
+  def afters(world, ctx) do
+    message = "after" <> String.upcase(String.first(ctx.verb)) <> String.slice(ctx.verb, 1..-1//1)
+    for q <- receivers(world, ctx), do: %{q | message: message, response: nil}
+  end
 
   defp receivers(world, ctx) do
     [

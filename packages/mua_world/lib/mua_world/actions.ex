@@ -1,7 +1,7 @@
 defmodule MuaWorld.Actions do
   @moduledoc """
-  mua's built-in actions, ported from `actions/objects.ts`, `say.ts` and
-  `help.ts`. Each takes the World and a command context (`actor`, `verb`,
+  mua's built-in actions, ported from `actions/objects.ts`, `locks.ts`,
+  `say.ts` and `help.ts`. Each takes the World and a command context (`actor`, `verb`,
   `target_id`, `indirect_id`, `direction`, `text`, and the World's
   `vocabulary`) and returns an outcome:
 
@@ -12,13 +12,14 @@ defmodule MuaWorld.Actions do
   - `%{kind: :refused, message:}`: it handled the command by saying no.
   - `:pass`: not its command.
 
-  Locking (`lock`, `unlock`) comes with #114.
+  A world can lock with the `lockable.talk` Script instead, whose answer
+  comes first; both must behave the same.
   """
 
   alias MuaWorld.Messages
   alias MuaWorld.Commands.{Scope, Verbs}
 
-  @built_in ~w(close drop examine help inventory open read say sayTo take)
+  @built_in ~w(close drop examine help inventory lock open read say sayTo take unlock)
 
   def built_in?(verb), do: verb in @built_in
 
@@ -40,6 +41,8 @@ defmodule MuaWorld.Actions do
       "sayTo" -> say_to(world, ctx)
       "help" -> help(world, ctx)
       "read" -> read(world, ctx)
+      "lock" -> set_locked(world, ctx, true)
+      "unlock" -> set_locked(world, ctx, false)
       _ -> :pass
     end
   end
@@ -203,6 +206,77 @@ defmodule MuaWorld.Actions do
         else
           outcome
         end
+    end
+  end
+
+  # -- lock, unlock ------------------------------------------------------------
+
+  # Locks or unlocks the target with a key. With no key named, uses one the
+  # actor carries that fits, and says which.
+  defp set_locked(world, ctx, locking?) do
+    verb = if locking?, do: "lock", else: "unlock"
+    id = ctx[:target_id]
+    lockable = get(world, id, "lockable")
+
+    cond do
+      lockable == nil ->
+        refused("You can't #{verb} that.")
+
+      lockable["is_locked"] == locking? ->
+        refused("#{capitalise(the_name(world, id))} is already #{verb}ed.")
+
+      locking? and closed?(world, id) == false ->
+        refused("You'll have to close #{the_name(world, id)} first.")
+
+      true ->
+        case choose_key(world, ctx, lockable["lock"], verb) do
+          {:ok, key, chosen} ->
+            :ok = OdgnEcs.put(world, id, "lockable", Map.put(lockable, "is_locked", locking?))
+            with_key = Map.put(ctx, :indirect_id, key)
+            outcome = report(world, with_key, verb)
+
+            message =
+              [chosen, outcome.message] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join("\n")
+
+            %{outcome | message: message}
+
+          refusal ->
+            refusal
+        end
+    end
+  end
+
+  defp choose_key(world, ctx, lock, verb) do
+    name = the_name(world, ctx.target_id)
+
+    case ctx[:indirect_id] do
+      nil ->
+        case Enum.find(Scope.elements(world, ctx.actor), &fits?(world, &1.id, lock)) do
+          nil -> refused("You need a key to #{verb} #{name}.")
+          key -> {:ok, key.id, "(with #{the_name(world, key.id)})"}
+        end
+
+      key ->
+        cond do
+          get(world, key, "key") == nil ->
+            refused("You can't #{verb} anything with that.")
+
+          not fits?(world, key, lock) ->
+            refused("#{capitalise(the_name(world, key))} doesn't fit.")
+
+          true ->
+            {:ok, key, nil}
+        end
+    end
+  end
+
+  defp fits?(world, key, lock), do: lock in ((get(world, key, "key") || %{})["opens"] || [])
+
+  # Whether a container or door is closed; `nil` for anything else
+  defp closed?(world, id) do
+    case get(world, id, "container") || get(world, id, "door") do
+      %{"is_closed" => closed} -> closed == true
+      _ -> nil
     end
   end
 

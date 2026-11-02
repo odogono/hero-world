@@ -102,21 +102,26 @@ defmodule MuaWorld.Talk do
                 ])}
            end
          end},
-      "message" =>
-        {[args: ["text", "text", optional, optional], result: "any", cost: 1],
-         fn [handler, kind, indirect, owner], call ->
-           ctx = context(table, call)
+      # `indirect` and `owner` are optional, and a Script may leave them out
+      "message" => {
+        [args: ["text", "text", optional, optional], result: "any", cost: 1],
+        fn [handler, kind | rest], call ->
+          [indirect, owner] = Enum.take(rest ++ [nil, nil], 2)
+          ctx = context(table, call)
 
-           if ctx && kind in ["msg", "omsg"] do
-             ctx =
-               if indirect, do: Map.put(ctx, :indirect_id, Values.from_value(indirect)), else: ctx
+          if ctx && kind in ["msg", "omsg"] do
+            ctx =
+              if indirect,
+                do: Map.put(ctx, :indirect_id, Values.from_value(indirect)),
+                else: ctx
 
-             owner = if owner, do: Values.from_value(owner), else: :target
-             {:ok, Messages.message_for(world, ctx, handler, kind, owner)}
-           else
-             {:ok, nil}
-           end
-         end},
+            owner = if owner, do: Values.from_value(owner), else: :target
+            {:ok, Messages.message_for(world, ctx, handler, kind, owner)}
+          else
+            {:ok, nil}
+          end
+        end
+      },
       "notice" =>
         {[args: [entity, "text", entity], cost: 1, mode: :fire_and_forget, command: true],
          fn [place, message, who], _ ->

@@ -1,0 +1,11 @@
+on move role, actor
+  if role is "room" then
+    return "A guard blocks your way."
+  end if
+  pass move
+end move
+
+on say role, actor
+  show the target, "The guard grunts."
+  pass say
+end say
