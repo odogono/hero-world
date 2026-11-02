@@ -324,6 +324,40 @@ entity key {
     ]);
   });
 
+  it('renames an entity the EDL says it was, keeping it and its state (#78)', async () => {
+    const { world } = await played();
+    const gate = world.getDefinitionNames().get('gate')!;
+    const renamed = BEFORE.replace(
+      'entity gate : portal',
+      'entity yard_gate was gate : portal'
+    );
+
+    const dry = migrateEDL(world, renamed, { dryRun: true });
+    expect(dry.renamed).toEqual([{ eid: gate, from: 'gate', to: 'yard_gate' }]);
+    expect(dry.created).toEqual([]);
+    expect(dry.gone).toEqual([]);
+    expect(world.getDefinitionNames().get('gate')).toBe(gate);
+
+    migrateEDL(world, renamed);
+    const names = world.getDefinitionNames();
+    expect(names.has('gate')).toBe(false);
+    expect(names.get('yard_gate')).toBe(gate);
+    expect(named(world, 'yard_gate').door?.isOpen).toBe(true);
+
+    // once migrated, the marker changes nothing and can be dropped
+    const dropped = renamed.replace(' was gate', '');
+    expect(migrateEDL(world, dropped).renamed).toEqual([]);
+    expect(world.getDefinitionNames().get('yard_gate')).toBe(gate);
+  });
+
+  it('refuses a rename from a name the EDL still defines', async () => {
+    const { world } = await played();
+    const edl = `${BEFORE}\nentity yard_gate was gate {}\n`;
+    expect(() => migrateEDL(world, edl, { dryRun: true })).toThrow(
+      "'yard_gate' was 'gate'"
+    );
+  });
+
   it('takes entities gone from the EDL out of play with prune', async () => {
     const { world } = await played();
     const bench = world.getDefinitionNames().get('old_bench')!;

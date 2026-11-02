@@ -66,6 +66,11 @@ export type MigrationPlan = {
   missing: { eid: number; name: string }[];
   /** Whether `gone` entities were taken out of play */
   pruned: boolean;
+  /**
+   * Entities whose Definition name the EDL changed (`entity b was a`);
+   * they keep their id and state
+   */
+  renamed: { eid: number; from: string; to: string }[];
   updated: EntityMigration[];
 };
 
@@ -150,6 +155,7 @@ export const migrateEDL = <T extends Components>(
     kept: [],
     missing: [],
     pruned: false,
+    renamed: [],
     updated: []
   };
 
@@ -170,9 +176,23 @@ export const migrateEDL = <T extends Components>(
   }
 
   // Match each EDL entity to the entity it made, if it is still in play
+  const edlNames = new Set(named.map(entity => entity.name!));
   const existing = new Map<string, number>();
-  for (const { name } of named) {
-    const eid = stored.get(name!);
+  for (const { name, was } of named) {
+    let eid = stored.get(name!);
+    if (eid === undefined && was !== undefined) {
+      if (edlNames.has(was)) {
+        throw new Error(
+          `'${name}' was '${was}', but the EDL still defines '${was}'`
+        );
+      }
+      eid = stored.get(was);
+      if (eid !== undefined) {
+        plan.renamed.push({ eid, from: was, to: name! });
+        stored.delete(was);
+        stored.set(name!, eid);
+      }
+    }
     if (eid === undefined) {
       plan.created.push(name!);
     } else if (world.get(eid)) {
@@ -181,7 +201,6 @@ export const migrateEDL = <T extends Components>(
       plan.missing.push({ eid, name: name! });
     }
   }
-  const edlNames = new Set(named.map(entity => entity.name!));
   for (const [name, eid] of stored) {
     if (!edlNames.has(name)) {
       plan.gone.push({ eid, name });
@@ -321,6 +340,11 @@ export const migrateEDL = <T extends Components>(
     if (name && !missingNames.has(name)) {
       recordEDLValues(world, ids[i]!, components[i]!);
     }
+  }
+
+  for (const { eid, from, to } of plan.renamed) {
+    world.deleteDefinitionName(from);
+    world.setDefinitionName(to, eid);
   }
 
   // Atoms' Lineage and Script owners are rewritten from the EDL

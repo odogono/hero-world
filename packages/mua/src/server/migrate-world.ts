@@ -29,6 +29,10 @@ const line = (label: string, items: string[]) => {
 
 const report = ({ exitsRemade, plan, timersCancelled }: WorldMigration) => {
   line('Created', plan.created);
+  line(
+    'Renamed',
+    plan.renamed.map(({ eid, from, to }) => `${from} -> ${to} (#${eid})`)
+  );
   for (const { added, changed, eid, lineage, name, removed } of plan.updated) {
     const parts = [
       added.length > 0 && `adds ${added.join(' ')}`,

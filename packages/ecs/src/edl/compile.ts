@@ -25,6 +25,7 @@ type EDLNode = {
   extends?: string[];
   id?: string;
   type: string;
+  was?: string;
 };
 
 type EDLSyntaxError = {
@@ -36,7 +37,11 @@ type EDLSyntaxError = {
 export type Definition = { extends: string[]; own: ComponentData };
 
 /** An entity definition, with its Definition name if it has one */
-export type EntityDefinition = Definition & { name?: string };
+export type EntityDefinition = Definition & {
+  name?: string;
+  /** The Definition name it had before a rename (`entity b was a`) */
+  was?: string;
+};
 
 export type EDLCommand = { name: string; rawArgs: string[] };
 
@@ -228,7 +233,8 @@ export const compileEDL = (edl: string): CompiledEDL => {
       entities.push({
         extends: def.extends ?? [],
         name: def.id,
-        own: def.components || {}
+        own: def.components || {},
+        ...(def.was ? { was: def.was } : {})
       });
     }
     // component definitions are ignored here
