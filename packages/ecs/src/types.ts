@@ -80,6 +80,7 @@ export type ComponentDef = {
   columns: ColumnInfo[];
   name: string;
   schema: CDef; // Add schema to access defaults
+  stmtExists: Statement;
   stmtInsert: Statement;
   stmtUpdate: Statement;
   tableName: string;

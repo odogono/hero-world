@@ -46,6 +46,7 @@ All of these were checked against the code:
 
 - **Field writes on any result are saved.** Every queried component is change-tracked, so `e.stats.hp = 7` then `flush()` writes it.
 - **Assigning a component adds it; assigning `null` removes it.** `world.create` and query results are proxies that turn `e.tag = {…}` into `addComponent`. With `asProxy: false` a query returns plain objects, and such an assignment is lost.
+- **Adding a component the entity has replaces it whole.** `addComponent`, `addComponents` and assignment all do this: fields left out go back to their defaults and are not merged with the old value. The flush updates the entity's existing row, so an entity never has two rows for one component.
 - **Queries see unflushed changes.** Entities are cached in `world.entityCache`, so a later query returns the pending value until the next flush.
 - The tracking lives in `component/helpers/make-tracked.ts`, and the dirty set is `world.dirtyEntities`.
 

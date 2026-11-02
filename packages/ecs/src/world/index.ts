@@ -167,6 +167,9 @@ const registerComponentDef = <TComponents extends Components>(
     columns: result.columns,
     name,
     schema: componentDef,
+    stmtExists: world.db.prepare(
+      `SELECT 1 AS found FROM ${result.tableName} WHERE eid = ?1 LIMIT 1`
+    ),
     stmtInsert: world.db.prepare(sqlInsert),
     stmtUpdate: world.db.prepare(sqlUpdate),
     tableName: result.tableName,
@@ -737,6 +740,12 @@ export class World<TComponents extends Components> {
 
           if (entry.exists === false && entry.data === null) {
             continue;
+          }
+
+          // The cache may not know about a row it never loaded, so check the
+          // table before inserting: an entity has at most one row per component.
+          if (!entry.exists && def.stmtExists.get([eid])) {
+            entry.exists = true;
           }
 
           if (entry.exists) {
