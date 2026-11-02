@@ -84,6 +84,11 @@ type TimerHost = {
    * true when the Host has handled it, and it isn't delivered to Scripts.
    */
   onTimer?: (timer: DueTimer) => boolean;
+  /**
+   * The name timers are kept under for a Script, given the name it was
+   * loaded under, so copies of one Script share their timers
+   */
+  timerScript?: (scriptName: string) => string;
 };
 
 /**
@@ -100,6 +105,7 @@ export const createTalkTimers = <TComponents extends Components>(
   host: TimerHost
 ): TalkTimers => {
   const receivers = new Map<string, number>();
+  const scriptOf = host.timerScript ?? ((scriptName: string) => scriptName);
   const timerWorld = world as unknown as World<
     Components & { talkTimer: TimerRow }
   >;
@@ -182,7 +188,9 @@ export const createTalkTimers = <TComponents extends Components>(
     ? timerCapability(
         {
           cancel: (call, name) => {
-            remove(find(ownerOf(call.delivery), call.scriptName, name));
+            remove(
+              find(ownerOf(call.delivery), scriptOf(call.scriptName), name)
+            );
             timerWorld.flush();
           },
           schedule: (call, name, at, message, args) => {
@@ -191,7 +199,14 @@ export const createTalkTimers = <TComponents extends Components>(
             if (micros === undefined) {
               throw new ScriptError('invalid value', 'at must be an Instant');
             }
-            store(owner, call.scriptName, name, micros, message, args);
+            store(
+              owner,
+              scriptOf(call.scriptName),
+              name,
+              micros,
+              message,
+              args
+            );
           }
         },
         { cancel: { fuel: 1 }, schedule: { fuel: 1 } }

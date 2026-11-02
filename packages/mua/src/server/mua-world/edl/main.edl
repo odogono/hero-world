@@ -25,6 +25,7 @@ atom container {
 atom room: container {
   # Provide defaults; entities will override name/description
   described { name: "Room" description: "An unremarkable room." }
+  script { src: "scripts/room.talk" }
 }
 
 # Exit atom

@@ -6,7 +6,6 @@ import {
   type ChangeScope,
   type World
 } from 'odgn-ecs/world';
-import { createLog } from 'odgn-helpers/log';
 
 import {
   Decimal,
@@ -40,8 +39,6 @@ import {
 import { toComponentShape, type ComponentShape } from './component-shape';
 import { createTalkTimers, type DueTimer } from './timer';
 
-const log = createLog('ecs-talk');
-
 /** The `talk:show` ECS event type `show actor, text` publishes */
 export const TALK_SHOW_EVENT = 'talk:show';
 
@@ -51,6 +48,9 @@ export const ATOM_KIND = 'atom';
 /** The native data behind an entity Handle */
 export type EntityNative = { eid: number };
 /** The native data behind an atom's Host Object */
+const samePath = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((atom, index) => atom === b[index]);
+
 export type AtomNative = { atom: string };
 
 export type TalkShowPayload = { actor: number; text: string };
@@ -67,8 +67,6 @@ export type EcsTalkOptions = {
    * instead of delivering it to Scripts (see `schedule`)
    */
   onTimer?: (timer: DueTimer) => boolean;
-  /** Called with Message Path warnings */
-  warn?: (message: string) => void;
 };
 
 export type LoadAtomScriptOptions = {
@@ -161,7 +159,7 @@ export const createEcsTalk = <TComponents extends Components>(
   world: World<TComponents>,
   options: EcsTalkOptions = {}
 ) => {
-  const { name = 'world', onPump, warn = msg => log.warn(msg) } = options;
+  const { name = 'world', onPump } = options;
 
   let lastNow = 0n;
   const clock =
@@ -180,6 +178,15 @@ export const createEcsTalk = <TComponents extends Components>(
   const handles = new Map<number, HostObject<EntityNative>>();
   const atomObjects = new Map<string, HostObject<AtomNative>>();
   const scripts = new Map<string, Script>();
+  /** Each atom Script's source, to load it again at another path position */
+  const atomSources = new Map<
+    string,
+    { options: LoadAtomScriptOptions; source: string }
+  >();
+  /** Host Objects at a position on a Message Path, by the path from there */
+  const positions = new Map<string, HostObject<AtomNative>>();
+  /** The atom each copy of a Script was loaded for, by the copy's name */
+  const copyAtoms = new Map<string, string>();
   /** Service Scripts' owners, by name (see `loadServiceScript`) */
   const serviceObjects = new Map<string, HostObject<AtomNative>>();
 
@@ -514,49 +521,84 @@ export const createEcsTalk = <TComponents extends Components>(
     deliver: (eid, message, args) =>
       group.deliver(handle(eid), { args, name: message }),
     entityValue: eid => (isLive(eid) ? handle(eid).value : undefined),
-    onTimer: options.onTimer
+    onTimer: options.onTimer,
+    timerScript: scriptName => copyAtoms.get(scriptName) ?? scriptName
   });
 
-  /** The scripted atom a Message Path climbs to from these bases, if any */
-  const scriptedParent = (
-    bases: string[],
-    from: string,
-    seen = new Set<string>()
+  /**
+   * The Lineage above these bases, linearized: each base, rightmost first,
+   * followed by its own bases, with an atom reached more than once kept only
+   * at its last place, so a shared ancestor comes after every atom built on
+   * it (vase: box fragile gives fragile, box, thing).
+   */
+  const linearize = (bases: readonly string[]): string[] => {
+    const order: string[] = [];
+    const visit = (atoms: readonly string[], climbing: Set<string>) => {
+      for (const atom of [...atoms].reverse()) {
+        if (climbing.has(atom)) {
+          continue;
+        }
+        order.push(atom);
+        visit(world.getAtomLineage(atom) ?? [], new Set([...climbing, atom]));
+      }
+    };
+    visit(bases, new Set());
+    return order.filter((atom, index) => order.lastIndexOf(atom) === index);
+  };
+
+  /** The scripted atoms a Message Path climbs through from these bases */
+  const scriptedPath = (bases: readonly string[]) =>
+    linearize(bases).filter(atom => atomObjects.has(atom));
+
+  const atomPath = (atom: string) =>
+    scriptedPath(world.getAtomLineage(atom) ?? []);
+
+  /**
+   * The Host Object at the head of a path of scripted atoms. A Host Object
+   * has one parent, but an atom can sit on several paths with different
+   * atoms above it (fragile is followed by thing on its own, by box in a
+   * vase). The atom's own Host Object serves the path above the atom
+   * itself; every other position gets a Host Object of its own, owning a
+   * copy of the atom's Script. A Script name is unique in a Group, so a
+   * copy is named `atom@path`; its timers are kept under the atom's name.
+   */
+  const objectFor = (
+    path: readonly string[]
   ): HostObject<AtomNative> | undefined => {
-    const scripted = bases.filter(base => atomObjects.has(base));
-    if (scripted.length > 1) {
-      warn(
-        `${from} has more than one base with a Script (${scripted.join(', ')}); ` +
-          `using ${scripted.at(-1)}`
-      );
+    const [atom, ...rest] = path;
+    if (atom === undefined) {
+      return undefined;
     }
-    const direct = scripted.at(-1);
-    if (direct) {
-      return atomObjects.get(direct);
+    if (samePath(rest, atomPath(atom))) {
+      return atomObjects.get(atom);
     }
-    // no base has a Script: climb through the bases, rightmost first
-    for (const base of [...bases].reverse()) {
-      if (seen.has(base)) {
-        continue;
-      }
-      seen.add(base);
-      const parent = scriptedParent(
-        world.getAtomLineage(base) ?? [],
-        from,
-        seen
-      );
-      if (parent) {
-        return parent;
-      }
+    const key = path.join(' ');
+    const existing = positions.get(key);
+    if (existing) {
+      return existing;
     }
-    return undefined;
+    const loaded = atomSources.get(atom)!;
+    const position = group.object(
+      atomKind,
+      `${atom} (${key})`,
+      { atom },
+      { parent: objectFor(rest) }
+    );
+    try {
+      loadOwned(`${atom}@${key}`, position, loaded.source, loaded.options);
+    } catch (error) {
+      group.dispose(position);
+      throw error;
+    }
+    positions.set(key, position);
+    copyAtoms.set(`${atom}@${key}`, atom);
+    return position;
   };
 
   const parentOfEntity = (eid: number) =>
-    scriptedParent(world.getEntityLineage(eid), `entity ${eid}`);
+    objectFor(scriptedPath(world.getEntityLineage(eid)));
 
-  const parentOfAtom = (atom: string) =>
-    scriptedParent(world.getAtomLineage(atom) ?? [], `atom ${atom}`);
+  const parentOfAtom = (atom: string) => objectFor(atomPath(atom));
 
   /** The Handle for an entity, made the first time it crosses */
   const handle = (eid: number): HostObject<EntityNative> => {
@@ -580,6 +622,11 @@ export const createEcsTalk = <TComponents extends Components>(
   const relink = () => {
     for (const [atom, obj] of atomObjects) {
       group.setParent(obj, parentOfAtom(atom));
+    }
+    // a position's own path is fixed, but the objects above it may now
+    // differ; iterate a copy, since finding them may add positions
+    for (const [key, obj] of new Map(positions)) {
+      group.setParent(obj, objectFor(key.split(' ').slice(1)));
     }
     for (const [eid, obj] of handles) {
       group.setParent(obj, parentOfEntity(eid));
@@ -656,7 +703,12 @@ export const createEcsTalk = <TComponents extends Components>(
       atom: service
     });
     try {
-      const script = loadOwned(service, owner, source, loadOptions);
+      const script = loadOwned(
+        `service:${service}`,
+        owner,
+        source,
+        loadOptions
+      );
       serviceObjects.set(service, owner);
       return script;
     } catch (error) {
@@ -690,10 +742,12 @@ export const createEcsTalk = <TComponents extends Components>(
     try {
       const script = loadOwned(atom, owner, source, loadOptions);
       scripts.set(atom, script);
+      atomSources.set(atom, { options: loadOptions, source });
       relink();
       return script;
     } catch (error) {
       atomObjects.delete(atom);
+      atomSources.delete(atom);
       group.dispose(owner);
       throw error;
     }

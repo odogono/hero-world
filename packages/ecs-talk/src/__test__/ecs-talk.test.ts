@@ -76,26 +76,43 @@ const setup = async () => {
       with: ['meta']
     })!.id;
 
-  const warnings: string[] = [];
   const reports: Report[] = [];
   let now = 1_000_000n;
   const ecsTalk = createEcsTalk(world, {
     clock: () => (now += 1000n),
-    onPump: result => reports.push(...result.reports),
-    warn: msg => warnings.push(msg)
+    onPump: result => reports.push(...result.reports)
   });
   const loop = createGameLoop(world, { throwErrors: true }).addSystem(
     'talk',
     ecsTalk.system
   );
 
-  return { byName, ecsTalk, loop, reports, warnings, world };
+  return { byName, ecsTalk, loop, reports, world };
 };
 
 const tick = (loop: { update: (dt: number) => void }) => loop.update(16);
 
 // text as written; other kinds in their display form
 const show = (v: Value) => v.asText() ?? String(v);
+
+/** A World built from this EDL, with a way to ask its entities */
+const linearized = async (edl: string) => {
+  const world = await createWorld([metaComponent, statsComponent]);
+  world.executeEDL(edl);
+  const ecsTalk = createEcsTalk(world);
+  const byName = (id: string) =>
+    world.query({
+      args: [id],
+      where: `json_extract(meta.props, '$.id') = ?1`,
+      with: ['meta']
+    })!.id;
+  const ask = async (eid: number, message: string) => {
+    const reply = ecsTalk.request(eid, message);
+    ecsTalk.pump();
+    return show(await reply.result);
+  };
+  return { ask, byName, ecsTalk };
+};
 
 describe('ecs-talk', () => {
   it('runs an atom Script against the World', async () => {
@@ -350,23 +367,74 @@ describe('ecs-talk', () => {
     expect(ecsTalk.handle(hero)).toBe(ecsTalk.handle(hero));
   });
 
-  it('warns when more than one base has a Script', async () => {
-    const world = await createWorld([statsComponent]);
-    world.executeEDL(`
-      atom a { stats { hp: 1 } }
-      atom b { stats { hp: 2 } }
-      entity both: a b {}
-    `);
-    const warnings: string[] = [];
-    const ecsTalk = createEcsTalk(world, { warn: msg => warnings.push(msg) });
-    ecsTalk.loadAtomScript('a', 'on who\n  return "a"\nend who');
-    ecsTalk.loadAtomScript('b', 'on who\n  return "b"\nend who');
+  describe('Message Path across several bases', () => {
+    it('reaches every base Script, rightmost first', async () => {
+      const { ask, byName, ecsTalk } = await linearized(`
+        atom a { stats { hp: 1 } }
+        atom b { stats { hp: 2 } }
+        entity both: a b { meta { props: { id: "both" } } }
+      `);
+      ecsTalk.loadAtomScript(
+        'a',
+        'on who\n  return "a"\nend who\non onlyA\n  return "from a"\nend onlyA'
+      );
+      ecsTalk.loadAtomScript('b', 'on who\n  return "b"\nend who');
 
-    const both = world.query({ with: ['stats'] })!.id;
-    const reply = ecsTalk.request(both, 'who');
-    ecsTalk.pump();
-    expect(show(await reply.result)).toBe('b');
-    expect(warnings.some(w => w.includes('more than one base'))).toBe(true);
+      const both = byName('both');
+      expect(await ask(both, 'who')).toBe('b');
+      expect(await ask(both, 'onlyA')).toBe('from a');
+    });
+
+    it('puts a shared ancestor after every atom built on it', async () => {
+      const { ask, byName, ecsTalk } = await linearized(`
+        atom thing { stats { hp: 1 } }
+        atom box: thing {}
+        atom fragile: thing {}
+        entity vase: box fragile { meta { props: { id: "vase" } } }
+      `);
+      ecsTalk.loadAtomScript(
+        'thing',
+        'on order\n  return "thing"\nend order\non base\n  return "thing"\nend base'
+      );
+      ecsTalk.loadAtomScript('box', 'on order\n  return "box"\nend order');
+      ecsTalk.loadAtomScript('fragile', 'on other\n  return 1\nend other');
+
+      const vase = byName('vase');
+      // fragile doesn't answer `order`; box comes before their shared thing
+      expect(await ask(vase, 'order')).toBe('box');
+      expect(await ask(vase, 'base')).toBe('thing');
+    });
+
+    it('gives an atom a parent for each path it sits on', async () => {
+      const { ask, byName, ecsTalk } = await linearized(`
+        atom a { stats { hp: 1 } }
+        atom b { stats { hp: 2 } }
+        entity plain: a { meta { props: { id: "plain" } } }
+        entity mixed: b a { meta { props: { id: "mixed" } } }
+      `);
+      ecsTalk.loadAtomScript('a', 'on who\n  pass who\nend who');
+      ecsTalk.loadAtomScript('b', 'on who\n  return "b"\nend who');
+
+      // on mixed's path, a passes to b; on plain's, a has no parent
+      expect(await ask(byName('mixed'), 'who')).toBe('b');
+      const reply = ecsTalk.request(byName('plain'), 'who');
+      ecsTalk.pump();
+      await expect(reply.result).rejects.toThrow();
+    });
+
+    it('re-links paths when an atom Script loads later', async () => {
+      const { ask, byName, ecsTalk } = await linearized(`
+        atom a { stats { hp: 1 } }
+        atom b { stats { hp: 2 } }
+        entity both: a b { meta { props: { id: "both" } } }
+      `);
+      ecsTalk.loadAtomScript('b', 'on who\n  return "b"\nend who');
+      const both = byName('both');
+      expect(await ask(both, 'who')).toBe('b');
+
+      ecsTalk.loadAtomScript('a', 'on onlyA\n  return "a"\nend onlyA');
+      expect(await ask(both, 'onlyA')).toBe('a');
+    });
   });
 
   it('passes text through a Handler argument', async () => {

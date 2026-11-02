@@ -2,6 +2,7 @@
 
 atom room {
   container { capacity: 100 is_closed: false }
+  script { src: "scripts/plain-room.talk" }
 }
 
 atom item {

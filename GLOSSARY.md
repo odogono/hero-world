@@ -55,5 +55,5 @@ The entity a message was delivered to; `the target` in every Script on its Messa
 _Avoid_: me, sender
 
 **Message Path**:
-The route an unhandled message climbs, from an entity through the atoms in its Lineage that have Scripts. Atoms without a Script are skipped.
+The route an unhandled message climbs, from an entity through the atoms in its Lineage that have Scripts, linearized rightmost first with a shared ancestor after every atom built on it. Atoms without a Script are skipped.
 _Avoid_: inheritance chain, delegation
