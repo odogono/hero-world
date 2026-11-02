@@ -187,6 +187,34 @@ describe('migrateEDL', () => {
     expect(isEDLChanged(world, AFTER)).toBe(true);
   });
 
+  it('drops a field the EDL no longer gives, leaving one row', async () => {
+    const world = await open();
+    world.executeEDL(`
+entity hall {
+  described { name: "Hall" description: "Big" }
+}
+`);
+    world.flush();
+
+    migrateEDL(
+      world,
+      `
+entity hall {
+  described { name: "Great hall" }
+}
+`
+    );
+
+    const hall = named(world, 'hall');
+    expect(hall.described?.name).toBe('Great hall');
+    expect(hall.described?.description ?? null).toBeNull();
+    const rows = world.db.query(
+      `SELECT COUNT(*) AS n FROM ${world.defs.get('described')!.tableName} WHERE eid = ?1`,
+      [hall.id]
+    ) as { n: number }[];
+    expect(rows[0]!.n).toBe(1);
+  });
+
   it('brings the world up to date and keeps players and Play state', async () => {
     const { player, world } = await played();
 

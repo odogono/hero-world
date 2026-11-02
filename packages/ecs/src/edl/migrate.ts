@@ -301,25 +301,13 @@ export const migrateEDL = <T extends Components>(
         entity: { id: eid, world } as GenericEntity<T>,
         maybe: [...world.defs.keys()] as (keyof T)[]
       })! as GenericEntity<T>;
+      // Adding a component the entity has replaces it whole
       addComponents(
         entity as Parameters<typeof addComponents>[0],
-        Object.fromEntries(change.added.map(c => [c, desired[c]]))
+        Object.fromEntries(
+          [...change.added, ...change.changed].map(c => [c, desired[c]])
+        )
       );
-      const fields = entity as unknown as Record<
-        string,
-        Record<string, unknown>
-      >;
-      for (const component of change.changed) {
-        const columns = world.defs.get(component)?.schema.columns ?? [];
-        const data = applyComponentDefaults(
-          world,
-          component,
-          desired[component] ?? {}
-        );
-        for (const { name: field } of columns) {
-          fields[component]![field] = data[field] ?? null;
-        }
-      }
       for (const component of change.removed) {
         removeComponent(entity, component as keyof T);
       }

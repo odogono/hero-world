@@ -57,29 +57,19 @@ export const addComponents = <
   TWorldComponents,
   keyof TComponentData & keyof TWorldComponents
 > => {
-  const { id, world } = entity;
-
   // Ensure id is defined
-  if (id === undefined) {
+  if (entity.id === undefined) {
     throw new Error('Entity ID is required');
   }
 
+  // Each component goes through addComponent, so one that the entity
+  // already has replaces it rather than being added a second time
   for (const [componentName, data] of Object.entries(components)) {
-    // Apply default values from the component schema
-    const dataWithDefaults = applyComponentDefaults(world, componentName, data);
-
-    (entity as Record<PropertyKey, unknown>)[componentName] =
-      makeTrackedComponent(
-        entity,
-        componentName,
-        dataWithDefaults,
-        false // mark as new
-      );
-
-    if (!world.dirtyEntities.has(id)) {
-      world.dirtyEntities.set(id, new Set());
-    }
-    world.dirtyEntities.get(id)!.add(componentName);
+    addComponent(
+      entity,
+      componentName as keyof TWorldComponents,
+      data as TWorldComponents[keyof TWorldComponents]
+    );
   }
 
   return entity as EntityWithComponents<
