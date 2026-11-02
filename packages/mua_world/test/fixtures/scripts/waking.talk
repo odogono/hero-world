@@ -1,0 +1,3 @@
+on start actor
+  change the target, "item", {weight: 7, is_takeable: true}
+end start

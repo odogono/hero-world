@@ -16,7 +16,8 @@ defmodule MuaWorld.Talk do
   - `notice place, message, who`: sends `message who` to the Scripts of the
     things in a place but `who`, once the Run's Pump ends.
 
-  `act` comes with NPCs (#116).
+  - `act actor, command`: has an NPC carry out a command as a Character
+    would, as a Step of its own after the current one commits (ADR 0003).
 
   Callbacks run in NorthTalk's Tasks while the World process is blocked in a
   Pump (ADR 0015). They write the outbox inside the World's transaction, and
@@ -72,6 +73,12 @@ defmodule MuaWorld.Talk do
     optional = %{"optional" => entity}
 
     Capability.from_functions("mua", %{
+      "act" =>
+        {[args: [entity, "text"], cost: 1, mode: :fire_and_forget, command: true],
+         fn [actor, text], _ ->
+           MuaWorld.Tables.queue_act(world, Values.from_value(actor), text)
+           :noreply
+         end},
       "announce" =>
         {[args: [entity, "text", optional], cost: 1, mode: :fire_and_forget, command: true],
          fn [place, text, except], _ ->

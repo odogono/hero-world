@@ -485,6 +485,36 @@ defmodule OdgnEcsTalkTest do
       assert [%{"owner" => ^chapel}] = OdgnEcsTalk.due_timers(talk, us(5))
     end
 
+    test "keeps the Host's own timers apart from Scripts'" do
+      {world, talk} = bells()
+      tower = id(world, "tower")
+
+      :ok =
+        OdgnEcsTalk.schedule(talk, %{
+          owner: tower,
+          script: "host",
+          name: "tick",
+          at: us(3),
+          message: "tick"
+        })
+
+      :ok =
+        OdgnEcsTalk.schedule(talk, %{
+          owner: tower,
+          script: "host",
+          name: "tick",
+          at: us(4),
+          message: "tick"
+        })
+
+      assert [%{"script" => "host", "at" => at} = timer] = OdgnEcsTalk.timers(talk, "host")
+      assert at == us(4)
+      assert [^timer] = OdgnEcsTalk.due_timers(talk, us(4))
+
+      :ok = OdgnEcsTalk.remove_timer(talk, timer)
+      assert OdgnEcsTalk.timers(talk, "host") == []
+    end
+
     test "replaces a timer of the same name, and cancels one" do
       {world, talk} = bells()
       tower = id(world, "tower")

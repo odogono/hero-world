@@ -42,6 +42,31 @@ defmodule MuaWorld.Input do
     end
   end
 
+  @doc """
+  Reads an NPC's command, as `npcSystem.ts` does: an NPC has no one to ask
+  "which do you mean?", so an ambiguous object means its first match, and a
+  command it can't understand is dropped. Returns `{:commands, bound}` or
+  `:dropped`.
+  """
+  def read_npc(world, vocabulary, actor, text) do
+    with {:ok, command} <- Parser.parse(text, vocabulary),
+         {:bound, commands} <- bind_first(world, actor, command, %{}) do
+      {:commands, commands}
+    else
+      _ -> :dropped
+    end
+  end
+
+  defp bind_first(world, actor, command, resolved) do
+    case Bind.bind(world, actor, command, nil, resolved) do
+      {:ambiguous, _message, %{"options" => [%{"id" => id} | _], "slot" => slot}} ->
+        bind_first(world, actor, command, Map.put(resolved, slot, id))
+
+      other ->
+        other
+    end
+  end
+
   defp finish({:error, message}, changes), do: {{:reply, message}, changes}
 
   defp finish({:ambiguous, message, pending}, changes),

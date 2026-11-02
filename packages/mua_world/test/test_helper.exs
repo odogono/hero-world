@@ -48,6 +48,29 @@ defmodule MuaWorld.Case do
     Enum.join(lines, "\n")
   end
 
+  @doc "Runs the World on for `seconds` of World time, a second a tick."
+  def run_for(world, seconds) do
+    for _ <- 1..seconds//1 do
+      :ok = MuaWorld.advance(world, 1000)
+      :ok = MuaWorld.tick(world)
+    end
+
+    :ok
+  end
+
+  @doc "The entity with this `described` name, through the World process."
+  def named_thing(world, name) do
+    Enum.find(1..10_000, fn eid ->
+      case MuaWorld.component(world, eid, "described") do
+        %{"name" => ^name} -> true
+        _ -> false
+      end
+    end)
+  end
+
+  @doc "Where an entity is."
+  def location(world, eid), do: (MuaWorld.component(world, eid, "location") || %{})["in"]
+
   @doc "The lines a Character has been sent since the last call."
   def received(eid, acc \\ []) do
     receive do

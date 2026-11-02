@@ -447,6 +447,40 @@ defmodule OdgnEcsTalk do
     |> Enum.sort_by(&{&1["at"], &1["eid"]})
   end
 
+  @doc """
+  Stores a timer of the Host's own, as a Script's `schedule` does, replacing
+  one of the same owner, `script` and name. `script` is a name of the Host's
+  choosing, such as `"mua:timers"`, so the Host can tell its timers apart in
+  `due_timers/2` and handle them itself instead of `fire_timer/2`. `at` is in
+  microseconds.
+  """
+  def schedule(
+        %__MODULE__{world: world},
+        %{owner: owner, script: script, name: name, at: at, message: message} = timer
+      ) do
+    for eid <- find_timer(world, owner, script, name), do: OdgnEcs.delete(world, eid)
+    {:ok, eid} = OdgnEcs.create(world)
+
+    OdgnEcs.put(world, eid, @timer, %{
+      "owner" => owner,
+      "script" => script,
+      "name" => name,
+      "at" => at,
+      "message" => message,
+      "args" => Values.encode(Map.get(timer, :args, []))
+    })
+  end
+
+  @doc "Every timer stored under `script`, as `due_timers/2` gives them."
+  def timers(%__MODULE__{world: world}, script) do
+    world
+    |> OdgnEcs.query(where: [{@timer, "script", script}])
+    |> Enum.map(&Map.put(OdgnEcs.get(world, &1, @timer), "eid", &1))
+  end
+
+  @doc "Removes a timer, as `due_timers/2` gave it, without delivering it."
+  def remove_timer(%__MODULE__{world: world}, %{"eid" => eid}), do: OdgnEcs.delete(world, eid)
+
   @doc "Removes a due timer and delivers its message to its entity, if that still exists."
   def fire_timer(%__MODULE__{world: world} = talk, %{"eid" => eid, "owner" => owner} = timer) do
     :ok = OdgnEcs.delete(world, eid)

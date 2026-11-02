@@ -14,8 +14,6 @@ defmodule MuaWorld.AccountsTest do
     {:ok, world: start("main", dir), dir: dir}
   end
 
-  defp location(world, eid), do: (MuaWorld.component(world, eid, "location") || %{})["in"]
-
   describe "the places every World has" do
     test "has Limbo and a system actor", %{world: world} do
       %{limbo: limbo, system: system, starting_room: room} = MuaWorld.places(world)
