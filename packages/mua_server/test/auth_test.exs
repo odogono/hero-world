@@ -14,14 +14,21 @@ defmodule MuaServer.AuthTest do
 
   test "an allowlisted, verified Google identity signs in to its Account" do
     conn = google("ada@example.com")
-    %{"account" => account} = json_response(conn, 200)
-
-    # the same identity finds the same Account
-    assert %{"account" => ^account} = json_response(google("ada@example.com"), 200)
+    # a browser goes back to the client
+    assert redirected_to(conn, 302) == "/"
 
     session = get(recycle(conn), "/api/session")
-    assert %{"account" => ^account, "socket_token" => token} = json_response(session, 200)
+    assert %{"account" => account, "socket_token" => token} = json_response(session, 200)
     assert is_binary(token)
+
+    # the same identity finds the same Account
+    again = get(recycle(google("ada@example.com")), "/api/session")
+    assert %{"account" => ^account} = json_response(again, 200)
+  end
+
+  test "serves the browser client, or says it isn't built" do
+    conn = get(build_conn(), "/")
+    assert conn.status in [200, 404]
   end
 
   test "an identity not on the allowlist, or unverified, is refused" do

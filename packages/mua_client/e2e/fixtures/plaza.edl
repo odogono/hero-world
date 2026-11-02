@@ -1,0 +1,25 @@
+# A small World for the browser checks: a plaza with a coin, and a garden
+# to the north.
+
+atom room {}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+entity plaza: room {
+  meta { props: { id: "plaza" } }
+  described { name: "Plaza" description: "A sunny plaza paved with old stones." }
+  exits { north: $garden }
+}
+
+entity garden: room {
+  meta { props: { id: "garden" } }
+  described { name: "Garden" description: "A quiet garden full of bees." }
+}
+
+entity coin: item {
+  meta { props: { id: "coin" } }
+  described { name: "coin" description: "A bright copper coin." }
+  location { in: $plaza }
+}

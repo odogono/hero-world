@@ -1,7 +1,7 @@
 import Config
 
 config :mua_server, MuaServer.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
   secret_key_base: String.duplicate("dev-only-secret-key-base-", 4),
   server: true
 

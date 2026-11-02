@@ -22,3 +22,6 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 mua_server-*.tar
 
+
+# The browser client, built by packages/mua_client
+/priv/static/
