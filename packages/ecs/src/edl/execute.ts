@@ -10,6 +10,7 @@ import {
   scriptPath,
   type ComponentData
 } from './compile';
+import { readComponents, recordEDLValues } from './edl-values';
 import {
   EDLCircularReferenceError,
   EDLExecutionError,
@@ -306,4 +307,10 @@ export const executeEDL = <T extends Components>(
 
   // Persist changes from commands
   world.flush();
+
+  // Record Play state as the EDL set it, so a migration can tell what
+  // play has changed
+  for (const eid of entityIdsByName.values()) {
+    recordEDLValues(world, eid, readComponents(world, eid));
+  }
 };
