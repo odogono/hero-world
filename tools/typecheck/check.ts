@@ -12,6 +12,7 @@ const PROJECTS = [
   'packages/ecs-talk',
   'packages/helpers',
   'packages/mua',
+  'packages/mua_client',
   'tools'
 ];
 

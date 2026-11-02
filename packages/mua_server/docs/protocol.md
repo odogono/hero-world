@@ -4,10 +4,12 @@ A browser plays one Character over a Phoenix Channel. The messages don't depend 
 
 ## Signing in
 
+`GET /` serves the browser client ([`packages/mua_client`](../../mua_client)), built into `priv/static`.
+
 | Request | Does |
 | --- | --- |
 | `GET /auth/google` | Redirects to Google. |
-| `GET /auth/google/callback` | Signs the identity in if its verified email is on `MUA_ALLOWLIST`; `403` otherwise. Replies `{account}`. |
+| `GET /auth/google/callback` | Signs the identity in if its verified email is on `MUA_ALLOWLIST`, then redirects to `/`; `403` otherwise. |
 | `POST /auth/dev {email}` | The same, by email alone. Only in development and tests; never compiled into a release. |
 | `DELETE /auth` | Signs out. |
 | `GET /api/session` | `{account, characters: [{id, name, in_play}], socket_token}`, or `401`. |

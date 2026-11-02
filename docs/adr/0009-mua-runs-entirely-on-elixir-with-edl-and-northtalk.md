@@ -12,6 +12,6 @@ The Elixir ECS retains SQLite for World storage initially. The existing query an
 
 - Existing authored content and behaviour tests provide acceptance cases for the port.
 - The transition may start with a freshly built World; importing existing SQLite saves is not required. Persistence and the agreed content Migration semantics remain requirements for the new server, including the protections for live edits in ADR 0008.
-- The browser client will use Preact, with typed commands central and room, inventory and available-action panels as supplements.
-- The Elixir libraries/server and browser client stay in this repository with independent build and CI paths: Mix for Elixir and Node-based tooling for Preact. Building, testing and deploying the new application must not require Bun. The TypeScript implementation remains temporarily as reference and can be retired after demonstrated parity.
+- The browser client will use Preact, with typed commands central. It starts as a transcript and a prompt; room, inventory and available-action panels may follow.
+- The Elixir libraries/server and browser client stay in this repository with independent build and CI paths: Mix for Elixir, Bun for the Preact client. The Elixir server needs no Bun. The browser client is built and tested with Bun, and a release needs Bun only at build time, to produce static assets (amended in #104). The TypeScript implementation remains temporarily as reference and can be retired after demonstrated parity.
 - The Elixir ECS interface, SQLite integration and NorthTalk host adapter still need detailed design decisions. Initial World ownership is recorded in ADR 0011. This ADR records the destination, not a completed implementation.

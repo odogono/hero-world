@@ -25,6 +25,10 @@ defmodule MuaServer.Router do
     end
   end
 
+  scope "/", MuaServer do
+    get("/", PageController, :index)
+  end
+
   scope "/api", MuaServer do
     pipe_through(:api)
 

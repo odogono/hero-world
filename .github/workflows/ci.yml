@@ -149,3 +149,29 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix test
+
+  # The browser client's journey, in Chromium against the real server (#104)
+  mua-client-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mua_client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.20'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/mua_server/deps
+            packages/mua_server/_build
+          key: mua-client-e2e-${{ hashFiles('packages/mua_server/mix.lock', 'packages/mua_world/mix.lock', 'packages/odgn_ecs_talk/mix.lock', 'packages/odgn_edl/mix.lock', 'packages/odgn_ecs/mix.lock') }}
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - run: bunx playwright install --with-deps chromium
+      - run: mix deps.get && mix compile
+        working-directory: packages/mua_server
+      - run: bun run e2e

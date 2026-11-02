@@ -13,6 +13,9 @@ defmodule MuaServer.Endpoint do
 
   socket("/socket", MuaServer.UserSocket, websocket: true, longpoll: false)
 
+  # The browser client's bundle, built by packages/mua_client
+  plug(Plug.Static, at: "/", from: :mua_server, only: ~w(assets))
+
   plug(Plug.RequestId)
   plug(Plug.Parsers, parsers: [:urlencoded, :json], pass: ["*/*"], json_decoder: Jason)
   plug(Plug.MethodOverride)
