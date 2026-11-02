@@ -2,6 +2,24 @@
 
 Game worlds described in EDL, stored in an ECS, and driven by NorthTalk Scripts.
 
+## Players
+
+**Player**:
+A person playing the game through their Account and its Character.
+_Avoid_: user, character (for the person)
+
+**Account**:
+A person's game identity, which owns their playable Characters and carries their permission to enter the game.
+_Avoid_: character, player entity
+
+**Character**:
+An Entity a person plays through, owned by an Account and known in the World by its chosen name.
+_Avoid_: account, login
+
+**Connection**:
+A browser's link through which a Player controls their Character. A Character has at most one controlling Connection; a new one takes over from the old.
+_Avoid_: session, socket
+
 ## World data
 
 **Entity**:
@@ -24,8 +42,20 @@ _Avoid_: parent, container (as a relation)
 The entities whose Location is a given entity. Named ones can be looked up by name, and all of them are counted and indexed.
 _Avoid_: contents, children
 
+**Home**:
+Where a thing starts, so that a reset can put it back. Characters and exits have none.
+_Avoid_: starting room, origin
+
+**Starting room**:
+Where a Character enters the World when it has nowhere valid to return to.
+_Avoid_: home, spawn
+
+**World time**:
+The World's clock, which advances while the server runs, even with no Players connected, and pauses while it is down. Timers count against it.
+_Avoid_: game time, wall-clock time
+
 **Limbo**:
-The place that holds what is out of play: stored things, and players who have left until they return.
+The place that holds what is out of play: stored things, and Characters whose Players have left until they return.
 _Avoid_: void, storage room
 
 **System actor**:
