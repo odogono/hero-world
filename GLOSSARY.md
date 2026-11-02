@@ -54,6 +54,10 @@ _Avoid_: home, spawn
 The World's clock, which advances while the server runs, even with no Players connected, and pauses while it is down. Timers count against it.
 _Avoid_: game time, wall-clock time
 
+**Step**:
+One input to the World, such as a command or a due timer, and the Script work it causes, ending in one commit. Output that confirms it is published only after that commit.
+_Avoid_: tick, transaction, turn
+
 **Limbo**:
 The place that holds what is out of play: stored things, and Characters whose Players have left until they return.
 _Avoid_: void, storage room
