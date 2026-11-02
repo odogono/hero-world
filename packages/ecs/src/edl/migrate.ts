@@ -1,17 +1,8 @@
-import { toCamelCase } from 'odgn-helpers/string';
-
 import { addComponents } from '../component';
 import { removeComponent } from '../component/remove';
 import type { Components, GenericEntity } from '../types';
 import type { World } from '../world';
-import {
-  compileEDL,
-  hashEDL,
-  resolveEDL,
-  scriptPath,
-  type CompiledEDL,
-  type ComponentData
-} from './compile';
+import { compileEDL, hashEDL, resolveEDL, scriptPath } from './compile';
 import {
   isPlayState,
   normalise,
@@ -83,60 +74,12 @@ export const isEDLChanged = <T extends Components>(
 const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
-/** Applies `!set $entity.component.prop value` commands to the components */
-const applySetCommands = (
-  compiled: CompiledEDL,
-  components: ComponentData[],
-  ids: readonly number[]
-) => {
-  const indexByName = new Map<string, number>();
-  for (const [i, entity] of compiled.entities.entries()) {
-    if (entity.name) {
-      indexByName.set(entity.name, i);
-    }
-  }
-  const toValue = (raw: string): unknown => {
-    if (raw === 'true' || raw === 'false') {
-      return raw === 'true';
-    }
-    if (raw === 'null') {
-      return null;
-    }
-    if (/^-?\d+(\.\d+)?$/.test(raw)) {
-      return Number(raw);
-    }
-    if (raw.startsWith('$') && !raw.includes('.')) {
-      const index = indexByName.get(raw.slice(1));
-      return index === undefined ? raw : ids[index];
-    }
-    return raw;
-  };
-  for (const { name, rawArgs } of compiled.commands) {
-    const [target, rawValue] = rawArgs;
-    if (name !== '!set' || !target?.startsWith('$') || rawValue === undefined) {
-      continue;
-    }
-    const [entityName = '', component = '', prop] = target.slice(1).split('.');
-    const index = indexByName.get(entityName);
-    if (index === undefined || !component || !prop) {
-      continue;
-    }
-    const data = components[index]!;
-    data[component] = {
-      ...data[component],
-      [toCamelCase(prop)]: toValue(rawValue)
-    };
-  }
-};
-
 /**
  * Brings a world up to date with a changed EDL (ADR 0005). New entities
  * are created; entities already in play get their static components set to
  * what the EDL now says, while Play state components are only added, never
  * overwritten. Entities gone from the EDL are reported, and taken out of
  * play only by `options.prune`.
- *
- * Only `!set` commands are applied; other EDL commands are not re-run.
  */
 export const migrateEDL = <T extends Components>(
   world: World<T>,
@@ -232,7 +175,6 @@ export const migrateEDL = <T extends Components>(
     throw new EDLExecutionError(resolved.errors);
   }
   const { components } = resolved;
-  applySetCommands(compiled, components, ids);
 
   // Work out, and unless this is a dry run make, each entity's changes
   for (const [i, def] of compiled.entities.entries()) {

@@ -98,8 +98,6 @@ entity behind_house : room {
   }
 }
 
-# !set $behind_house.mua.id "behind_house"
-
 # ==========
 # Items
 # ==========
