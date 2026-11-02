@@ -31,6 +31,12 @@ const isUnhandled = (error: unknown) =>
 /** An argument sent to a Script: text, or an entity (sent as its Handle) */
 export type ScriptArg = string | { entity: EntityId };
 
+/**
+ * Who a request goes to: an entity, which its Message Path answers, or one
+ * of mua's Service Scripts by name (see scripts/load.ts)
+ */
+export type Receiver = EntityId | { service: string };
+
 export type ScriptRunner = {
   /**
    * Ask an entity's Scripts whether something may happen, as a NorthTalk
@@ -40,15 +46,15 @@ export type ScriptRunner = {
    */
   decide: (
     key: string,
-    id: EntityId,
+    to: Receiver,
     message: string,
     args: ScriptArg[],
     context?: CommandContext
   ) => ScriptReply;
   /** Forget a command's request, e.g. once it has been answered */
   forget: (key: string) => void;
-  /** Does a Script sit on this entity's Message Path? */
-  hasScript: (id: EntityId) => boolean;
+  /** Does a Script sit on this entity's Message Path, or is it a Service? */
+  hasScript: (to: Receiver) => boolean;
   /**
    * Send a message to an entity's Scripts without waiting for an answer, such
    * as a lifecycle message. It still counts towards `settled` when its Run
@@ -62,7 +68,7 @@ export type ScriptRunner = {
    */
   offer: (
     key: string,
-    id: EntityId,
+    to: Receiver,
     message: string,
     args: ScriptArg[],
     /** The command, for the Script to ask about (`mua`'s `command`) */
@@ -86,7 +92,8 @@ export const createScriptRunner = (
   world: World<MuaComponents>,
   ecsTalk: EcsTalk<MuaComponents>,
   scriptedAtoms: ReadonlySet<string>,
-  contexts?: CommandContexts
+  contexts?: CommandContexts,
+  services: ReadonlySet<string> = new Set()
 ): ScriptRunner => {
   const replies = new Map<string, ScriptReply>();
   /** The Delivery each request key made, to drop its command when forgotten */
@@ -117,9 +124,11 @@ export const createScriptRunner = (
       return reachesScript(world.getAtomLineage(base) ?? [], seen);
     });
 
-  const hasScript = (id: EntityId) =>
-    scriptedAtoms.size > 0 &&
-    reachesScript(world.getEntityLineage(id), new Set());
+  const hasScript = (to: Receiver) =>
+    typeof to === 'object'
+      ? services.has(to.service)
+      : scriptedAtoms.size > 0 &&
+        reachesScript(world.getEntityLineage(to), new Set());
 
   const toValues = (args: ScriptArg[]) =>
     args.map(arg =>
@@ -143,9 +152,12 @@ export const createScriptRunner = (
     replies.set(key, reply);
   };
 
-  const decide: ScriptRunner['decide'] = (key, id, message, args, context) =>
+  const decide: ScriptRunner['decide'] = (key, to, message, args, context) =>
     once(key, () => {
-      const deciding = ecsTalk.decide(id, message, ...toValues(args));
+      const deciding =
+        typeof to === 'object'
+          ? ecsTalk.decideService(to.service, message, ...toValues(args))
+          : ecsTalk.decide(to, message, ...toValues(args));
       noteContext(key, deciding.id, context);
       deciding.decided.then(
         decided => {
@@ -167,9 +179,12 @@ export const createScriptRunner = (
       );
     });
 
-  const offer: ScriptRunner['offer'] = (key, id, message, args, context) =>
+  const offer: ScriptRunner['offer'] = (key, to, message, args, context) =>
     once(key, () => {
-      const request = ecsTalk.request(id, message, ...toValues(args));
+      const request =
+        typeof to === 'object'
+          ? ecsTalk.requestService(to.service, message, ...toValues(args))
+          : ecsTalk.request(to, message, ...toValues(args));
       noteContext(key, request.id, context);
       request.result.then(
         value => {

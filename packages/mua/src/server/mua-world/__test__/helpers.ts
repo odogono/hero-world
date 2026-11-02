@@ -55,21 +55,16 @@ export const openTestWorld = async (mainEDL?: string, dbPath?: string) => {
     return conn;
   };
 
-  /** Sends a command and returns everything the sender was told */
-  const send = (conn: TestConnection, text: string) => {
-    conn.messages.length = 0;
-    muaWorld.onConnectionCommand(conn, text);
-    tick();
-    return conn.messages.join('\n');
-  };
-
-  /** Sends a command, runs one full tick (Scripts included), and returns what the sender was told */
-  const sendAndWait = async (conn: TestConnection, text: string) => {
+  /**
+   * Sends a command, runs one full tick (Scripts included, since `look` and
+   * `move` are Scripts), and returns what the sender was told
+   */
+  const send = async (conn: TestConnection, text: string) => {
     conn.messages.length = 0;
     muaWorld.onConnectionCommand(conn, text);
     await muaWorld.tick(1000);
     return conn.messages.join('\n');
   };
 
-  return { login, muaWorld, send, sendAndWait, tick };
+  return { login, muaWorld, send, sendAndWait: send, tick };
 };

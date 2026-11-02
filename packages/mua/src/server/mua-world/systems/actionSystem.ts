@@ -1,5 +1,5 @@
 import { stepCommand, type ActionOutcome } from '../actions';
-import { entitiesIn } from '../queries/entity';
+import { sendNotice } from '../scripts/notices';
 import { NO_SCRIPTS, type ScriptRunner } from '../scripts/runner';
 import { createMuaSystem } from './create-mua-system';
 import { tell } from './output';
@@ -82,11 +82,7 @@ export const createActionSystem = (scripts: ScriptRunner = NO_SCRIPTS) =>
       // Let the scripted things there notice it (speech, arrivals)
       const notices = outcome.kind === 'done' ? outcome.notices : [];
       for (const notice of notices ?? []) {
-        for (const watcher of entitiesIn(world, notice.to)) {
-          if (watcher !== playerId && scripts.hasScript(watcher)) {
-            scripts.notify(watcher, notice.message, notice.args);
-          }
-        }
+        sendNotice(world, scripts, notice);
       }
 
       // Tell everyone else who saw it

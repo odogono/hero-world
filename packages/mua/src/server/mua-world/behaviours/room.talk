@@ -1,0 +1,11 @@
+-- The room Service: `look`, as a Script. mua sends it `look place, actor`
+-- for the room the actor is in; what it returns is the actor's reply.
+--
+-- A world's own room Scripts are offered `look` first (as the receiver
+-- with role "room"), so they can replace it or add to it.
+
+use describe from rooms
+
+on look place, actor
+  return describe(place, actor)
+end look

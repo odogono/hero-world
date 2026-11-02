@@ -13,7 +13,7 @@ describe('renderTemplate', () => {
     the: { target: 'the lamp' }
   };
 
-  it('fills in names, with or without "the"', () => {
+  it('fills in names, with or without "the"', async () => {
     expect(renderTemplate('{actor} takes {the target}.', values)).toBe(
       'bob takes the lamp.'
     );
@@ -22,13 +22,13 @@ describe('renderTemplate', () => {
     );
   });
 
-  it('capitalises a placeholder written with a capital', () => {
+  it('capitalises a placeholder written with a capital', async () => {
     expect(renderTemplate('{The target} glows. {Actor} grins.', values)).toBe(
       'The lamp glows. Bob grins.'
     );
   });
 
-  it('leaves unknown placeholders alone', () => {
+  it('leaves unknown placeholders alone', async () => {
     expect(renderTemplate('{actor} eyes {the indirect}.', values)).toBe(
       'bob eyes {the indirect}.'
     );
@@ -54,30 +54,30 @@ describe('Messages', () => {
     await world.muaWorld.close();
   });
 
-  it("uses a thing's own message for the actor", () => {
-    expect(send('take vase')).toBe('You lift the vase with both hands.');
+  it("uses a thing's own message for the actor", async () => {
+    expect(await send('take vase')).toBe('You lift the vase with both hands.');
     expect(aliceHeard()).toContain('bob takes the vase.');
   });
 
-  it('uses a message inherited from an atom for everyone else', () => {
-    send('take vase');
+  it('uses a message inherited from an atom for everyone else', async () => {
+    await send('take vase');
     alice.messages.length = 0;
 
-    expect(send('drop vase')).toBe('Dropped.');
+    expect(await send('drop vase')).toBe('Dropped.');
     expect(aliceHeard()).toContain('bob sets the vase down very gently.');
   });
 
-  it('tells the room left behind where someone went', () => {
-    send('east');
+  it('tells the room left behind where someone went', async () => {
+    await send('east');
 
     expect(aliceHeard()).toContain('bob goes east.');
   });
 
-  it("uses an exit's messages for leaving, passing and arriving", () => {
-    send('east');
+  it("uses an exit's messages for leaving, passing and arriving", async () => {
+    await send('east');
     alice.messages.length = 0;
 
-    expect(send('down')).toContain('You drop through the trapdoor.');
+    expect(await send('down')).toContain('You drop through the trapdoor.');
     expect(aliceHeard()).toContain('bob tumbles out of the ceiling.');
   });
 });
@@ -89,7 +89,7 @@ describe('look', () => {
     await world.login('alice');
     bob.payloads.length = 0;
 
-    world.send(bob, 'look');
+    await world.send(bob, 'look');
 
     expect(bob.payloads.at(-1)?.room).toEqual({
       description: 'A cluttered workshop.',

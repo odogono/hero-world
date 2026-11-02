@@ -7,7 +7,7 @@ A text adventure: an Elysia server (`src/server/index.ts`, port `HUB_API_PORT`, 
 A connection's command becomes an `inputEvent` entity (`index.ts`), then runs through the game-loop systems in `systems/`, in the order `index.ts` adds them:
 
 1. `parse`: `commands/` parses the verb and binds words to objects in scope (`commands/bind.ts`).
-2. `action`: offers the command to the room, then the second object, then the target. A NorthTalk Script on an atom may answer (`scripts/`); otherwise the built-in action in `actions/` runs.
+2. `action`: offers the command to the room, then the second object, then the target. A NorthTalk Script on an atom may answer (`scripts/`). Otherwise the action runs: a built-in in `actions/`, or for `look` and `move` one of mua's Service Scripts in `behaviours/` (`docs/core-scripts.md`).
 3. `show`: delivers a Script's `show actor, text` to the players who should see it.
 4. `output`: sends each `outputEvent` to its player's connection.
 5. `talk`: the `ecs-talk` Pump, which runs the Scripts.

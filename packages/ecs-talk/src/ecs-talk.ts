@@ -24,6 +24,7 @@ import {
   toValue,
   type Call,
   type Grant,
+  type GrantDecls,
   type Group,
   type HostObject,
   type Library,
@@ -121,6 +122,41 @@ const fromPlain = (value: unknown): unknown => {
  * entities as Host Objects of the `entity` Object Kind, atoms with Scripts on
  * their Message Path, and a `world` Capability.
  */
+/** What a Library's compilation needs of a Capability: its Operations' forms */
+export type DeclaredCapability = {
+  readonly name: string;
+  readonly operations: ReadonlyMap<
+    string,
+    Omit<GrantDecls[string][string], 'args'> & {
+      args?: GrantDecls[string][string]['args'];
+    }
+  >;
+};
+
+/**
+ * The Operation Declarations a Library is compiled against, so that it can
+ * call these Capabilities, each under its own name, with its caller's Grants
+ */
+const declarationsOf = (
+  capabilities: readonly DeclaredCapability[]
+): GrantDecls =>
+  Object.fromEntries(
+    capabilities.map(capability => [
+      capability.name,
+      Object.fromEntries(
+        [...capability.operations].map(([opName, op]) => [
+          opName,
+          {
+            args: op.args ?? [],
+            command: op.command,
+            labels: op.labels,
+            mode: op.mode
+          }
+        ])
+      )
+    ])
+  );
+
 export const createEcsTalk = <TComponents extends Components>(
   world: World<TComponents>,
   options: EcsTalkOptions = {}
@@ -144,6 +180,8 @@ export const createEcsTalk = <TComponents extends Components>(
   const handles = new Map<number, HostObject<EntityNative>>();
   const atomObjects = new Map<string, HostObject<AtomNative>>();
   const scripts = new Map<string, Script>();
+  /** Service Scripts' owners, by name (see `loadServiceScript`) */
+  const serviceObjects = new Map<string, HostObject<AtomNative>>();
 
   const ref = (eid: number) =>
     ({ id: eid, world }) as unknown as GenericEntity<TComponents>;
@@ -553,19 +591,86 @@ export const createEcsTalk = <TComponents extends Components>(
    * other Libraries, import with `use name from library`. Add a Library
    * before the Scripts that use it. `imports` holds the Libraries it uses.
    * It may call the `world`, `clock` and `timer` Capabilities of the Script
-   * that calls it.
+   * that calls it, and any others in `capabilities` that the Host grants
+   * under their own names.
    */
   const addLibrary = (
     libraryName: string,
     source: string,
-    imports: readonly Library[] = []
+    imports: readonly Library[] = [],
+    capabilities: readonly DeclaredCapability[] = []
   ): Library => {
     const library = compileLibrary(
       { name: libraryName, source, version: '1' },
-      imports
+      imports,
+      declarationsOf([
+        worldCapability,
+        clockGrant.capability,
+        ...(timers.capability ? [timers.capability] : []),
+        ...capabilities
+      ])
     );
     group.addLibrary(library);
     return library;
+  };
+
+  const loadOwned = (
+    scriptName: string,
+    owner: HostObject<AtomNative>,
+    source: string,
+    loadOptions: LoadAtomScriptOptions
+  ): Script =>
+    group.load({
+      grants: {
+        clock: clockGrant,
+        world: worldCapability.grant(
+          ['change', 'find', 'moveTo', 'resolve', 'show'],
+          undefined
+        ),
+        ...(timers.capability
+          ? { timer: timers.capability.grant('all', undefined) }
+          : {}),
+        ...loadOptions.grants
+      },
+      limits: loadOptions.limits,
+      name: scriptName,
+      owner,
+      source
+    });
+
+  /**
+   * Load a Service Script: one owned by a Host object of its own rather than
+   * an atom, so no entity's Message Path reaches it. The Host sends to it by
+   * name, with `requestService` and `decideService`, and passes the entities
+   * it should act on as arguments. It has the same Grants as an atom's Script.
+   */
+  const loadServiceScript = (
+    service: string,
+    source: string,
+    loadOptions: LoadAtomScriptOptions = {}
+  ): Script => {
+    if (serviceObjects.has(service)) {
+      throw new Error(`Service ${service} already has a Script`);
+    }
+    const owner = group.object(atomKind, `service:${service}`, {
+      atom: service
+    });
+    try {
+      const script = loadOwned(service, owner, source, loadOptions);
+      serviceObjects.set(service, owner);
+      return script;
+    } catch (error) {
+      group.dispose(owner);
+      throw error;
+    }
+  };
+
+  const serviceObject = (service: string) => {
+    const owner = serviceObjects.get(service);
+    if (!owner) {
+      throw new Error(`No Service Script named ${service}`);
+    }
+    return owner;
   };
 
   /** Load a Script owned by an atom; entities built from it climb to it */
@@ -583,23 +688,7 @@ export const createEcsTalk = <TComponents extends Components>(
     const owner = group.object(atomKind, atom, { atom });
     atomObjects.set(atom, owner);
     try {
-      const script = group.load({
-        grants: {
-          clock: clockGrant,
-          world: worldCapability.grant(
-            ['change', 'find', 'moveTo', 'resolve', 'show'],
-            undefined
-          ),
-          ...(timers.capability
-            ? { timer: timers.capability.grant('all', undefined) }
-            : {}),
-          ...loadOptions.grants
-        },
-        limits: loadOptions.limits,
-        name: atom,
-        owner,
-        source
-      });
+      const script = loadOwned(atom, owner, source, loadOptions);
       scripts.set(atom, script);
       relink();
       return script;
@@ -663,17 +752,28 @@ export const createEcsTalk = <TComponents extends Components>(
     return deciding;
   };
 
+  /** A Request to a Service Script, as `request` is to an entity */
+  const requestService = (service: string, message: string, ...args: Value[]) =>
+    group.request(serviceObject(service), { args, name: message });
+
+  /** A Decision asked of a Service Script, as `decide` is of an entity */
+  const decideService = (service: string, message: string, ...args: Value[]) =>
+    group.decide(serviceObject(service), { args, name: message });
+
   return {
     addLibrary,
     atomKind,
     decide,
+    decideService,
     deliver,
     entityKind,
     group,
     handle,
     loadAtomScript,
+    loadServiceScript,
     pump,
     request,
+    requestService,
     /** Stores a durable timer for an entity, as `timer`'s `schedule` does */
     schedule: timers.schedule,
     script: (atom: string) => scripts.get(atom),

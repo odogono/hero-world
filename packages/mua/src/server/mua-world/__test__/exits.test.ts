@@ -20,36 +20,36 @@ describe('Exits shorthand', () => {
     await world.muaWorld.close();
   });
 
-  it('makes an exit to the room named', () => {
-    expect(send('north')).toContain('Library');
+  it('makes an exit to the room named', async () => {
+    expect(await send('north')).toContain('Library');
   });
 
-  it('makes the way back', () => {
+  it('makes the way back', async () => {
     // the cellar's `up` makes the hall's `down`
-    expect(send('down')).toContain('Cellar');
-    expect(send('up')).toContain('Hall');
+    expect(await send('down')).toContain('Cellar');
+    expect(await send('up')).toContain('Hall');
   });
 
-  it('leaves out the way back for a one-way exit', () => {
-    send('east');
-    expect(send('west')).toBe("You can't go west from here.");
+  it('leaves out the way back for a one-way exit', async () => {
+    await send('east');
+    expect(await send('west')).toBe("You can't go west from here.");
   });
 
-  it('says why an exit that leads nowhere is closed', () => {
-    expect(send('west')).toBe("A painted door. It doesn't open.");
+  it('says why an exit that leads nowhere is closed', async () => {
+    expect(await send('west')).toBe("A painted door. It doesn't open.");
   });
 
-  it('keeps an exit declared as an entity over the way back', () => {
-    send('north');
-    expect(send('south')).toBe('A bookcase blocks the way.');
+  it('keeps an exit declared as an entity over the way back', async () => {
+    await send('north');
+    expect(await send('south')).toBe('A bookcase blocks the way.');
   });
 
-  it('keeps an exit the room declares over a way back', () => {
+  it('keeps an exit the room declares over a way back', async () => {
     // the study's south exit would make the hall's north: the hall's own wins
-    expect(send('north')).toContain('Library');
+    expect(await send('north')).toContain('Library');
   });
 
-  it('makes nothing new when run again', () => {
+  it('makes nothing new when run again', async () => {
     const ecs = world.muaWorld.world!;
     const count = () => ecs.queryAll({ with: ['portal'] }).length;
     const before = count();

@@ -1,8 +1,9 @@
 import type { EntityId } from 'odgn-ecs/types';
 
 import { getEntity, getLocationOf } from '../queries/entity';
-import { planMove } from './move';
+import type { Receiver } from '../scripts/runner';
 import { takeRefusal } from './objects';
+import { planMove } from './scripted';
 import type { ActionContext } from './types';
 
 /**
@@ -11,6 +12,8 @@ import type { ActionContext } from './types';
  * `responses { veto: { <event>: "..." } }`, or a Script handler
  * `on <event> actor, subject, deciding` that runs `veto "reason"`. A Script
  * that passes, allows, or has no handler lets it happen.
+ * - `beforeTraverse` asked of the exit Service (behaviours/exit.talk), which
+ *                  vetoes when the exit's door is closed; subject: the exit
  * - `beforeExit`   asked of the room being left; subject: the room entered
  * - `beforeEnter`  asked of the room being entered; subject: the room left
  * - `beforeRemove` asked of what holds a thing about to leave it; subject:
@@ -18,12 +21,16 @@ import type { ActionContext } from './types';
  * - `beforeAdd`    asked of where a thing is about to go; subject: the thing
  */
 export type VetoEvent =
-  'beforeAdd' | 'beforeEnter' | 'beforeExit' | 'beforeRemove';
+  | 'beforeAdd'
+  | 'beforeEnter'
+  | 'beforeExit'
+  | 'beforeRemove'
+  | 'beforeTraverse';
 
 export type VetoQuestion = {
   event: VetoEvent;
-  /** The entity asked */
-  id: EntityId;
+  /** Who is asked: an entity, or one of mua's Services */
+  id: Receiver;
   subject: EntityId;
 };
 
@@ -35,6 +42,7 @@ const moveVetoes: VetoPlan = ctx => {
     return [];
   }
   return [
+    { event: 'beforeTraverse', id: { service: 'exit' }, subject: plan.exitId },
     { event: 'beforeExit', id: plan.from, subject: plan.to },
     { event: 'beforeEnter', id: plan.to, subject: plan.from }
   ];

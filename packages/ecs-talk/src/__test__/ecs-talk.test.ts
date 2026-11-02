@@ -212,6 +212,40 @@ describe('ecs-talk', () => {
     expect(show(await described.result)).toBe('a thing with 20');
   });
 
+  it('runs a Service Script that no entity climbs to', async () => {
+    const { byName, ecsTalk, loop } = await setup();
+    ecsTalk.loadServiceScript(
+      'weigher',
+      talk`
+        on weigh thing
+          return the hp of the stats of thing
+        end weigh
+
+        on beforeLift thing, deciding
+          if the hp of the stats of thing > 15 then
+            veto "too heavy"
+          end if
+        end beforeLift
+      `
+    );
+    const hero = ecsTalk.handle(byName('hero')).value;
+
+    const weighed = ecsTalk.requestService('weigher', 'weigh', hero);
+    const lifted = ecsTalk.decideService('weigher', 'beforeLift', hero);
+    // the hero's own Message Path doesn't reach it
+    const unreached = ecsTalk.request(byName('hero'), 'weigh', hero);
+    tick(loop);
+
+    expect(show(await weighed.result)).toBe('20');
+    expect((await lifted.decided).verdict).toBe('vetoed');
+    await expect(unreached.result).rejects.toMatchObject({
+      reason: 'unhandled'
+    });
+    expect(() => ecsTalk.requestService('nobody', 'weigh')).toThrow(
+      'No Service Script named nobody'
+    );
+  });
+
   it('finds, moves and shows through the world Capability', async () => {
     const { byName, ecsTalk, loop, world } = await setup();
     const hero = byName('hero');
