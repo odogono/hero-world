@@ -1,10 +1,11 @@
 /* eslint-disable perfectionist/sort-objects */
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import {
   EDLErrorCodes,
   EDLExecutionError,
   EDLMissingPropertyError,
+  EDLParseError,
   EDLUnknownEntityReferenceError,
   executeEDL,
   parseEDL
@@ -316,6 +317,18 @@ entity lockable_chest: chest {
         }
       ]);
     });
+    it('rejects a command line, naming it', async () => {
+      const edl = `entity chest {
+        thing { size: 10 }
+      }
+      !set $chest.thing.size 30
+      `;
+      const world = await createWorld([thingComponent]);
+      expect(() => executeEDL(world, edl)).toThrow(EDLParseError);
+      expect(() => executeEDL(world, edl)).toThrow(
+        /line 4.*!set \$chest\.thing\.size 30.*write the value inline/s
+      );
+    });
   });
 
   describe('execution', () => {
@@ -589,97 +602,7 @@ entity lockable_chest: chest {
     });
   });
 
-  describe('commands', () => {
-    it('should set component properties', async () => {
-      const edl = `
-      entity chest {
-        thing { size: 10 weight: 20 }
-      }
-      !set $chest.thing.size 30
-      `;
-
-      const world = await createWorld([thingComponent]);
-      executeEDL(world, edl);
-
-      const chest = world.query({
-        with: ['thing'],
-        where: 'thing_size = 30'
-      })!;
-      expect(chest.thing.size).toBe(30);
-      expect(chest.thing.weight).toBe(20);
-    });
-
-    it('should add a component with !set', async () => {
-      const edl = `
-      entity chest {}
-
-      # the !set command adds the thing component to the chest entity
-      # and sets the weight property to 40
-      !set $chest.thing.weight 40
-      `;
-
-      const world = await createWorld([thingComponent]);
-      executeEDL(world, edl);
-
-      const chest = world.query({
-        with: ['thing'],
-        where: 'thing_weight = 40'
-      })!;
-      expect(chest.thing.weight).toBe(40);
-    });
-
-    it('should allow arbitrary commands', async () => {
-      const edl = `
-      entity chest {
-        thing { size: 10 weight: 20 }
-      }
-      #commands start with a ! and are executed in the order they appear
-      !examine $chest.thing.weight $chest arg_1 13 true "a medium sized chest" $chest.thing.id
-      `;
-
-      const examine = mock((..._args: unknown[]) => {});
-
-      const world = await createWorld([thingComponent]);
-      executeEDL(world, edl, { commands: { '!examine': examine } });
-
-      const chest = world.query({
-        with: ['thing'],
-        where: 'thing_weight = 20'
-      })!;
-
-      expect(examine.mock.calls).toEqual([
-        [20, chest.id, 'arg_1', 13, true, 'a medium sized chest', 1]
-      ]);
-    });
-
-    it('should resolve component existence for commands', async () => {
-      const edl = `
-      entity chest {}
-      !examine $chest.thing._exists
-    `;
-
-      const examine = mock((..._args: unknown[]) => {});
-      const world = await createWorld([thingComponent]);
-      executeEDL(world, edl, { commands: { '!examine': examine } });
-
-      expect(examine.mock.calls).toEqual([[false]]);
-    });
-
-    it('should resolve component row id for commands', async () => {
-      const edl = `
-      entity chest { thing { size: 1 weight: 2 } }
-      !examine $chest.thing.id $chest._count
-    `;
-
-      const examine = mock((..._args: unknown[]) => {});
-      const world = await createWorld([thingComponent]);
-      world.executeEDL(edl, { commands: { '!examine': examine } });
-
-      const chest = world.query({ with: ['thing'] })!;
-      expect(chest).toBeDefined();
-      expect(examine.mock.calls).toEqual([[1, 1]]); // i don't really know why this is important
-    });
-
+  describe('optional values', () => {
     it('should handle optional properties', async () => {
       const edl = `
 

@@ -43,12 +43,9 @@ export type EntityDefinition = Definition & {
   was?: string;
 };
 
-export type EDLCommand = { name: string; rawArgs: string[] };
-
 /** An EDL source, parsed but not yet applied to a world */
 export type CompiledEDL = {
   atoms: Map<string, Definition>;
-  commands: EDLCommand[];
   entities: EntityDefinition[];
 };
 
@@ -100,71 +97,22 @@ export const stripComments = (line: string) => {
   return line;
 };
 
-// Lightweight command tokenizer supporting quoted strings and comments
-const tokenize = (line: string): string[] => {
-  const tokens: string[] = [];
-  const re = /"([^"\\]|\\.)*"|\S+/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(line))) {
-    const tok = match[0];
-    if (tok.startsWith('"')) {
-      // Unquote + unescape
-      const inner = tok.slice(1, -1);
-      tokens.push(
-        inner.replaceAll(/\\(["\\nrt])/g, (_m, c) => {
-          switch (c) {
-            case 'n':
-              return '\n';
-            case 'r':
-              return '\r';
-            case 't':
-              return '\t';
-            case '"':
-              return '"';
-            case '\\':
-            default:
-              return '\\';
-          }
-        })
-      );
-    } else {
-      tokens.push(tok);
-    }
-  }
-  return tokens;
-};
-
-const parseCommands = (edl: string): EDLCommand[] => {
-  const lines = edl.split(/\r?\n/);
-  const commands: EDLCommand[] = [];
-
-  for (let raw of lines) {
-    raw = stripComments(raw).trim();
-    if (!raw || raw[0] !== '!') {
-      continue;
-    }
-    const toks = tokenize(raw);
-    const [name, ...rawArgs] = toks;
-    if (name === undefined) {
-      continue;
-    }
-    commands.push({ name, rawArgs });
-  }
-
-  return commands;
-};
-
-/** Parses an EDL source into its atoms, entities and commands */
+/** Parses an EDL source into its atoms and entities */
 export const compileEDL = (edl: string): CompiledEDL => {
-  const commands = parseCommands(edl);
-  // Remove command lines before parsing entity/atom definitions
   const origLines = edl.split(/\r?\n/);
   const includeMap: Array<{ originalIndex: number; text: string }> = [];
   const parseLines: string[] = [];
   for (const [i, line] of origLines.entries()) {
     const stripped = stripComments(line);
     const trimmed = stripped.trim();
-    if (trimmed.length > 0 && trimmed[0] !== '!') {
+    if (trimmed.startsWith('!')) {
+      // EDL commands were removed (ADR 0007)
+      throw new EDLParseError(
+        `EDL has no commands, at line ${i + 1}: ${trimmed}\nwrite the value inline on the entity or atom instead`,
+        { line: i + 1 }
+      );
+    }
+    if (trimmed.length > 0) {
       // Keep left whitespace intact in the parse buffer so columns align
       parseLines.push(stripped);
       includeMap.push({ originalIndex: i, text: line });
@@ -240,7 +188,7 @@ export const compileEDL = (edl: string): CompiledEDL => {
     // component definitions are ignored here
   }
 
-  return { atoms, commands, entities };
+  return { atoms, entities };
 };
 
 /** What resolving a compiled EDL against entity ids gives */

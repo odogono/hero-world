@@ -9,7 +9,7 @@ EDL is a compact, declarative syntax for defining atoms (reusable templates), en
 - A value can be an object or array, as in JSON, but commas between entries are optional: `props: { to: $hall oneWay: true tags: ["a" "b"] }`.
 - Atoms and entities can extend one or more bases using `:`. Rightmost base wins on conflicts.
 - Inline component schemas can be declared with `def <name> { ... }`.
-- Lines starting with `!` are commands executed after parsing; see `src/edl/COMMANDS.md`.
+- EDL has no commands (ADR 0007): a line starting with `!` is a parse error. Write the value inline on the entity or atom.
 
 ## Atoms
 
@@ -116,15 +116,8 @@ if (isEDLChanged(world, edl)) {
 - To rename an entity, say what it used to be called: `entity garden_door was shed_door { … }`. The migration gives the existing entity the new Definition name, keeping its id and state, and lists it in `renamed`; without `was`, a renamed entity is created anew and the old one is reported `gone`. Once every world has migrated, the `was` can be removed. The old name must not still be defined.
 - Lineage and Script owners are rewritten from the EDL.
 - Entities whose name is gone from the EDL are listed in `gone`. Pass `prune: eid => …` to take them out of play; their names are then forgotten.
-- `dryRun: true` returns the plan and changes nothing. Of the commands, only `!set` is applied.
+- `dryRun: true` returns the plan and changes nothing.
 - `adoptDefinitionNames(world, originalEDL)` names the entities of a world built before names were saved, from the EDL it was first built with.
-
-## Commands
-
-- Lines beginning with `!` are parsed as commands and executed after definitions.
-- Built‑in: `!set $entity.component.prop value` adds/updates a property.
-- Arguments support scalars, strings, and `$` references (can return ids, values, existence, or row ids).
-- Full reference and examples: see `src/edl/COMMANDS.md`.
 
 ## Error Handling
 
