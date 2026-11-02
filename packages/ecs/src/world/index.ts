@@ -55,6 +55,9 @@ import type {
   GenericEntity,
   InferComponentsFromCDefs
 } from '../types';
+import { ChangeConflictError, ChangeScope } from './changes';
+
+export { ChangeConflictError, ChangeScope } from './changes';
 
 const log = createLog('world');
 
@@ -194,6 +197,10 @@ export class World<TComponents extends Components> {
   /** Script owners: atoms (by name) and entities (by id) that declare their own `script`, mapped to its source path */
   atomScripts: Map<string, string>;
   entityScripts: Map<number, string>;
+  /** The Change Scope that writes join, while one is running */
+  activeChanges: ChangeScope<TComponents> | undefined;
+  /** The open Change Scope holding each entity it has touched */
+  changeHolders: Map<number, ChangeScope<TComponents>>;
 
   constructor(options: CreateWorldOptions) {
     this.options = options;
@@ -207,6 +214,30 @@ export class World<TComponents extends Components> {
     this.atomLineage = new Map();
     this.atomScripts = new Map();
     this.entityScripts = new Map();
+    this.activeChanges = undefined;
+    this.changeHolders = new Map();
+  }
+
+  /**
+   * Open a Change Scope: writes made inside `scope.run(fn)` can later be
+   * committed into the pending changes, or discarded. See `ChangeScope`.
+   */
+  openChanges(): ChangeScope<TComponents> {
+    return new ChangeScope(this);
+  }
+
+  /**
+   * Called before an entity's pending state changes. Inside a Change Scope it
+   * records the entity's state first; it throws `ChangeConflictError` when
+   * another open scope holds the entity.
+   */
+  noteChange(eid: number, created = false) {
+    const holder = this.changeHolders.get(eid);
+    const scope = this.activeChanges;
+    if (holder && holder !== scope) {
+      throw new ChangeConflictError(eid);
+    }
+    scope?.noteChange(eid, created);
   }
 
   /** Atoms and entities that own a Script, with the Script's source path */
@@ -302,6 +333,7 @@ export class World<TComponents extends Components> {
     [K in keyof TComponents]?: ComponentInput<TComponents[K]>;
   }): EntityWithComponents<TComponents, keyof TComponents> {
     const eid = this.db.addEntity();
+    this.noteChange(eid, true);
 
     const entity: GenericEntity<TComponents> & Record<string, unknown> = {
       id: eid,
@@ -491,6 +523,7 @@ export class World<TComponents extends Components> {
    */
   delete(entity: { id: number }) {
     const { id } = entity;
+    this.noteChange(id);
 
     // Mark entity for deletion instead of immediate deletion
     this.entitiesToDelete.add(id);
@@ -604,7 +637,15 @@ export class World<TComponents extends Components> {
   }
 
   flush(): World<TComponents> {
-    const { db, defs, dirtyEntities, entitiesToDelete, entityCache } = this;
+    const { changeHolders, db, defs, entityCache } = this;
+
+    // an open Change Scope's entities stay pending until it closes
+    const dirtyEntities = new Map(
+      [...this.dirtyEntities].filter(([eid]) => !changeHolders.has(eid))
+    );
+    const entitiesToDelete = new Set(
+      [...this.entitiesToDelete].filter(eid => !changeHolders.has(eid))
+    );
 
     db.transaction(() => {
       // Handle entity deletions first
@@ -620,6 +661,7 @@ export class World<TComponents extends Components> {
         for (const eid of entityIds) {
           entityCache.delete(eid);
           dirtyEntities.delete(eid);
+          this.dirtyEntities.delete(eid);
         }
       }
 
@@ -716,9 +758,13 @@ export class World<TComponents extends Components> {
       }
     });
 
-    // Clear all tracking
-    dirtyEntities.clear();
-    entitiesToDelete.clear();
+    // Clear the tracking of what was flushed
+    for (const eid of dirtyEntities.keys()) {
+      this.dirtyEntities.delete(eid);
+    }
+    for (const eid of entitiesToDelete) {
+      this.entitiesToDelete.delete(eid);
+    }
 
     return this;
   }

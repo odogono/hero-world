@@ -1,7 +1,11 @@
 import { scheduleEvent, type EventComponent } from 'odgn-ecs/events';
 import type { System } from 'odgn-ecs/system';
 import type { Components, GenericEntity } from 'odgn-ecs/types';
-import type { World } from 'odgn-ecs/world';
+import {
+  ChangeConflictError,
+  type ChangeScope,
+  type World
+} from 'odgn-ecs/world';
 import { createLog } from 'odgn-helpers/log';
 
 import {
@@ -18,6 +22,7 @@ import {
   num,
   shape,
   toValue,
+  type Call,
   type Grant,
   type Group,
   type HostObject,
@@ -27,6 +32,7 @@ import {
   type PropDef,
   type PumpResult,
   type Script,
+  type SegmentLifecycle,
   type Value
 } from '@northtalk/ts';
 
@@ -180,6 +186,73 @@ export const createEcsTalk = <TComponents extends Components>(
     proxy[componentName] = data;
   };
 
+  /** Validate a Script's value for a component, as the ECS data to write */
+  const toComponentData = (
+    componentName: string,
+    value: Value
+  ): Record<string, unknown> => {
+    const componentShape = shapes.get(componentName);
+    if (!componentShape) {
+      throw new ScriptError(
+        'invalid value',
+        `Unknown component ${componentName}`
+      );
+    }
+    const plain = toPlain(fromValue(value));
+    const result = componentShape.validator.safeParse(plain);
+    if (!result.success) {
+      throw new ScriptError(
+        'invalid value',
+        `Invalid ${componentName}: ${result.error.message}`
+      );
+    }
+    // Nothing for an omittable field leaves it to the component default
+    return Object.fromEntries(
+      Object.entries(result.data).filter(([, v]) => v !== null)
+    );
+  };
+
+  /**
+   * Each open Segment's Change Scope, by Segment id. The `world` Capability's
+   * Segment-bound Operations write into it; the Segment's commit keeps the
+   * writes pending for the tick's flush, and its rollback discards them.
+   */
+  const segments = new Map<string, ChangeScope<TComponents>>();
+  const OK = { status: 'ok' } as const;
+
+  const segmentLifecycle: SegmentLifecycle<void> = {
+    begin: context => {
+      segments.set(context.segmentId, world.openChanges());
+      return OK;
+    },
+    commit: context => {
+      segments.get(context.segmentId)?.commit();
+      segments.delete(context.segmentId);
+      return OK;
+    },
+    rollback: context => {
+      segments.get(context.segmentId)?.discard();
+      segments.delete(context.segmentId);
+      return OK;
+    }
+  };
+
+  /** Run a Segment-bound write inside its Segment's Change Scope */
+  const inSegment = <R>(call: Call<unknown>, fn: () => R): R => {
+    const scope = segments.get(call.segmentId);
+    try {
+      return scope ? scope.run(fn) : fn();
+    } catch (error) {
+      if (error instanceof ChangeConflictError) {
+        throw new ScriptError(
+          'world busy',
+          `Entity ${error.eid} is being changed by another Run`
+        );
+      }
+      throw error;
+    }
+  };
+
   const locationOf = (eid: number) => {
     const location = readComponent(eid, LOCATION);
     return typeof location?.in === 'number' ? location.in : undefined;
@@ -240,19 +313,21 @@ export const createEcsTalk = <TComponents extends Components>(
       if (!isLive(eid)) {
         throw new ScriptError('object gone', `Entity ${eid} is gone`);
       }
-      const plain = toPlain(fromValue(value));
-      const result = componentShape.validator.safeParse(plain);
-      if (!result.success) {
-        throw new ScriptError(
-          'invalid value',
-          `Invalid ${componentName}: ${result.error.message}`
+      try {
+        writeComponent(
+          eid,
+          componentName,
+          toComponentData(componentName, value)
         );
+      } catch (error) {
+        if (error instanceof ChangeConflictError) {
+          throw new ScriptError(
+            'world busy',
+            `Entity ${eid} is being changed by another Run`
+          );
+        }
+        throw error;
       }
-      // Nothing for an omittable field leaves it to the component default
-      const data = Object.fromEntries(
-        Object.entries(result.data).filter(([, v]) => v !== null)
-      );
-      writeComponent(eid, componentName, data);
     },
     setCost: COST,
     shape: componentShape.shape
@@ -298,73 +373,96 @@ export const createEcsTalk = <TComponents extends Components>(
 
   const entityArg = shape.object(entityKind);
 
-  const worldCapability = defineCapability('world', {
-    find: {
-      args: [entityArg, shape.text],
-      cost: COST,
-      do: (_call, place, componentName) => {
-        if (!world.defs.has(componentName)) {
-          throw new ScriptError(
-            'invalid value',
-            `Unknown component ${componentName}`
+  const worldCapability = defineCapability(
+    'world',
+    {
+      change: {
+        args: [entityArg, shape.text, shape.any],
+        command: true,
+        cost: COST,
+        do: (call, thing, componentName, value) => {
+          const { eid } = thing.native;
+          if (!isLive(eid)) {
+            throw new ScriptError('object gone', `Entity ${eid} is gone`);
+          }
+          const data = toComponentData(componentName, value);
+          inSegment(call, () => writeComponent(eid, componentName, data));
+          return nothing;
+        },
+        mode: 'immediate',
+        segmentBound: true
+      },
+      find: {
+        args: [entityArg, shape.text],
+        cost: COST,
+        do: (_call, place, componentName) => {
+          if (!world.defs.has(componentName)) {
+            throw new ScriptError(
+              'invalid value',
+              `Unknown component ${componentName}`
+            );
+          }
+          const found = elementIds(place.native.eid)
+            .filter(eid => readComponent(eid, componentName) !== undefined)
+            .map(eid => handle(eid).value);
+          return list(...found);
+        },
+        mode: 'immediate',
+        result: shape.listOf(entityArg)
+      },
+      moveTo: {
+        args: [entityArg, entityArg],
+        command: true,
+        cost: COST,
+        do: (call, thing, place) => {
+          const { eid } = thing.native;
+          const placeEid = place.native.eid;
+          if (!isLive(eid) || !isLive(placeEid)) {
+            throw new ScriptError(
+              'object gone',
+              `Entity ${isLive(eid) ? placeEid : eid} is gone`
+            );
+          }
+          inSegment(call, () =>
+            writeComponent(eid, LOCATION, { in: placeEid })
           );
-        }
-        const found = elementIds(place.native.eid)
-          .filter(eid => readComponent(eid, componentName) !== undefined)
-          .map(eid => handle(eid).value);
-        return list(...found);
+          return nothing;
+        },
+        mode: 'immediate',
+        segmentBound: true
       },
-      mode: 'immediate',
-      result: shape.listOf(entityArg)
-    },
-    moveTo: {
-      args: [entityArg, entityArg],
-      command: true,
-      cost: COST,
-      do: (_call, thing, place) => {
-        const { eid } = thing.native;
-        const placeEid = place.native.eid;
-        if (!isLive(eid) || !isLive(placeEid)) {
-          throw new ScriptError(
-            'object gone',
-            `Entity ${isLive(eid) ? placeEid : eid} is gone`
+      resolve: {
+        args: [shape.number],
+        cost: COST,
+        do: (_call, id) => {
+          const eid = Number(id);
+          return Number.isInteger(eid) && isLive(eid)
+            ? handle(eid).value
+            : nothing;
+        },
+        mode: 'immediate',
+        result: shape.optional(entityArg)
+      },
+      show: {
+        args: [entityArg, shape.text],
+        command: true,
+        cost: COST,
+        fire: (_call, actor, line) => {
+          const payload: TalkShowPayload = {
+            actor: actor.native.eid,
+            text: line
+          };
+          scheduleEvent(
+            world as unknown as World<Components & { event: EventComponent }>,
+            TALK_SHOW_EVENT,
+            payload
           );
-        }
-        writeComponent(eid, LOCATION, { in: placeEid });
-        return nothing;
-      },
-      mode: 'immediate'
+        },
+        mode: 'fire-and-forget'
+      }
     },
-    resolve: {
-      args: [shape.number],
-      cost: COST,
-      do: (_call, id) => {
-        const eid = Number(id);
-        return Number.isInteger(eid) && isLive(eid)
-          ? handle(eid).value
-          : nothing;
-      },
-      mode: 'immediate',
-      result: shape.optional(entityArg)
-    },
-    show: {
-      args: [entityArg, shape.text],
-      command: true,
-      cost: COST,
-      fire: (_call, actor, line) => {
-        const payload: TalkShowPayload = {
-          actor: actor.native.eid,
-          text: line
-        };
-        scheduleEvent(
-          world as unknown as World<Components & { event: EventComponent }>,
-          TALK_SHOW_EVENT,
-          payload
-        );
-      },
-      mode: 'fire-and-forget'
-    }
-  });
+    segmentLifecycle
+  );
 
   const group: Group = newGroup({ name });
 
@@ -489,7 +587,7 @@ export const createEcsTalk = <TComponents extends Components>(
         grants: {
           clock: clockGrant,
           world: worldCapability.grant(
-            ['find', 'moveTo', 'resolve', 'show'],
+            ['change', 'find', 'moveTo', 'resolve', 'show'],
             undefined
           ),
           ...(timers.capability

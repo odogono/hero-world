@@ -1,4 +1,4 @@
 on examine role, actor
-  set the item of the target to {weight: "heavy"}
+  change the target, "item", {weight: "heavy"}
   return "unreachable"
 end examine

@@ -42,6 +42,7 @@ export const createEntity: CreateEntityOverloads = <
   initialComponents?: C
 ): EntityWithComponents<TComponents, keyof C & keyof TComponents> => {
   const eid = world.db.addEntity();
+  world.noteChange(eid, true);
 
   const entity: GenericEntity<TComponents> & Record<string, unknown> = {
     id: eid,

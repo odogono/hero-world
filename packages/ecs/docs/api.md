@@ -49,6 +49,15 @@ All of these were checked against the code:
 - **Queries see unflushed changes.** Entities are cached in `world.entityCache`, so a later query returns the pending value until the next flush.
 - The tracking lives in `component/helpers/make-tracked.ts`, and the dirty set is `world.dirtyEntities`.
 
+## Change Scopes: `src/world/changes.ts`
+
+A Change Scope groups pending changes so they can be kept or undone together. `ecs-talk` opens one per NorthTalk Segment.
+
+- `const scope = world.openChanges()`, then `scope.run(() => …)`: writes inside `run` (component sets, adds and removes, `world.create`, `world.delete`) join the scope. The first time it touches an entity, it records the entity's pending state.
+- `scope.commit()` keeps the changes as ordinary pending changes for the next flush. `scope.discard()` puts every entity it touched back as it was, and removes the entities it created.
+- An open scope holds the entities it touched. `flush()` leaves their changes pending, and a write to one from another scope or from outside any scope throws `ChangeConflictError`.
+- `world.clone` and `world.copy` write SQL directly, so a scope can't undo them.
+
 ## Systems and the game loop: `src/system/`
 
 - `createSystem(fn, opts)` (`system/index.ts`): with query options, `fn` runs once per matching entity as `{ entity, world, deltaTime }`; without them, once per update.

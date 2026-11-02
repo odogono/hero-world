@@ -21,6 +21,10 @@ export const makeTrackedComponent = <
     throw new Error('Entity ID is required');
   }
 
+  if (mode === 'write') {
+    world.noteChange(id);
+  }
+
   let cache = world.entityCache.get(id);
   if (!cache) {
     cache = {};
@@ -53,7 +57,7 @@ export const makeTrackedComponent = <
 
   return new Proxy(tracked, {
     set(target, prop, value) {
-      // console.debug('[makeTrackedComponent] set', prop, value);
+      world.noteChange(id);
       target[prop] = value;
       if (!world.dirtyEntities.has(id)) {
         world.dirtyEntities.set(id, new Set());

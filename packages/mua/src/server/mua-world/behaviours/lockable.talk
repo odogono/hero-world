@@ -68,7 +68,7 @@ on turnKey verb, actor, locking
     return `The ${nameOf(k)} doesn't fit.`
   end if
 
-  set the lockable of the target to {isLocked: locking, lock: lockName}
+  change the target, "lockable", {isLocked: locking, lock: lockName}
   ask mua to message verb, "omsg", k
   put it into others
   ask world to resolve the in of the location of actor
