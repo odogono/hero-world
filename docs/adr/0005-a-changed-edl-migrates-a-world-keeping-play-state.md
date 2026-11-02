@@ -14,4 +14,4 @@ For each entity, the components the EDL now gives it, including through its atom
 ## Consequences
 
 - A component's definition must say whether it is Play state, and a wrong flag either clobbers play or leaves stale data.
-- Renaming an entity in the EDL creates a new one and reports the old one as removed.
+- Renaming an entity in the EDL creates a new one and reports the old one as removed, unless the EDL says what it was called (`entity b was a`, #78).

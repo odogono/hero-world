@@ -4,6 +4,8 @@
     type: 'atom' | 'entity';
     id: string | undefined;
     extends?: string[];
+    /** The Definition name the entity had before a rename */
+    was?: string;
     components: Record<string, Record<string, unknown>>;
   };
 
@@ -69,15 +71,19 @@ AtomDef
     }
 
 EntityDef
-  = 'entity' __ id:IdentifierOrString _ ':' _ exts:ExtendsList _ '{' _ comps:Components? _ '}' {
-      return { type: 'entity', id, extends: exts, components: comps ?? {} } as EDLDefinition;
+  = 'entity' __ id:IdentifierOrString was:WasName? _ ':' _ exts:ExtendsList _ '{' _ comps:Components? _ '}' {
+      return { type: 'entity', id, was: was ?? undefined, extends: exts, components: comps ?? {} } as EDLDefinition;
     }
-  / 'entity' __ id2:IdentifierOrString _ '{' _ comps2:Components? _ '}' {
-      return { type: 'entity', id: id2, components: comps2 ?? {} } as EDLDefinition;
+  / 'entity' __ id2:IdentifierOrString was2:WasName? _ '{' _ comps2:Components? _ '}' {
+      return { type: 'entity', id: id2, was: was2 ?? undefined, components: comps2 ?? {} } as EDLDefinition;
     }
   / 'entity' _ '{' _ comps3:Components? _ '}' {
       return { type: 'entity', id: undefined, components: comps3 ?? {} } as EDLDefinition;
     }
+
+// `entity garden_door was shed_door`: the name it had before a rename
+WasName
+  = __ 'was' __ old:IdentifierOrString { return old; }
 
 // Component definition grammar
 ComponentDef
