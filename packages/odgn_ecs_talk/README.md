@@ -31,4 +31,4 @@ The caller drives it: it Pumps with `pump/2` inside its own transaction, as Mua'
 
 - **Read-only properties:** components can't be set as properties. Scripts change the World through `change` and `moveTo`, so every write can roll back with its Segment (ADR 0015).
 - **Handles made outside a Pump:** callbacks can't make Host Objects, so an entity made during play needs `handle/2` before a Script can reach it.
-- **NorthTalk pin:** the adapter is pinned to odogono/odgn-talk#1993 for Host Commands and Library declarations.
+- **NorthTalk pin:** the adapter needs a NorthTalk with Elixir Host Commands and Library declarations (odogono/odgn-talk#1993).
