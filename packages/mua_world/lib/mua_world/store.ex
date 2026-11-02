@@ -173,12 +173,9 @@ defmodule MuaWorld.Store do
   def move(conn, eid, place),
     do: run!(conn, "UPDATE entities SET location = ? WHERE id = ?", [place, eid])
 
-  def characters_at(conn, place),
-    do:
-      for(
-        [id] <- all(conn, "SELECT id FROM entities WHERE location = ? AND character = 1", [place]),
-        do: id
-      )
+  @characters_at "SELECT id FROM entities WHERE location = ? AND character = 1"
+
+  def characters_at(conn, place), do: for([id] <- all(conn, @characters_at, [place]), do: id)
 
   def output(conn, character, text),
     do: run!(conn, "INSERT INTO outbox (character, text) VALUES (?, ?)", [character, text])
