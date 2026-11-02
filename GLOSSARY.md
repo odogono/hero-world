@@ -37,12 +37,16 @@ The name an entity was given in the EDL, which ties it to that definition for as
 _Avoid_: id, key, slug
 
 **Play state**:
-Components that play changes, such as whether a door is open or where a movable thing is. A Migration never overwrites them.
+Components that play changes, such as whether a door is open or where a movable thing is. A Migration changes them only where play has left them as the EDL last set them.
 _Avoid_: runtime data, dynamic components
 
 **Migration**:
-Bringing an existing world up to date with a changed EDL while keeping its players, Play state and time.
+Bringing an existing world up to date with a changed EDL while keeping its players, Play state and time. A Build is the Migration of an empty world.
 _Avoid_: rebuild, reset, sync
+
+**Build**:
+The first Migration of a world: from empty to what the EDL describes.
+_Avoid_: execute, load (for EDL)
 
 ## Behaviour
 
