@@ -1,4 +1,5 @@
 import { createLog } from 'odgn-helpers/log';
+import { trycatch } from 'odgn-helpers/try-catch';
 
 import {
   addComponent,
@@ -130,6 +131,30 @@ type CreateWorldOptions = Partial<CreateDatabaseOptions> & {
   dbType?: DatabaseType;
 };
 
+/**
+ * Keeps one row per entity in a component table. A world file written before
+ * the flush updated existing rows may hold several; the newest (highest id)
+ * holds the value last written, so the others are dropped. The unique index
+ * then makes a later duplicate fail loudly. The index sits outside the table
+ * SQL so the component's definition hash is unchanged.
+ */
+const enforceOneRowPerEntity = (db: Database, tableName: string): void => {
+  const createIndex = `CREATE UNIQUE INDEX IF NOT EXISTS uidx_${tableName}_eid ON ${tableName} (eid)`;
+  const [, error] = trycatch(() => db.exec(createIndex));
+  if (!error) {
+    return;
+  }
+  const dropped = db
+    .prepare(
+      `DELETE FROM ${tableName} WHERE eid IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM ${tableName} WHERE eid IS NOT NULL GROUP BY eid)`
+    )
+    .run();
+  log.warn(
+    `${tableName}: dropped ${dropped.changes} duplicate row(s), keeping the newest per entity`
+  );
+  db.exec(createIndex);
+};
+
 const registerComponentDef = <TComponents extends Components>(
   world: World<TComponents>,
   componentDef: CDef
@@ -143,6 +168,7 @@ const registerComponentDef = <TComponents extends Components>(
 
   const result = cdefToSqlCreate(componentDef);
   world.db.exec(result.sql);
+  enforceOneRowPerEntity(world.db, result.tableName);
 
   const sqlInsert = cdefToSqlInsert(componentDef, {
     namedParams: true
