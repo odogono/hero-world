@@ -1,0 +1,7 @@
+-- Hears what is said in the room it is in (a notice), and echoes hello.
+on heard actor, words
+  if words is "hello" then
+    ask world to resolve the in of the location of the target
+    announce it, "The walls echo: hello.", nothing
+  end if
+end heard

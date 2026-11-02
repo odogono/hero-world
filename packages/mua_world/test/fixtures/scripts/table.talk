@@ -1,0 +1,10 @@
+on lookUnder role, actor
+  if role is "target" then
+    return "Something is scratched into the stone beneath: SALVE."
+  end if
+  pass lookUnder
+end lookUnder
+
+on prayTo role, actor
+  return "The altar glows faintly."
+end prayTo

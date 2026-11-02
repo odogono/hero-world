@@ -1,0 +1,10 @@
+on pray role, actor
+  return "A calm settles over you."
+end pray
+
+on prayTo role, actor
+  if role is "room" then
+    pass prayTo
+  end if
+  return "The altar is silent."
+end prayTo

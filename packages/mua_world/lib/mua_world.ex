@@ -21,7 +21,8 @@ defmodule MuaWorld do
   """
   use GenServer
 
-  alias MuaWorld.{Components, Tables, Talk}
+  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Tables, Talk}
+  alias MuaWorld.Commands.{Scope, Verbs}
   alias NorthTalk.{Pending, Result, ScriptError, Verdict}
 
   # World time 0, as the Instant NorthTalk's Clock reads.
@@ -30,6 +31,10 @@ defmodule MuaWorld do
   defstruct [
     :world,
     :talk,
+    # Command contexts and notices, shared with `mua`'s callbacks.
+    :table,
+    # The verbs the World understands.
+    :vocabulary,
     :fault,
     :tick,
     # World time at the last reading, and the monotonic time it was read.
@@ -79,6 +84,16 @@ defmodule MuaWorld do
   @doc "The entity with this Definition name, through the World process."
   def named(world, name), do: GenServer.call(world, {:named, name})
 
+  @doc "Every word that starts a command in this World, for clients to complete."
+  def verbs(world), do: GenServer.call(world, :verbs)
+
+  @doc """
+  Makes a Character called `name` in the place with Definition name `place`,
+  as one Step, and returns its id. A stand-in until Accounts and Characters
+  arrive (#115).
+  """
+  def spawn(world, name, place), do: GenServer.call(world, {:spawn, name, place})
+
   # ---------------------------------------------------------------------
   # Start
   # ---------------------------------------------------------------------
@@ -100,8 +115,11 @@ defmodule MuaWorld do
     }
 
     :ok = OdgnEcs.begin(world)
+    Exits.expand(world)
     Tables.abandon_waiting(world)
     :ok = OdgnEcs.commit(world)
+
+    state = %{state | vocabulary: Verbs.from_world(world)}
 
     state = start_talk(state, Keyword.get(opts, :limits, []))
     if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
@@ -110,10 +128,18 @@ defmodule MuaWorld do
 
   defp ok!({:ok, value}), do: value
 
+  # mua's Libraries, by the name Scripts `use` them from, and its Service
+  # Scripts: its core actions, which no Message Path reaches.
+  @libraries ~w(rooms things)
+  @services ~w(room exit)
+
+  defp behaviour(path), do: Path.join([:code.priv_dir(:mua_world), "behaviours", path])
+
   defp start_talk(state, limits) do
     world = state.world
+    table = Talk.table()
     {:ok, owner} = NorthTalk.start_link(drive: :manual)
-    :ok = NorthTalk.define_capability!(owner, Talk.mua(world))
+    :ok = NorthTalk.define_capability!(owner, Talk.mua(world, table))
 
     {:ok, talk} =
       OdgnEcsTalk.start(world,
@@ -123,8 +149,19 @@ defmodule MuaWorld do
         on_show: &Tables.output(world, &1, &2)
       )
 
+    for name <- @libraries,
+        do:
+          {:ok, _} =
+            OdgnEcsTalk.add_library(talk, name, File.read!(behaviour("lib/#{name}.talk")), [], [
+              "mua"
+            ])
+
+    for name <- @services,
+        do:
+          :ok = OdgnEcsTalk.load_service_script(talk, name, File.read!(behaviour("#{name}.talk")))
+
     :ok = OdgnEcsTalk.load_scripts(talk, &File.read!/1)
-    %{state | talk: talk}
+    %{state | talk: talk, table: table}
   end
 
   # ---------------------------------------------------------------------
@@ -134,7 +171,7 @@ defmodule MuaWorld do
   @impl true
   def handle_call({:command, character, text}, _from, state) do
     state = advance_clock(state)
-    {lines, state} = step(state, fn state -> dispatch(state, character, String.trim(text)) end)
+    {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
     {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
   end
 
@@ -161,6 +198,21 @@ defmodule MuaWorld do
 
   def handle_call({:named, name}, _from, state),
     do: {:reply, OdgnEdl.entity_named(state.world, name), state}
+
+  def handle_call(:verbs, _from, state), do: {:reply, Verbs.list(state.vocabulary), state}
+
+  def handle_call({:spawn, name, place}, _from, state) do
+    world = state.world
+    room = OdgnEdl.entity_named(world, place)
+    :ok = OdgnEcs.begin(world)
+    {:ok, eid} = OdgnEcs.create(world)
+    :ok = OdgnEcs.put(world, eid, "player", %{"name" => name})
+    :ok = OdgnEcs.put(world, eid, "meta", %{"props" => %{"id" => name}})
+    :ok = OdgnEcs.put(world, eid, "location", %{"in" => room})
+    :ok = OdgnEcs.commit(world)
+    OdgnEcsTalk.handle(state.talk, eid)
+    {:reply, eid, state}
+  end
 
   @impl true
   def handle_info(:tick, state) do
@@ -235,10 +287,17 @@ defmodule MuaWorld do
   defp fault(%{fault: point}, point), do: Process.exit(self(), :kill)
   defp fault(_, _), do: :ok
 
+  # Pumps until the Group is idle, sending the notices Scripts asked for
+  # along the way.
   defp pump_idle(state) do
     {:ok, pump} = OdgnEcsTalk.pump(state.talk, instant(state.world_ms))
     state = %{state | next_deadline: deadline(pump.next_deadline)}
-    if pump.state == "sliced", do: pump_idle(state), else: state
+    notices = Talk.take_notices(state.table)
+
+    for {place, message, who} <- notices,
+        do: send_notice(state, place, message, [{:entity, who}])
+
+    if pump.state == "sliced" or notices != [], do: pump_idle(state), else: state
   end
 
   defp instant(ms), do: DateTime.add(@epoch, ms, :millisecond)
@@ -282,130 +341,194 @@ defmodule MuaWorld do
 
   # ---------------------------------------------------------------------
   # Commands
-  #
-  # A stand-in until command parsing, binding and dispatch arrive (#113):
-  # `say`, `take`, and any other verb offered to the room.
   # ---------------------------------------------------------------------
 
-  defp dispatch(state, character, text) do
-    room = location(state, character)
-    [verb | rest] = String.split(text, " ", parts: 2) ++ [""]
-    rest = String.trim(hd(rest))
+  # A Character's input: read into commands, which are dispatched in turn.
+  defp input(state, actor, text) do
+    world = state.world
+    {result, changes} = Input.read(world, state.vocabulary, actor, text)
 
+    if changes != %{} do
+      player = OdgnEcs.get(world, actor, "player") || %{}
+      :ok = OdgnEcs.put(world, actor, "player", Map.merge(player, changes))
+    end
+
+    case result do
+      {:reply, message} -> tell(state, actor, message)
+      {:commands, commands} -> run_commands(state, actor, commands, text)
+    end
+  end
+
+  defp run_commands(state, _actor, [], _raw), do: state
+
+  defp run_commands(state, actor, [command | rest], raw) do
+    ctx =
+      command
+      |> Map.take([:verb, :target, :indirect, :target_id, :indirect_id, :direction, :text])
+      |> Map.merge(%{actor: actor, raw: raw, vocabulary: state.vocabulary})
+
+    run_dispatch(state, ctx, fn state, outcome ->
+      state
+      |> finish(ctx, outcome, command[:label])
+      |> run_commands(actor, rest, raw)
+    end)
+  end
+
+  @doc false
+  # Asks the questions of `MuaWorld.Dispatch` in turn, then runs the action,
+  # and calls `k` with the outcome. A Script that hasn't answered once its
+  # Pumps are idle carries the rest over to a later Step.
+  def run_dispatch(state, ctx, k),
+    do: ask_each(state, ctx, Dispatch.questions(state.world, ctx), k)
+
+  defp ask_each(state, ctx, [], k), do: run_action(state, ctx, k)
+
+  defp ask_each(state, ctx, [q | rest], k) do
     cond do
-      room == nil -> tell(state, character, "You are nowhere.")
-      verb == "say" -> say(state, character, room, rest)
-      verb == "take" -> take(state, character, room, rest, text)
-      true -> offer(state, character, room, verb, rest, text)
+      q.response != nil ->
+        k.(state, Actions.refused(q.response))
+
+      not answerable?(state, q.to) ->
+        ask_each(state, ctx, rest, k)
+
+      true ->
+        ask(state, ctx, q, fn state, reply ->
+          case {reply, q.kind} do
+            {{:replied, message}, :receiver} ->
+              k.(state, Actions.done(message || ""))
+
+            {{:replied, message}, :veto} ->
+              k.(state, Actions.refused(message || Dispatch.cannot()))
+
+            {:failed, _} ->
+              k.(state, Actions.refused("Something went wrong."))
+
+            {:passed, _} ->
+              ask_each(state, ctx, rest, k)
+          end
+        end)
     end
   end
 
-  defp location(state, eid) do
-    case OdgnEcs.get(state.world, eid, "location") do
-      %{"in" => place} -> place
-      _ -> nil
+  defp run_action(state, ctx, k) do
+    if Dispatch.scripted?(ctx.verb) do
+      case Dispatch.plan(state.world, ctx) do
+        {:refused, message} ->
+          k.(state, Actions.refused(message))
+
+        {:send, to, message, args} ->
+          q = %{kind: :action, asks: :offer, to: to, message: message, args: args, response: nil}
+
+          ask(state, ctx, q, fn state, reply ->
+            case reply do
+              {:replied, message} -> k.(state, Actions.done(message || ""))
+              :failed -> k.(state, Actions.refused("Something went wrong."))
+              :passed -> k.(state, Actions.refused(Dispatch.cannot()))
+            end
+          end)
+      end
+    else
+      case Actions.run(state.world, ctx) do
+        :pass -> k.(state, Actions.refused(Dispatch.cannot()))
+        outcome -> k.(state, outcome)
+      end
     end
   end
 
-  defp name(state, eid) do
-    case OdgnEcs.get(state.world, eid, "player") || OdgnEcs.get(state.world, eid, "described") do
-      %{"name" => name} -> name
-      _ -> nil
+  defp answerable?(_state, {:service, _}), do: true
+  defp answerable?(state, eid), do: OdgnEcsTalk.scripted?(state.talk, eid)
+
+  # Sends one question, Pumps until idle, and answers `k` now or, if its Run
+  # is still waiting, in the Step that sees it end.
+  defp ask(state, ctx, q, k) do
+    talk = state.talk
+    now = instant(state.world_ms)
+    args = Enum.map(q.args, &arg(state, &1))
+    Talk.note_context(state.table, :current, ctx)
+
+    {:ok, pending} =
+      case {q.asks, q.to} do
+        {:offer, {:service, service}} ->
+          OdgnEcsTalk.request_service(talk, service, q.message, args, now)
+
+        {:offer, eid} ->
+          OdgnEcsTalk.request(talk, eid, q.message, args, now)
+
+        {:decide, {:service, service}} ->
+          OdgnEcsTalk.decide_service(talk, service, q.message, args)
+
+        {:decide, eid} ->
+          OdgnEcsTalk.decide(talk, eid, q.message, args)
+      end
+
+    Talk.note_context(state.table, pending.id, ctx)
+    state = pump_idle(state)
+
+    answer = fn state, result ->
+      Talk.drop_context(state.table, pending.id)
+      k.(state, reply(q.asks, result))
     end
+
+    case NorthTalk.await(pending, 0) do
+      {:error, %NorthTalk.HostError{code: "timeout"}} ->
+        wait(state, pending, ctx.actor, ctx.raw, answer)
+
+      result ->
+        NorthTalk.release_pending(pending)
+        answer.(state, result)
+    end
+  end
+
+  defp arg(state, {:entity, eid}), do: OdgnEcsTalk.handle(state.talk, eid)
+  defp arg(_state, text), do: text
+
+  defp reply(:offer, {:ok, %Result{value: value}}),
+    do: {:replied, if(is_binary(value), do: value)}
+
+  defp reply(:offer, {:error, %ScriptError{outcome: "unhandled"}}), do: :passed
+
+  defp reply(:decide, {:ok, %Verdict{verdict: :vetoed, vetoes: [veto | _]}}),
+    do: {:replied, if(is_binary(veto.reason), do: veto.reason)}
+
+  defp reply(:decide, {:ok, %Verdict{verdict: :allowed}}), do: :passed
+  defp reply(_, _), do: :failed
+
+  # Tells the actor, the Scripts that notice it, and everyone else who saw it.
+  defp finish(state, ctx, outcome, label) do
+    message = outcome.message
+
+    state =
+      if message not in [nil, ""],
+        do: tell(state, ctx.actor, if(label, do: "#{label}: #{message}", else: message)),
+        else: state
+
+    if outcome.kind == :done do
+      for {place, notice, args} <- outcome.notices, do: send_notice(state, place, notice, args)
+
+      for {place, line, except} <- outcome.broadcasts,
+          do: Tables.tell(state.world, place, line, except)
+    end
+
+    state
+  end
+
+  # A notice goes to the Scripts of the things in its place, but not the one
+  # it is about (its first argument), such as the actor who arrived.
+  defp send_notice(state, place, message, args) do
+    about = with [{:entity, eid} | _] <- args, do: eid
+    values = Enum.map(args, &arg(state, &1))
+
+    for watcher <- Scope.entities_in(state.world, place),
+        watcher != about,
+        OdgnEcsTalk.scripted?(state.talk, watcher),
+        do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, watcher, message, values)
+
+    :ok
   end
 
   defp tell(state, character, text) do
     Tables.output(state.world, character, text)
     state
-  end
-
-  defp handle(state, eid), do: OdgnEcsTalk.handle(state.talk, eid)
-
-  # A command offered to the room: its Message Path may answer. `look`
-  # falls back to the built-in description.
-  defp offer(state, me, room, verb, rest, text) do
-    args = if verb == "look", do: [handle(state, me)], else: [handle(state, me), rest]
-    {:ok, pending} = OdgnEcsTalk.request(state.talk, room, verb, args, instant(state.world_ms))
-
-    wait(state, pending, me, text, fn state, result ->
-      case result do
-        {:ok, %Result{value: reply}} when is_binary(reply) and reply != "" ->
-          tell(state, me, reply)
-
-        {:ok, %Result{}} ->
-          state
-
-        {:error, %ScriptError{outcome: "unhandled"}} when verb == "look" ->
-          describe(state, me, room)
-
-        {:error, %ScriptError{outcome: "unhandled"}} ->
-          tell(state, me, "You can't do that here.")
-
-        {:error, _} ->
-          tell(state, me, "Something went wrong.")
-      end
-    end)
-  end
-
-  defp describe(state, character, room) do
-    described = OdgnEcs.get(state.world, room, "described") || %{}
-
-    others =
-      for id <- OdgnEcsTalk.element_ids(state.talk, room),
-          id != character,
-          n = name(state, id),
-          do: n
-
-    lines = [described["name"], described["description"]] ++ Enum.map(others, &"You see #{&1}.")
-    Enum.reduce(Enum.reject(lines, &is_nil/1), state, &tell(&2, character, &1))
-  end
-
-  defp say(state, me, room, words) do
-    for c <- Tables.characters_at(state.world, room),
-        do:
-          tell(
-            state,
-            c,
-            if(c == me,
-              do: "You say, \"#{words}\"",
-              else: "#{name(state, me)} says, \"#{words}\""
-            )
-          )
-
-    {:ok, _} = OdgnEcsTalk.deliver(state.talk, room, "heard", [handle(state, me), words])
-    state
-  end
-
-  # Taking asks the thing first, as a Decision along its Message Path.
-  defp take(state, me, room, name, text) do
-    case Enum.find(
-           OdgnEcsTalk.element_ids(state.talk, room),
-           &(OdgnEcsTalk.element_name(state.talk, &1) == name)
-         ) do
-      nil ->
-        tell(state, me, "You don't see #{name} here.")
-
-      thing ->
-        {:ok, pending} =
-          OdgnEcsTalk.decide(state.talk, thing, "taking", [
-            handle(state, me),
-            handle(state, thing)
-          ])
-
-        wait(state, pending, me, text, fn state, result ->
-          case result do
-            {:ok, %Verdict{verdict: :allowed}} ->
-              :ok = OdgnEcs.put(state.world, thing, "location", %{"in" => me})
-              tell(state, me, "You take #{name}.")
-
-            {:ok, %Verdict{verdict: :vetoed, vetoes: [veto | _]}} ->
-              tell(state, me, veto.reason || "You can't take #{name}.")
-
-            _ ->
-              tell(state, me, "You can't take #{name}.")
-          end
-        end)
-    end
   end
 
   defp wait(state, %Pending{id: id} = pending, character, command, then),

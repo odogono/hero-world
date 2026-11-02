@@ -48,7 +48,7 @@ defmodule MuaWorldTest do
     world = start(path)
     assert ["It is far too heavy."] = cmd(world, "take statue")
     assert location(world, "statue") == MuaWorld.named(world, "chapel")
-    assert ["You take candle."] = cmd(world, "take candle")
+    assert ["Taken."] = cmd(world, "take candle")
     assert location(world, "candle") == ada(world)
   end
 
@@ -88,7 +88,7 @@ defmodule MuaWorldTest do
     world = start(path)
     assert location(world, "candle") == ada(world)
     # The change doesn't repeat: the candle is already taken.
-    assert ["You don't see candle here."] = cmd(world, "take candle")
+    assert ["You already have that."] = cmd(world, "take candle")
   end
 
   test "a Script waiting at a restart is abandoned, keeping its committed steps", %{path: path} do

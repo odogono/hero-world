@@ -13,6 +13,19 @@ atom thing {}
 atom room: thing { script { src: "room.talk" } }
 atom chapel_place: room { script { src: "chapel.talk" } }
 atom heavy: thing { script { src: "heavy.talk" } }
+atom echoing: thing { script { src: "sexton.talk" } }
+
+# The chapel's own verbs, each taking the rest of the input as text
+entity chapel_verbs {
+  verbs {
+    defs: [
+      { names: ["pull"] forms: [{ handler: "pull" pattern: "text" }] }
+      { names: ["smash"] forms: [{ handler: "smash" pattern: "text" }] }
+      { names: ["pray"] forms: [{ handler: "pray" pattern: "text" }] }
+      { names: ["ring"] forms: [{ handler: "ring" pattern: "text" }] }
+    ]
+  }
+}
 
 entity chapel: chapel_place {
   described { name: "Chapel" description: "Candles flicker." }
@@ -26,6 +39,7 @@ entity ada: thing {
 
 entity statue: heavy {
   described { name: "statue" }
+  item { is_takeable: true }
   meta { props: { id: "statue" } }
   location { in: $chapel }
 }
@@ -38,11 +52,12 @@ entity lever: thing {
 
 entity candle: thing {
   described { name: "candle" }
+  item { is_takeable: true }
   meta { props: { id: "candle" } }
   location { in: $chapel }
 }
 
-entity sexton: thing {
+entity sexton: echoing {
   described { name: "Sexton" }
   meta { props: { id: "sexton" } }
   location { in: $chapel }

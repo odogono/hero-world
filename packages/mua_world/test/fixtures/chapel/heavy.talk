@@ -1,3 +1,7 @@
-on taking who, thing, deciding
-  veto "It is far too heavy."
-end taking
+-- Too heavy to take: it answers `take` itself, so the built-in never runs.
+on take role, actor
+  if role is "target" then
+    return "It is far too heavy."
+  end if
+  pass take
+end take

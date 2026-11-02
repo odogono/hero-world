@@ -35,6 +35,20 @@ defmodule MuaWorld.Tables do
     OdgnEcs.query(world, with: ["player"], where: [{"location", "in", place}])
   end
 
+  @doc """
+  Tells an entity something: a Character hears it; any other entity (a room,
+  a box) passes it to the Characters inside it, but for `except`.
+  """
+  def tell(world, to, text, except \\ nil) do
+    if OdgnEcs.get(world, to, "player") do
+      output(world, to, text)
+    else
+      for c <- characters_at(world, to), c != except, do: output(world, c, text)
+    end
+
+    :ok
+  end
+
   def output(%OdgnEcs{conn: conn}, character, text),
     do:
       SQL.run!(conn, "INSERT INTO mua_outbox (character, text) VALUES (?1, ?2)", [character, text])

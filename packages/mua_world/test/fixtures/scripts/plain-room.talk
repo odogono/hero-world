@@ -1,0 +1,8 @@
+-- A room that answers `look` with its name alone
+on look role, actor
+  if role is "room" then
+    put the described of the target into place
+    return `You stand in the ${the name of place}.`
+  end if
+  pass look
+end look

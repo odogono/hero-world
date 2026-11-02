@@ -1,33 +1,36 @@
--- The chapel itself passes `look` on to every room.
-on look who
+-- The chapel itself passes `look` on to every room. Its own verbs take the
+-- rest of the input as the command's text.
+on look role, actor
   pass look
 end look
 
-on pull who, what
+on pull role, actor
+  ask mua to command
+  put the text of it into what
   put element what of the target otherwise nothing into thing
   if thing is nothing then
     return "There is no " & what & " to pull."
   end if
   change thing, "pulled", {yes: true}
-  show who, "You pull the " & what & "."
+  show actor, "You pull the " & what & "."
   return ""
 end pull
 
-on smash who, what
+on smash role, actor
   change the target, "smashed", {yes: true}
   repeat forever
   end repeat
 end smash
 
-on pray who, what
-  show who, "You begin to pray."
+on pray role, actor
+  show actor, "You begin to pray."
   wait 5 s
-  show who, "Your prayer is answered."
+  show actor, "Your prayer is answered."
   return ""
 end pray
 
 -- A timer belongs to the entity its Run was delivered to: the chapel.
-on ring who, what
+on ring role, actor
   ask clock to now
   tell timer to schedule "bell", it + 2 s, "chime", []
   return "You set the bell swinging."

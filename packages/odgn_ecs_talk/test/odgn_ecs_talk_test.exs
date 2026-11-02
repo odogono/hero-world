@@ -318,6 +318,40 @@ defmodule OdgnEcsTalkTest do
     end
   end
 
+  test "a Library calls the world Capability with its caller's Grant" do
+    {world, talk} = setup_world()
+
+    {:ok, _} =
+      OdgnEcsTalk.add_library(talk, "weights", """
+      function heaviest place
+        ask world to find place, "item"
+        return the weight of the item of item 1 of it
+      end heaviest
+      """)
+
+    :ok =
+      OdgnEcsTalk.load_atom_script(talk, "person", """
+      use heaviest from weights
+
+      on weigh place
+        return heaviest(place)
+      end weigh
+      """)
+
+    hall = OdgnEcsTalk.handle(talk, id(world, "hall"))
+    assert value(ask(talk, id(world, "hero"), "weigh", [hall])) == Decimal.new("2.0")
+  end
+
+  test "knows which entities a Script can answer for" do
+    {world, talk} = setup_world()
+    :ok = OdgnEcsTalk.load_atom_script(talk, "thing", "on x\n  return 1\nend x")
+    :ok = OdgnEcsTalk.load_entity_script(talk, id(world, "lamp"), "on x\n  return 1\nend x")
+
+    assert OdgnEcsTalk.scripted?(talk, id(world, "hero"))
+    assert OdgnEcsTalk.scripted?(talk, id(world, "lamp"))
+    refute OdgnEcsTalk.scripted?(talk, id(world, "hall"))
+  end
+
   test "a Service Script is reached only by name" do
     {world, talk} = setup_world()
 
