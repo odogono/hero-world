@@ -7,4 +7,4 @@ The alternative was to keep Accounts entirely outside the World, in Phoenix's ow
 ## Consequences
 
 - The World process is the only writer of Accounts, like every other Entity. Phoenix asks it to create or look up an Account rather than writing one itself.
-- The Google identity mapping refers to an Account's Entity id, so that id must stay stable across Migrations (ADR 0005), as Definition names already make other ids stable.
+- The Google identity mapping refers to an Account's Entity id, so that id must never change. A Migration (ADR 0005) never renumbers Entities, and an Account is made during play with no Definition name, so a Migration leaves it alone.
