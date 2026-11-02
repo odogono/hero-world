@@ -54,6 +54,56 @@ defmodule OdgnEdl do
     end
   end
 
+  # -- Build ------------------------------------------------------------------
+
+  @doc """
+  Builds an empty World from EDL: defines its components, makes its entities
+  and records what the EDL set. It runs in one savepoint, so on an error
+  nothing changes. Like every change, it is durable once the caller commits
+  (or, outside a transaction, as soon as it returns).
+
+  `:path` is the `.edl` file's path, which `script { src: }` values are
+  resolved against.
+  """
+  @spec build(OdgnEcs.t(), String.t(), keyword()) :: {:ok, OdgnEcs.t()} | {:error, Error.t()}
+  def build(%OdgnEcs{} = world, source, opts \\ []) do
+    with {:ok, definitions} <- parse(source) do
+      OdgnEdl.Build.run(world, source, definitions, opts)
+    end
+  end
+
+  @doc """
+  Builds the World from EDL if it is empty, or resumes it if it was built from
+  this same EDL: a World is built once, then resumed (ADR 0004). A World built
+  from a different EDL needs a Migration, which this does not do yet.
+  """
+  @spec load(OdgnEcs.t(), String.t(), keyword()) ::
+          {:ok, OdgnEcs.t(), :built | :resumed} | {:error, Error.t()}
+  def load(%OdgnEcs{} = world, source, opts \\ []) do
+    case OdgnEdl.Record.hash(world) do
+      nil ->
+        with {:ok, world} <- build(world, source, opts), do: {:ok, world, :built}
+
+      hash ->
+        if hash == OdgnEdl.Build.hash(source) do
+          {:ok, world, :resumed}
+        else
+          {:error,
+           Error.new(
+             :migration_needed,
+             "The EDL has changed since this World was built; it needs a Migration"
+           )}
+        end
+    end
+  end
+
+  defdelegate built?(world), to: OdgnEdl.Record
+  defdelegate atom_lineage(world, name), to: OdgnEdl.Record
+  defdelegate entity_lineage(world, eid), to: OdgnEdl.Record
+  defdelegate script_owners(world), to: OdgnEdl.Record
+  defdelegate definition_names(world), to: OdgnEdl.Record
+  defdelegate entity_named(world, name), to: OdgnEdl.Record
+
   # EDL commands were removed (ADR 0007); name the line rather than report a
   # bare syntax error.
   defp reject_commands(source) do
