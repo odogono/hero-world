@@ -1,0 +1,38 @@
+-- The chapel itself passes `look` on to every room.
+on look who
+  pass look
+end look
+
+on pull who, what
+  put element what of the target otherwise nothing into thing
+  if thing is nothing then
+    return "There is no " & what & " to pull."
+  end if
+  change thing, "pulled", {yes: true}
+  show who, "You pull the " & what & "."
+  return ""
+end pull
+
+on smash who, what
+  change the target, "smashed", {yes: true}
+  repeat forever
+  end repeat
+end smash
+
+on pray who, what
+  show who, "You begin to pray."
+  wait 5 s
+  show who, "Your prayer is answered."
+  return ""
+end pray
+
+-- A timer belongs to the entity its Run was delivered to: the chapel.
+on ring who, what
+  ask clock to now
+  tell timer to schedule "bell", it + 2 s, "chime", []
+  return "You set the bell swinging."
+end ring
+
+on chime
+  announce the target, "The bell chimes.", nothing
+end chime

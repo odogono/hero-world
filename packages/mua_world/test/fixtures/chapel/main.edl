@@ -1,0 +1,49 @@
+# A chapel with a statue, a lever, a candle and a sexton, and Ada, a
+# Character, in it.
+
+def pulled {
+  yes: boolean
+}
+
+def smashed {
+  yes: boolean
+}
+
+atom thing {}
+atom room: thing { script { src: "room.talk" } }
+atom chapel_place: room { script { src: "chapel.talk" } }
+atom heavy: thing { script { src: "heavy.talk" } }
+
+entity chapel: chapel_place {
+  described { name: "Chapel" description: "Candles flicker." }
+}
+
+entity ada: thing {
+  player { name: "Ada" }
+  meta { props: { id: "ada" } }
+  location { in: $chapel }
+}
+
+entity statue: heavy {
+  described { name: "statue" }
+  meta { props: { id: "statue" } }
+  location { in: $chapel }
+}
+
+entity lever: thing {
+  described { name: "lever" }
+  meta { props: { id: "lever" } }
+  location { in: $chapel }
+}
+
+entity candle: thing {
+  described { name: "candle" }
+  meta { props: { id: "candle" } }
+  location { in: $chapel }
+}
+
+entity sexton: thing {
+  described { name: "Sexton" }
+  meta { props: { id: "sexton" } }
+  location { in: $chapel }
+}

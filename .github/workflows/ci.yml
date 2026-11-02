@@ -48,7 +48,7 @@ jobs:
           path: |
             packages/mua_world/deps
             packages/mua_world/_build
-          key: mua-world-${{ hashFiles('packages/mua_world/mix.lock') }}
+          key: mua-world-${{ hashFiles('packages/mua_world/mix.lock', 'packages/odgn_ecs_talk/mix.lock', 'packages/odgn_edl/mix.lock', 'packages/odgn_ecs/mix.lock') }}
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
@@ -97,6 +97,30 @@ jobs:
             packages/odgn_edl/deps
             packages/odgn_edl/_build
           key: odgn-edl-${{ hashFiles('packages/odgn_edl/mix.lock', 'packages/odgn_ecs/mix.lock') }}
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+
+  # The NorthTalk Host Adapter (packages/odgn_ecs_talk) builds and tests
+  # with Mix alone, without Bun (#112).
+  odgn-ecs-talk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/odgn_ecs_talk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.20'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/odgn_ecs_talk/deps
+            packages/odgn_ecs_talk/_build
+          key: odgn-ecs-talk-${{ hashFiles('packages/odgn_ecs_talk/mix.lock', 'packages/odgn_edl/mix.lock', 'packages/odgn_ecs/mix.lock') }}
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors

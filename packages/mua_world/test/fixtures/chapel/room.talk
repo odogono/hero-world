@@ -1,0 +1,13 @@
+-- Every room: answers `look` for the room that received it.
+on look who
+  put the name of the described of the target into out
+  put out & ". " & the description of the described of the target into out
+  put out & " It holds " & the number of elements of the target & " things." into out
+  return out
+end look
+
+on heard who, words
+  if words is "hello" then
+    announce the target, "The walls echo: hello.", nothing
+  end if
+end heard
