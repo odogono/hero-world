@@ -59,11 +59,14 @@ defmodule MuaWorld.TimersTest do
     assert stopped_at >= 5000
     GenServer.stop(world)
 
-    Process.sleep(300)
+    # Long enough that start-up time, which does count, can't be mistaken
+    # for the downtime, which doesn't
+    downtime = 2_000
+    Process.sleep(downtime)
     world = start("timers.edl", dir, path: path)
     resumed_at = MuaWorld.world_time(world)
     assert resumed_at >= stopped_at
-    assert resumed_at - stopped_at < 300
+    assert resumed_at - stopped_at < downtime
   end
 
   describe "a World kept in a file" do
