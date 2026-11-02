@@ -61,11 +61,11 @@ attach them.
    any Capabilities the Host names, such as `mua`. ecs-talk builds those
    declarations by hand: `@northtalk/ts` doesn't export
    `operationDeclarations` from its main entry.
-3. **Collections.** There is no `whose` over an Object Collection
-   (odogono/odgn-talk#1627), so a room's contents come from
-   `ask world to find place, "described"` and `filter(...)` with lambdas.
-   Building the lines one at a time means
-   `put [...lines, x] into lines`.
+3. **Filtering a list.** A Whose Clause works on a list, but on a list it is
+   `every item of found whose portal is nothing`. `every element of` is only
+   for a Host object's collection, and on a list it fails at run time with
+   `wrong kind`. A later name in the condition needs `it's`
+   (`… and it's container is nothing`). `put x after lines` adds to a list.
 4. **A reply is only text.** The runner reads a Script's reply as text, so
    the structured RoomView for clients is built again in TypeScript
    (`queries/view.ts`) and picks the same things the Script does. Changing
