@@ -103,12 +103,9 @@ defmodule OdgnEcsTest do
                OdgnEcs.define(w, bad)
     end
 
-    test "defining a component again must match" do
+    test "defining a component again with the same definition changes nothing" do
       w = world()
       assert {:ok, ^w} = OdgnEcs.define(w, @stats)
-
-      changed = %{@stats | columns: [%Column{name: "health", type: :float}]}
-      assert {:error, %Error{kind: :definition_changed}} = OdgnEcs.define(w, changed)
     end
 
     test "a definition keeps whether it is Play state" do
@@ -124,8 +121,8 @@ defmodule OdgnEcsTest do
 
       assert OdgnEcs.component(w, "door").play_state
 
-      assert {:error, %Error{kind: :definition_changed}} =
-               OdgnEcs.define(w, %{door | play_state: false})
+      {:ok, w} = OdgnEcs.define(w, %{door | play_state: false})
+      refute OdgnEcs.component(w, "door").play_state
     end
 
     test "deleting an entity removes its components" do
@@ -135,6 +132,85 @@ defmodule OdgnEcsTest do
 
       refute OdgnEcs.exists?(w, eid)
       assert OdgnEcs.get(w, eid, "stats") == nil
+    end
+  end
+
+  describe "a changed definition" do
+    defp with_stats do
+      w = world([@stats])
+      eid = with_health(w, 5)
+      {w, eid}
+    end
+
+    defp redefine(w, columns), do: OdgnEcs.define(w, %{@stats | columns: columns})
+
+    test "adds a column, giving existing rows its default" do
+      {w, eid} = with_stats()
+
+      {:ok, w} =
+        redefine(w, [
+          %Column{name: "health", type: :int},
+          %Column{name: "mood", type: :string, optional: false, default: "calm"},
+          %Column{name: "note", type: :string}
+        ])
+
+      assert OdgnEcs.get(w, eid, "stats") == %{"health" => 5, "mood" => "calm", "note" => nil}
+      assert {:ok, ^w} = OdgnEcs.define(w, OdgnEcs.component(w, "stats"))
+    end
+
+    test "removes a column, and changes a default" do
+      {w, eid} = with_stats()
+
+      {:ok, w} =
+        redefine(w, [%Column{name: "health", type: :int}, %Column{name: "x", type: :int}])
+
+      {:ok, w} = redefine(w, [%Column{name: "x", type: :int, default: 3}])
+
+      assert OdgnEcs.get(w, eid, "stats") == %{"x" => nil}
+      {:ok, other} = OdgnEcs.create(w)
+      :ok = OdgnEcs.put(w, other, "stats", %{})
+      assert OdgnEcs.get(w, other, "stats") == %{"x" => 3}
+    end
+
+    test "makes a column required with a default, filling the empty ones" do
+      {w, eid} = with_stats()
+      :ok = OdgnEcs.put(w, eid, "stats", %{"health" => nil})
+      {:ok, w} = redefine(w, [%Column{name: "health", type: :int, optional: false, default: 1}])
+
+      assert OdgnEcs.get(w, eid, "stats") == %{"health" => 1}
+    end
+
+    test "keeps the change when the World is opened again" do
+      {w, _} = with_stats()
+
+      {:ok, w} =
+        redefine(w, [%Column{name: "health", type: :int}, %Column{name: "x", type: :int}])
+
+      assert [_, "x"] = Enum.map(OdgnEcs.component(w, "stats").columns, & &1.name)
+    end
+
+    test "refuses changes the data can't follow" do
+      {w, _} = with_stats()
+
+      for {columns, reason} <- [
+            {[%Column{name: "health", type: :float}], ~r/change type/},
+            {[%Column{name: "health", type: :int, unique: true}], ~r/unique/},
+            {[%Column{name: "health", type: :int, optional: false}],
+             ~r/required with no default/},
+            {[
+               %Column{name: "health", type: :int},
+               %Column{name: "y", type: :int, optional: false}
+             ], ~r/required column 'y'/},
+            {[%Column{name: "health", type: :int}, %Column{name: "y", type: :int, unique: true}],
+             ~r/unique column 'y'/}
+          ] do
+        assert {:error, %Error{kind: :incompatible_change, message: message}} =
+                 redefine(w, columns)
+
+        assert message =~ reason
+      end
+
+      assert OdgnEcs.component(w, "stats") == @stats
     end
   end
 

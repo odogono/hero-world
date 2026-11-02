@@ -110,6 +110,72 @@ defmodule OdgnEcs.Component do
       ")"
   end
 
+  @doc false
+  def sql_column(%Column{} = col), do: OdgnEcs.SQL.ident(col.name) <> " " <> sql_type(col.type)
+
+  @doc """
+  How the table of `existing` changes to hold `new`: `{:ok, changes}`, each
+  `{:add, column}`, `{:drop, name}` or `{:fill, column}` (a column whose empty
+  values take its default), or `{:error, reason}` for a change the data can't
+  follow. Compatible: adding a column that is optional or has a default,
+  removing one, making one optional, changing a default, and flipping
+  `play_state`. Incompatible: changing a column's type or `unique`, adding a
+  unique column, and making one required with no default.
+  """
+  def changes(%__MODULE__{columns: old}, %__MODULE__{name: name, columns: new}) do
+    old_by = Map.new(old, &{&1.name, &1})
+    new_names = MapSet.new(new, & &1.name)
+
+    new
+    |> Enum.reduce_while({:ok, []}, fn col, {:ok, acc} ->
+      case {Map.get(old_by, col.name), col} do
+        {nil, %Column{unique: true}} ->
+          {:halt, {:error, "Component '#{name}' can't add unique column '#{col.name}'."}}
+
+        {nil, %Column{optional: false, default: nil}} ->
+          {:halt,
+           {:error,
+            "Component '#{name}' can't add required column '#{col.name}' with no default."}}
+
+        {nil, _} ->
+          {:cont, {:ok, [{:add, col} | acc]}}
+
+        {%Column{type: t}, %Column{type: t2}} when t != t2 ->
+          {:halt,
+           {:error,
+            "Component '#{name}' column '#{col.name}' can't change type from #{t} to #{t2}."}}
+
+        {%Column{unique: u}, %Column{unique: u2}} when u != u2 ->
+          {:halt,
+           {:error, "Component '#{name}' column '#{col.name}' can't change whether it is unique."}}
+
+        {%Column{optional: true}, %Column{optional: false, default: nil}} ->
+          {:halt,
+           {:error,
+            "Component '#{name}' column '#{col.name}' can't become required with no default."}}
+
+        {%Column{optional: true}, %Column{optional: false}} ->
+          {:cont, {:ok, [{:fill, col} | acc]}}
+
+        _ ->
+          {:cont, {:ok, acc}}
+      end
+    end)
+    |> case do
+      {:ok, acc} ->
+        dropped = for c <- old, not MapSet.member?(new_names, c.name), do: {:drop, c.name}
+        {:ok, Enum.reverse(acc) ++ dropped}
+
+      error ->
+        error
+    end
+  end
+
+  @doc false
+  # A column's default, as stored
+  def stored_default(%__MODULE__{name: name}, %Column{} = col),
+    do: encode_value(name, %{col | optional: true}, default(col))
+
   defp sql_type(t) when t in [:int, :eid, :boolean], do: "INTEGER"
   defp sql_type(:float), do: "REAL"
   defp sql_type(_), do: "TEXT"

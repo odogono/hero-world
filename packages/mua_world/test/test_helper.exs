@@ -24,7 +24,7 @@ defmodule MuaWorld.Case do
 
   # The main world ships with mua_world; the rest are test fixtures
   defp edl("main"), do: Path.join(:code.priv_dir(:mua_world), "edl/main.edl")
-  defp edl(name), do: fixture(name)
+  defp edl(name), do: if(Path.type(name) == :absolute, do: name, else: fixture(name))
 
   @doc """
   Makes an Account and its Character, enters it into the World and subscribes

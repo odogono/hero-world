@@ -31,14 +31,21 @@ defmodule OdgnEcs do
   @doc """
   Opens the World at `path` (or `":memory:"`), with the components already
   defined in it.
+
+  With `exclusive: true`, the connection keeps SQLite's lock once it has
+  written, until it closes, so no other process can write the World
+  meanwhile, as a World process needs while it runs.
   """
-  @spec open(String.t()) :: {:ok, t()} | {:error, Error.t()}
-  def open(path) do
+  @spec open(String.t(), keyword()) :: {:ok, t()} | {:error, Error.t()}
+  def open(path, opts \\ []) do
+    locking = if opts[:exclusive], do: "PRAGMA locking_mode = EXCLUSIVE; ", else: ""
+
     with {:ok, conn} <- open_conn(path),
          :ok <-
            SQL.exec(
              conn,
-             "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL"
+             locking <>
+               "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL"
            ),
          :ok <- SQL.exec(conn, @schema) do
       components =
@@ -65,23 +72,18 @@ defmodule OdgnEcs do
 
   @doc """
   Defines a component, creating its table. Defining one the World already has
-  is fine if the definition is the same, and an error if it differs: changing
-  a definition is part of Migration.
+  is fine if the definition is the same. If it differs, compatible changes
+  are made to the table in place, and any other is an `:incompatible_change`
+  error (see `OdgnEcs.Component.changes/2`).
   """
   @spec define(t(), Component.t()) :: {:ok, t()} | {:error, Error.t()}
   def define(%__MODULE__{} = world, %Component{name: name} = component) do
     with :ok <- Component.validate(component) do
       case world.components do
         %{^name => existing} ->
-          if Component.to_json(existing) == Component.to_json(component) do
-            {:ok, world}
-          else
-            {:error,
-             Error.new(
-               :definition_changed,
-               "Component '#{name}' differs from the definition stored in the World."
-             )}
-          end
+          if Component.to_json(existing) == Component.to_json(component),
+            do: {:ok, world},
+            else: change(world, existing, component)
 
         _ ->
           SQL.exec!(world.conn, Component.create_sql(component))
@@ -93,6 +95,64 @@ defmodule OdgnEcs do
 
           {:ok, %{world | components: Map.put(world.components, name, component)}}
       end
+    end
+  end
+
+  # A definition that differs from the stored one: its compatible changes
+  # are made to the table in place (`OdgnEcs.Component.changes/2`)
+  defp change(world, existing, %Component{name: name} = component) do
+    case Component.changes(existing, component) do
+      {:ok, changes} ->
+        table = SQL.ident(Component.table(component))
+
+        for change <- changes do
+          case change do
+            {:add, col} ->
+              SQL.exec!(
+                world.conn,
+                "ALTER TABLE #{table} ADD COLUMN #{Component.sql_column(col)}"
+              )
+
+              fill(world, table, component, col, "")
+
+            {:fill, col} ->
+              fill(world, table, component, col, " WHERE #{SQL.ident(col.name)} IS NULL")
+
+            {:drop, column} ->
+              case SQL.exec(world.conn, "ALTER TABLE #{table} DROP COLUMN #{SQL.ident(column)}") do
+                :ok ->
+                  :ok
+
+                {:error, error} ->
+                  throw(
+                    {:incompatible,
+                     "Component '#{name}' can't drop column '#{column}': #{error.message}"}
+                  )
+              end
+          end
+        end
+
+        SQL.run!(world.conn, "UPDATE ecs_components SET columns = ?2 WHERE name = ?1", [
+          name,
+          Component.to_json(component)
+        ])
+
+        {:ok, %{world | components: Map.put(world.components, name, component)}}
+
+      {:error, reason} ->
+        {:error, Error.new(:incompatible_change, reason)}
+    end
+  catch
+    {:incompatible, reason} -> {:error, Error.new(:incompatible_change, reason)}
+  end
+
+  defp fill(world, table, component, col, where) do
+    case Component.stored_default(component, col) do
+      {:ok, nil} ->
+        :ok
+
+      {:ok, value} ->
+        SQL.run!(world.conn, "UPDATE #{table} SET #{SQL.ident(col.name)} = ?1#{where}", [value])
     end
   end
 

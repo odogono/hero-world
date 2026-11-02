@@ -154,6 +154,48 @@ defmodule OdgnEdl.Record do
     )
   end
 
+  @doc "Every atom the record knows, by name."
+  @spec atom_names(OdgnEcs.t()) :: [String.t()]
+  def atom_names(%OdgnEcs{conn: conn} = world) do
+    ensure(world)
+
+    for [name] <-
+          SQL.all!(conn, "SELECT name FROM edl_lineage WHERE kind = 'atom' ORDER BY rowid"),
+        do: name
+  end
+
+  @doc false
+  # Forgets every atom's Lineage and Script, before they are written again
+  def clear_atoms(%OdgnEcs{conn: conn}) do
+    SQL.exec!(
+      conn,
+      "DELETE FROM edl_lineage WHERE kind = 'atom'; DELETE FROM edl_script_owner WHERE kind = 'atom'"
+    )
+  end
+
+  @doc false
+  # Records the Script an entity owns, or that it owns none
+  def replace_entity_script(%OdgnEcs{conn: conn} = world, eid, src) do
+    SQL.run!(conn, "DELETE FROM edl_script_owner WHERE kind = 'entity' AND name = ?1", [
+      Integer.to_string(eid)
+    ])
+
+    put_script(world, "entity", eid, src)
+  end
+
+  @doc false
+  def delete_definition_name(%OdgnEcs{conn: conn}, name) do
+    SQL.run!(conn, "DELETE FROM edl_definition_name WHERE name = ?1", [name])
+  end
+
+  @doc false
+  # Replaces the values the EDL last set on an entity
+  def replace_edl_values(%OdgnEcs{conn: conn} = world, eid, values) do
+    SQL.run!(conn, "DELETE FROM edl_value WHERE eid = ?1", [eid])
+    for {component, data} <- values, do: put_edl_value(world, eid, component, data)
+    :ok
+  end
+
   @doc false
   def put_hash(%OdgnEcs{conn: conn}, hash) do
     SQL.run!(conn, "INSERT OR REPLACE INTO edl_meta (key, value) VALUES ('hash', ?1)", [hash])

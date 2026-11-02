@@ -10,6 +10,8 @@ defmodule OdgnEdl.Error do
           | :command
           | :already_built
           | :migration_needed
+          | :invalid_rename
+          | :check_failed
           | :duplicate_name
           | :unknown_atom
           | :invalid_extend
