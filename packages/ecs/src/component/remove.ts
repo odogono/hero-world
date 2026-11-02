@@ -18,6 +18,8 @@ export const removeComponent = <
     throw new Error('Entity ID is required');
   }
 
+  world.noteChange(id);
+
   // Mark component for deletion in cache
   const cacheEntry = world.entityCache.get(id)?.[componentName as string];
   if (cacheEntry) {
