@@ -1,7 +1,8 @@
 defmodule MuaWorld.Tables do
   @moduledoc """
   mua's own tables, beside the ECS's, in the World's database: World time,
-  each Step's outbox, inputs still waiting, and notices left from a restart.
+  each Step's outbox, inputs still waiting, notices left from a restart, and
+  the sign-in identities that map to Accounts (ADR 0016).
   None of them are game data, so they aren't components.
   """
   alias OdgnEcs.SQL
@@ -11,6 +12,7 @@ defmodule MuaWorld.Tables do
   CREATE TABLE IF NOT EXISTS mua_waiting (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, command TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS mua_identities (sub TEXT PRIMARY KEY, email TEXT, account INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL);
   """
 
@@ -115,4 +117,21 @@ defmodule MuaWorld.Tables do
 
   def delete_act(%OdgnEcs{conn: conn}, id),
     do: SQL.run!(conn, "DELETE FROM mua_npc_queue WHERE id = ?1", [id])
+
+  @doc "The Account a sign-in identity (`sub`) maps to, or `nil`."
+  def account_for(%OdgnEcs{conn: conn}, sub) do
+    case SQL.one!(conn, "SELECT account FROM mua_identities WHERE sub = ?1", [sub]) do
+      [account] -> account
+      nil -> nil
+    end
+  end
+
+  def put_identity(%OdgnEcs{conn: conn}, sub, email, account) do
+    SQL.run!(
+      conn,
+      "INSERT INTO mua_identities (sub, email, account) VALUES (?1, ?2, ?3) " <>
+        "ON CONFLICT(sub) DO UPDATE SET email = excluded.email",
+      [sub, email, account]
+    )
+  end
 end

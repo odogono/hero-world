@@ -148,16 +148,20 @@ defmodule MuaWorld.Migration do
   @spec migrate_file(String.t(), String.t(), keyword()) ::
           {:ok, [String.t()]} | {:error, String.t()}
   def migrate_file(db, edl_path, opts) do
-    case OdgnEcs.open(db) do
-      {:ok, world} -> migrate_open(world, db, edl_path, opts)
-      {:error, %OdgnEcs.Error{message: message}} -> {:error, locked(db, message)}
-    end
-  end
+    case MuaWorld.Lock.acquire(db) do
+      :ok ->
+        try do
+          case OdgnEcs.open(db) do
+            {:ok, world} -> migrate_open(world, db, edl_path, opts)
+            {:error, %OdgnEcs.Error{message: message}} -> {:error, message}
+          end
+        after
+          MuaWorld.Lock.release(db)
+        end
 
-  defp locked(db, message) do
-    if message =~ "locked",
-      do: "Another process holds the World at #{db}: stop the World before migrating it",
-      else: message
+      {:error, :locked} ->
+        {:error, "Another process holds the World at #{db}: stop the World before migrating it"}
+    end
   end
 
   defp migrate_open(world, db, edl_path, opts) do
@@ -187,7 +191,7 @@ defmodule MuaWorld.Migration do
           end
 
         {:error, %OdgnEcs.Error{message: message}} ->
-          {:error, locked(db, message)}
+          {:error, "Cannot write the World at #{db}: #{message}"}
       end
     after
       OdgnEcs.close(world)
