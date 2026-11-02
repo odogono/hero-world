@@ -108,7 +108,7 @@ Detailed library interfaces, process ownership, schema, snapshot strategy and wi
 
 ## Integration findings
 
-Source inspection of the local NorthTalk checkout found an existing `impl/elixir` package, `:north_talk`, embedding the Zig WASI reactor through Wasmex without Bun. It supplies manual driving, capabilities, segment transaction hooks and save/restore. Its README and implementation currently exclude Host Objects, properties and collections, and its public API does not expose Decisions. Mua's existing entity handles and vetoes depend on these features. Verify and complete those surfaces alongside the Elixir ECS Host Adapter; no new interpreter is implied.
+Source inspection of the local NorthTalk checkout found an existing `impl/elixir` package, `:north_talk`, embedding the Zig WASI reactor through Wasmex without Bun. It supplies manual driving, capabilities, segment transaction hooks and save/restore. Its README and implementation currently exclude Host Objects, properties and collections, and its public API does not expose Decisions. Mua's existing entity handles and vetoes depend on these features. Reactor v0.18.0, which the Elixir package now pins, already supports all of them, so the gap is in the Elixir wrapper only; it is requested in odogono/odgn-talk#1970. ADR 0015 records the process model and transaction boundary that follow from how the owner runs callbacks.
 
 The current Mua HTTP authentication plugin verifies Google tokens, but gameplay WebSockets still use passwords and have no Google identity-to-player binding. The new browser sign-in and game session flow therefore requires integration work.
 
