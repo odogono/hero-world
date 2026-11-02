@@ -30,6 +30,16 @@ defmodule MuaWorld.IdentitiesTest do
     end
   end
 
+  test "in_play lists the Characters outside Limbo, with their Accounts", %{world: world} do
+    {:ok, account} = MuaWorld.sign_in(world, "google-1", "ada@example.com")
+    {:ok, ada} = MuaWorld.create_character(world, account, "Ada")
+    assert MuaWorld.in_play(world) == []
+
+    {:ok, _} = MuaWorld.enter(world, account, ada)
+    assert MuaWorld.in_play(world) == [{account, ada}]
+    assert MuaWorld.characters(world, account) == [%{id: ada, name: "Ada", in_play: true}]
+  end
+
   describe "view" do
     setup %{world: world} do
       {:ok, account} = MuaWorld.sign_in(world, "google-1", "ada@example.com")

@@ -125,3 +125,27 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix test
+
+  # The Phoenix server (packages/mua_server) builds and tests with Mix
+  # alone, without Bun (#97).
+  mua-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mua_server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          elixir-version: '1.20'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/mua_server/deps
+            packages/mua_server/_build
+          key: mua-server-${{ hashFiles('packages/mua_server/mix.lock', 'packages/mua_world/mix.lock', 'packages/odgn_ecs_talk/mix.lock', 'packages/odgn_edl/mix.lock', 'packages/odgn_ecs/mix.lock') }}
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix test
