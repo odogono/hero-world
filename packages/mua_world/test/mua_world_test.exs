@@ -8,11 +8,28 @@ defmodule MuaWorldTest do
   end
 
   defp start(path, opts \\ []) do
-    {:ok, world} = MuaWorld.start([path: path, edl: @edl, tick: :manual] ++ opts)
+    {:ok, world} =
+      MuaWorld.start([path: path, edl: @edl, tick: :manual, starting_room: "chapel"] ++ opts)
+
     world
   end
 
-  defp ada(world), do: MuaWorld.named(world, "ada")
+  # Ada, a Character with an Account of her own, made the first time a test
+  # asks for her and entered into the chapel. A World restarted from the same
+  # file has her already.
+  defp ada(world) do
+    case Process.get(:ada) do
+      {_account, ada} ->
+        ada
+
+      nil ->
+        {:ok, account} = MuaWorld.create_account(world)
+        {:ok, ada} = MuaWorld.create_character(world, account, "Ada")
+        {:ok, _} = MuaWorld.enter(world, account, ada)
+        Process.put(:ada, {account, ada})
+        ada
+    end
+  end
 
   defp location(world, name),
     do: MuaWorld.component(world, MuaWorld.named(world, name), "location")["in"]
@@ -24,8 +41,15 @@ defmodule MuaWorldTest do
     assert_receive {:DOWN, ^ref, _, _, _}
   end
 
+  defp with_ada(world) do
+    ada(world)
+    world
+  end
+
   defp cmd(world, text) do
-    {:ok, lines} = MuaWorld.command(world, ada(world), text)
+    ada = ada(world)
+    {account, ^ada} = Process.get(:ada)
+    {:ok, lines} = MuaWorld.command(world, account, ada, text)
     lines
   end
 
@@ -68,6 +92,8 @@ defmodule MuaWorldTest do
   end
 
   test "a crash before COMMIT loses the change and tells nobody", %{path: path} do
+    # Ada is made first, in a World without the fault
+    crash(with_ada(start(path)))
     world = start(path, fault: :before_commit)
     ada = ada(world)
     :ok = MuaWorld.subscribe(world, ada)
@@ -79,6 +105,8 @@ defmodule MuaWorldTest do
   end
 
   test "a crash after COMMIT keeps the change, though its output is lost", %{path: path} do
+    # Ada is made first, in a World without the fault
+    crash(with_ada(start(path)))
     world = start(path, fault: :after_commit)
     ada = ada(world)
     :ok = MuaWorld.subscribe(world, ada)

@@ -14,14 +14,21 @@ defmodule MuaWorld do
   fresh, and each Character whose command was still waiting at the last stop
   is told it was abandoned (ADR 0014).
 
-      {:ok, world} = MuaWorld.start_link(path: "world.db", edl: "edl/main.edl")
-      ada = MuaWorld.named(world, "ada")
+  Accounts and Characters are Entities in the World (ADR 0016). An Account
+  owns its Characters through `player.account`, and every call that acts
+  for a Character names its Account, which must own it. A new Character
+  waits in Limbo until it enters.
+
+      {:ok, world} = MuaWorld.start_link(path: "world.db", edl: "main.edl", starting_room: "west_of_house")
+      {:ok, account} = MuaWorld.create_account(world)
+      {:ok, ada} = MuaWorld.create_character(world, account, "Ada")
       :ok = MuaWorld.subscribe(world, ada)
-      {:ok, lines} = MuaWorld.command(world, ada, "look")
+      {:ok, _welcome} = MuaWorld.enter(world, account, ada)
+      {:ok, lines} = MuaWorld.command(world, account, ada, "look")
   """
   use GenServer
 
-  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Tables, Talk}
+  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Places, Tables, Talk}
   alias MuaWorld.Commands.{Scope, Verbs}
   alias NorthTalk.{Pending, Result, ScriptError, Verdict}
 
@@ -35,6 +42,10 @@ defmodule MuaWorld do
     :table,
     # The verbs the World understands.
     :vocabulary,
+    # Limbo, the system actor and the Starting room (`MuaWorld.Places`).
+    :places,
+    # What the input of the current Step returns to its caller.
+    :result,
     :fault,
     :tick,
     # World time at the last reading, and the monotonic time it was read.
@@ -50,17 +61,53 @@ defmodule MuaWorld do
 
   @doc """
   Starts a World. Options: `path` (required), `edl`, the path of the EDL to
-  build an empty World from (required), `tick` in milliseconds (100 by
-  default, or `:manual`), `limits` for every Script, and, in tests only,
-  `fault`, a point where the World stops itself: `:before_commit` or
-  `:after_commit`, before publishing.
+  build an empty World from (required), `starting_room`, the Definition name
+  of the room Characters enter when they have nowhere to return to
+  (required), `tick` in milliseconds (100 by default, or `:manual`),
+  `limits` for every Script, and, in tests only, `fault`, a point where the
+  World stops itself: `:before_commit` or `:after_commit`, before
+  publishing.
+
+  A World whose Starting room isn't a top-level place of the World refuses
+  to start, with `{:error, {:invalid_starting_room, reason}}`.
   """
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, Keyword.take(opts, [:name]))
   def start(opts), do: GenServer.start(__MODULE__, opts, Keyword.take(opts, [:name]))
 
-  @doc "Runs one command for a Character as one Step. Returns the Character's output once committed."
-  def command(world, character, text),
-    do: GenServer.call(world, {:command, character, text}, 30_000)
+  @doc """
+  Runs one command for a Character as one Step. Returns the Character's
+  output once committed, `{:error, :not_owner}` if the Account doesn't own
+  the Character, or `{:error, :not_in_play}` if it is in Limbo.
+  """
+  def command(world, account, character, text),
+    do: GenServer.call(world, {:command, account, character, text}, 30_000)
+
+  @doc "Makes an Account, as one Step, and returns its id."
+  def create_account(world), do: GenServer.call(world, :create_account, 30_000)
+
+  @doc """
+  Makes a Character for an Account, with a public name, as one Step. It waits
+  in Limbo until it enters. Names are unique among Characters, ignoring case:
+  `{:error, :name_taken}`, `{:error, :invalid_name}` or
+  `{:error, :not_an_account}` when it can't be made.
+  """
+  def create_character(world, account, name),
+    do: GenServer.call(world, {:create_character, account, name}, 30_000)
+
+  @doc """
+  Brings a Character into play from Limbo, as one Step: to the room it left,
+  if that is still a place, otherwise to the Starting room. Returns what the
+  Character is told. A Character already in play stays where it is.
+  """
+  def enter(world, account, character),
+    do: GenServer.call(world, {:enter, account, character}, 30_000)
+
+  @doc """
+  Takes a Character out of play, into Limbo, as one Step, remembering the
+  room it left. A Character already in Limbo stays there.
+  """
+  def leave(world, account, character),
+    do: GenServer.call(world, {:leave, account, character}, 30_000)
 
   @doc """
   Sends the calling process `{:mua, character, text}` for each line of the
@@ -87,12 +134,8 @@ defmodule MuaWorld do
   @doc "Every word that starts a command in this World, for clients to complete."
   def verbs(world), do: GenServer.call(world, :verbs)
 
-  @doc """
-  Makes a Character called `name` in the place with Definition name `place`,
-  as one Step, and returns its id. A stand-in until Accounts and Characters
-  arrive (#115).
-  """
-  def spawn(world, name, place), do: GenServer.call(world, {:spawn, name, place})
+  @doc "Limbo, the system actor and the Starting room, by their ids."
+  def places(world), do: GenServer.call(world, :places)
 
   # ---------------------------------------------------------------------
   # Start
@@ -117,13 +160,20 @@ defmodule MuaWorld do
     :ok = OdgnEcs.begin(world)
     Exits.expand(world)
     Tables.abandon_waiting(world)
-    :ok = OdgnEcs.commit(world)
 
-    state = %{state | vocabulary: Verbs.from_world(world)}
+    case Places.ensure(world, opts[:starting_room]) do
+      {:ok, places} ->
+        :ok = OdgnEcs.commit(world)
+        state = %{state | vocabulary: Verbs.from_world(world), places: places}
+        state = start_talk(state, Keyword.get(opts, :limits, []))
+        if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
+        {:ok, state}
 
-    state = start_talk(state, Keyword.get(opts, :limits, []))
-    if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
-    {:ok, state}
+      {:error, reason} ->
+        :ok = OdgnEcs.rollback(world)
+        OdgnEcs.close(world)
+        {:stop, {:invalid_starting_room, reason}}
+    end
   end
 
   defp ok!({:ok, value}), do: value
@@ -169,11 +219,78 @@ defmodule MuaWorld do
   # ---------------------------------------------------------------------
 
   @impl true
-  def handle_call({:command, character, text}, _from, state) do
-    state = advance_clock(state)
-    {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
-    {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
+  def handle_call({:command, account, character, text}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character) do
+      state = advance_clock(state)
+      {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
+      {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
+    else
+      error -> {:reply, error, state}
+    end
   end
+
+  def handle_call(:create_account, _from, state) do
+    {_, state} =
+      step(state, fn state ->
+        {:ok, eid} = OdgnEcs.create(state.world)
+        :ok = OdgnEcs.put(state.world, eid, "account", %{})
+        %{state | result: {:ok, eid}}
+      end)
+
+    reply_result(state)
+  end
+
+  def handle_call({:create_character, account, name}, _from, state) do
+    name = String.trim(to_string(name))
+
+    cond do
+      OdgnEcs.get(state.world, account, "account") == nil ->
+        {:reply, {:error, :not_an_account}, state}
+
+      not Regex.match?(~r/^[A-Za-z][A-Za-z0-9' -]{0,19}$/, name) ->
+        {:reply, {:error, :invalid_name}, state}
+
+      name_taken?(state.world, name) ->
+        {:reply, {:error, :name_taken}, state}
+
+      true ->
+        {_, state} =
+          step(state, fn state ->
+            world = state.world
+            {:ok, eid} = OdgnEcs.create(world)
+            :ok = OdgnEcs.put(world, eid, "player", %{"name" => name, "account" => account})
+            :ok = OdgnEcs.put(world, eid, "meta", %{"props" => %{"id" => String.downcase(name)}})
+            :ok = OdgnEcs.put(world, eid, "location", %{"in" => state.places.limbo})
+            OdgnEcsTalk.handle(state.talk, eid)
+            %{state | result: {:ok, eid}}
+          end)
+
+        reply_result(state)
+    end
+  end
+
+  def handle_call({:enter, account, character}, _from, state) do
+    with :ok <- owns(state, account, character) do
+      state = advance_clock(state)
+      {lines, state} = step(state, &enter_play(&1, character))
+      {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:leave, account, character}, _from, state) do
+    with :ok <- owns(state, account, character) do
+      state = advance_clock(state)
+      {_, state} = step(state, &leave_play(&1, character))
+      {:reply, :ok, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call(:places, _from, state), do: {:reply, state.places, state}
 
   def handle_call({:subscribe, character, pid}, _from, state) do
     :ok = OdgnEcs.begin(state.world)
@@ -201,17 +318,71 @@ defmodule MuaWorld do
 
   def handle_call(:verbs, _from, state), do: {:reply, Verbs.list(state.vocabulary), state}
 
-  def handle_call({:spawn, name, place}, _from, state) do
+  defp reply_result(state), do: {:reply, state.result, %{state | result: nil}}
+
+  # ---------------------------------------------------------------------
+  # Accounts and Characters
+  # ---------------------------------------------------------------------
+
+  defp owns(state, account, character) do
+    case OdgnEcs.get(state.world, character, "player") do
+      %{"account" => ^account} when is_integer(account) -> :ok
+      _ -> {:error, :not_owner}
+    end
+  end
+
+  defp in_play(state, character) do
+    if location(state, character) == state.places.limbo,
+      do: {:error, :not_in_play},
+      else: :ok
+  end
+
+  defp location(state, eid), do: (OdgnEcs.get(state.world, eid, "location") || %{})["in"]
+
+  defp name_taken?(world, name) do
+    wanted = String.downcase(name)
+
+    world
+    |> OdgnEcs.query(with: ["player"])
+    |> Enum.any?(&(String.downcase(OdgnEcs.get(world, &1, "player")["name"]) == wanted))
+  end
+
+  # A Character in Limbo returns to the room it left, if that is still a
+  # place, otherwise to the Starting room. Those already there see it appear.
+  defp enter_play(state, character) do
     world = state.world
-    room = OdgnEdl.entity_named(world, place)
-    :ok = OdgnEcs.begin(world)
-    {:ok, eid} = OdgnEcs.create(world)
-    :ok = OdgnEcs.put(world, eid, "player", %{"name" => name})
-    :ok = OdgnEcs.put(world, eid, "meta", %{"props" => %{"id" => name}})
-    :ok = OdgnEcs.put(world, eid, "location", %{"in" => room})
-    :ok = OdgnEcs.commit(world)
-    OdgnEcsTalk.handle(state.talk, eid)
-    {:reply, eid, state}
+    player = OdgnEcs.get(world, character, "player")
+
+    if location(state, character) == state.places.limbo do
+      room = Places.destination(world, character, state.places)
+      :ok = OdgnEcs.put(world, character, "location", %{"in" => room})
+      :ok = OdgnEcs.put(world, character, "player", Map.put(player, "return_to", nil))
+
+      if player["return_to"] != nil,
+        do: Tables.tell(world, room, "#{player["name"]} appears.", character)
+    end
+
+    tell(
+      state,
+      character,
+      "Welcome, #{player["name"]}! Type 'look' to begin, or 'help' for the commands."
+    )
+  end
+
+  # A Character who leaves waits in Limbo, out of the World, and remembers
+  # the room it left.
+  defp leave_play(state, character) do
+    world = state.world
+    room = location(state, character)
+
+    if room != nil and room != state.places.limbo do
+      player = OdgnEcs.get(world, character, "player")
+      :ok = OdgnEcs.put(world, character, "player", Map.put(player, "return_to", room))
+      :ok = OdgnEcs.put(world, character, "location", %{"in" => state.places.limbo})
+      Tables.tell(world, room, "#{player["name"]} fades from view.")
+    end
+
+    state
   end
 
   @impl true

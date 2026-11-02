@@ -1,5 +1,5 @@
-# A chapel with a statue, a lever, a candle and a sexton, and Ada, a
-# Character, in it.
+# A chapel with a statue, a lever, a candle and a sexton. Tests make Ada, a
+# Character, and enter her here.
 
 def pulled {
   yes: boolean
@@ -29,12 +29,6 @@ entity chapel_verbs {
 
 entity chapel: chapel_place {
   described { name: "Chapel" description: "Candles flicker." }
-}
-
-entity ada: thing {
-  player { name: "Ada" }
-  meta { props: { id: "ada" } }
-  location { in: $chapel }
 }
 
 entity statue: heavy {

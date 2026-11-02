@@ -59,7 +59,7 @@ One input to the World, such as a command or a due timer, and the Script work it
 _Avoid_: tick, transaction, turn
 
 **Limbo**:
-The place that holds what is out of play: stored things, and Characters whose Players have left until they return.
+The place that holds what is out of play: stored things, and Characters not in play, whether their Players have left or they have yet to enter for the first time.
 _Avoid_: void, storage room
 
 **System actor**:
