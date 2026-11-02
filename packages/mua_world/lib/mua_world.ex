@@ -12,7 +12,14 @@ defmodule MuaWorld do
 
   On start, timers carry on from the saved World time, every Script is loaded
   fresh, and each Character whose command was still waiting at the last stop
-  is told it was abandoned (ADR 0014).
+  is told it was abandoned (ADR 0014). Then every scripted thing hears
+  `start`, in one Step.
+
+  World time advances while the World runs, whether or not anyone is
+  playing, and pauses while it is down. NPCs act through commands (ADR 0003):
+  a command a Script asks for with `mua act` runs as a Step of its own once
+  the current one commits; any it asks for while those run waits for the
+  next tick.
 
   Accounts and Characters are Entities in the World (ADR 0016). An Account
   owns its Characters through `player.account`, and every call that acts
@@ -28,7 +35,7 @@ defmodule MuaWorld do
   """
   use GenServer
 
-  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Places, Tables, Talk}
+  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Lifecycle, Places, Tables, Talk}
   alias MuaWorld.Commands.{Scope, Verbs}
   alias NorthTalk.{Pending, Result, ScriptError, Verdict}
 
@@ -128,11 +135,22 @@ defmodule MuaWorld do
   @doc "Reads a component, through the World process."
   def component(world, eid, name), do: GenServer.call(world, {:component, eid, name})
 
+  @doc "Writes a component, through the World process, as one Step. For tests and operators."
+  def set_component(world, eid, name, data),
+    do: GenServer.call(world, {:set_component, eid, name, data}, 30_000)
+
   @doc "The entity with this Definition name, through the World process."
   def named(world, name), do: GenServer.call(world, {:named, name})
 
   @doc "Every word that starts a command in this World, for clients to complete."
   def verbs(world), do: GenServer.call(world, :verbs)
+
+  @doc """
+  Resets a place, as its `reset` timer does, as one Step: puts back what has
+  strayed from it, unless a Character carries it, and tells its Scripts.
+  Returns how many things moved.
+  """
+  def reset(world, place), do: GenServer.call(world, {:reset, place}, 30_000)
 
   @doc "Limbo, the system actor and the Starting room, by their ids."
   def places(world), do: GenServer.call(world, :places)
@@ -163,9 +181,12 @@ defmodule MuaWorld do
 
     case Places.ensure(world, opts[:starting_room]) do
       {:ok, places} ->
+        Lifecycle.record_homes(world)
         :ok = OdgnEcs.commit(world)
         state = %{state | vocabulary: Verbs.from_world(world), places: places}
         state = start_talk(state, Keyword.get(opts, :limits, []))
+        # a test's `fault` is for the Steps that follow start-up
+        state = %{start_world(%{state | fault: nil}) | fault: opts[:fault]}
         if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
         {:ok, state}
 
@@ -214,6 +235,25 @@ defmodule MuaWorld do
     %{state | talk: talk, table: table}
   end
 
+  # Arms mua's timers, then tells every scripted thing the World has
+  # started, as one Step. Scripts load fresh on every start (ADR 0014), so
+  # this is where they set themselves up again.
+  defp start_world(state) do
+    {_, state} =
+      step(state, fn state ->
+        Lifecycle.arm(state.world, state.talk, instant_us(state.world_ms))
+        system = OdgnEcsTalk.handle(state.talk, state.places.system)
+
+        for eid <- OdgnEcs.query(state.world, with: ["described"]),
+            OdgnEcsTalk.scripted?(state.talk, eid),
+            do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, eid, "start", [system])
+
+        state
+      end)
+
+    state
+  end
+
   # ---------------------------------------------------------------------
   # Calls
   # ---------------------------------------------------------------------
@@ -224,7 +264,7 @@ defmodule MuaWorld do
          :ok <- in_play(state, character) do
       state = advance_clock(state)
       {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
-      {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
+      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
     else
       error -> {:reply, error, state}
     end
@@ -274,7 +314,7 @@ defmodule MuaWorld do
     with :ok <- owns(state, account, character) do
       state = advance_clock(state)
       {lines, state} = step(state, &enter_play(&1, character))
-      {:reply, {:ok, for({^character, t} <- lines, do: t)}, state}
+      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
     else
       error -> {:reply, error, state}
     end
@@ -284,13 +324,19 @@ defmodule MuaWorld do
     with :ok <- owns(state, account, character) do
       state = advance_clock(state)
       {_, state} = step(state, &leave_play(&1, character))
-      {:reply, :ok, state}
+      {:reply, :ok, run_npcs(state)}
     else
       error -> {:reply, error, state}
     end
   end
 
   def handle_call(:places, _from, state), do: {:reply, state.places, state}
+
+  def handle_call({:reset, place}, _from, state) do
+    state = advance_clock(state)
+    {_, state} = step(state, &reset_place(&1, place))
+    reply_result(state)
+  end
 
   def handle_call({:subscribe, character, pid}, _from, state) do
     :ok = OdgnEcs.begin(state.world)
@@ -312,6 +358,13 @@ defmodule MuaWorld do
 
   def handle_call({:component, eid, name}, _from, state),
     do: {:reply, OdgnEcs.get(state.world, eid, name), state}
+
+  def handle_call({:set_component, eid, name, data}, _from, state) do
+    {_, state} =
+      step(state, fn state -> %{state | result: OdgnEcs.put(state.world, eid, name, data)} end)
+
+    reply_result(state)
+  end
 
   def handle_call({:named, name}, _from, state),
     do: {:reply, OdgnEdl.entity_named(state.world, name), state}
@@ -412,18 +465,83 @@ defmodule MuaWorld do
       state.talk
       |> OdgnEcsTalk.due_timers(instant_us(state.world_ms))
       |> Enum.reduce(state, fn timer, state ->
-        {_, state} =
-          step(state, fn state ->
-            OdgnEcsTalk.fire_timer(state.talk, timer)
-            state
-          end)
-
+        {_, state} = step(state, &fire(&1, timer))
         state
       end)
 
-    if state.next_deadline != nil and state.next_deadline <= state.world_ms,
-      do: elem(step(state, & &1), 1),
-      else: state
+    state =
+      if state.next_deadline != nil and state.next_deadline <= state.world_ms,
+        do: elem(step(state, & &1), 1),
+        else: state
+
+    run_npcs(state)
+  end
+
+  # A Script's timer goes to its entity; mua's own `timers` are handled here.
+  defp fire(state, %{"script" => script} = timer) do
+    if script == Lifecycle.timers_script() do
+      OdgnEcsTalk.remove_timer(state.talk, timer)
+      owner = timer["owner"]
+
+      state =
+        cond do
+          not OdgnEcs.exists?(state.world, owner) ->
+            state
+
+          timer["message"] == "reset" ->
+            reset_place(state, owner)
+
+          OdgnEcsTalk.scripted?(state.talk, owner) ->
+            system = OdgnEcsTalk.handle(state.talk, state.places.system)
+            {:ok, _} = OdgnEcsTalk.deliver(state.talk, owner, timer["message"], [system])
+            state
+
+          true ->
+            state
+        end
+
+      Lifecycle.rearm(state.world, state.talk, timer, instant_us(state.world_ms))
+      state
+    else
+      OdgnEcsTalk.fire_timer(state.talk, timer)
+      state
+    end
+  end
+
+  defp reset_place(state, place) do
+    moved = Lifecycle.put_back(state.world, place)
+
+    if OdgnEcsTalk.scripted?(state.talk, place) do
+      system = OdgnEcsTalk.handle(state.talk, state.places.system)
+      {:ok, _} = OdgnEcsTalk.deliver(state.talk, place, "reset", [system])
+    end
+
+    %{state | result: moved}
+  end
+
+  # The NPC commands queued so far, each a Step of its own. Any they queue
+  # wait for the next run, so an NPC answering itself can't loop.
+  defp run_npcs(state) do
+    Enum.reduce(Tables.queued_acts(state.world), state, fn {id, actor, text}, state ->
+      {_, state} =
+        step(state, fn state ->
+          Tables.delete_act(state.world, id)
+          npc_input(state, actor, text)
+        end)
+
+      state
+    end)
+  end
+
+  defp npc_input(state, actor, text) do
+    active? = (OdgnEcs.get(state.world, actor, "npc") || %{})["active"] == true
+
+    with true <- active?,
+         {:commands, commands} <- Input.read_npc(state.world, state.vocabulary, actor, text) do
+      run_commands(state, actor, commands, text)
+    else
+      _ -> state
+    end
   end
 
   # ---------------------------------------------------------------------

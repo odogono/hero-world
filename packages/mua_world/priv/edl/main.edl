@@ -153,9 +153,8 @@ atom npc {
   npc { active: true }
 }
 
-# Hollis's Script (`scripts/gardener.talk` in packages/mua) acts through
-# `mua act`, which comes with NPCs (#116)
 atom gardener {
+  script { src: "scripts/gardener.talk" }
 }
 
 entity garden_path : garden_room fragrant {

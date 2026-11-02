@@ -55,4 +55,26 @@ defmodule MuaWorld.GardenTest do
     assert send_bob(c, "water roses with can") ==
              "You water the roses. They drink gratefully and lift their heads."
   end
+
+  test "has a gardener who greets you and knows where the key is", c do
+    walk(c, ["north", "east", "east"])
+    received(c.bob)
+
+    send_bob(c, "north")
+    assert ~s(Hollis says, "Mind the roses, bob.") in received(c.bob)
+
+    send_bob(c, "say have you seen a key?")
+
+    assert ~s(Hollis says, "The shed key? I dropped it in the well bucket, I think.") in received(
+             c.bob
+           )
+  end
+
+  test "has a gardener who potters off on his own", c do
+    walk(c, ["north", "east", "east", "north"])
+    received(c.bob)
+
+    run_for(c.world, 50)
+    assert "Hollis goes south." in received(c.bob)
+  end
 end

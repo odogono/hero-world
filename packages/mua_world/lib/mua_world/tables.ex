@@ -11,6 +11,7 @@ defmodule MuaWorld.Tables do
   CREATE TABLE IF NOT EXISTS mua_waiting (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, command TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL);
   """
 
   def ensure(%OdgnEcs{conn: conn}), do: SQL.exec!(conn, @schema)
@@ -100,4 +101,18 @@ defmodule MuaWorld.Tables do
     SQL.run!(conn, "DELETE FROM mua_notices WHERE character = ?1", [character])
     notices
   end
+
+  @doc "Queues a command an NPC's Script asked it to carry out (`mua act`)."
+  def queue_act(%OdgnEcs{conn: conn}, actor, text),
+    do: SQL.run!(conn, "INSERT INTO mua_npc_queue (actor, text) VALUES (?1, ?2)", [actor, text])
+
+  @doc "The queued NPC commands, oldest first, as `{id, actor, text}`."
+  def queued_acts(%OdgnEcs{conn: conn}) do
+    for [id, actor, text] <-
+          SQL.all!(conn, "SELECT id, actor, text FROM mua_npc_queue ORDER BY id"),
+        do: {id, actor, text}
+  end
+
+  def delete_act(%OdgnEcs{conn: conn}, id),
+    do: SQL.run!(conn, "DELETE FROM mua_npc_queue WHERE id = ?1", [id])
 end
