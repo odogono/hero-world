@@ -162,7 +162,9 @@ defmodule MuaWorld do
   @impl true
   def init(opts) do
     edl_path = Keyword.fetch!(opts, :edl)
-    {:ok, world} = OdgnEcs.open(Keyword.fetch!(opts, :path))
+    # The World keeps the database's write lock while it runs, so nothing
+    # else, such as `mix mua.migrate`, can write it meanwhile
+    {:ok, world} = OdgnEcs.open(Keyword.fetch!(opts, :path), exclusive: true)
     world = Enum.reduce(Components.all(), world, fn c, w -> ok!(OdgnEcs.define(w, c)) end)
     Tables.ensure(world)
     {:ok, world, _built_or_resumed} = OdgnEdl.load(world, File.read!(edl_path), path: edl_path)
@@ -195,6 +197,15 @@ defmodule MuaWorld do
         OdgnEcs.close(world)
         {:stop, {:invalid_starting_room, reason}}
     end
+  end
+
+  # A stopped World lets go of its database at once, and its lock with it:
+  # NorthTalk's owner holds the connection too, through the callbacks.
+  @impl true
+  def terminate(_reason, state) do
+    if state.talk, do: NorthTalk.close(state.talk.owner)
+    if state.world, do: OdgnEcs.close(state.world)
+    :ok
   end
 
   defp ok!({:ok, value}), do: value

@@ -25,13 +25,7 @@ defmodule MuaWorld.Places do
   """
   @spec ensure(OdgnEcs.t(), String.t() | nil) :: {:ok, t()} | {:error, String.t()}
   def ensure(world, starting_room) do
-    limbo =
-      find(world, @limbo) ||
-        make(world, %{
-          "container" => %{"capacity" => 10_000, "is_closed" => false},
-          "described" => %{"name" => "Limbo", "description" => "Nowhere at all."},
-          "meta" => %{"props" => %{"id" => @limbo}}
-        })
+    limbo = limbo(world)
 
     system =
       find(world, @system) ||
@@ -43,6 +37,32 @@ defmodule MuaWorld.Places do
 
     with {:ok, room} <- starting_room(world, starting_room, limbo),
          do: {:ok, %{limbo: limbo, system: system, starting_room: room}}
+  end
+
+  @doc "Finds or makes Limbo. Call it inside a transaction."
+  @spec limbo(OdgnEcs.t()) :: OdgnEcs.eid()
+  def limbo(world) do
+    find(world, @limbo) ||
+      make(world, %{
+        "container" => %{"capacity" => 10_000, "is_closed" => false},
+        "described" => %{"name" => "Limbo", "description" => "Nowhere at all."},
+        "meta" => %{"props" => %{"id" => @limbo}}
+      })
+  end
+
+  @doc "The Characters inside an entity, at any depth."
+  @spec characters_within(OdgnEcs.t(), OdgnEcs.eid()) :: [OdgnEcs.eid()]
+  def characters_within(world, eid, seen \\ MapSet.new()) do
+    if MapSet.member?(seen, eid) do
+      []
+    else
+      seen = MapSet.put(seen, eid)
+
+      Enum.flat_map(OdgnEcs.query(world, where: [{"location", "in", eid}]), fn element ->
+        own = if OdgnEcs.get(world, element, "player"), do: [element], else: []
+        own ++ characters_within(world, element, seen)
+      end)
+    end
   end
 
   defp starting_room(_world, nil, _limbo),

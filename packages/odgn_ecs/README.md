@@ -21,4 +21,6 @@ mix test
 - **No implicit transactions:** callers decide where changes commit, with `begin`, `commit`, `rollback`, `savepoint`, `release`, `rollback_to` and `in_savepoint`.
 - **One table per component:** each component has one typed column per property, so SQL enforces types and `unique` columns.
 - **Values are checked when they are put:** properties left out take their defaults, and unknown properties, wrong types and missing required values are errors. Putting a component replaces it whole.
-- **Definitions are stored in the World:** a reopened World knows its components. Defining a component again with a different definition is an error, because changing a definition is part of Migration (#100).
+- **Definitions are stored in the World:** a reopened World knows its components.
+- **A changed definition is applied in place when the data can follow it:** defining a component again may add a column that is optional or has a default (existing rows get the default), remove a column, make a column optional, change a default, or flip `play_state`. Changing a column's type or `unique`, adding a unique column, or making one required with no default is an `:incompatible_change` error.
+- **`open/2` with `exclusive: true`** keeps SQLite's lock from the first write until the connection closes, so no other process can write the World meanwhile.

@@ -34,6 +34,20 @@ NorthTalk's Elixir Host isn't on Hex yet, so `mix.exs` pins it to a commit of od
 - **Homes and resets:** each located thing remembers where it started as its `home`. A reset (`MuaWorld.reset/2`, or a `reset` timer) puts back what has strayed, unless a Character carries it, and tells the place's Scripts.
 - **`start`:** every scripted thing with `described` hears `start` each time the World starts, after its Scripts load, in one Step.
 - **Exits:** each room's `exits` shorthand becomes exit entities on start, ways back included. Exits that already exist are kept, so this makes nothing new on a restart.
+- **Migrating to a changed EDL** ([ADR 0005](../../docs/adr/0005-a-changed-edl-migrates-a-world-keeping-play-state.md)): a World whose EDL has changed refuses to start until it is migrated, offline, with the World stopped:
+
+  ```sh
+  mix mua.migrate --db world.db --edl priv/edl/main.edl --starting-room west_of_house [--dry-run] [--prune]
+  ```
+
+  - **What it prints:** what changes and what play keeps, from `OdgnEdl.migrate/3`.
+  - **Pruning:** with `--prune`, things gone from the EDL move to Limbo, never deleted. Their contents go with them, except Characters, who move to the Starting room. Their timers are cancelled.
+  - **Exits:** a room whose `exits` changed gets its exits made again.
+  - **Timers:** mua timers nothing declares any more are cancelled.
+  - **What it never touches:** Characters, Accounts, inventories, World time and other timers.
+  - **The Starting room:** a Migration that would leave it invalid fails and changes nothing, on a dry run too (`MuaWorld.Migration`).
+  - **Locking:** a running World holds the database's write lock, so the task refuses until the World stops.
+  - **Code changes:** compatible changes to mua's own components are applied as the World starts (`OdgnEcs.define/2`).
 - **Restarts** ([ADR 0014](../../docs/adr/0014-a-restart-keeps-timers-and-abandons-waiting-scripts.md)):
   - World time is kept in the database, so timers resume without counting downtime.
   - Every Script loads fresh.
@@ -50,6 +64,7 @@ NorthTalk's Elixir Host isn't on Hex yet, so `mix.exs` pins it to a commit of od
 | [`lib/mua_world/actions.ex`](lib/mua_world/actions.ex), [`messages.ex`](lib/mua_world/messages.ex) | The built-in actions and their messages. |
 | [`lib/mua_world/exits.ex`](lib/mua_world/exits.ex) | Exit entities from the `exits` shorthand. |
 | [`lib/mua_world/components.ex`](lib/mua_world/components.ex) | mua's components. |
+| [`lib/mua_world/migration.ex`](lib/mua_world/migration.ex), [`lib/mix/tasks/mua.migrate.ex`](lib/mix/tasks/mua.migrate.ex) | Migrating a World to a changed EDL. |
 | [`lib/mua_world/talk.ex`](lib/mua_world/talk.ex) | The `mua` Capability. |
 | [`lib/mua_world/tables.ex`](lib/mua_world/tables.ex) | mua's own tables: World time, the outbox, waiting inputs, notices and queued NPC commands. |
 | [`lib/mua_world/lifecycle.ex`](lib/mua_world/lifecycle.ex) | Homes, resets and mua's `timers`. |
