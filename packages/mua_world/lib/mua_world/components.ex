@@ -53,8 +53,13 @@ defmodule MuaWorld.Components do
       c("messages", false, [col("msg", :json), col("omsg", :json)]),
       c("script", false, [col("src", :string)]),
       c("described", false, [col("description", :string), col("name", :string)]),
+      # A person's game identity (ADR 0016). Phoenix maps a Google identity
+      # to its id; nothing in the World points at a person directly.
+      c("account", true, []),
       c("player", false, [
         col("name", :string, optional: false),
+        # the Account that owns the Character
+        col("account", :eid),
         col("last_input", :string),
         col("last_target_id", :eid),
         col("pending", :json),
