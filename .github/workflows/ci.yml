@@ -29,3 +29,27 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check
+
+  # The Elixir World (packages/mua_world) builds and tests with Mix alone,
+  # without Bun (#102).
+  mua-world:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mua_world
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '27'
+          elixir-version: '1.18'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/mua_world/deps
+            packages/mua_world/_build
+          key: mua-world-${{ hashFiles('packages/mua_world/mix.lock') }}
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix test
