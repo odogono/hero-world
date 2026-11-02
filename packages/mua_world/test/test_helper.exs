@@ -36,4 +36,6 @@ defmodule MuaWorld.Case do
   end
 end
 
-ExUnit.start()
+# Every World starts a NorthTalk reactor, which is CPU-heavy: too many at once
+# starve each other on a small CI runner past NorthTalk's 5 s call timeout.
+ExUnit.start(max_cases: 2)
