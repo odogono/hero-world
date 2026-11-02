@@ -146,7 +146,7 @@ defmodule MuaWorld do
         owner: owner,
         grants: %{"mua" => NorthTalk.grant!(owner, "mua")},
         limits: limits,
-        on_show: &Tables.output(world, &1, &2)
+        on_show: &Tables.tell(world, &1, &2)
       )
 
     for name <- @libraries,
@@ -421,17 +421,80 @@ defmodule MuaWorld do
 
           ask(state, ctx, q, fn state, reply ->
             case reply do
-              {:replied, message} -> k.(state, Actions.done(message || ""))
-              :failed -> k.(state, Actions.refused("Something went wrong."))
-              :passed -> k.(state, Actions.refused(Dispatch.cannot()))
+              {:replied, message} ->
+                after_each(
+                  state,
+                  ctx,
+                  Dispatch.afters(state.world, ctx),
+                  Actions.done(message || ""),
+                  k
+                )
+
+              :failed ->
+                k.(state, Actions.refused("Something went wrong."))
+
+              :passed ->
+                k.(state, Actions.refused(Dispatch.cannot()))
             end
           end)
       end
     else
-      case Actions.run(state.world, ctx) do
+      case run_built_in(state.world, ctx) do
         :pass -> k.(state, Actions.refused(Dispatch.cannot()))
-        outcome -> k.(state, outcome)
+        outcome -> after_each(state, ctx, Dispatch.afters(state.world, ctx), outcome, k)
       end
+    end
+  end
+
+  # A built-in runs in a savepoint of its own: one that refuses, or raises,
+  # leaves no partial change behind.
+  defp run_built_in(world, ctx) do
+    :ok = OdgnEcs.savepoint(world, "mua_action")
+
+    outcome =
+      try do
+        Actions.run(world, ctx)
+      rescue
+        e ->
+          OdgnEcs.rollback_to(world, "mua_action")
+          reraise e, __STACKTRACE__
+      end
+
+    case outcome do
+      %{kind: :done} -> :ok = OdgnEcs.release(world, "mua_action")
+      _ -> :ok = OdgnEcs.rollback_to(world, "mua_action")
+    end
+
+    outcome
+  end
+
+  # Once an action has succeeded, `after<Verb>` goes to the same receivers,
+  # whose replies are added to its message.
+  defp after_each(state, _ctx, _afters, %{kind: kind} = outcome, k) when kind != :done,
+    do: k.(state, outcome)
+
+  defp after_each(state, _ctx, [], outcome, k), do: k.(state, outcome)
+
+  defp after_each(state, ctx, [q | rest], outcome, k) do
+    if answerable?(state, q.to) do
+      ask(state, ctx, q, fn state, reply ->
+        outcome =
+          case reply do
+            {:replied, line} when line not in [nil, ""] ->
+              %{
+                outcome
+                | message:
+                    Enum.join(Enum.reject([outcome.message, line], &(&1 in [nil, ""])), "\n")
+              }
+
+            _ ->
+              outcome
+          end
+
+        after_each(state, ctx, rest, outcome, k)
+      end)
+    else
+      after_each(state, ctx, rest, outcome, k)
     end
   end
 

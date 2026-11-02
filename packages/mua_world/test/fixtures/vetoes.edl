@@ -1,0 +1,63 @@
+# A small world where rooms and things can veto actions
+
+atom room {
+  container { capacity: 100 is_closed: false }
+  described { name: "Room" description: "A room." }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom box {
+  container { capacity: 5 is_closed: false }
+}
+
+# Won't let anyone leave north, and lets them leave any other way
+atom sentried {
+  script { src: "scripts/sentry.talk" }
+}
+
+# Won't give up what it holds
+atom jealous {
+  script { src: "scripts/jealous.talk" }
+}
+
+entity west_of_house : room sentried {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Gatehouse" description: "A gatehouse with a sentry." }
+  exits {
+    north: $courtyard
+    east: $hall
+    south: $vault
+  }
+}
+
+entity courtyard : room {
+  described { name: "Courtyard" description: "An open courtyard." }
+}
+
+entity hall : room {
+  described { name: "Hall" description: "A hall with a hot stone floor." }
+  responses { veto: { beforeAdd: "The floor is too hot to put anything down." } }
+}
+
+entity vault : room {
+  described { name: "Vault" description: "A sealed vault." }
+  responses { veto: { beforeEnter: "The vault door is sealed." } }
+}
+
+entity chest : box jealous {
+  described { name: "Chest" description: "An iron-bound chest." }
+  location { in: $west_of_house }
+}
+
+entity gem : item {
+  described { name: "Gem" description: "A glittering gem." }
+  location { in: $chest }
+}
+
+entity rock : item {
+  described { name: "Rock" description: "A plain rock." }
+  location { in: $west_of_house }
+}

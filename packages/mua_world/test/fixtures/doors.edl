@@ -1,0 +1,33 @@
+# A small world with a lockable door between two rooms
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+entity oak_door {
+  described { name: "Oak door" description: "A heavy oak door." }
+  noun { words: ["door"] }
+  door { is_closed: true }
+  lockable { is_locked: true lock: "study" }
+}
+
+entity west_of_house : room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Hall" description: "A long hall." }
+  exits { north: { to: $study door: $oak_door } }
+}
+
+entity study : room {
+  described { name: "Study" description: "A quiet study." }
+}
+
+entity brass_key : item {
+  described { name: "Brass key" description: "A small brass key." }
+  noun { words: ["key"] }
+  key { opens: ["study"] }
+  location { in: $west_of_house }
+}

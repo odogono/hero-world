@@ -1,0 +1,3 @@
+on beforeRemove actor, thing, deciding
+  veto "The chest snaps shut on your fingers."
+end beforeRemove
