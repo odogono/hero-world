@@ -46,6 +46,12 @@ const report = ({ exitsRemade, plan, timersCancelled }: WorldMigration) => {
     'Deleted in play, not brought back',
     plan.missing.map(({ name }) => name)
   );
+  line(
+    'Changed in play, so the EDL edit is not applied',
+    plan.kept.map(
+      ({ components, eid, name }) => `${name} (#${eid}) ${components.join(' ')}`
+    )
+  );
   line('Atoms added', plan.atoms.added);
   line('Atoms with new bases', plan.atoms.changed);
   line('Atoms removed', plan.atoms.removed);

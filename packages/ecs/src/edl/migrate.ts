@@ -1,7 +1,6 @@
 import { toCamelCase } from 'odgn-helpers/string';
 
 import { addComponents } from '../component';
-import { applyComponentDefaults } from '../component/defaults';
 import { removeComponent } from '../component/remove';
 import type { Components, GenericEntity } from '../types';
 import type { World } from '../world';
@@ -13,6 +12,12 @@ import {
   type CompiledEDL,
   type ComponentData
 } from './compile';
+import {
+  isPlayState,
+  normalise,
+  readComponents,
+  recordEDLValues
+} from './edl-values';
 import { EDLExecutionError } from './errors';
 
 export type MigrateOptions = {
@@ -31,7 +36,10 @@ export type MigrateOptions = {
 export type EntityMigration = {
   /** Components the entity lacks and the EDL now gives it */
   added: string[];
-  /** Static components the EDL now sets differently */
+  /**
+   * Components the EDL now sets differently: static ones, and Play state
+   * that play hasn't changed since the EDL last set it
+   */
   changed: string[];
   eid: number;
   /** Its bases, when they changed */
@@ -48,6 +56,12 @@ export type MigrationPlan = {
   created: string[];
   /** Entities whose Definition name is gone from the EDL */
   gone: { eid: number; name: string }[];
+  /**
+   * Play state components the EDL sets differently from the world, left as
+   * they are because play changed them, or because the world doesn't know
+   * what the EDL last set (it was built before that was saved)
+   */
+  kept: { components: string[]; eid: number; name: string }[];
   /** Entities deleted during play; the EDL doesn't bring them back */
   missing: { eid: number; name: string }[];
   /** Whether `gone` entities were taken out of play */
@@ -63,33 +77,6 @@ export const isEDLChanged = <T extends Components>(
 
 const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
-
-/** JSON with sorted keys, so field order doesn't count as a change */
-const stable = (value: unknown): string =>
-  JSON.stringify(value, (_key, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(
-          Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
-            a.localeCompare(b)
-          )
-        )
-      : v
-  );
-
-/** A component's fields as the world would store them */
-const normalise = <T extends Components>(
-  world: World<T>,
-  name: string,
-  data: Record<string, unknown> | null | undefined
-): string => {
-  const columns = world.defs.get(name)?.schema.columns ?? [];
-  const withDefaults = applyComponentDefaults(world, name, data ?? {});
-  return stable(
-    Object.fromEntries(
-      columns.map(({ name: field }) => [field, withDefaults[field] ?? null])
-    )
-  );
-};
 
 /** Applies `!set $entity.component.prop value` commands to the components */
 const applySetCommands = (
@@ -160,6 +147,7 @@ export const migrateEDL = <T extends Components>(
     atoms: { added: [], changed: [], removed: [] },
     created: [],
     gone: [],
+    kept: [],
     missing: [],
     pruned: false,
     updated: []
@@ -250,11 +238,8 @@ export const migrateEDL = <T extends Components>(
       continue;
     }
 
-    const current = (world.query({
-      asProxy: false,
-      entity: { id: eid, world } as GenericEntity<T>,
-      maybe: [...world.defs.keys()] as (keyof T)[]
-    }) ?? {}) as Record<string, Record<string, unknown> | undefined>;
+    const current = readComponents(world, eid);
+    const edlValues = world.getEDLValues(eid);
 
     const change: EntityMigration = {
       added: [],
@@ -263,25 +248,35 @@ export const migrateEDL = <T extends Components>(
       name,
       removed: []
     };
+    const kept: string[] = [];
     for (const [component, data] of Object.entries(desired)) {
       const now = current[component];
       if (!now) {
         change.added.push(component);
-      } else if (
-        !world.defs.get(component)?.schema.playState &&
-        normalise(world, component, data) !== normalise(world, component, now)
-      ) {
-        change.changed.push(component);
+      } else {
+        const stored = normalise(world, component, now);
+        if (normalise(world, component, data) === stored) {
+          continue;
+        }
+        // Play state is set only when play left it as the EDL last set it
+        const untouched = edlValues.get(component) === stored;
+        (isPlayState(world, component) && !untouched
+          ? kept
+          : change.changed
+        ).push(component);
       }
     }
     for (const component of world.defs.keys()) {
       if (
         current[component] &&
         !(component in desired) &&
-        !world.defs.get(component)?.schema.playState
+        !isPlayState(world, component)
       ) {
         change.removed.push(component);
       }
+    }
+    if (kept.length > 0) {
+      plan.kept.push({ components: kept, eid, name });
     }
     const lineage = world.getEntityLineage(eid);
     if (!sameList(lineage, def.extends)) {
@@ -319,6 +314,13 @@ export const migrateEDL = <T extends Components>(
 
   if (dryRun) {
     return plan;
+  }
+
+  // What the EDL now sets is what later migrations compare play against
+  for (const [i, { name }] of compiled.entities.entries()) {
+    if (name && !missingNames.has(name)) {
+      recordEDLValues(world, ids[i]!, components[i]!);
+    }
   }
 
   // Atoms' Lineage and Script owners are rewritten from the EDL

@@ -112,7 +112,7 @@ if (isEDLChanged(world, edl)) {
 ```
 
 - New Definition names are created. An entity deleted during play is listed in `missing` and not brought back.
-- For an entity already in the world, components the EDL now gives it are added; static components are set to exactly what the EDL says, and removed when it no longer gives them. A component defined with `playState: true` (`defineComponent({ id, playState: true, schema })`) is added if missing but never overwritten or removed.
+- For an entity already in the world, components the EDL now gives it are added; static components are set to exactly what the EDL says, and removed when it no longer gives them. A component defined with `playState: true` (`defineComponent({ id, playState: true, schema })`) is added if missing and never removed. It is set to what the EDL now says only if play never changed it from what the EDL last set (ADR 0006); otherwise it is left alone and listed in `kept`, so a dry run shows an EDL edit that won't land.
 - Lineage and Script owners are rewritten from the EDL.
 - Entities whose name is gone from the EDL are listed in `gone`. Pass `prune: eid => …` to take them out of play; their names are then forgotten.
 - `dryRun: true` returns the plan and changes nothing. Of the commands, only `!set` is applied.

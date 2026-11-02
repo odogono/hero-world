@@ -315,6 +315,28 @@ export class World<TComponents extends Components> {
     return new Map(rows.map(({ eid, name }) => [name, eid]));
   }
 
+  /** Save a Play state component's value as the EDL last set it */
+  setEDLValue(eid: number, component: string, value: string) {
+    this.db.exec(
+      'INSERT OR REPLACE INTO tbl_edl_value (eid, component, value) VALUES (?1, ?2, ?3)',
+      [eid, component, value]
+    );
+  }
+
+  /** Each Play state component's value as the EDL last set it */
+  getEDLValues(eid: number): Map<string, string> {
+    const rows = this.db.query(
+      'SELECT component, value FROM tbl_edl_value WHERE eid = ?1',
+      [eid]
+    ) as { component: string; value: string }[];
+    return new Map(rows.map(({ component, value }) => [component, value]));
+  }
+
+  /** Forget the values the EDL last set on an entity */
+  deleteEDLValues(eid: number) {
+    this.db.exec('DELETE FROM tbl_edl_value WHERE eid = ?1', [eid]);
+  }
+
   /** Save the hash of the EDL the world was last built or migrated from */
   setEDLHash(hash: string) {
     this.db.exec(
@@ -946,6 +968,10 @@ const initialiseWorldDb = async <TComponents extends Components>(
   );
   world.db.exec(
     `CREATE TABLE IF NOT EXISTS tbl_edl (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  );
+  // Play state components as the EDL last set them (ADR 0006)
+  world.db.exec(
+    `CREATE TABLE IF NOT EXISTS tbl_edl_value (eid INTEGER NOT NULL, component TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (eid, component))`
   );
   loadLineage(world);
 

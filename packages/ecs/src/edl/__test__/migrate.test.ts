@@ -98,6 +98,24 @@ entity garden : room {
 }
 `;
 
+/** Lamp and key both starting in `room` */
+const moved = (room: string) => `
+entity hall {
+  described { name: "Hall" }
+}
+entity yard {
+  described { name: "Yard" }
+}
+entity lamp {
+  described { name: "Lamp" }
+  location { in: $${room} }
+}
+entity key {
+  described { name: "Key" }
+  location { in: $${room} }
+}
+`;
+
 const open = (path = ':memory:') =>
   createWorld(defs, { path, type: DatabaseType.BUN });
 
@@ -179,8 +197,12 @@ describe('migrateEDL', () => {
       from: ['portal'],
       to: ['portal', 'heavy']
     });
-    // Play state is never planned as a change
-    expect(byName.gate?.changed).toEqual([]);
+    // the gate never moved in play, so the EDL moves it; play opened it,
+    // so its door is kept and reported
+    expect(byName.gate?.changed).toEqual(['location']);
+    expect(plan.kept).toEqual([
+      { components: ['door'], eid: byName.gate!.eid, name: 'gate' }
+    ]);
 
     expect(entityCount()).toBe(before);
     expect(named(world, 'hall').described?.name).toBe('Hall');
@@ -228,10 +250,10 @@ entity hall {
     expect(named(world, 'hall').described?.name).toBe('Great hall');
     expect(named(world, 'sign').readable).toBeUndefined();
 
-    // the gate keeps what play did to it, though the EDL now sets otherwise
+    // the gate keeps what play did to it, and goes where the EDL now says
     const gate = named(world, 'gate');
     expect(gate.door?.isOpen).toBe(true);
-    expect(gate.location?.in).toBe(world.getDefinitionNames().get('hall'));
+    expect(gate.location?.in).toBe(yard);
     expect(world.getEntityLineage(gate.id)).toEqual(['portal', 'heavy']);
     expect(world.getAtomLineage('heavy')).toEqual([]);
 
@@ -246,6 +268,60 @@ entity hall {
 
     expect(isEDLChanged(world, AFTER)).toBe(false);
     expect(migrateEDL(world, AFTER).updated).toEqual([]);
+  });
+
+  it('sets Play state play never changed, and keeps what it did (#77)', async () => {
+    const world = await open();
+    world.executeEDL(`
+entity hall {
+  described { name: "Hall" }
+}
+entity yard {
+  described { name: "Yard" }
+}
+entity lamp {
+  described { name: "Lamp" }
+  location { in: $hall }
+}
+entity key {
+  described { name: "Key" }
+  location { in: $hall }
+}
+`);
+    const ids = world.getDefinitionNames();
+    // a player carries the key off to the yard
+    const key = world.query({
+      entity: { id: ids.get('key')!, world },
+      with: ['location']
+    })!;
+    key.location!.in = ids.get('yard')!;
+    world.flush();
+
+    // both now start in the yard, then later in the hall again
+    const plan = migrateEDL(world, moved('yard'));
+    expect(plan.updated.map(u => [u.name, u.changed])).toEqual([
+      ['lamp', ['location']]
+    ]);
+    expect(plan.kept).toEqual([]);
+    expect(named(world, 'lamp').location?.in).toBe(ids.get('yard'));
+
+    // the key now matches the EDL, so it moves with the next edit
+    const again = migrateEDL(world, moved('hall'));
+    expect(again.updated.map(u => u.name).sort()).toEqual(['key', 'lamp']);
+    expect(named(world, 'key').location?.in).toBe(ids.get('hall'));
+  });
+
+  it('keeps Play state when the world never saved what the EDL set', async () => {
+    const { world } = await played();
+    world.db.exec('DELETE FROM tbl_edl_value');
+
+    const plan = migrateEDL(world, AFTER, { dryRun: true });
+
+    const gate = plan.updated.find(u => u.name === 'gate');
+    expect(gate?.changed).toEqual([]);
+    expect(plan.kept).toEqual([
+      { components: ['door', 'location'], eid: gate!.eid, name: 'gate' }
+    ]);
   });
 
   it('takes entities gone from the EDL out of play with prune', async () => {
