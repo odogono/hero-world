@@ -14,6 +14,6 @@ defmodule OdgnEdl.MixProject do
   def application, do: [extra_applications: [:logger]]
 
   defp deps do
-    [{:nimble_parsec, "~> 1.4"}]
+    [{:nimble_parsec, "~> 1.4"}, {:odgn_ecs, path: "../odgn_ecs"}]
   end
 end

@@ -5,7 +5,24 @@ defmodule OdgnEdl.Error do
   """
   defexception [:kind, :message, :line, :column]
 
-  @type kind :: :syntax | :command
+  @type kind ::
+          :syntax
+          | :command
+          | :already_built
+          | :migration_needed
+          | :duplicate_name
+          | :unknown_atom
+          | :invalid_extend
+          | :circular
+          | :unknown_reference
+          | :missing_component
+          | :missing_property
+          | :invalid_definition
+          | :ecs
+
+  @doc false
+  def new(kind, message), do: %__MODULE__{kind: kind, message: message}
+
   @type t :: %__MODULE__{
           kind: kind(),
           message: String.t(),
