@@ -120,6 +120,16 @@ defmodule MuaWorld do
   def view(world, account, character),
     do: GenServer.call(world, {:view, account, character})
 
+  @doc """
+  The Characters in play (not in Limbo), as `{account, character}`. After a
+  restart no Connection controls them, so the caller gives each its grace
+  before it leaves (#97).
+  """
+  def in_play(world), do: GenServer.call(world, :in_play)
+
+  @doc "The Characters an Account owns, as `%{id: eid, name: name, in_play: boolean}`."
+  def characters(world, account), do: GenServer.call(world, {:characters, account})
+
   @doc "Makes an Account, as one Step, and returns its id."
   def create_account(world), do: GenServer.call(world, :create_account, 30_000)
 
@@ -153,6 +163,10 @@ defmodule MuaWorld do
   first.
   """
   def subscribe(world, character), do: GenServer.call(world, {:subscribe, character, self()})
+
+  @doc "Stops sending the calling process a Character's output."
+  def unsubscribe(world, character),
+    do: GenServer.call(world, {:unsubscribe, character, self()})
 
   @doc "Advances World time and runs what is due, as a tick does."
   def tick(world), do: GenServer.call(world, :tick, 30_000)
@@ -359,6 +373,27 @@ defmodule MuaWorld do
     end
   end
 
+  def handle_call({:characters, account}, _from, state) do
+    owned =
+      for eid <- OdgnEcs.query(state.world, where: [{"player", "account", account}]),
+          do: %{
+            id: eid,
+            name: OdgnEcs.get(state.world, eid, "player")["name"],
+            in_play: location(state, eid) != state.places.limbo
+          }
+
+    {:reply, owned, state}
+  end
+
+  def handle_call(:in_play, _from, state) do
+    playing =
+      for eid <- OdgnEcs.query(state.world, with: ["player"]),
+          location(state, eid) != state.places.limbo,
+          do: {OdgnEcs.get(state.world, eid, "player")["account"], eid}
+
+    {:reply, playing, state}
+  end
+
   def handle_call(:create_account, _from, state) do
     {_, state} =
       step(state, fn state ->
@@ -432,8 +467,12 @@ defmodule MuaWorld do
     notices = Tables.take_notices(state.world, character)
     :ok = OdgnEcs.commit(state.world)
     for t <- notices, do: send(pid, {:mua, character, t})
-    {:reply, :ok, update_in(state.subscribers[character], &[pid | &1 || []])}
+    live = Enum.filter(Map.get(state.subscribers, character, []), &Process.alive?/1)
+    {:reply, :ok, put_in(state.subscribers[character], [pid | live -- [pid]])}
   end
+
+  def handle_call({:unsubscribe, character, pid}, _from, state),
+    do: {:reply, :ok, update_in(state.subscribers[character], &List.delete(&1 || [], pid))}
 
   def handle_call(:tick, _from, state), do: {:reply, :ok, run_due(advance_clock(state))}
 

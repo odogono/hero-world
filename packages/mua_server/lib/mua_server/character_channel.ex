@@ -1,0 +1,112 @@
+defmodule MuaServer.CharacterChannel do
+  @moduledoc """
+  `character:<id>`: playing one Character the socket's Account owns
+  (docs/protocol.md). Joining enters the Character into play, or resumes
+  control of it, and takes over from any other Connection. Every line the
+  Character is told arrives as `output` after the World commits the change
+  behind it (ADR 0012); `state` and any `prompt` follow.
+  """
+  use Phoenix.Channel
+
+  alias MuaServer.{Connection, Protocol}
+
+  @world MuaServer.World
+
+  @impl true
+  def join("character:" <> id, _params, socket) do
+    account = socket.assigns.account
+
+    with {character, ""} <- Integer.parse(id),
+         {:ok, lines} <- MuaWorld.enter(@world, account, character) do
+      :ok = Connection.attach(account, character, self())
+      send(self(), {:after_join, lines})
+      {:ok, assign(socket, :character, character)}
+    else
+      {:error, reason} -> {:error, %{reason: to_string(reason)}}
+      _ -> {:error, %{reason: "no_such_character"}}
+    end
+  end
+
+  @impl true
+  def handle_in("command", payload, socket) do
+    with true <- Connection.controls?(socket.assigns.character, self()),
+         {:ok, %{text: text, ref: ref}} <- Protocol.command(payload) do
+      reply =
+        case MuaWorld.command(@world, socket.assigns.account, socket.assigns.character, text) do
+          {:ok, _lines} -> {:ok, %{ref: ref}}
+          {:error, reason} -> {:error, %{ref: ref, reason: to_string(reason)}}
+        end
+
+      # after the output the command produced, which is already queued
+      send(self(), :refresh)
+      {:reply, reply, socket}
+    else
+      false -> {:reply, {:error, %{reason: "replaced"}}, socket}
+      {:error, reason} -> {:reply, {:error, %{reason: reason}}, socket}
+    end
+  end
+
+  def handle_in("logout", _payload, socket) do
+    case Connection.logout(socket.assigns.character, self()) do
+      :ok ->
+        push(socket, "status", Protocol.status(:limbo))
+        {:stop, :normal, :ok, socket}
+
+      {:error, _} ->
+        {:reply, {:error, %{reason: "replaced"}}, socket}
+    end
+  end
+
+  def handle_in(_event, _payload, socket),
+    do: {:reply, {:error, %{reason: "unknown message"}}, socket}
+
+  @impl true
+  def handle_info({:after_join, lines}, socket) do
+    push(socket, "status", Protocol.status(:connected))
+    if lines != [], do: push(socket, "output", Protocol.output(lines))
+    # subscribed after the entry's own lines, so none arrives twice
+    :ok = MuaWorld.subscribe(@world, socket.assigns.character)
+    refresh(socket)
+    {:noreply, socket}
+  end
+
+  def handle_info({:mua, character, text}, %{assigns: %{character: character}} = socket) do
+    push(socket, "output", Protocol.output([text]))
+    {:noreply, socket}
+  end
+
+  def handle_info(:refresh, socket) do
+    refresh(socket)
+    {:noreply, socket}
+  end
+
+  # Another Connection took the Character over: this one may not command it
+  def handle_info({:replaced, character}, %{assigns: %{character: character}} = socket) do
+    MuaWorld.unsubscribe(@world, character)
+    push(socket, "status", Protocol.status(:replaced))
+    {:stop, :normal, socket}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
+
+  defp refresh(socket) do
+    %{account: account, character: character} = socket.assigns
+
+    case MuaWorld.view(@world, account, character) do
+      {:ok, view} -> push(socket, "state", Protocol.state(view))
+      {:error, _} -> :ok
+    end
+
+    case MuaWorld.component(@world, character, "player") do
+      %{"pending" => %{"options" => [_ | _] = options}} ->
+        push(
+          socket,
+          "prompt",
+          Protocol.prompt("Which do you mean?", Enum.map(options, & &1["name"]))
+        )
+
+      _ ->
+        :ok
+    end
+  end
+end
