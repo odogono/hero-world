@@ -59,7 +59,8 @@ entity dust {
 }
 `;
 
-const setup = async () => {
+/** A World built from EDL and `more`, with ecs-talk and a game loop */
+const setup = async (more = '') => {
   const world = await createWorld([
     metaComponent,
     statsComponent,
@@ -67,7 +68,7 @@ const setup = async () => {
     locationComponent,
     eventComponent
   ]);
-  world.executeEDL(EDL);
+  world.executeEDL(EDL + more);
 
   const byName = (id: string) =>
     world.query({
@@ -301,8 +302,7 @@ describe('ecs-talk', () => {
   });
 
   it('routes a send to a Handle first made inside the same Run', async () => {
-    const { byName, ecsTalk, loop, world } = await setup();
-    world.executeEDL(`
+    const { byName, ecsTalk, loop, world } = await setup(`
       entity yard {
         meta { props: { id: "yard" } }
       }

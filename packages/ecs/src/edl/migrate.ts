@@ -4,12 +4,13 @@ import type { Components, GenericEntity } from '../types';
 import type { World } from '../world';
 import { compileEDL, hashEDL, resolveEDL, scriptPath } from './compile';
 import {
+  edlValues,
   isPlayState,
   normalise,
-  readComponents,
-  recordEDLValues
+  readComponents
 } from './edl-values';
 import { EDLExecutionError } from './errors';
+import { edlRecord } from './record';
 
 export type MigrateOptions = {
   /** Report what would change without changing anything */
@@ -69,7 +70,7 @@ export type MigrationPlan = {
 export const isEDLChanged = <T extends Components>(
   world: World<T>,
   edl: string
-) => world.getEDLHash() !== hashEDL(edl);
+) => edlRecord(world).getEDLHash() !== hashEDL(edl);
 
 const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -85,11 +86,22 @@ export const migrateEDL = <T extends Components>(
   world: World<T>,
   edl: string,
   options: MigrateOptions = {}
+): MigrationPlan => migrate(world, edl, options);
+
+/**
+ * A Migration, or with `build` a Build: the Migration of an empty world,
+ * which also makes the EDL's entities that have no Definition name
+ */
+export const migrate = <T extends Components>(
+  world: World<T>,
+  edl: string,
+  options: MigrateOptions & { build?: boolean } = {}
 ): MigrationPlan => {
-  const { dryRun = false, path, prune } = options;
+  const { build = false, dryRun = false, path, prune } = options;
+  const record = edlRecord(world);
   const compiled = compileEDL(edl);
   const named = compiled.entities.filter(entity => entity.name);
-  const stored = world.getDefinitionNames();
+  const stored = record.getDefinitionNames();
 
   const plan: MigrationPlan = {
     atoms: { added: [], changed: [], removed: [] },
@@ -105,14 +117,14 @@ export const migrateEDL = <T extends Components>(
   // Atoms
   const edlAtoms = compiled.atoms;
   for (const [name, atom] of edlAtoms) {
-    const lineage = world.getAtomLineage(name);
+    const lineage = record.getAtomLineage(name);
     if (lineage === undefined) {
       plan.atoms.added.push(name);
     } else if (!sameList(lineage, atom.extends)) {
       plan.atoms.changed.push(name);
     }
   }
-  for (const name of world.atomLineage.keys()) {
+  for (const name of record.atomNames()) {
     if (!edlAtoms.has(name)) {
       plan.atoms.removed.push(name);
     }
@@ -150,26 +162,24 @@ export const migrateEDL = <T extends Components>(
     }
   }
 
-  // Entities to create get placeholder ids until they are made
+  // Entities are made in EDL order, so a Build numbers them in that order;
+  // on a dry run they get placeholder ids instead
   const missingNames = new Set(plan.missing.map(({ name }) => name));
-  const created = new Map<string, number>();
-  let placeholder = -1;
-  const idsFor = () =>
-    compiled.entities.map(({ name }) =>
-      name && existing.has(name)
-        ? existing.get(name)!
-        : name && created.has(name)
-          ? created.get(name)!
-          : placeholder--
-    );
-
+  const toCreate = new Set(plan.created);
+  const created = new Map<number, number>();
   if (!dryRun) {
-    for (const name of plan.created) {
-      created.set(name, world.create().id);
+    for (const [i, { name }] of compiled.entities.entries()) {
+      if (name ? toCreate.has(name) : build) {
+        created.set(i, world.create().id);
+      }
     }
   }
-
-  const ids = idsFor();
+  let placeholder = -1;
+  const ids = compiled.entities.map(({ name }, i) =>
+    name && existing.has(name)
+      ? existing.get(name)!
+      : (created.get(i) ?? placeholder--)
+  );
   const resolved = resolveEDL(compiled, ids);
   if (resolved.errors.length > 0) {
     throw new EDLExecutionError(resolved.errors);
@@ -179,28 +189,25 @@ export const migrateEDL = <T extends Components>(
   // Work out, and unless this is a dry run make, each entity's changes
   for (const [i, def] of compiled.entities.entries()) {
     const { name } = def;
-    if (!name || missingNames.has(name)) {
-      continue;
-    }
     const desired = components[i]!;
     const eid = ids[i]!;
 
-    if (created.has(name) || !existing.has(name)) {
-      if (!dryRun) {
-        const entity = world.get(eid)! as GenericEntity<T>;
-        addComponents(entity as Parameters<typeof addComponents>[0], desired);
-        world.setEntityLineage(eid, def.extends);
-        world.setDefinitionName(name, eid);
-        const src = scriptPath(def.own, path);
-        if (src) {
-          world.setScriptOwner('entity', eid, src);
-        }
+    if (created.has(i)) {
+      const entity = world.get(eid)! as GenericEntity<T>;
+      addComponents(entity as Parameters<typeof addComponents>[0], desired);
+      record.setEntityLineage(eid, def.extends);
+      record.setEntityScript(eid, scriptPath(def.own, path));
+      if (name) {
+        record.setDefinitionName(name, eid);
       }
+      continue;
+    }
+    if (!name || !existing.has(name)) {
       continue;
     }
 
     const current = readComponents(world, eid);
-    const edlValues = world.getEDLValues(eid);
+    const lastSet = record.getEDLValues(eid);
 
     const change: EntityMigration = {
       added: [],
@@ -220,7 +227,7 @@ export const migrateEDL = <T extends Components>(
           continue;
         }
         // Play state is set only when play left it as the EDL last set it
-        const untouched = edlValues.get(component) === stored;
+        const untouched = lastSet.get(component) === stored;
         (isPlayState(world, component) && !untouched
           ? kept
           : change.changed
@@ -239,7 +246,7 @@ export const migrateEDL = <T extends Components>(
     if (kept.length > 0) {
       plan.kept.push({ components: kept, eid, name });
     }
-    const lineage = world.getEntityLineage(eid);
+    const lineage = record.getEntityLineage(eid);
     if (!sameList(lineage, def.extends)) {
       change.lineage = { from: lineage, to: [...def.extends] };
     }
@@ -268,7 +275,7 @@ export const migrateEDL = <T extends Components>(
         removeComponent(entity, component as keyof T);
       }
       if (change.lineage) {
-        world.setEntityLineage(eid, def.extends);
+        record.setEntityLineage(eid, def.extends);
       }
     }
   }
@@ -280,83 +287,35 @@ export const migrateEDL = <T extends Components>(
   // What the EDL now sets is what later migrations compare play against
   for (const [i, { name }] of compiled.entities.entries()) {
     if (name && !missingNames.has(name)) {
-      recordEDLValues(world, ids[i]!, components[i]!);
+      record.setEDLValues(ids[i]!, edlValues(world, components[i]!));
     }
   }
 
   for (const { eid, from, to } of plan.renamed) {
-    world.deleteDefinitionName(from);
-    world.setDefinitionName(to, eid);
+    record.deleteDefinitionName(from);
+    record.setDefinitionName(to, eid);
   }
 
   // Atoms' Lineage and Script owners are rewritten from the EDL
-  world.clearAtoms();
+  record.clearAtoms();
   for (const [name, atom] of edlAtoms) {
-    world.setAtomLineage(name, atom.extends);
-    const src = scriptPath(atom.own, path);
-    if (src) {
-      world.setScriptOwner('atom', name, src);
-    }
+    record.setAtom(name, atom.extends, scriptPath(atom.own, path));
   }
   for (const [i, def] of compiled.entities.entries()) {
-    const eid = ids[i]!;
     if (def.name && existing.has(def.name)) {
-      world.deleteEntityScriptOwner(eid);
-      const src = scriptPath(def.own, path);
-      if (src) {
-        world.setScriptOwner('entity', eid, src);
-      }
+      record.setEntityScript(ids[i]!, scriptPath(def.own, path));
     }
   }
 
   if (prune) {
     for (const { eid, name } of plan.gone) {
       prune(eid);
-      world.deleteDefinitionName(name);
+      record.deleteDefinitionName(name);
     }
     plan.pruned = plan.gone.length > 0;
   }
 
-  world.setEDLHash(hashEDL(edl));
+  record.setEDLHash(hashEDL(edl));
   world.flush();
   return plan;
-};
-
-/**
- * Gives a world built before Definition names were saved the names from
- * the EDL it was first built with. That EDL made its entities first and in
- * order, so the nth entity it defines is the world's nth entity. The
- * world's hash is set to that EDL's, so a later migration sees what changed.
- */
-export const adoptDefinitionNames = <T extends Components>(
-  world: World<T>,
-  originalEDL: string
-): Map<string, number> => {
-  if (world.getDefinitionNames().size > 0) {
-    throw new Error('The world already has Definition names');
-  }
-  const { entities } = compileEDL(originalEDL);
-  const rows = world.db.query(
-    'SELECT id FROM tbl_entity ORDER BY id LIMIT ?1',
-    [entities.length]
-  ) as { id: number }[];
-  const first = rows[0]?.id ?? 1;
-  const adopted = new Map<string, number>();
-  for (const [i, { name }] of entities.entries()) {
-    const eid = first + i;
-    if (!name) {
-      continue;
-    }
-    if (rows[i]?.id !== eid) {
-      throw new Error(
-        `Entity ${eid} for '${name}' is not in the world; is this the EDL it was built with?`
-      );
-    }
-    adopted.set(name, eid);
-  }
-  for (const [name, eid] of adopted) {
-    world.setDefinitionName(name, eid);
-  }
-  world.setEDLHash(hashEDL(originalEDL));
-  return adopted;
 };
