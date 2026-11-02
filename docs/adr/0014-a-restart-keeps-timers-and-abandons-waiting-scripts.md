@@ -9,4 +9,5 @@ Restoring waiting Scripts from their saved positions was the alternative. NorthT
 - No committed effect repeats after a restart, because abandoned Scripts commit nothing further. ADR 0012's commit-before-success guarantee is unchanged.
 - If the browser lost a reply, the command's outcome stays unconfirmed unless the server can establish it (ADR 0013).
 - Content that needs a long wait should use a timer, not a waiting Script.
+- Each start loads every Script fresh, so Script Variables are reset. State that must survive a restart belongs in components.
 - Restoring waiting Scripts can be added later if content needs it; that would require coordinating NorthTalk saves with the World.
