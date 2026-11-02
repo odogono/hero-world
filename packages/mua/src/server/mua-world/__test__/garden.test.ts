@@ -29,6 +29,14 @@ describe('The walled garden', () => {
     expect(await send('east')).toContain('Garden Path');
   });
 
+  it('answers look in a room with a scripted mix-in', async () => {
+    await walk('north', 'east', 'east');
+    bob.payloads.length = 0;
+
+    expect(await send('look')).toContain('A gravel path runs between');
+    expect(bob.payloads.at(-1)?.room).toMatchObject({ name: 'Garden Path' });
+  });
+
   it('smells of roses', async () => {
     await walk('north', 'east', 'east');
 

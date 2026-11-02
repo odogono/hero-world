@@ -10,7 +10,8 @@ closed or locked door, an exit's own messages and the arrival broadcast.
 `src/server/mua-world/behaviours/`:
 
 - `room.talk`: the `room` Service. `on look place, actor` returns what the
-  actor sees.
+  actor sees. It is the fallback: a room whose own Script answers `look`
+  (the main world's `room` atom, `edl/scripts/room.talk`) is asked first.
 - `exit.talk`: the `exit` Service.
   - `on beforeTraverse actor, way, deciding` is a Decision that vetoes when
     the exit's door is closed.
@@ -49,11 +50,14 @@ attach them.
 
 1. **A world's atoms couldn't own the core actions.** Many rooms are built
    from two scripted atoms, as in `entity chapel : room holy`. A Message Path
-   follows only the rightmost scripted base (#10), so a Script on `room`
-   would be skipped for those rooms. A Script on `room` would also have
-   been offered every command in every room. Service Scripts avoid both
-   problems. If #10 is fixed, `room` could own `look` as the issue first
-   planned.
+   used to follow only the rightmost scripted base, so a Script on `room`
+   would be skipped for those rooms. #10 fixed this: the path now climbs
+   through every scripted base. The main world's `room` atom now answers
+   `look` itself (`edl/scripts/room.talk`), and its reply carries the
+   RoomView. The `room` Service stays as the fallback for worlds whose rooms
+   have no Script. One cost remains: every command in a scripted room is
+   offered to the room's Script, which takes a Pump to answer even when it
+   passes.
 2. **Libraries couldn't call Capabilities.** ecs-talk compiled Libraries
    without Operation Declarations, so `ask world to find` in a Library
    failed to load (`unknown operation`). Its README said this worked.

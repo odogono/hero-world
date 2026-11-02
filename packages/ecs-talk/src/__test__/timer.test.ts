@@ -191,3 +191,40 @@ describe('timer Capability', () => {
     expect(world.queryAll({ with: ['talkTimer'] })).toHaveLength(0);
   });
 });
+
+describe('timers on a mixed Message Path', () => {
+  it("keeps a copied Script's timers under its atom's name", async () => {
+    const world = await createWorld([
+      metaComponent,
+      locationComponent,
+      eventComponent,
+      talkTimerComponent
+    ]);
+    world.executeEDL(`
+      atom bell {}
+      atom loud {}
+      entity belfry : loud bell {
+        meta { props: { id: "belfry" } }
+      }
+    `);
+    const now = 1_000_000_000_000n;
+    const ecsTalk = createEcsTalk(world, { clock: () => now });
+    ecsTalk.loadAtomScript('bell', BELL);
+    // on belfry's path loud follows bell, so belfry reaches a copy of bell
+    ecsTalk.loadAtomScript('loud', 'on shout\n  return 1\nend shout');
+    const belfry = world.queryAll({ with: ['meta'] })[0]!.id;
+
+    ecsTalk.deliver(belfry, 'arm', ecsTalk.handle(belfry).value, seconds(5));
+    ecsTalk.pump();
+    world.flush();
+    await Bun.sleep(0);
+    const timers = () => world.queryAll({ with: ['talkTimer'] });
+    expect(timers().map(t => t.talkTimer.script)).toEqual(['bell']);
+
+    ecsTalk.deliver(belfry, 'disarm');
+    ecsTalk.pump();
+    world.flush();
+    await Bun.sleep(0);
+    expect(timers()).toHaveLength(0);
+  });
+});

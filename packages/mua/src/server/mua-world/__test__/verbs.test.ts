@@ -25,6 +25,14 @@ describe('Verbs a world adds', () => {
     expect(await send('kneel')).toBe('A calm settles over you.');
   });
 
+  it("lets the room's own Script answer look past a scripted mix-in", async () => {
+    // the chapel is `room holy`: look climbs past holy's Script to room's
+    expect(await send('look')).toBe('You stand in the Chapel.');
+    expect(bob.payloads.at(-1)?.room).toMatchObject({ name: 'Chapel' });
+    await send('east');
+    expect(await send('look')).toBe('You stand in the Yard.');
+  });
+
   it('binds a new verb to the things it names', async () => {
     expect(await send('pray to altar')).toBe('The altar glows faintly.');
   });

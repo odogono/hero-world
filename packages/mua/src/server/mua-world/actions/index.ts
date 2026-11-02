@@ -146,7 +146,11 @@ const receiverQuestions = (ctx: ActionContext): Question[] => {
       asks: 'offer' as const,
       id,
       message: ctx.verb,
-      onReply: message => done(message ?? ''),
+      // a scripted action answered by a receiver still sends the RoomView
+      onReply: message =>
+        isScripted(ctx.verb)
+          ? scriptedOutcome(ctx, message ?? '')
+          : done(message ?? ''),
       response: responseFrom(ctx, id, role)
     }));
 };
