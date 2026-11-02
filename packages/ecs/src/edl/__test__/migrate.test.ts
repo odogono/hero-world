@@ -318,6 +318,10 @@ entity key {
 
     const plan = migrateEDL(world, AFTER, { dryRun: true });
 
+    // static components still take the EDL's value
+    expect(plan.updated.find(u => u.name === 'hall')?.changed).toEqual([
+      'described'
+    ]);
     const gate = plan.updated.find(u => u.name === 'gate');
     expect(gate?.changed).toEqual([]);
     expect(plan.kept).toEqual([
@@ -408,28 +412,38 @@ const snapshot = (world: Defs, names: string[]) => {
   const record = edlRecord(world);
   // references hold ids, which differ between the worlds
   const byName = (v: unknown) => nameOf.get(v as number) ?? v;
+  /** A component with the ids it refers to replaced by Definition names */
+  const withNames = (component: string, data: Record<string, unknown>) => {
+    if (component === 'location') {
+      return { ...data, in: byName(data.in) };
+    }
+    if (component === 'exits') {
+      const to = data.to as Record<string, unknown>;
+      return {
+        to: Object.fromEntries(
+          Object.entries(to).map(([dir, v]) => [dir, byName(v)])
+        )
+      };
+    }
+    return data;
+  };
   return {
     atoms: ['room', 'portal', 'heavy'].map(a => world.getAtomLineage(a)),
     entities: names.map(name => {
       const entity = named(world, name);
       const id = entity.id;
       const components = Object.fromEntries(
-        defs.map(({ id: c }) => [c, entity[c]])
+        defs.map(({ id: c }) => [c, entity[c] && withNames(c, entity[c])])
       );
-      if (components.location) {
-        components.location = { in: byName(components.location.in) };
-      }
-      if (components.exits) {
-        const to = components.exits.to as Record<string, unknown>;
-        components.exits = {
-          to: Object.fromEntries(
-            Object.entries(to).map(([dir, v]) => [dir, byName(v)])
-          )
-        };
-      }
+      const edlValues = Object.fromEntries(
+        [...record.getEDLValues(id)].map(([c, value]) => [
+          c,
+          withNames(c, JSON.parse(value) as Record<string, unknown>)
+        ])
+      );
       return {
         components,
-        edlValues: Object.fromEntries(record.getEDLValues(id)),
+        edlValues,
         lineage: world.getEntityLineage(id),
         name
       };
@@ -468,5 +482,101 @@ describe('a Build is a Migration from an empty world', () => {
     world.executeEDL(BEFORE);
     expect(() => world.executeEDL(AFTER)).toThrow(EDLError);
     expect(() => world.executeEDL(AFTER)).toThrow(/migrateEDL/);
+  });
+});
+
+/** The hall's name as the EDL sets it */
+const hallAs = (name: string) => `
+entity hall {
+  described { name: "${name}" }
+}
+entity yard {
+  described { name: "Yard" }
+}
+`;
+
+/** A world built with the hall named "Hall", then the hall renamed live */
+const editedLive = async () => {
+  const world = await open();
+  world.executeEDL(hallAs('Hall'));
+  const hall = world.query({
+    entity: { id: world.getDefinitionNames().get('hall')!, world },
+    with: ['described']
+  })!;
+  hall.described!.name = 'Entrance';
+  world.flush();
+  return world;
+};
+
+describe('a Migration keeps components edited live (#90)', () => {
+  it('records the EDL value of every component, static and Play state', async () => {
+    const world = await open();
+    world.executeEDL(BEFORE);
+    const gate = world.getDefinitionNames().get('gate')!;
+    expect([...edlRecord(world).getEDLValues(gate).keys()].sort()).toEqual([
+      'described',
+      'door',
+      'location'
+    ]);
+  });
+
+  it('keeps a static component changed after Build, and lists it in kept', async () => {
+    const world = await editedLive();
+    const hall = world.getDefinitionNames().get('hall')!;
+
+    const plan = migrateEDL(world, hallAs('Great hall'));
+
+    expect(named(world, 'hall').described?.name).toBe('Entrance');
+    expect(plan.kept).toEqual([
+      { components: ['described'], eid: hall, name: 'hall' }
+    ]);
+    expect(plan.updated).toEqual([]);
+  });
+
+  it('sets a static component left alone to the EDL’s new value', async () => {
+    const world = await editedLive();
+
+    const plan = migrateEDL(
+      world,
+      hallAs('Great hall').replace('"Yard"', '"Courtyard"')
+    );
+
+    expect(named(world, 'yard').described?.name).toBe('Courtyard');
+    expect(plan.updated.map(u => [u.name, u.changed])).toEqual([
+      ['yard', ['described']]
+    ]);
+  });
+
+  it('keeps a live edit through later Migrations until it matches the EDL', async () => {
+    const world = await editedLive();
+    migrateEDL(world, hallAs('Great hall'));
+
+    expect(migrateEDL(world, hallAs('Grand hall')).kept).toHaveLength(1);
+    expect(named(world, 'hall').described?.name).toBe('Entrance');
+
+    // the EDL adopts the edit, so the hall follows the EDL again
+    expect(migrateEDL(world, hallAs('Entrance')).kept).toEqual([]);
+    migrateEDL(world, hallAs('Front hall'));
+    expect(named(world, 'hall').described?.name).toBe('Front hall');
+  });
+
+  it('removes a static component the EDL stops setting, but not Play state', async () => {
+    const world = await open();
+    world.executeEDL(BEFORE);
+
+    const plan = migrateEDL(
+      world,
+      BEFORE.replace('readable { text: "Keep out" }', '').replace(
+        'location { in: $yard }',
+        ''
+      )
+    );
+
+    const sign = named(world, 'sign');
+    expect(sign.readable).toBeUndefined();
+    expect(sign.location?.in).toBe(world.getDefinitionNames().get('yard'));
+    expect(plan.updated.map(u => [u.name, u.removed])).toEqual([
+      ['sign', ['readable']]
+    ]);
   });
 });

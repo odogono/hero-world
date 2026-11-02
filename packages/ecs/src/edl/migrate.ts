@@ -29,8 +29,8 @@ export type EntityMigration = {
   /** Components the entity lacks and the EDL now gives it */
   added: string[];
   /**
-   * Components the EDL now sets differently: static ones, and Play state
-   * that play hasn't changed since the EDL last set it
+   * Components the EDL now sets differently, which the world still held as
+   * the EDL last set them
    */
   changed: string[];
   eid: number;
@@ -49,9 +49,10 @@ export type MigrationPlan = {
   /** Entities whose Definition name is gone from the EDL */
   gone: { eid: number; name: string }[];
   /**
-   * Play state components the EDL sets differently from the world, left as
-   * they are because play changed them, or because the world doesn't know
-   * what the EDL last set (it was built before that was saved)
+   * Components the EDL sets differently from the world, left as they are
+   * because they changed since the EDL last set them, or, for Play state,
+   * because the world doesn't know what the EDL last set (it was built
+   * before that was saved)
    */
   kept: { components: string[]; eid: number; name: string }[];
   /** Entities deleted during play; the EDL doesn't bring them back */
@@ -76,11 +77,12 @@ const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
 /**
- * Brings a world up to date with a changed EDL (ADR 0005). New entities
- * are created; entities already in play get their static components set to
- * what the EDL now says, while Play state components are only added, never
- * overwritten. Entities gone from the EDL are reported, and taken out of
- * play only by `options.prune`.
+ * Brings a world up to date with a changed EDL (ADR 0005, 0008). New
+ * entities are created; entities already in play get each component the
+ * EDL now sets, unless it changed since the EDL last set it, in which case
+ * it is kept and reported. Static components the EDL no longer sets are
+ * removed; Play state ones stay. Entities gone from the EDL are reported,
+ * and taken out of play only by `options.prune`.
  */
 export const migrateEDL = <T extends Components>(
   world: World<T>,
@@ -226,12 +228,15 @@ export const migrate = <T extends Components>(
         if (normalise(world, component, data) === stored) {
           continue;
         }
-        // Play state is set only when play left it as the EDL last set it
-        const untouched = lastSet.get(component) === stored;
-        (isPlayState(world, component) && !untouched
-          ? kept
-          : change.changed
-        ).push(component);
+        // A component is set only where the world still holds what the EDL
+        // last set; without a saved value, static ones are set and Play
+        // state is kept
+        const saved = lastSet.get(component);
+        const untouched =
+          saved === undefined
+            ? !isPlayState(world, component)
+            : saved === stored;
+        (untouched ? change.changed : kept).push(component);
       }
     }
     for (const component of world.defs.keys()) {

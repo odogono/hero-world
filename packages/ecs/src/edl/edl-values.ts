@@ -46,9 +46,8 @@ export const readComponents = <T extends Components>(
   }) ?? {}) as Record<string, Record<string, unknown> | undefined>;
 
 /**
- * The Play state components the EDL gives an entity, normalised as the
- * world stores them, so a later Migration can tell whether play has
- * changed them
+ * The components the EDL gives an entity, normalised as the world stores
+ * them, so a later Migration can tell whether they changed since
  */
 export const edlValues = <T extends Components>(
   world: World<T>,
@@ -56,7 +55,7 @@ export const edlValues = <T extends Components>(
 ): Map<string, string> => {
   const values = new Map<string, string>();
   for (const [component, data] of Object.entries(components)) {
-    if (data && isPlayState(world, component)) {
+    if (data) {
       values.set(component, normalise(world, component, data));
     }
   }
