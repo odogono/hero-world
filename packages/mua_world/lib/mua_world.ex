@@ -35,7 +35,19 @@ defmodule MuaWorld do
   """
   use GenServer
 
-  alias MuaWorld.{Actions, Components, Dispatch, Exits, Input, Lifecycle, Places, Tables, Talk}
+  alias MuaWorld.{
+    Actions,
+    Components,
+    Dispatch,
+    Exits,
+    Input,
+    Lifecycle,
+    Lock,
+    Places,
+    Tables,
+    Talk
+  }
+
   alias MuaWorld.Commands.{Scope, Verbs}
   alias NorthTalk.{Pending, Result, ScriptError, Verdict}
 
@@ -44,6 +56,8 @@ defmodule MuaWorld do
 
   defstruct [
     :world,
+    # the database's path, whose lock file the World holds
+    :path,
     :talk,
     # Command contexts and notices, shared with `mua`'s callbacks.
     :table,
@@ -88,6 +102,23 @@ defmodule MuaWorld do
   """
   def command(world, account, character, text),
     do: GenServer.call(world, {:command, account, character, text}, 30_000)
+
+  @doc """
+  The Account a sign-in identity maps to, made with its mapping in one Step
+  the first time the identity signs in (ADR 0016). `sub` is the identity's
+  stable id, such as Google's; `email` is kept, and updated, for operators.
+  Admission is the caller's job: this maps whoever it is given.
+  """
+  def sign_in(world, sub, email) when is_binary(sub) and sub != "",
+    do: GenServer.call(world, {:sign_in, sub, email}, 30_000)
+
+  @doc """
+  What a Character can see: its room, what it carries and the commands it
+  could type next (`MuaWorld.View`). `{:error, :not_owner}` if the Account
+  doesn't own it, `{:error, :not_in_play}` if it is in Limbo.
+  """
+  def view(world, account, character),
+    do: GenServer.call(world, {:view, account, character})
 
   @doc "Makes an Account, as one Step, and returns its id."
   def create_account(world), do: GenServer.call(world, :create_account, 30_000)
@@ -162,15 +193,26 @@ defmodule MuaWorld do
   @impl true
   def init(opts) do
     edl_path = Keyword.fetch!(opts, :edl)
-    # The World keeps the database's write lock while it runs, so nothing
-    # else, such as `mix mua.migrate`, can write it meanwhile
-    {:ok, world} = OdgnEcs.open(Keyword.fetch!(opts, :path), exclusive: true)
+    path = Keyword.fetch!(opts, :path)
+
+    # The World holds the lock file while it runs, so nothing else, such as
+    # `mix mua.migrate`, writes the database meanwhile; readers may still
+    # open it
+    case Lock.acquire(path) do
+      :ok -> init_world(opts, path, edl_path)
+      {:error, :locked} -> {:stop, :locked}
+    end
+  end
+
+  defp init_world(opts, path, edl_path) do
+    {:ok, world} = OdgnEcs.open(path)
     world = Enum.reduce(Components.all(), world, fn c, w -> ok!(OdgnEcs.define(w, c)) end)
     Tables.ensure(world)
     {:ok, world, _built_or_resumed} = OdgnEdl.load(world, File.read!(edl_path), path: edl_path)
 
     state = %__MODULE__{
       world: world,
+      path: path,
       fault: opts[:fault],
       tick: Keyword.get(opts, :tick, 100),
       world_ms: Tables.world_time(world),
@@ -195,6 +237,7 @@ defmodule MuaWorld do
       {:error, reason} ->
         :ok = OdgnEcs.rollback(world)
         OdgnEcs.close(world)
+        Lock.release(path)
         {:stop, {:invalid_starting_room, reason}}
     end
   end
@@ -205,6 +248,7 @@ defmodule MuaWorld do
   def terminate(_reason, state) do
     if state.talk, do: NorthTalk.close(state.talk.owner)
     if state.world, do: OdgnEcs.close(state.world)
+    if state.path, do: Lock.release(state.path)
     :ok
   end
 
@@ -276,6 +320,40 @@ defmodule MuaWorld do
       state = advance_clock(state)
       {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
       {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:sign_in, sub, email}, _from, state) do
+    {_, state} =
+      step(state, fn state ->
+        world = state.world
+
+        account =
+          case Tables.account_for(world, sub) do
+            nil ->
+              {:ok, eid} = OdgnEcs.create(world)
+              :ok = OdgnEcs.put(world, eid, "account", %{})
+              eid
+
+            account ->
+              account
+          end
+
+        Tables.put_identity(world, sub, email, account)
+        %{state | result: {:ok, account}}
+      end)
+
+    reply_result(state)
+  end
+
+  def handle_call({:view, account, character}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character) do
+      {:reply,
+       {:ok, MuaWorld.View.for_character(state.world, character, location(state, character))},
+       state}
     else
       error -> {:reply, error, state}
     end
