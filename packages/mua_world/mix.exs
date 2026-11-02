@@ -5,9 +5,8 @@ defmodule MuaWorld.MixProject do
     [
       app: :mua_world,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      elixirc_paths: if(Mix.env() == :test, do: ["lib", "test/support"], else: ["lib"]),
       deps: deps()
     ]
   end
@@ -15,15 +14,16 @@ defmodule MuaWorld.MixProject do
   def application, do: [extra_applications: [:logger]]
 
   # NorthTalk's Elixir Host isn't on Hex yet (odogono/odgn-talk#1983), so it
-  # is pinned to a commit of odgn-talk.
+  # is pinned to the commit odgn_ecs_talk uses.
   defp deps do
     [
+      {:odgn_ecs, path: "../odgn_ecs"},
+      {:odgn_edl, path: "../odgn_edl"},
+      {:odgn_ecs_talk, path: "../odgn_ecs_talk"},
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",
-       ref: "dca82fcfc4988e95df2fa87781503ee3dd722eaf"},
-      {:exqlite, "~> 0.27"},
-      {:jason, "~> 1.4"}
+       ref: "8708b24a873e30226268eed360eca43d4e02c97e"}
     ]
   end
 end

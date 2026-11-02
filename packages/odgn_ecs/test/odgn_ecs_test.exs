@@ -111,6 +111,23 @@ defmodule OdgnEcsTest do
       assert {:error, %Error{kind: :definition_changed}} = OdgnEcs.define(w, changed)
     end
 
+    test "a definition keeps whether it is Play state" do
+      {:ok, w} = OdgnEcs.open(":memory:")
+
+      door = %Component{
+        name: "door",
+        play_state: true,
+        columns: [%Column{name: "open", type: :boolean}]
+      }
+
+      {:ok, w} = OdgnEcs.define(w, door)
+
+      assert OdgnEcs.component(w, "door").play_state
+
+      assert {:error, %Error{kind: :definition_changed}} =
+               OdgnEcs.define(w, %{door | play_state: false})
+    end
+
     test "deleting an entity removes its components" do
       w = world()
       eid = with_health(w, 5)

@@ -38,12 +38,15 @@ defmodule OdgnEcs.Component do
   @moduledoc """
   A component definition: a name and its columns. Each component is stored in
   its own table, one row per entity that has it.
+
+  `play_state` marks a component that play changes, such as whether a door
+  is open; a Migration treats it differently from static components.
   """
   alias OdgnEcs.{Column, Error}
 
-  defstruct name: nil, columns: []
+  defstruct name: nil, columns: [], play_state: false
 
-  @type t :: %__MODULE__{name: String.t(), columns: [Column.t()]}
+  @type t :: %__MODULE__{name: String.t(), columns: [Column.t()], play_state: boolean()}
 
   @reserved ~w(id eid)
   @time_now ~w(current_timestamp current_date current_time)
@@ -201,7 +204,7 @@ defmodule OdgnEcs.Component do
   defp decode_value(_, v), do: v
 
   @doc false
-  def to_json(%__MODULE__{columns: columns}) do
+  def to_json(%__MODULE__{columns: columns, play_state: play_state}) do
     columns
     |> Enum.map(fn c ->
       %{
@@ -212,13 +215,21 @@ defmodule OdgnEcs.Component do
         "default" => c.default
       }
     end)
+    |> then(&%{"columns" => &1, "play_state" => play_state})
     |> JSON.encode!()
   end
 
   @doc false
   def from_json(name, json) do
+    # Definitions stored before `play_state` are a bare list of columns
+    {stored, play_state} =
+      case JSON.decode!(json) do
+        %{"columns" => columns} = d -> {columns, d["play_state"] == true}
+        columns when is_list(columns) -> {columns, false}
+      end
+
     columns =
-      for c <- JSON.decode!(json) do
+      for c <- stored do
         %Column{
           name: c["name"],
           type: String.to_existing_atom(c["type"]),
@@ -228,6 +239,6 @@ defmodule OdgnEcs.Component do
         }
       end
 
-    %__MODULE__{name: name, columns: columns}
+    %__MODULE__{name: name, columns: columns, play_state: play_state}
   end
 end

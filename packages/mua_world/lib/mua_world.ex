@@ -1,7 +1,10 @@
 defmodule MuaWorld do
   @moduledoc """
-  One World: the process that owns its SQLite connection and its NorthTalk
+  One World: the process that owns its SQLite database and its NorthTalk
   instance, and orders every change to it (ADRs 0011 and 0015).
+
+  The World is an `odgn_ecs` store, built from EDL once and resumed after
+  (`OdgnEdl.load/3`), and its Scripts run through `odgn_ecs_talk`.
 
   Inputs (commands and due timers) enter one at a time. Each is one Step:
   the input, then `pump` until the Group is idle, then one `COMMIT`. Output
@@ -11,22 +14,22 @@ defmodule MuaWorld do
   fresh, and each Character whose command was still waiting at the last stop
   is told it was abandoned (ADR 0014).
 
-      {:ok, world} = MuaWorld.start_link(path: "world.db", fixture: fixture)
-      :ok = MuaWorld.subscribe(world, character_id)
-      {:ok, lines} = MuaWorld.command(world, character_id, "look")
+      {:ok, world} = MuaWorld.start_link(path: "world.db", edl: "edl/main.edl")
+      ada = MuaWorld.named(world, "ada")
+      :ok = MuaWorld.subscribe(world, ada)
+      {:ok, lines} = MuaWorld.command(world, ada, "look")
   """
   use GenServer
 
-  alias MuaWorld.{Store, Talk}
-  alias NorthTalk.{Pending, Pumped, Result, ScriptError, Verdict}
+  alias MuaWorld.{Components, Tables, Talk}
+  alias NorthTalk.{Pending, Result, ScriptError, Verdict}
 
   # World time 0, as the Instant NorthTalk's Clock reads.
   @epoch ~U[2000-01-01 00:00:00Z]
 
   defstruct [
-    :conn,
-    :owner,
-    :group,
+    :world,
+    :talk,
     :fault,
     :tick,
     # World time at the last reading, and the monotonic time it was read.
@@ -36,13 +39,13 @@ defmodule MuaWorld do
     :next_deadline,
     subscribers: %{},
     # Inputs whose Runs are still waiting, by Pending id: what to do with
-    # the result, and their `waiting` row.
+    # the result, and their `mua_waiting` row.
     waiting: %{}
   ]
 
   @doc """
-  Starts a World. Options: `path` (required), `fixture` to seed an empty
-  World (see `MuaWorld.Store.seed/2`), `tick` in milliseconds (100 by
+  Starts a World. Options: `path` (required), `edl`, the path of the EDL to
+  build an empty World from (required), `tick` in milliseconds (100 by
   default, or `:manual`), `limits` for every Script, and, in tests only,
   `fault`, a point where the World stops itself: `:before_commit` or
   `:after_commit`, before publishing.
@@ -73,8 +76,8 @@ defmodule MuaWorld do
   @doc "Reads a component, through the World process."
   def component(world, eid, name), do: GenServer.call(world, {:component, eid, name})
 
-  @doc "Reads an entity, through the World process."
-  def entity(world, eid), do: GenServer.call(world, {:entity, eid})
+  @doc "The entity with this Definition name, through the World process."
+  def named(world, name), do: GenServer.call(world, {:named, name})
 
   # ---------------------------------------------------------------------
   # Start
@@ -82,94 +85,46 @@ defmodule MuaWorld do
 
   @impl true
   def init(opts) do
-    {:ok, conn} = Store.open(Keyword.fetch!(opts, :path))
-    if Store.empty?(conn) and opts[:fixture], do: Store.seed(conn, opts[:fixture])
+    edl_path = Keyword.fetch!(opts, :edl)
+    {:ok, world} = OdgnEcs.open(Keyword.fetch!(opts, :path))
+    world = Enum.reduce(Components.all(), world, fn c, w -> ok!(OdgnEcs.define(w, c)) end)
+    Tables.ensure(world)
+    {:ok, world, _built_or_resumed} = OdgnEdl.load(world, File.read!(edl_path), path: edl_path)
 
     state = %__MODULE__{
-      conn: conn,
+      world: world,
       fault: opts[:fault],
       tick: Keyword.get(opts, :tick, 100),
-      world_ms: Store.world_time(conn),
+      world_ms: Tables.world_time(world),
       read_at: now_ms()
     }
 
-    abandon_waiting(conn)
+    :ok = OdgnEcs.begin(world)
+    Tables.abandon_waiting(world)
+    :ok = OdgnEcs.commit(world)
+
     state = start_talk(state, Keyword.get(opts, :limits, []))
     if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
     {:ok, state}
   end
 
-  # Commands still waiting at the last stop are abandoned: their Characters
-  # are told, once they subscribe. Undelivered output was never confirmed.
-  defp abandon_waiting(conn) do
-    Store.exec!(conn, "BEGIN IMMEDIATE")
-
-    for [character, command] <-
-          Store.all(conn, "SELECT character, command FROM waiting ORDER BY id") do
-      Store.run!(conn, "INSERT INTO notices (character, text) VALUES (?, ?)", [
-        character,
-        "The world was restarted, and \"#{command}\" was abandoned."
-      ])
-    end
-
-    Store.exec!(conn, "DELETE FROM waiting; DELETE FROM outbox")
-    Store.exec!(conn, "COMMIT")
-  end
+  defp ok!({:ok, value}), do: value
 
   defp start_talk(state, limits) do
-    conn = state.conn
+    world = state.world
     {:ok, owner} = NorthTalk.start_link(drive: :manual)
-    group = NorthTalk.new_group!(owner, Talk.group_name(), [])
-    world_time = world_clock(state)
+    :ok = NorthTalk.define_capability!(owner, Talk.mua(world))
 
-    :ok = NorthTalk.define_object_kind!(owner, Talk.atom_kind())
-    :ok = NorthTalk.define_object_kind!(owner, Talk.entity_kind())
-    :ok = NorthTalk.define_capability!(owner, Talk.world(conn, world_time))
-    :ok = NorthTalk.define_capability!(owner, Talk.clock(world_time))
+    {:ok, talk} =
+      OdgnEcsTalk.start(world,
+        owner: owner,
+        grants: %{"mua" => NorthTalk.grant!(owner, "mua")},
+        limits: limits,
+        on_show: &Tables.output(world, &1, &2)
+      )
 
-    grants = %{
-      "world" => NorthTalk.grant!(owner, "world", []),
-      "clock" => NorthTalk.grant!(owner, "clock", [])
-    }
-
-    # Single inheritance: each atom's Object sits under its parent's.
-    atoms = Store.atoms(conn)
-    by_name = Map.new(atoms, &{&1.name, &1})
-
-    for atom <- parents_first(atoms, by_name) do
-      parent = atom.parent && Talk.atom_object(atom.parent)
-      obj = NorthTalk.object!(group, Talk.atom_kind(), atom.name, atom.name, parent: parent)
-      if atom.script, do: load!(group, "atom:" <> atom.name, atom.script, obj, grants, limits)
-    end
-
-    # Every entity has its Handle from the start, so a callback can give one
-    # without asking the owner.
-    for e <- Store.entities(conn) do
-      parent = e.atom && Talk.atom_object(e.atom)
-
-      handle =
-        NorthTalk.object!(group, Talk.entity_kind(), Integer.to_string(e.id), {conn, e.id},
-          parent: parent
-        )
-
-      if e.script, do: load!(group, "entity:#{e.id}", e.script, handle, grants, limits)
-    end
-
-    %{state | owner: owner, group: group}
-  end
-
-  defp load!(group, name, source, owner, grants, limits),
-    do: NorthTalk.load!(group, name, source, owner: owner, grants: grants, limits: limits)
-
-  defp parents_first(atoms, by_name) do
-    depth = fn depth, a -> if a.parent, do: 1 + depth.(depth, by_name[a.parent]), else: 0 end
-    Enum.sort_by(atoms, &depth.(depth, &1))
-  end
-
-  # Callbacks read World time from the table, where each Step keeps it.
-  defp world_clock(state) do
-    conn = state.conn
-    fn -> Store.world_time(conn) end
+    :ok = OdgnEcsTalk.load_scripts(talk, &File.read!/1)
+    %{state | talk: talk}
   end
 
   # ---------------------------------------------------------------------
@@ -184,18 +139,9 @@ defmodule MuaWorld do
   end
 
   def handle_call({:subscribe, character, pid}, _from, state) do
-    conn = state.conn
-    Store.exec!(conn, "BEGIN IMMEDIATE")
-
-    notices =
-      for [t] <-
-            Store.all(conn, "SELECT text FROM notices WHERE character = ? ORDER BY id", [
-              character
-            ]),
-          do: t
-
-    Store.run!(conn, "DELETE FROM notices WHERE character = ?", [character])
-    Store.exec!(conn, "COMMIT")
+    :ok = OdgnEcs.begin(state.world)
+    notices = Tables.take_notices(state.world, character)
+    :ok = OdgnEcs.commit(state.world)
     for t <- notices, do: send(pid, {:mua, character, t})
     {:reply, :ok, update_in(state.subscribers[character], &[pid | &1 || []])}
   end
@@ -211,10 +157,10 @@ defmodule MuaWorld do
     do: {:reply, :ok, %{state | world_ms: state.world_ms + ms}}
 
   def handle_call({:component, eid, name}, _from, state),
-    do: {:reply, Store.component(state.conn, eid, name), state}
+    do: {:reply, OdgnEcs.get(state.world, eid, name), state}
 
-  def handle_call({:entity, eid}, _from, state),
-    do: {:reply, Store.entity(state.conn, eid), state}
+  def handle_call({:named, name}, _from, state),
+    do: {:reply, OdgnEdl.entity_named(state.world, name), state}
 
   @impl true
   def handle_info(:tick, state) do
@@ -237,21 +183,15 @@ defmodule MuaWorld do
   defp run_due(state) do
     # World time is kept on every tick, so a restart resumes close to where
     # it stopped even when nothing happened in between.
-    Store.put_world_time(state.conn, state.world_ms)
-
-    due =
-      Store.all(
-        state.conn,
-        "SELECT id, entity, message FROM timers WHERE due <= ? ORDER BY due, id",
-        [state.world_ms]
-      )
+    Tables.put_world_time(state.world, state.world_ms)
 
     state =
-      Enum.reduce(due, state, fn [id, eid, message], state ->
+      state.talk
+      |> OdgnEcsTalk.due_timers(instant_us(state.world_ms))
+      |> Enum.reduce(state, fn timer, state ->
         {_, state} =
           step(state, fn state ->
-            Store.run!(state.conn, "DELETE FROM timers WHERE id = ?", [id])
-            {:ok, _} = NorthTalk.deliver(state.group, Talk.handle(eid), message, [])
+            OdgnEcsTalk.fire_timer(state.talk, timer)
             state
           end)
 
@@ -270,20 +210,19 @@ defmodule MuaWorld do
   # One Step: the input, pumps until idle, the results it settles, then one
   # COMMIT, and only then the output.
   defp step(state, input) do
-    conn = state.conn
-    Store.exec!(conn, "BEGIN IMMEDIATE")
-    # Callbacks read World time from the table, so it is current for the Step.
-    Store.put_world_time(conn, state.world_ms)
+    world = state.world
+    :ok = OdgnEcs.begin(world)
+    Tables.put_world_time(world, state.world_ms)
     state = input.(state)
     state = pump_idle(state)
     state = settle_waiting(state)
-    Store.put_world_time(conn, state.world_ms)
-    lines = Store.take_outbox(conn)
+    Tables.put_world_time(world, state.world_ms)
+    lines = Tables.take_outbox(world)
     fault(state, :before_commit)
 
     # A failed COMMIT leaves NorthTalk ahead of the database, so the World
     # stops and restarts from what was committed.
-    case Exqlite.Sqlite3.execute(conn, "COMMIT") do
+    case OdgnEcs.commit(world) do
       :ok -> :ok
       {:error, reason} -> exit({:commit_failed, reason})
     end
@@ -297,12 +236,13 @@ defmodule MuaWorld do
   defp fault(_, _), do: :ok
 
   defp pump_idle(state) do
-    {:ok, pump} = NorthTalk.pump(state.group, now: instant(state.world_ms))
+    {:ok, pump} = OdgnEcsTalk.pump(state.talk, instant(state.world_ms))
     state = %{state | next_deadline: deadline(pump.next_deadline)}
     if pump.state == "sliced", do: pump_idle(state), else: state
   end
 
   defp instant(ms), do: DateTime.add(@epoch, ms, :millisecond)
+  defp instant_us(ms), do: DateTime.to_unix(instant(ms), :microsecond)
 
   defp deadline(nil), do: nil
 
@@ -312,7 +252,7 @@ defmodule MuaWorld do
   end
 
   # Every input still waiting whose Run has now ended gets its result, in
-  # this Step; any still waiting keeps or gains its `waiting` row.
+  # this Step; any still waiting keeps or gains its `mua_waiting` row.
   defp settle_waiting(state) do
     Enum.reduce(state.waiting, state, fn {id, w}, state ->
       case NorthTalk.await(w.pending, 0) do
@@ -320,24 +260,18 @@ defmodule MuaWorld do
           if w.row,
             do: state,
             else:
-              put_in(state.waiting[id].row, insert_waiting(state.conn, w.character, w.command))
+              put_in(
+                state.waiting[id].row,
+                Tables.insert_waiting(state.world, w.character, w.command)
+              )
 
         result ->
           NorthTalk.release_pending(w.pending)
-          if w.row, do: Store.run!(state.conn, "DELETE FROM waiting WHERE id = ?", [w.row])
+          if w.row, do: Tables.delete_waiting(state.world, w.row)
           state = %{state | waiting: Map.delete(state.waiting, id)}
           w.then.(state, result)
       end
     end)
-  end
-
-  defp insert_waiting(conn, character, command) do
-    Store.run!(conn, "INSERT INTO waiting (character, command) VALUES (?, ?)", [
-      character,
-      command
-    ])
-
-    Store.last_id(conn)
   end
 
   defp publish(state, lines) do
@@ -348,110 +282,127 @@ defmodule MuaWorld do
 
   # ---------------------------------------------------------------------
   # Commands
+  #
+  # A stand-in until command parsing, binding and dispatch arrive (#113):
+  # `say`, `take`, and any other verb offered to the room.
   # ---------------------------------------------------------------------
 
   defp dispatch(state, character, text) do
-    me = Store.entity(state.conn, character)
-    room = me && me.location
+    room = location(state, character)
     [verb | rest] = String.split(text, " ", parts: 2) ++ [""]
     rest = String.trim(hd(rest))
 
     cond do
       room == nil -> tell(state, character, "You are nowhere.")
-      verb == "say" -> say(state, me, room, rest)
-      verb == "take" -> take(state, me, room, rest, text)
-      true -> offer(state, me, room, verb, rest, text)
+      verb == "say" -> say(state, character, room, rest)
+      verb == "take" -> take(state, character, room, rest, text)
+      true -> offer(state, character, room, verb, rest, text)
+    end
+  end
+
+  defp location(state, eid) do
+    case OdgnEcs.get(state.world, eid, "location") do
+      %{"in" => place} -> place
+      _ -> nil
+    end
+  end
+
+  defp name(state, eid) do
+    case OdgnEcs.get(state.world, eid, "player") || OdgnEcs.get(state.world, eid, "described") do
+      %{"name" => name} -> name
+      _ -> nil
     end
   end
 
   defp tell(state, character, text) do
-    Store.output(state.conn, character, text)
+    Tables.output(state.world, character, text)
     state
   end
+
+  defp handle(state, eid), do: OdgnEcsTalk.handle(state.talk, eid)
 
   # A command offered to the room: its Message Path may answer. `look`
   # falls back to the built-in description.
   defp offer(state, me, room, verb, rest, text) do
-    args = if verb == "look", do: [Talk.handle(me.id)], else: [Talk.handle(me.id), rest]
+    args = if verb == "look", do: [handle(state, me)], else: [handle(state, me), rest]
+    {:ok, pending} = OdgnEcsTalk.request(state.talk, room, verb, args, instant(state.world_ms))
 
-    {:ok, %Pumped{pending: pending}} =
-      NorthTalk.request_pump(state.group, Talk.handle(room), verb, args,
-        now: instant(state.world_ms)
-      )
-
-    wait(state, pending, me.id, text, fn state, result ->
+    wait(state, pending, me, text, fn state, result ->
       case result do
         {:ok, %Result{value: reply}} when is_binary(reply) and reply != "" ->
-          tell(state, me.id, reply)
+          tell(state, me, reply)
 
         {:ok, %Result{}} ->
           state
 
         {:error, %ScriptError{outcome: "unhandled"}} when verb == "look" ->
-          describe(state, me.id, room)
+          describe(state, me, room)
 
         {:error, %ScriptError{outcome: "unhandled"}} ->
-          tell(state, me.id, "You can't do that here.")
+          tell(state, me, "You can't do that here.")
 
         {:error, _} ->
-          tell(state, me.id, "Something went wrong.")
+          tell(state, me, "Something went wrong.")
       end
     end)
   end
 
   defp describe(state, character, room) do
-    conn = state.conn
-    place = Store.entity(conn, room)
+    described = OdgnEcs.get(state.world, room, "described") || %{}
 
     others =
-      for id <- Store.elements(conn, room), id != character, do: Store.entity(conn, id).name
+      for id <- OdgnEcsTalk.element_ids(state.talk, room),
+          id != character,
+          n = name(state, id),
+          do: n
 
-    lines =
-      [place.name, Store.component(conn, room, "description")] ++
-        Enum.map(others, &"You see #{&1}.")
-
+    lines = [described["name"], described["description"]] ++ Enum.map(others, &"You see #{&1}.")
     Enum.reduce(Enum.reject(lines, &is_nil/1), state, &tell(&2, character, &1))
   end
 
   defp say(state, me, room, words) do
-    for c <- Store.characters_at(state.conn, room),
+    for c <- Tables.characters_at(state.world, room),
         do:
-          Store.output(
-            state.conn,
+          tell(
+            state,
             c,
-            if(c == me.id, do: "You say, \"#{words}\"", else: "#{me.name} says, \"#{words}\"")
+            if(c == me,
+              do: "You say, \"#{words}\"",
+              else: "#{name(state, me)} says, \"#{words}\""
+            )
           )
 
-    {:ok, _} =
-      NorthTalk.deliver(state.group, Talk.handle(room), "heard", [Talk.handle(me.id), words])
-
+    {:ok, _} = OdgnEcsTalk.deliver(state.talk, room, "heard", [handle(state, me), words])
     state
   end
 
   # Taking asks the thing first, as a Decision along its Message Path.
   defp take(state, me, room, name, text) do
-    case Store.named_element(state.conn, room, name) do
+    case Enum.find(
+           OdgnEcsTalk.element_ids(state.talk, room),
+           &(OdgnEcsTalk.element_name(state.talk, &1) == name)
+         ) do
       nil ->
-        tell(state, me.id, "You don't see #{name} here.")
+        tell(state, me, "You don't see #{name} here.")
 
       thing ->
         {:ok, pending} =
-          NorthTalk.decide(state.group, Talk.handle(thing), "taking", [
-            Talk.handle(me.id),
-            Talk.handle(thing)
+          OdgnEcsTalk.decide(state.talk, thing, "taking", [
+            handle(state, me),
+            handle(state, thing)
           ])
 
-        wait(state, pending, me.id, text, fn state, result ->
+        wait(state, pending, me, text, fn state, result ->
           case result do
             {:ok, %Verdict{verdict: :allowed}} ->
-              Store.move(state.conn, thing, me.id)
-              tell(state, me.id, "You take #{name}.")
+              :ok = OdgnEcs.put(state.world, thing, "location", %{"in" => me})
+              tell(state, me, "You take #{name}.")
 
             {:ok, %Verdict{verdict: :vetoed, vetoes: [veto | _]}} ->
-              tell(state, me.id, veto.reason || "You can't take #{name}.")
+              tell(state, me, veto.reason || "You can't take #{name}.")
 
             _ ->
-              tell(state, me.id, "You can't take #{name}.")
+              tell(state, me, "You can't take #{name}.")
           end
         end)
     end
