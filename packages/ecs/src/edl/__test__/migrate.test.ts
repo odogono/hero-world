@@ -4,10 +4,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { adoptDefinitionNames, isEDLChanged, migrateEDL } from '@edl';
-import { createWorld } from '@world';
+import { adoptDefinitionNames, isEDLChanged, migrateEDL } from '..';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 const described = defineComponent({
   id: 'described' as const,
