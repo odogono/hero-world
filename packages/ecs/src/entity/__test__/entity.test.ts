@@ -755,3 +755,27 @@ describe('delete entity', () => {
     expect(inventoryStmt.get(entity.id)).toBeNull();
   });
 });
+
+describe('maybe', () => {
+  it('leaves out a component the entity lacks, even one with booleans', async () => {
+    const tag = defineComponent({ id: 'meTag', schema: { x: s.int() } });
+    const flags = defineComponent({
+      id: 'meFlags',
+      schema: { on: s.boolean().default(true) }
+    });
+    const world = await createWorld([tag, flags]);
+    const plain = world.create({ meTag: { x: 1 } });
+    const flagged = world.create({ meFlags: { on: false }, meTag: { x: 2 } });
+    world.flush();
+
+    const read = (id: number) =>
+      world.query({
+        asProxy: false,
+        entity: { id, world },
+        maybe: ['meTag', 'meFlags']
+      });
+
+    expect(read(plain.id)?.meFlags).toBeUndefined();
+    expect(read(flagged.id)?.meFlags).toEqual({ on: false });
+  });
+});

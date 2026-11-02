@@ -1,6 +1,6 @@
 # mua
 
-A text adventure: an Elysia server (`src/server/index.ts`, port `HUB_API_PORT`, default 3974) runs the game world, and an OpenTUI client (`src/tui/`, JSX from `@opentui/react`) talks to it over WebSocket. Run them with `bun run server` and `bun run tui`. The server keeps the world in `MUA_DB` (default `data/world.db`): the EDL builds it the first time, and later runs resume it. Delete the file to start the world afresh.
+A text adventure: an Elysia server (`src/server/index.ts`, port `HUB_API_PORT`, default 3974) runs the game world, and an OpenTUI client (`src/tui/`, JSX from `@opentui/react`) talks to it over WebSocket. Run them with `bun run server` and `bun run tui`. The server keeps the world in `MUA_DB` (default `data/world.db`): the EDL builds it the first time, and later runs resume it. After editing the EDL, `bun run world:migrate` brings the file up to date (`--dry-run` lists the changes first; ADR 0005); delete the file to start the world afresh.
 
 ## The game world: `src/server/mua-world/`
 

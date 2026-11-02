@@ -43,6 +43,7 @@ const authenticatedDef = defineComponent({
 
 const containerDef = defineComponent({
   id: 'container',
+  playState: true,
   schema: {
     capacity: s.number().default(10),
     isClosed: s.boolean().default(false)
@@ -83,6 +84,7 @@ const portalDef = defineComponent({
  */
 const doorDef = defineComponent({
   id: 'door',
+  playState: true,
   schema: {
     isClosed: s.boolean().default(true)
   }
@@ -117,6 +119,7 @@ const exitsDef = defineComponent({
 /** The world's clock, kept on the system actor: game time in milliseconds */
 const clockDef = defineComponent({
   id: 'clock',
+  playState: true,
   schema: {
     now: s.number().default(0)
   }
@@ -142,6 +145,7 @@ const timersDef = defineComponent({
  */
 const npcDef = defineComponent({
   id: 'npc',
+  playState: true,
   schema: {
     /** Set false to leave it standing still: its commands are ignored */
     active: s.boolean().default(true)
@@ -163,6 +167,7 @@ const npcInputDef = defineComponent({
  */
 const lockableDef = defineComponent({
   id: 'lockable',
+  playState: true,
   schema: {
     isLocked: s.boolean().default(false),
     lock: s.string()
@@ -201,6 +206,7 @@ const readableDef = defineComponent({
 /** Where a thing belongs, so a reset can put it back (see lifecycle.ts) */
 const homeDef = defineComponent({
   id: 'home',
+  playState: true,
   schema: {
     in: s.entityId()
   }
@@ -343,7 +349,8 @@ export const defs = [
   outputEventDef,
   containerDef,
   metaDef,
-  locationComponent,
+  // where a thing is changes in play, so a migration leaves it
+  { ...locationComponent, playState: true },
   portalDef,
   exitsDef,
   homeDef,

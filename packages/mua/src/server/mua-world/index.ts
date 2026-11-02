@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { createEcsTalk, type DueTimer } from 'ecs-talk';
 import { createGameLoop } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
-import { EDLParseError } from 'odgn-ecs/edl';
+import { EDLParseError, isEDLChanged } from 'odgn-ecs/edl';
 import { type GameLoop } from 'odgn-ecs/system';
 import type { EntityId } from 'odgn-ecs/types';
 import { createWorld, type World } from 'odgn-ecs/world';
@@ -106,6 +106,11 @@ export class MuaWorld {
     const isResumed = Boolean(findRoomByMetaId(this.world, LIMBO_META_ID));
     if (isResumed) {
       log.info(`Resumed the world from ${dbPath}`);
+      if (mainEDL && isEDLChanged(this.world, mainEDL)) {
+        log.warn(
+          `${mainPath} has changed since the world was built; run \`bun run world:migrate --dry-run\` to see what migrating it would change`
+        );
+      }
     }
 
     if (mainEDL && !isResumed) {
