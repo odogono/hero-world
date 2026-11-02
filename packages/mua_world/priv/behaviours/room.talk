@@ -1,0 +1,12 @@
+-- The room Service: `look`, as a Script. mua sends it `look place, actor`
+-- for the room the actor is in; what it returns is the actor's reply.
+--
+-- A world's own room Scripts are offered `look` first (as the receiver
+-- with role "room"), so they can replace it. The main world's room atom
+-- does (edl/scripts/room.talk); this Service answers for rooms without one.
+
+use describe from rooms
+
+on look place, actor
+  return describe(place, actor)
+end look

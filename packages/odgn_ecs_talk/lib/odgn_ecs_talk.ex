@@ -219,7 +219,10 @@ defmodule OdgnEcsTalk do
 
   @doc "Loads a Script owned by an entity's Handle."
   def load_entity_script(%__MODULE__{} = talk, eid, source, opts \\ []) do
-    load_owned(talk, "entity:#{eid}", handle(talk, eid), source, opts)
+    with :ok <- load_owned(talk, "entity:#{eid}", handle(talk, eid), source, opts) do
+      :ets.insert(talk.table, {{:entity_script, eid}, true})
+      :ok
+    end
   end
 
   @doc """
@@ -261,13 +264,31 @@ defmodule OdgnEcsTalk do
     end)
   end
 
-  @doc "Compiles a Library and adds it to the Group, for Scripts loaded after it."
-  def add_library(%__MODULE__{} = talk, name, source, imports \\ []) do
+  @doc """
+  Compiles a Library and adds it to the Group, for Scripts loaded after it.
+  Its functions may call `world`, `clock` and `timer` with their caller's
+  Grants, and the defined Capabilities named in `capabilities`, which
+  Scripts must be granted under those names.
+  """
+  def add_library(%__MODULE__{} = talk, name, source, imports \\ [], capabilities \\ []) do
     with {:ok, library} <-
-           NorthTalk.compile_library(talk.owner, name, "1", source, imports: imports),
+           NorthTalk.compile_library(talk.owner, name, "1", source,
+             imports: imports,
+             capabilities: ["world", "clock", "timer" | capabilities]
+           ),
          :ok <- NorthTalk.add_library(talk.group, library) do
       {:ok, library}
     end
+  end
+
+  @doc """
+  Whether a Script sits on an entity's Message Path, or the entity owns one,
+  so that sending it a message can be answered.
+  """
+  @spec scripted?(t(), OdgnEcs.eid()) :: boolean()
+  def scripted?(%__MODULE__{} = talk, eid) do
+    :ets.member(talk.table, {:entity_script, eid}) or
+      scripted_path(talk, OdgnEdl.entity_lineage(talk.world, eid)) != []
   end
 
   defp load_owned(talk, name, obj, source, opts) do

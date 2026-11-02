@@ -25,6 +25,7 @@ The caller drives it: it Pumps with `pump/2` inside its own transaction, as Mua'
   - `find` and `resolve` are lookups.
 - **`clock`:** `now`, the Pump's Clock reading.
 - **`timer`:** `schedule name, at, message, args` and `cancel name`. Timers are kept in the World as `talk_timer` entities, so they outlive the adapter. Each belongs to the entity its Run was delivered to. `due_timers/2` lists the timers due, and `fire_timer/2` delivers one.
+- **Libraries:** `add_library/5` compiles a Library whose functions may call `world`, `clock`, `timer` and any Capabilities named, with their caller's Grants.
 - **Service Scripts:** `load_service_script/4` loads a Script that no Message Path reaches. Send to it with `request_service/5` and `decide_service/4`.
 
 ## How it differs from `ecs-talk`

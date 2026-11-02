@@ -1,0 +1,30 @@
+# A small world where a Script reads the command it handles
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+# A puzzle box that takes anything pressed into it, and says so to the room
+atom puzzle {
+  script { src: "scripts/puzzle.talk" }
+}
+
+entity west_of_house : room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Study" description: "A cluttered study." }
+}
+
+entity box : puzzle {
+  described { name: "Puzzle box" description: "A box of sliding panels." }
+  noun { words: ["box"] }
+  location { in: $west_of_house }
+}
+
+entity feather : item {
+  described { name: "Feather" description: "A long feather." }
+  location { in: $west_of_house }
+}
