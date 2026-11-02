@@ -4,10 +4,11 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { adoptDefinitionNames, isEDLChanged, migrateEDL } from '..';
+import { EDLError, isEDLChanged, migrateEDL } from '..';
 import { defineComponent, s } from '../../component';
 import { DatabaseType } from '../../db';
 import { createWorld } from '../../world';
+import { edlRecord } from '../record';
 
 const described = defineComponent({
   id: 'described' as const,
@@ -400,22 +401,72 @@ entity key {
   });
 });
 
-describe('adoptDefinitionNames', () => {
-  it('names the entities of a world built before names were saved', async () => {
-    const { world } = await played();
-    const names = world.getDefinitionNames();
-    world.db.exec('DELETE FROM tbl_definition_name');
-    world.db.exec('DELETE FROM tbl_edl');
+/** What a world records and holds for each entity the EDL names */
+const snapshot = (world: Defs, names: string[]) => {
+  const ids = world.getDefinitionNames();
+  const nameOf = new Map([...ids].map(([name, eid]) => [eid, name]));
+  const record = edlRecord(world);
+  // references hold ids, which differ between the worlds
+  const byName = (v: unknown) => nameOf.get(v as number) ?? v;
+  return {
+    atoms: ['room', 'portal', 'heavy'].map(a => world.getAtomLineage(a)),
+    entities: names.map(name => {
+      const entity = named(world, name);
+      const id = entity.id;
+      const components = Object.fromEntries(
+        defs.map(({ id: c }) => [c, entity[c]])
+      );
+      if (components.location) {
+        components.location = { in: byName(components.location.in) };
+      }
+      if (components.exits) {
+        const to = components.exits.to as Record<string, unknown>;
+        components.exits = {
+          to: Object.fromEntries(
+            Object.entries(to).map(([dir, v]) => [dir, byName(v)])
+          )
+        };
+      }
+      return {
+        components,
+        edlValues: Object.fromEntries(record.getEDLValues(id)),
+        lineage: world.getEntityLineage(id),
+        name
+      };
+    }),
+    scripts: world
+      .getScriptOwners()
+      .map(o => (o.kind === 'atom' ? o.name : nameOf.get(o.eid)))
+  };
+};
 
-    expect(adoptDefinitionNames(world, BEFORE)).toEqual(names);
-    expect(isEDLChanged(world, BEFORE)).toBe(false);
-    expect(migrateEDL(world, AFTER, { dryRun: true }).created).toEqual([
-      'garden'
-    ]);
+describe('a Build is a Migration from an empty world', () => {
+  it('plans nothing when migrating to the EDL it was built from', async () => {
+    const world = await open();
+    world.executeEDL(BEFORE);
+    const plan = migrateEDL(world, BEFORE);
+    expect(plan.created).toEqual([]);
+    expect(plan.updated).toEqual([]);
+    expect(plan.kept).toEqual([]);
+    expect(plan.gone).toEqual([]);
+    expect(plan.atoms).toEqual({ added: [], changed: [], removed: [] });
   });
 
-  it('refuses a world that already has names', async () => {
-    const { world } = await played();
-    expect(() => adoptDefinitionNames(world, BEFORE)).toThrow();
+  it('leaves an unplayed world as building the new EDL would', async () => {
+    const migrated = await open();
+    migrated.executeEDL(BEFORE);
+    migrateEDL(migrated, AFTER);
+    const built = await open();
+    built.executeEDL(AFTER);
+
+    const names = ['hall', 'yard', 'gate', 'sign', 'garden'];
+    expect(snapshot(migrated, names)).toEqual(snapshot(built, names));
+  });
+
+  it('refuses to build a world twice', async () => {
+    const world = await open();
+    world.executeEDL(BEFORE);
+    expect(() => world.executeEDL(AFTER)).toThrow(EDLError);
+    expect(() => world.executeEDL(AFTER)).toThrow(/migrateEDL/);
   });
 });

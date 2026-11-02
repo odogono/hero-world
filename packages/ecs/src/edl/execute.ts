@@ -1,86 +1,28 @@
-import { addComponents } from '../component';
 import type { Components } from '../types';
-import { World } from '../world';
-import { compileEDL, hashEDL, resolveEDL, scriptPath } from './compile';
-import { readComponents, recordEDLValues } from './edl-values';
-import { EDLExecutionError } from './errors';
-
-type EntityRef = { id: number; world: World<Components> };
+import type { World } from '../world';
+import { EDLError } from './errors';
+import { migrate } from './migrate';
+import { edlRecord } from './record';
 
 export type ExecuteOptions = {
   /** Path of the .edl file; `script.src` values resolve relative to it */
   path?: string;
 };
 
+/**
+ * Builds a world from EDL: the Migration of an empty world (ADR 0007). It
+ * throws on any unresolved reference, and on a world already built or
+ * migrated from an EDL, which `migrateEDL` brings up to date instead.
+ */
 export const executeEDL = <T extends Components>(
   world: World<T>,
   edl: string,
   options: ExecuteOptions = {}
 ): void => {
-  const compiled = compileEDL(edl);
-  const { atoms: rawAtoms, entities } = compiled;
-
-  // Create entities without components to avoid schema validation before
-  // resolving refs
-  const entitiesById = new Map<number, EntityRef>();
-  const entityIdsByName = new Map<string, number>();
-  const ids = entities.map(def => {
-    const entity = world.create();
-    entitiesById.set(entity.id, entity as unknown as EntityRef);
-    if (def.name) {
-      entityIdsByName.set(def.name, entity.id);
-    }
-    return entity.id;
-  });
-
-  const resolved = resolveEDL(compiled, ids);
-  const { errors } = resolved;
-  for (const [i, eid] of ids.entries()) {
-    const entity = entitiesById.get(eid)!;
-    addComponents(
-      entity as Parameters<typeof addComponents>[0],
-      resolved.components[i]!
+  if (edlRecord(world).isBuilt()) {
+    throw new EDLError(
+      'This world has already been built from an EDL; use migrateEDL to bring it up to date'
     );
   }
-
-  if (errors.length > 0) {
-    throw new EDLExecutionError(errors);
-  }
-
-  // Record Lineage: each atom's and entity's ordered base atoms
-  for (const [name, atom] of rawAtoms.entries()) {
-    world.setAtomLineage(name, atom.extends);
-  }
-  for (const [i, def] of entities.entries()) {
-    world.setEntityLineage(ids[i]!, def.extends);
-  }
-
-  // Record Script owners: only atoms and entities that declare `script`
-  // themselves own a Script; inheritors share their atom's Script
-  for (const [name, atom] of rawAtoms.entries()) {
-    const path = scriptPath(atom.own, options.path);
-    if (path) {
-      world.setScriptOwner('atom', name, path);
-    }
-  }
-  for (const [i, def] of entities.entries()) {
-    const path = scriptPath(def.own, options.path);
-    if (path) {
-      world.setScriptOwner('entity', ids[i]!, path);
-    }
-  }
-
-  // Record Definition names, and the EDL they came from, for migrations
-  for (const [name, eid] of entityIdsByName) {
-    world.setDefinitionName(name, eid);
-  }
-  world.setEDLHash(hashEDL(edl));
-
-  world.flush();
-
-  // Record Play state as the EDL set it, so a migration can tell what
-  // play has changed
-  for (const eid of entityIdsByName.values()) {
-    recordEDLValues(world, eid, readComponents(world, eid));
-  }
+  migrate(world, edl, { build: true, path: options.path });
 };

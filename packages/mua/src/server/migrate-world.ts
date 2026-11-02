@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 // Brings a world kept in a file up to date with a changed EDL (ADR 0005).
 //
-//   bun run world:migrate [--dry-run] [--prune] [--adopt <first.edl>]
-//                         [--db <world.db>] [--edl <main.edl>]
+//   bun run world:migrate [--dry-run] [--prune] [--db <world.db>]
+//                         [--edl <main.edl>]
 //
 // --dry-run   migrate a copy, print what would change, leave the file alone
 // --prune     move entities gone from the EDL to Limbo (else only listed)
-// --adopt     for a world made before Definition names were saved: the EDL
-//             it was first built with, e.g. from `git show <rev>:<path>`
 /* eslint-disable no-console -- a command-line tool, it prints its report */
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +13,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { DatabaseType } from 'odgn-ecs/db';
-import { adoptDefinitionNames, isEDLChanged } from 'odgn-ecs/edl';
+import { isEDLChanged } from 'odgn-ecs/edl';
 import { createWorld } from 'odgn-ecs/world';
 
 import { defs } from './mua-world/coms';
@@ -71,7 +69,6 @@ const report = ({ exitsRemade, plan, timersCancelled }: WorldMigration) => {
 
 const { values } = parseArgs({
   options: {
-    adopt: { type: 'string' },
     db: { default: process.env.MUA_DB ?? 'data/world.db', type: 'string' },
     'dry-run': { default: false, type: 'boolean' },
     edl: { default: 'src/server/mua-world/edl/main.edl', type: 'string' },
@@ -96,15 +93,9 @@ const world = await createWorld(defs, { path, type: DatabaseType.BUN });
 try {
   const edl = await Bun.file(values.edl).text();
 
-  if (values.adopt) {
-    const adopted = adoptDefinitionNames(
-      world,
-      await Bun.file(values.adopt).text()
-    );
-    console.log(`Adopted ${adopted.size} Definition names`);
-  } else if (world.getDefinitionNames().size === 0) {
+  if (world.getDefinitionNames().size === 0) {
     console.error(
-      'This world was made before Definition names were saved. Pass --adopt with the EDL it was first built with.'
+      'This world was made before Definition names were saved, so it cannot be migrated; build a new one.'
     );
     process.exit(1);
   }

@@ -23,7 +23,9 @@ import {
   saveToJSON as sharedSaveToJSON
 } from '../db/json-functions';
 import { executeEDL, type ExecuteOptions } from '../edl';
+import { compileEDL } from '../edl/compile';
 import { parseDefsFromEDL } from '../edl/helpers';
+import { edlRecord, type ScriptOwner } from '../edl/record';
 import {
   queryEntities,
   queryEntitiesIterator,
@@ -206,9 +208,7 @@ const registerComponentDef = <TComponents extends Components>(
   world.defs.set(name, def);
 };
 
-export type ScriptOwner =
-  | { kind: 'atom'; name: string; src: string }
-  | { eid: number; kind: 'entity'; src: string };
+export type { ScriptOwner } from '../edl/record';
 
 export class World<TComponents extends Components> {
   db!: Database;
@@ -220,12 +220,6 @@ export class World<TComponents extends Components> {
   entityCache: EntityCache<TComponents>;
   defs: Map<string, ComponentDef>;
   stmts: Record<string, Statement>;
-  /** Lineage: the ordered base atoms each entity (by id) and atom (by name) extends */
-  entityLineage: Map<number, string[]>;
-  atomLineage: Map<string, string[]>;
-  /** Script owners: atoms (by name) and entities (by id) that declare their own `script`, mapped to its source path */
-  atomScripts: Map<string, string>;
-  entityScripts: Map<number, string>;
   /** The Change Scope that writes join, while one is running */
   activeChanges: ChangeScope<TComponents> | undefined;
   /** The open Change Scope holding each entity it has touched */
@@ -239,10 +233,6 @@ export class World<TComponents extends Components> {
     this.entityCache = new Map();
     this.defs = new Map<string, ComponentDef>();
     this.stmts = {};
-    this.entityLineage = new Map();
-    this.atomLineage = new Map();
-    this.atomScripts = new Map();
-    this.entityScripts = new Map();
     this.activeChanges = undefined;
     this.changeHolders = new Map();
   }
@@ -271,140 +261,22 @@ export class World<TComponents extends Components> {
 
   /** Atoms and entities that own a Script, with the Script's source path */
   getScriptOwners(): ScriptOwner[] {
-    return [
-      ...[...this.atomScripts].map(([name, src]) => ({
-        kind: 'atom' as const,
-        name,
-        src
-      })),
-      ...[...this.entityScripts].map(([eid, src]) => ({
-        eid,
-        kind: 'entity' as const,
-        src
-      }))
-    ];
-  }
-
-  /**
-   * Record the base atoms an atom extends, and save them, so a world opened
-   * from its database knows them without running its EDL again.
-   */
-  setAtomLineage(name: string, bases: string[]) {
-    this.atomLineage.set(name, [...bases]);
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
-      ['atom', name, JSON.stringify(bases)]
-    );
-  }
-
-  /** Record, and save, the base atoms an entity was built from */
-  setEntityLineage(eid: number, bases: string[]) {
-    this.entityLineage.set(eid, [...bases]);
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
-      ['entity', String(eid), JSON.stringify(bases)]
-    );
-  }
-
-  /** Record, and save, the Script an atom (by name) or entity (by id) owns */
-  setScriptOwner(kind: 'atom' | 'entity', name: string | number, src: string) {
-    if (kind === 'atom') {
-      this.atomScripts.set(String(name), src);
-    } else {
-      this.entityScripts.set(Number(name), src);
-    }
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
-      [kind, String(name), src]
-    );
-  }
-
-  /** Record, and save, the Definition name an entity was given in the EDL */
-  setDefinitionName(name: string, eid: number) {
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_definition_name (name, eid) VALUES (?1, ?2)',
-      [name, eid]
-    );
-  }
-
-  /** Forget a Definition name, once its entity is out of play */
-  deleteDefinitionName(name: string) {
-    this.db.exec('DELETE FROM tbl_definition_name WHERE name = ?1', [name]);
+    return edlRecord(this).getScriptOwners();
   }
 
   /** Each Definition name the EDL gave, with the id of its entity */
   getDefinitionNames(): Map<string, number> {
-    const rows = this.db.query('SELECT name, eid FROM tbl_definition_name') as {
-      eid: number;
-      name: string;
-    }[];
-    return new Map(rows.map(({ eid, name }) => [name, eid]));
-  }
-
-  /** Save a Play state component's value as the EDL last set it */
-  setEDLValue(eid: number, component: string, value: string) {
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_edl_value (eid, component, value) VALUES (?1, ?2, ?3)',
-      [eid, component, value]
-    );
-  }
-
-  /** Each Play state component's value as the EDL last set it */
-  getEDLValues(eid: number): Map<string, string> {
-    const rows = this.db.query(
-      'SELECT component, value FROM tbl_edl_value WHERE eid = ?1',
-      [eid]
-    ) as { component: string; value: string }[];
-    return new Map(rows.map(({ component, value }) => [component, value]));
-  }
-
-  /** Forget the values the EDL last set on an entity */
-  deleteEDLValues(eid: number) {
-    this.db.exec('DELETE FROM tbl_edl_value WHERE eid = ?1', [eid]);
-  }
-
-  /** Save the hash of the EDL the world was last built or migrated from */
-  setEDLHash(hash: string) {
-    this.db.exec(
-      "INSERT OR REPLACE INTO tbl_edl (key, value) VALUES ('hash', ?1)",
-      [hash]
-    );
-  }
-
-  /** The hash of the EDL the world was last built or migrated from */
-  getEDLHash(): string | undefined {
-    const rows = this.db.query(
-      "SELECT value FROM tbl_edl WHERE key = 'hash'"
-    ) as { value: string }[];
-    return rows[0]?.value;
-  }
-
-  /** Forget the saved Lineage and Script owners of every atom */
-  clearAtoms() {
-    this.atomLineage.clear();
-    this.atomScripts.clear();
-    this.db.exec("DELETE FROM tbl_lineage WHERE kind = 'atom'");
-    this.db.exec("DELETE FROM tbl_script_owner WHERE kind = 'atom'");
-  }
-
-  /** Forget the Script an entity owns */
-  deleteEntityScriptOwner(eid: number) {
-    this.entityScripts.delete(eid);
-    this.db.exec(
-      "DELETE FROM tbl_script_owner WHERE kind = 'entity' AND name = ?1",
-      [String(eid)]
-    );
+    return edlRecord(this).getDefinitionNames();
   }
 
   /** The ordered base atoms an entity was built from (empty if none) */
   getEntityLineage(eid: number): string[] {
-    return [...(this.entityLineage.get(eid) ?? [])];
+    return edlRecord(this).getEntityLineage(eid);
   }
 
   /** The ordered base atoms an atom extends, or undefined if no such atom */
   getAtomLineage(name: string): string[] | undefined {
-    const lineage = this.atomLineage.get(name);
-    return lineage ? [...lineage] : undefined;
+    return edlRecord(this).getAtomLineage(name);
   }
 
   async open() {
@@ -922,8 +794,12 @@ export async function createWorld(
     const world = new World(options || {});
     await world.open();
     await initialiseWorldDb(world, defs, options);
-    // Execute entity/atom definitions and commands to populate initial data
-    executeEDL(world, componentDefs);
+    // Build its atoms and entities, if it has any; one with only `def`s
+    // leaves the world unbuilt, for a later executeEDL
+    const { atoms, entities } = compileEDL(componentDefs);
+    if (atoms.size > 0 || entities.length > 0) {
+      executeEDL(world, componentDefs);
+    }
     return world;
   }
 
@@ -932,33 +808,6 @@ export async function createWorld(
   await initialiseWorldDb(world, componentDefs, options);
   return world;
 }
-
-/** Reads the saved Lineage and Script owners into the world's maps */
-const loadLineage = <TComponents extends Components>(
-  world: World<TComponents>
-) => {
-  const lineage = world.db.query(
-    'SELECT kind, name, bases FROM tbl_lineage'
-  ) as { bases: string; kind: string; name: string }[];
-  for (const { bases, kind, name } of lineage) {
-    const parsed = JSON.parse(bases) as string[];
-    if (kind === 'atom') {
-      world.atomLineage.set(name, parsed);
-    } else {
-      world.entityLineage.set(Number(name), parsed);
-    }
-  }
-  const owners = world.db.query(
-    'SELECT kind, name, src FROM tbl_script_owner'
-  ) as { kind: string; name: string; src: string }[];
-  for (const { kind, name, src } of owners) {
-    if (kind === 'atom') {
-      world.atomScripts.set(name, src);
-    } else {
-      world.entityScripts.set(Number(name), src);
-    }
-  }
-};
 
 const initialiseWorldDb = async <TComponents extends Components>(
   world: World<TComponents>,
@@ -981,25 +830,8 @@ const initialiseWorldDb = async <TComponents extends Components>(
     'CREATE TABLE IF NOT EXISTS tbl_entity (id INTEGER PRIMARY KEY AUTOINCREMENT)';
   world.db.exec(sql);
 
-  // Lineage and Script owners, recorded by EDL, and loaded back on open
-  world.db.exec(
-    `CREATE TABLE IF NOT EXISTS tbl_lineage (kind TEXT NOT NULL, name TEXT NOT NULL, bases TEXT NOT NULL, PRIMARY KEY (kind, name))`
-  );
-  world.db.exec(
-    `CREATE TABLE IF NOT EXISTS tbl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name))`
-  );
-  // Definition names and the EDL's hash, recorded by EDL, for migrations
-  world.db.exec(
-    `CREATE TABLE IF NOT EXISTS tbl_definition_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL)`
-  );
-  world.db.exec(
-    `CREATE TABLE IF NOT EXISTS tbl_edl (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
-  );
-  // Play state components as the EDL last set them (ADR 0006)
-  world.db.exec(
-    `CREATE TABLE IF NOT EXISTS tbl_edl_value (eid INTEGER NOT NULL, component TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (eid, component))`
-  );
-  loadLineage(world);
+  // The EDL record's tables, and its Lineage and Script owners
+  edlRecord(world);
 
   // Initialize component metadata table for compatibility checking
   initializeComponentMetadataTable(world.db);
