@@ -4,9 +4,9 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 const statsComponent = defineComponent({
   id: 'stats' as const,

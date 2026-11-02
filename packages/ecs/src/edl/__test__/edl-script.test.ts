@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
-
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 import { serializeEDL } from '../serialize';
 
 const DEFS = `

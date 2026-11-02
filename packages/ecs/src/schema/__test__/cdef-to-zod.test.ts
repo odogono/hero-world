@@ -1,8 +1,7 @@
 /* eslint-disable perfectionist/sort-objects */
 import { describe, expect, test } from 'bun:test';
 
-import type { CDef } from '@types';
-
+import type { CDef } from '../../types';
 import { cdefToZod } from '../cdef-to-zod';
 
 describe('CDef to Zod schema (text output)', () => {

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { CDef, Components } from '@types';
-import type { World } from '@world';
-
+import type { CDef, Components } from '../../types';
+import type { World } from '../../world';
 import {
   serializeComponentDef,
   serializeEDL,

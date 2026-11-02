@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { deleteTempFile, makeTempFile } from 'odgn-helpers/file';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../../component';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 
 const worldOpts = {
   clearExisting: true,

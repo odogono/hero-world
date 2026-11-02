@@ -2,9 +2,8 @@
 
 import { describe, expect, expectTypeOf, setSystemTime, test } from 'bun:test';
 
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
-
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
 import { addComponent, addComponents } from '../add';
 import { s } from '../builder';
 import { createComponent } from '../create';

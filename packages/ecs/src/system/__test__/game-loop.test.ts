@@ -1,11 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
-import { DatabaseType } from '@db';
-import { eventComponent } from '@events';
-import { createSystem } from '@system';
-import type { ExtractWorldComponents } from '@types';
-import { createWorld, type World } from '@world';
-
+import { createSystem } from '..';
+import { DatabaseType } from '../../db';
+import { eventComponent } from '../../events';
+import type { ExtractWorldComponents } from '../../types';
+import { createWorld, type World } from '../../world';
 import { createGameLoop, logSystemPerformance } from '../game-loop';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.BUN;

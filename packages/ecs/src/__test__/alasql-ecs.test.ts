@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { DatabaseType } from '@db';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../component';
+import { DatabaseType } from '../db';
+import { createWorld } from '../world';
 
 const dbType = (process.env.DB_TYPE as DatabaseType) ?? DatabaseType.ALASQL;
 

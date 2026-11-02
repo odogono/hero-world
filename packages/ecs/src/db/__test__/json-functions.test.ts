@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { queryEntities } from '@entity';
-import { createWorld } from '@world';
-
+import { defineComponent, s } from '../../component';
+import { queryEntities } from '../../entity';
+import { createWorld } from '../../world';
 import { DatabaseType } from '../index';
 
 const statsComponent = defineComponent({

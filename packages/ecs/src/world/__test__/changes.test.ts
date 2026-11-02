@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { ChangeConflictError, createWorld } from '@world';
+import { ChangeConflictError, createWorld } from '..';
+import { defineComponent, s } from '../../component';
 
 const statsComponent = defineComponent({
   id: 'statsChangeTest',

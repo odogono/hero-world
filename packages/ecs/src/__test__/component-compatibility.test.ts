@@ -1,8 +1,7 @@
 /* eslint-disable perfectionist/sort-objects */
 import { afterEach, describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-
+import { defineComponent, s } from '../component';
 import {
   compareComponentHashes,
   hashComponentDefinition

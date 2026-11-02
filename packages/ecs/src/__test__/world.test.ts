@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { defineComponent, s } from '@component';
-import { createWorld } from '@world';
+import { defineComponent, s } from '../component';
+import { createWorld } from '../world';
 
 describe('World', () => {
   test('should create world with predefined components', async () => {
