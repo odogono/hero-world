@@ -28,6 +28,8 @@ import {
 import { findRoomByMetaId } from './queries/room';
 import { createCommandContexts } from './scripts/commands';
 import { loadScripts } from './scripts/load';
+import type { NoticeHook } from './scripts/mua-capability';
+import { sendNotice } from './scripts/notices';
 import {
   NO_SCRIPTS,
   createScriptRunner,
@@ -144,13 +146,23 @@ export class MuaWorld {
     });
     // the command each Script is offered, for it to ask about
     const contexts = createCommandContexts();
-    const scriptedAtoms = await loadScripts(this.world, ecsTalk, contexts);
+    // `notice`, from a Script, needs the runner made from what loads
+    const noticeHook: NoticeHook = {};
+    const loaded = await loadScripts(this.world, ecsTalk, contexts, noticeHook);
     const scripts = createScriptRunner(
       this.world,
       ecsTalk,
-      scriptedAtoms,
-      contexts
+      loaded.atoms,
+      contexts,
+      loaded.services
     );
+    const world = this.world;
+    noticeHook.notice = (place, message, who) =>
+      sendNotice(world, scripts, {
+        args: [{ entity: who }],
+        message,
+        to: place
+      });
     this.scripts = scripts;
     const lifecycle = createLifecycle(this.world, scripts, this.places);
     this.lifecycle = lifecycle;

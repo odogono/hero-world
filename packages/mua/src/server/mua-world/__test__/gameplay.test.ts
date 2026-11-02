@@ -20,7 +20,7 @@ describe('Gameplay', () => {
   it('looks at the starting room', async () => {
     const conn = await login('bob');
 
-    const output = send(conn, 'look');
+    const output = await send(conn, 'look');
 
     expect(output).toContain('West of house');
     expect(output).toContain('the mailbox');
@@ -30,24 +30,24 @@ describe('Gameplay', () => {
   it('moves through an exit and describes the new room', async () => {
     const conn = await login('bob');
 
-    expect(send(conn, 'north')).toContain('North of house');
-    expect(send(conn, 'look')).toContain('North of house');
+    expect(await send(conn, 'north')).toContain('North of house');
+    expect(await send(conn, 'look')).toContain('North of house');
   });
 
   it('reports a blocked exit', async () => {
     const conn = await login('bob');
-    send(conn, 'north');
+    await send(conn, 'north');
 
-    expect(send(conn, 's')).toContain('The windows are all barred');
+    expect(await send(conn, 's')).toContain('The windows are all barred');
   });
 
   it('tells others in the room when someone arrives', async () => {
     const alice = await login('alice');
-    send(alice, 'north');
+    await send(alice, 'north');
 
     const bob = await login('bob');
     alice.messages.length = 0;
-    send(bob, 'north');
+    await send(bob, 'north');
 
     expect(alice.messages.join('\n')).toContain('bob arrives.');
   });
@@ -57,16 +57,20 @@ describe('Gameplay', () => {
     const bob = await login('bob');
     alice.messages.length = 0;
 
-    expect(send(bob, 'say Hello Alice')).toContain('You say, "Hello Alice"');
+    expect(await send(bob, 'say Hello Alice')).toContain(
+      'You say, "Hello Alice"'
+    );
     expect(alice.messages.join('\n')).toContain('bob says, "Hello Alice"');
   });
 
   it('repeats the previous command with again', async () => {
     const conn = await login('bob');
 
-    expect(send(conn, 'g')).toContain('There is nothing to repeat.');
-    send(conn, 'north');
-    expect(send(conn, 'again')).toContain("You can't go north from here.");
+    expect(await send(conn, 'g')).toContain('There is nothing to repeat.');
+    await send(conn, 'north');
+    expect(await send(conn, 'again')).toContain(
+      "You can't go north from here."
+    );
   });
 
   it('answers a command within one tick', async () => {
@@ -74,7 +78,7 @@ describe('Gameplay', () => {
     conn.messages.length = 0;
 
     world.muaWorld.onConnectionCommand(conn, 'look');
-    world.tick(1);
+    await world.muaWorld.tick(1000);
 
     expect(conn.messages.join('\n')).toContain('West of house');
   });
@@ -93,7 +97,7 @@ describe('Gameplay', () => {
   it('starts a look with the room, with no stray blank lines', async () => {
     const conn = await login('bob');
 
-    expect(send(conn, 'look')).toMatch(
+    expect(await send(conn, 'look')).toMatch(
       /^West of house\n.+\n\nThere is: the mailbox\nExits: north, south$/
     );
   });
@@ -101,16 +105,18 @@ describe('Gameplay', () => {
   it('lists the commands for help', async () => {
     const conn = await login('bob');
 
-    const help = send(conn, 'help');
+    const help = await send(conn, 'help');
     expect(help).toContain('Commands: look, move, take');
     expect(help).toContain('read');
   });
 
   it('reads what is written on a thing', async () => {
     const conn = await login('bob');
-    send(conn, 'open mailbox');
+    await send(conn, 'open mailbox');
 
-    expect(send(conn, 'read leaflet')).toStartWith('WELCOME TO MUA!');
-    expect(send(conn, 'read mailbox')).toBe("There's nothing written on it.");
+    expect(await send(conn, 'read leaflet')).toStartWith('WELCOME TO MUA!');
+    expect(await send(conn, 'read mailbox')).toBe(
+      "There's nothing written on it."
+    );
   });
 });

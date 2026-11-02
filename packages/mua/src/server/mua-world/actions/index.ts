@@ -4,14 +4,13 @@ import { createLog } from 'odgn-helpers/log';
 import { getEntity, getLocationOf } from '../queries/entity';
 import {
   NO_SCRIPTS,
+  type Receiver,
   type ScriptArg,
   type ScriptReply,
   type ScriptRunner
 } from '../scripts/runner';
 import { helpAction, readAction } from './help';
 import { lockAction, unlockAction } from './locks';
-import { lookAction } from './look';
-import { moveAction } from './move';
 import {
   closeAction,
   dropAction,
@@ -21,6 +20,7 @@ import {
   takeAction
 } from './objects';
 import { sayAction, sayToAction } from './say';
+import { isScripted, planScripted, scriptedOutcome } from './scripted';
 import {
   PASS,
   done,
@@ -43,8 +43,6 @@ const BUILT_IN: Record<string, Handler> = {
   help: helpAction,
   inventory: inventoryAction,
   lock: lockAction,
-  look: lookAction,
-  move: moveAction,
   open: openAction,
   read: readAction,
   say: sayAction,
@@ -61,10 +59,13 @@ const CANNOT = "You can't do that.";
 /** A fixed reply from the entity's `responses`, by role (or `veto`) and key */
 const responseFrom = (
   ctx: ActionContext,
-  id: EntityId,
+  id: Receiver,
   role: Role | 'veto',
   key: string = ctx.verb
 ): string | undefined => {
+  if (typeof id === 'object') {
+    return undefined;
+  }
   const entity = getEntity(ctx.world, id, ['responses']);
   const table: unknown = entity?.responses[role];
   if (typeof table !== 'object' || table === null) {
@@ -124,7 +125,7 @@ type Question = {
   args: ScriptArg[];
   /** A command is offered as a request; a veto question is a Decision */
   asks: 'decide' | 'offer';
-  id: EntityId;
+  id: Receiver;
   message: string;
   /** What a reply means: the command is handled, or the action is vetoed */
   onReply: (message: string | undefined) => ActionOutcome;
@@ -161,24 +162,18 @@ const vetoQuestions = (ctx: ActionContext): Question[] =>
   }));
 
 /**
- * Moves a command along the questions dispatch asks, and stops at the first
- * that settles it:
- * 1. the receivers — the room it happens in, the second object, the thing
- *    acted on — any of which may handle the command;
- * 2. the veto questions of the built-in action (see vetoes.ts), any of
- *    which may refuse it;
- * 3. the built-in action itself.
- * Each question is answered by a fixed response, else by Scripts. A Script
- * answers on a later pass, so the step may stop and wait; call it again
- * with the state it returned.
- */
-/**
  * Where the `after` questions' stages start. The questions before the
  * built-in are worked out from the world as it is, so once the built-in has
  * changed it (a taken thing has no more veto questions), their count can
  * change: `after` stages are numbered from here instead.
  */
 const AFTER_STAGE = 1000;
+
+/**
+ * The stage of a scripted action (see scripted.ts), between the questions
+ * and the `after` questions, numbered apart for the same reason.
+ */
+const ACTION_STAGE = 500;
 
 /** `afterExamine`, `afterTake`: the message sent once a built-in succeeds */
 const afterMessage = (verb: string) =>
@@ -233,7 +228,8 @@ const ask = (
  *    acted on — any of which may handle the command;
  * 2. the veto questions of the built-in action (see vetoes.ts), any of
  *    which may refuse it;
- * 3. the built-in action itself;
+ * 3. the action itself: a built-in, or for `look` and `move` a request to
+ *    one of mua's Service Scripts (see scripted.ts);
  * 4. once it has succeeded, `after<Verb>` (`afterExamine`) to the same
  *    receivers, whose replies are added to the built-in's.
  * Each question is answered by a fixed response, else by Scripts. A Script
@@ -247,7 +243,7 @@ export const stepCommand = (
   const options = { key, scripts, state };
   const questions = [...receiverQuestions(ctx), ...vetoQuestions(ctx)];
 
-  if (state.outcome === undefined) {
+  if (state.outcome === undefined && state.stage < ACTION_STAGE) {
     for (let stage = state.stage; stage < questions.length; stage++) {
       const question = questions[stage]!;
       if (question.response !== undefined) {
@@ -273,8 +269,19 @@ export const stepCommand = (
     }
   }
 
-  // the built-in runs once; its outcome is kept while `after` waits
-  const outcome = state.outcome ?? runBuiltIn(ctx);
+  // the action runs once; its outcome is kept while `after` waits
+  let outcome = state.outcome;
+  if (outcome === undefined) {
+    if (isScripted(ctx.verb)) {
+      const step = runScripted(ctx, options);
+      if (step.kind === 'waiting') {
+        return step;
+      }
+      outcome = step.outcome;
+    } else {
+      outcome = runBuiltIn(ctx);
+    }
+  }
   if (outcome.kind !== 'done') {
     return finished(outcome);
   }
@@ -312,6 +319,49 @@ export const stepCommand = (
     }
   }
   return finished({ ...outcome, message });
+};
+
+/**
+ * Runs a scripted action: sends its request to a Service Script, then waits
+ * for the reply. The request is planned only when first sent; once it has
+ * run, the world has changed and the plan would differ.
+ */
+const runScripted = (
+  ctx: ActionContext,
+  options: Required<StepOptions>
+): DispatchStep => {
+  const isSent = options.state.stage === ACTION_STAGE;
+  const plan = isSent ? undefined : planScripted(ctx);
+  if (plan && 'kind' in plan) {
+    return finished(plan.outcome);
+  }
+  const to = plan?.to ?? { service: ctx.verb };
+  if (!options.scripts.hasScript(to) && !isSent) {
+    return finished(PASS);
+  }
+  const question: Question = {
+    // a request already sent is answered from its key; these go unused
+    args: plan?.args ?? [],
+    asks: 'offer',
+    id: to,
+    message: plan?.message ?? ctx.verb,
+    onReply: message => scriptedOutcome(ctx, message ?? ''),
+    response: undefined
+  };
+  const asked = ask(ctx, question, ACTION_STAGE, options);
+  if (asked.kind === 'waiting') {
+    return asked;
+  }
+  if (asked.kind === 'gave up') {
+    return finished(refused('Nothing happens.'));
+  }
+  if (asked.reply.kind === 'replied') {
+    return finished(question.onReply(asked.reply.message));
+  }
+  if (asked.reply.kind === 'failed') {
+    return finished(refused('Something went wrong.'));
+  }
+  return finished(PASS);
 };
 
 /** Dispatches a command that no Script can delay, in one step */

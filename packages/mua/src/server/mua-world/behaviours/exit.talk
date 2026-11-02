@@ -1,0 +1,51 @@
+-- The exit Service: moving through an exit, as a Script. For `go north`,
+-- mua finds the exit, then asks:
+--   1. `beforeTraverse actor, way` of this Service, a Decision: a closed
+--      door vetoes it;
+--   2. `beforeExit` of the room left and `beforeEnter` of the room entered,
+--      which a world's Scripts may veto (see actions/vetoes.ts);
+--   3. if nothing vetoed, `traverse way, actor, origin, destination`, which
+--      moves the actor and returns what they see.
+
+use describe, isClosed from rooms
+
+on beforeTraverse actor, way, deciding
+  if the door of the portal of way is nothing then
+    pass beforeTraverse
+  end if
+  ask world to resolve the door of the portal of way
+  put it into door
+  if isClosed(door) then
+    put "door" into doorName
+    if the described of door is not nothing then
+      put lower(the name of the described of door) into doorName
+    end if
+    veto `The ${doorName} is closed.`
+  end if
+  pass beforeTraverse
+end beforeTraverse
+
+on traverse way, actor, origin, destination
+  moveTo actor, destination
+
+  -- the exit's `messages` can replace what is said as the actor passes
+  ask mua to message "move", "omsg", nothing, way
+  if it is not nothing then
+    tell mua to announce origin, it, actor
+  end if
+  ask mua to message "arrive", "omsg", nothing, way
+  if it is not nothing then
+    tell mua to announce destination, it, actor
+  end if
+
+  -- let the scripted things on each side notice
+  tell mua to notice origin, "departed", actor
+  tell mua to notice destination, "arrived", actor
+
+  put describe(destination, actor) into seen
+  ask mua to message "move", "msg", nothing, way
+  if it is nothing then
+    return seen
+  end if
+  return it & `\n` & seen
+end traverse

@@ -143,7 +143,8 @@ order:
 **For MUA.** You don't need classes for this. A data shape like
 `{ check, perform, describe }` per verb, with veto messages between `check` and
 `perform`, gives the same structure. Spell out the movement order once, in
-`move.ts`, and send the veto messages through scripts.
+`behaviours/exit.talk` (see `core-scripts.md`), and send the veto messages
+through scripts.
 
 ### 2.5 Veto and lifecycle messages
 
