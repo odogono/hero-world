@@ -43,9 +43,9 @@ function describe place, actor
     return "You are in darkness."
   end if
   ask world to find place, "described"
-  put filter(it, given t: the portal of t is nothing) into things
-  put filter(things, given t: the container of t is not nothing) into containers
-  put filter(things, given t: the item of t is not nothing and the container of t is nothing) into items
+  put every item of it whose portal is nothing into things
+  put every item of things whose container is not nothing into containers
+  put every item of things whose item is not nothing and it's container is nothing into items
 
   ask world to find place, "player"
   put map(filter(it, given p: p is not actor), given p: the name of the player of p) into people
@@ -58,16 +58,16 @@ function describe place, actor
 
   put [] into lines
   if items is not empty then
-    put [...lines, "You see: " & theNames(items)] into lines
+    put "You see: " & theNames(items) after lines
   end if
   if containers is not empty then
-    put [...lines, "There is: " & theNames(containers)] into lines
+    put "There is: " & theNames(containers) after lines
   end if
   if people is not empty then
-    put [...lines, "Also here: " & join(people, ", ")] into lines
+    put "Also here: " & join(people, ", ") after lines
   end if
   if ways is not empty then
-    put [...lines, "Exits: " & join(ways, ", ")] into lines
+    put "Exits: " & join(ways, ", ") after lines
   end if
 
   put the name of the described of place & `\n` & the description of the described of place into text
