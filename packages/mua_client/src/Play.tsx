@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { logout, sendCommand } from './connection';
-import { lines, status, type Status } from './store';
+import { actions, lines, status, type Status } from './store';
 import type { Line } from './transcript';
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -12,7 +12,18 @@ const STATUS_TEXT: Record<Status, string> = {
   replaced: 'Playing elsewhere'
 };
 
-const TranscriptLine = ({ line }: { line: Line }) => {
+/**
+ * A transcript line. Only the latest choice can be answered by clicking: a
+ * choice answers by its number, so an older list's numbers would mean
+ * nothing now.
+ */
+const TranscriptLine = ({
+  answerable,
+  line
+}: {
+  answerable: boolean;
+  line: Line;
+}) => {
   switch (line.kind) {
     case 'command':
       return (
@@ -33,9 +44,21 @@ const TranscriptLine = ({ line }: { line: Line }) => {
       return (
         <li class="line prompt">
           {line.text}
-          <ol>
-            {line.options.map(option => (
-              <li key={option}>{option}</li>
+          <ol class="choices">
+            {line.options.map((option, index) => (
+              <li key={`${index}-${option}`}>
+                {answerable ? (
+                  <button
+                    class="choice"
+                    onClick={() => sendCommand(String(index + 1))}
+                    type="button"
+                  >
+                    {option}
+                  </button>
+                ) : (
+                  option
+                )}
+              </li>
             ))}
           </ol>
         </li>
@@ -56,6 +79,7 @@ export const Play = ({
   const end = useRef<HTMLLIElement>(null);
   const joined = status.value === 'joined';
   const count = lines.value.length;
+  const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
 
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
@@ -86,10 +110,29 @@ export const Play = ({
       </header>
       <ul aria-label="Transcript" aria-live="polite" class="transcript">
         {lines.value.map(line => (
-          <TranscriptLine key={line.id} line={line} />
+          <TranscriptLine
+            answerable={joined && line.id === lastPrompt}
+            key={line.id}
+            line={line}
+          />
         ))}
         <li aria-hidden="true" ref={end} />
       </ul>
+      {actions.value.length > 0 && (
+        <nav aria-label="Actions" class="actions">
+          {actions.value.map(action => (
+            <button
+              class="chip"
+              disabled={!joined}
+              key={action}
+              onClick={() => sendCommand(action)}
+              type="button"
+            >
+              {action}
+            </button>
+          ))}
+        </nav>
+      )}
       <form class="prompt-line" onSubmit={submit}>
         <span class="caret">&gt;</span>
         <input

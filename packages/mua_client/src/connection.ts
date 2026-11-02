@@ -1,6 +1,6 @@
 import { Socket, type Channel } from 'phoenix';
 
-import { lines, status } from './store';
+import { actions, lines, status } from './store';
 import {
   append,
   confirmed,
@@ -12,6 +12,7 @@ import {
 
 type Output = { lines: string[] };
 type Prompt = { options: string[]; text: string };
+type State = { actions?: string[] };
 type Status = { status: 'connected' | 'limbo' | 'replaced' };
 
 let socket: Socket | undefined;
@@ -45,6 +46,9 @@ export const connect = (token: string, character: number) => {
     for (const text of told) {
       add({ kind: 'output', text });
     }
+  });
+  channel.on('state', ({ actions: next }: State) => {
+    actions.value = next ?? [];
   });
   channel.on('prompt', ({ options, text }: Prompt) =>
     add({ kind: 'prompt', options, text })
