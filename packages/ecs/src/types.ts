@@ -58,6 +58,8 @@ export type CDef = {
   columns: CDefColumnInfo[];
   hash: string;
   id: string;
+  /** Play changes this component, so a migration never overwrites it */
+  playState?: boolean;
   statements?: Record<string, string>;
   tableName?: string;
 };
