@@ -1,37 +1,20 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
+import {
+  command,
+  count,
+  enter,
+  lastLine,
+  leaveAll,
+  play,
+  transcript
+} from './helpers';
 
 // Two players in two browsers, through the first playable milestone
 // (docs/mua-next.md): sign in, meet, talk, move, share an item, and recover
 // from a dropped Connection.
 
-const transcript = (page: Page) => page.getByLabel('Transcript');
-const command = (page: Page) => page.getByLabel('Command');
-const lastLine = (page: Page) => transcript(page).locator('li.line').last();
-
-const play = async (page: Page, text: string) => {
-  await command(page).fill(text);
-  await command(page).press('Enter');
-};
-
-const enter = async (browser: Browser, email: string, name: string) => {
-  const page = await (await browser.newContext()).newPage();
-  await page.goto('/');
-  await page.getByLabel(/Email/).fill(email);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  // an Account that has a Character goes straight to it
-  const nameField = page.getByLabel('Name');
-  const status = page.getByRole('status');
-  await expect(nameField.or(status)).toBeVisible();
-  if (await nameField.isVisible()) {
-    await nameField.fill(name);
-    await page.getByRole('button', { name: 'Enter the world' }).click();
-  }
-  await expect(status).toHaveText('Connected');
-  return page;
-};
-
-const count = async (page: Page, text: string) =>
-  ((await transcript(page).textContent()) ?? '').split(text).length - 1;
+test.afterEach(leaveAll);
 
 test('two players meet, talk, move and share an item', async ({ browser }) => {
   const ada = await enter(browser, 'ada@example.com', 'Ada');

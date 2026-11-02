@@ -6,13 +6,13 @@ A browser plays one Character over a Phoenix Channel. The messages don't depend 
 
 `GET /` serves the browser client ([`packages/mua_client`](../../mua_client)), built into `priv/static`.
 
-| Request | Does |
-| --- | --- |
-| `GET /auth/google` | Redirects to Google. |
-| `GET /auth/google/callback` | Signs the identity in if its verified email is on `MUA_ALLOWLIST`, then redirects to `/`; `403` otherwise. |
-| `POST /auth/dev {email}` | The same, by email alone. Only in development and tests; never compiled into a release. |
-| `DELETE /auth` | Signs out. |
-| `GET /api/session` | `{account, characters: [{id, name, in_play}], socket_token}`, or `401`. |
+| Request                      | Does                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/google`           | Redirects to Google.                                                                                                            |
+| `GET /auth/google/callback`  | Signs the identity in if its verified email is on `MUA_ALLOWLIST`, then redirects to `/`; `403` otherwise.                      |
+| `POST /auth/dev {email}`     | The same, by email alone. Only in development and tests; never compiled into a release.                                         |
+| `DELETE /auth`               | Signs out.                                                                                                                      |
+| `GET /api/session`           | `{account, characters: [{id, name, in_play}], socket_token}`, or `401`.                                                         |
 | `POST /api/character {name}` | Makes the Account's Character: `201 {id, name}`. `409` if it has one already; `422 {error}` for `name_taken` or `invalid_name`. |
 
 The session is an HttpOnly, SameSite=Lax cookie, which keeps it off cross-site POSTs.
@@ -25,21 +25,21 @@ Joining brings the Character into play, or resumes control of it, and takes over
 
 ### From the client
 
-| Event | Payload | Reply |
-| --- | --- | --- |
+| Event     | Payload                                                                      | Reply                                                                    |
+| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `command` | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}` |
-| `logout` | `{}` | `ok`; the Character goes to Limbo at once and the Channel closes |
+| `logout`  | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes         |
 
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
 ### From the server
 
-| Event | Payload | When |
-| --- | --- | --- |
-| `output` | `{lines}` | Each line the Character is told, only after the World commits the change behind it (ADR 0012). |
-| `state` | `{room: {name, description, exits, items, players}, inventory, actions}` | On joining, and after each command. `actions` are commands the Character could type next. |
-| `prompt` | `{text, options}` | After a command, while the Character must choose: "Which do you mean?". The next command answers it. |
-| `status` | `{status}` | `connected` on joining; `replaced` when another Connection takes over, just before this one closes; `limbo` on logging out. |
+| Event    | Payload                                                                  | When                                                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output` | `{lines}`                                                                | Each line the Character is told, only after the World commits the change behind it (ADR 0012).                                                                                                                                   |
+| `state`  | `{room: {name, description, exits, items, players}, inventory, actions}` | On joining, and after each command. `actions` are commands the Character could type next.                                                                                                                                        |
+| `prompt` | `{text, options}`                                                        | After a command, while the Character must choose: "Which do you mean?". The next command answers it, by an option's number (from 1) or words that pick one. A choice whose thing has gone is refused, never swapped for another. |
+| `status` | `{status}`                                                               | `connected` on joining; `replaced` when another Connection takes over, just before this one closes; `limbo` on logging out.                                                                                                      |
 
 ## Connections and recovery
 

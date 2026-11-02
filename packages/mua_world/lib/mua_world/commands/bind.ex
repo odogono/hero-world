@@ -223,10 +223,19 @@ defmodule MuaWorld.Commands.Bind do
   # -- Pending commands -------------------------------------------------------
 
   @doc """
-  Reads a reply as the answer to "which do you mean?". Returns the chosen id,
-  or `nil` if the reply doesn't pick exactly one option.
+  Reads a reply as the answer to "which do you mean?": an option's number,
+  counting from 1, or words that pick exactly one option. Returns the chosen
+  id, or `nil` if the reply picks none.
   """
   def resolve_pending(%{"options" => options}, reply) do
+    case Integer.parse(String.trim(reply)) do
+      {n, ""} when n >= 1 and n <= length(options) -> Enum.at(options, n - 1)["id"]
+      {_, ""} -> nil
+      _ -> resolve_by_words(options, reply)
+    end
+  end
+
+  defp resolve_by_words(options, reply) do
     words = reply |> String.downcase() |> String.split() |> Enum.reject(&(&1 == "the"))
 
     case Enum.filter(

@@ -116,6 +116,26 @@ defmodule MuaWorld.ObjectsTest do
       assert send_bob(c, "inventory") == "You are carrying: the brass key."
     end
 
+    test "takes the option's number as an answer", c do
+      send_bob(c, "take key")
+      assert send_bob(c, "2") == "Taken."
+      assert send_bob(c, "inventory") == "You are carrying: the iron key."
+    end
+
+    test "treats a number that is no option as a new command", c do
+      send_bob(c, "take key")
+      assert send_bob(c, "3") == ~s(Unknown command: "3")
+    end
+
+    test "fails safely when the chosen thing has gone", c do
+      alice = join(c.world, "alice")
+      assert send_bob(c, "take key") == "Which do you mean: the brass key or the iron key?"
+      assert send_command(c.world, alice, "take brass key") == "Taken."
+
+      assert send_bob(c, "brass") == "That is no longer here."
+      assert send_bob(c, "inventory") == "You are empty-handed."
+    end
+
     test "uses adjectives to tell things apart", c do
       assert send_bob(c, "take iron key") == "Taken."
     end

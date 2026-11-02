@@ -1,0 +1,82 @@
+# A manor for the browser checks of scripted interactions: a door between
+# the hall and the study, a chest holding a closed box, two keys, and a cat
+# that wanders in from the kitchen and talks on a short timer.
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom npc {
+  npc { active: true }
+}
+
+atom cat {
+  script { src: "scripts/cat.talk" }
+}
+
+entity oak_door {
+  described { name: "oak door" description: "A heavy oak door." }
+  noun { words: ["door"] }
+  door { is_closed: true }
+}
+
+entity hall: room {
+  meta { props: { id: "hall" } }
+  described { name: "Hall" description: "A draughty hall with a stone floor." }
+  exits { north: { to: $study door: $oak_door } east: $kitchen }
+}
+
+entity study: room {
+  meta { props: { id: "study" } }
+  described { name: "Study" description: "Shelves of dusty books." }
+}
+
+entity kitchen: room {
+  meta { props: { id: "kitchen" } }
+  described { name: "Kitchen" description: "It smells of bread." }
+}
+
+entity chest {
+  meta { props: { id: "chest" } }
+  described { name: "chest" description: "A wide wooden chest." }
+  container { capacity: 10 is_closed: false }
+  location { in: $hall }
+}
+
+entity box: item {
+  meta { props: { id: "box" } }
+  described { name: "box" description: "A small lacquered box." }
+  container { capacity: 2 is_closed: true }
+  location { in: $chest }
+}
+
+entity gem: item {
+  meta { props: { id: "gem" } }
+  described { name: "gem" description: "A glittering green gem." }
+  location { in: $box }
+}
+
+entity brass_key: item {
+  meta { props: { id: "brass_key" } }
+  described { name: "brass key" description: "A small brass key." }
+  noun { words: ["key"] }
+  location { in: $hall }
+}
+
+entity iron_key: item {
+  meta { props: { id: "iron_key" } }
+  described { name: "iron key" description: "A rusty iron key." }
+  noun { words: ["key"] }
+  location { in: $hall }
+}
+
+entity tabby: npc cat {
+  meta { props: { id: "tabby" } }
+  described { name: "cat" description: "A sleek tabby cat." }
+  noun { words: ["cat", "tabby"] }
+  location { in: $kitchen }
+}
