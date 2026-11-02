@@ -6,4 +6,4 @@ The server keeps its world in a SQLite file (`MUA_DB`). The EDL builds it only w
 
 - **Editing the EDL doesn't change a running world.** New rooms, items or Scripts appear only in a fresh world: delete the file to rebuild it. Script source is read from its file on every start, so changes to a `.talk` file do apply.
 - Players who were online when the server stopped wait in Limbo until they log in again.
-- Migrating an existing world to a changed EDL is an open problem.
+- Migrating an existing world to a changed EDL: see ADR 0005.

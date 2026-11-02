@@ -29,7 +29,7 @@ const stats = defineComponent({
 - `world.delete(entity)` marks the entity for deletion when the world is next flushed.
 - `world.query(opts)` returns one entity or `null`; `world.queryAll(opts)` returns an array; `world.queryIterator(opts)` returns a `using`-disposable iterator.
 - `world.flush()` writes the pending changes and deletions in one transaction.
-- `world.executeEDL(source, { path })`: see `docs/EDL.md`.
+- `world.executeEDL(source, { path })`: see `docs/EDL.md`. `migrateEDL(world, source, { dryRun, prune })` brings a built world up to date with a changed EDL (`docs/EDL.md`, Migrating a world).
 - Lineage and Scripts: `getEntityLineage(eid)`, `getAtomLineage(name)` and `getScriptOwners()`.
 - `saveWorld` / `loadWorld` and `world.saveToJSON` / `loadFromJSON` persist a world.
 

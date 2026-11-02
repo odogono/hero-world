@@ -15,6 +15,7 @@ export const defineComponent = <
 ): CDefWithSchema<S, Name> => {
   const {
     id: componentId,
+    playState,
     schema,
     statements,
     tableName: tableNameProp
@@ -53,6 +54,7 @@ export const defineComponent = <
     columns,
     hash,
     id: componentId as Name,
+    ...(playState ? { playState } : {}),
     statements
   } as CDefWithSchema<S, Name>;
 };

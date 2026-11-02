@@ -1,52 +1,23 @@
-import { dirname, resolve } from 'node:path';
-
 import { toCamelCase } from 'odgn-helpers/string';
 
-import { parseEDL } from '.';
 import { addComponents } from '../component';
 import type { Components } from '../types';
 import { World } from '../world';
 import {
+  compileEDL,
+  hashEDL,
+  resolveEDL,
+  scriptPath,
+  type ComponentData
+} from './compile';
+import {
   EDLCircularReferenceError,
   EDLExecutionError,
-  EDLInvalidExtendError,
-  EDLMissingComponentError,
   EDLMissingPropertyError,
-  EDLParseError,
   EDLUnknownEntityReferenceError
 } from './errors';
 
-type ComponentData = Record<string, Record<string, unknown>>;
-
-type EDLNode = {
-  components?: ComponentData;
-  extends?: string[];
-  id?: string;
-  type: string;
-};
-
-type EDLSyntaxError = {
-  location?: { start?: { column?: unknown; line?: unknown } };
-  message?: unknown;
-};
-
 type EntityRef = { id: number; world: World<Components> };
-
-const mergeComponents = (
-  base: ComponentData,
-  extension?: ComponentData
-): ComponentData => {
-  if (!extension) {
-    return { ...base };
-  }
-  const out: ComponentData = { ...base };
-  for (const [name, data] of Object.entries(extension)) {
-    out[name] = out[name]
-      ? { ...(out[name] as Record<string, unknown>), ...data }
-      : data;
-  }
-  return out;
-};
 
 export type ExecuteOptions = {
   commands?: Record<string, (...args: unknown[]) => void>;
@@ -54,338 +25,37 @@ export type ExecuteOptions = {
   path?: string;
 };
 
-/** The component that attaches a NorthTalk Script to an atom or entity */
-const SCRIPT_COMPONENT = 'script';
-
-const scriptPath = (
-  own: ComponentData,
-  edlPath: string | undefined
-): string | undefined => {
-  const src = own[SCRIPT_COMPONENT]?.src;
-  if (typeof src !== 'string' || src.length === 0) {
-    return undefined;
-  }
-  return edlPath ? resolve(dirname(edlPath), src) : src;
-};
-
-const stripComments = (line: string) => {
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"' && line[i - 1] !== '\\') {
-      inQuotes = !inQuotes;
-    }
-    if (ch === '#' && !inQuotes) {
-      return line.slice(0, i);
-    }
-  }
-  return line;
-};
-
-// Lightweight command tokenizer supporting quoted strings and comments
-const tokenize = (line: string): string[] => {
-  const tokens: string[] = [];
-  const re = /"([^"\\]|\\.)*"|\S+/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(line))) {
-    const tok = match[0];
-    if (tok.startsWith('"')) {
-      // Unquote + unescape
-      const inner = tok.slice(1, -1);
-      tokens.push(
-        inner.replaceAll(/\\(["\\nrt])/g, (_m, c) => {
-          switch (c) {
-            case 'n':
-              return '\n';
-            case 'r':
-              return '\r';
-            case 't':
-              return '\t';
-            case '"':
-              return '"';
-            case '\\':
-            default:
-              return '\\';
-          }
-        })
-      );
-    } else {
-      tokens.push(tok);
-    }
-  }
-  return tokens;
-};
-
-const parseCommands = (edl: string) => {
-  const lines = edl.split(/\r?\n/);
-  const commands: Array<{ name: string; rawArgs: string[] }> = [];
-
-  for (let raw of lines) {
-    raw = stripComments(raw).trim();
-    if (!raw || raw[0] !== '!') {
-      continue;
-    }
-    const toks = tokenize(raw);
-    const [name, ...rawArgs] = toks;
-    if (name === undefined) {
-      continue;
-    }
-    commands.push({ name, rawArgs });
-  }
-
-  return commands;
-};
-
 export const executeEDL = <T extends Components>(
   world: World<T>,
   edl: string,
   options: ExecuteOptions = {}
 ): void => {
-  const commands = parseCommands(edl);
-  // Remove command lines before parsing entity/atom definitions
-  const origLines = edl.split(/\r?\n/);
-  const includeMap: Array<{ originalIndex: number; text: string }> = [];
-  const parseLines: string[] = [];
-  for (const [i, line] of origLines.entries()) {
-    const stripped = stripComments(line);
-    const trimmed = stripped.trim();
-    if (trimmed.length > 0 && trimmed[0] !== '!') {
-      // Keep left whitespace intact in the parse buffer so columns align
-      parseLines.push(stripped);
-      includeMap.push({ originalIndex: i, text: line });
-    }
-  }
-  const edlForParse = parseLines.join('\n');
+  const compiled = compileEDL(edl);
+  const { atoms: rawAtoms, commands, entities } = compiled;
 
-  let defs: EDLNode[];
-  try {
-    defs = parseEDL(edlForParse);
-  } catch (error_: unknown) {
-    const error = error_ as EDLSyntaxError | undefined;
-    // Try to produce a friendly error with original line/column and a code frame
-    const loc = error?.location?.start;
-    if (loc && typeof loc.line === 'number' && typeof loc.column === 'number') {
-      const mapped = includeMap[loc.line - 1];
-      const origIndex = mapped?.originalIndex ?? loc.line - 1; // fallback
-      const displayLineNo = origIndex + 1;
-      const lineText = (
-        mapped?.text ??
-        parseLines[loc.line - 1] ??
-        ''
-      ).toString();
-      const caret = ' '.repeat(Math.max(0, loc.column - 1)) + '^';
-
-      const prev = origLines[origIndex - 1];
-      const next = origLines[origIndex + 1];
-
-      const frameParts: string[] = [];
-      if (prev !== undefined) {
-        frameParts.push(`${displayLineNo - 1} | ${prev}`);
-      }
-      frameParts.push(`${displayLineNo} | ${lineText}`, `    | ${caret}`);
-      if (next !== undefined) {
-        frameParts.push(`${displayLineNo + 1} | ${next}`);
-      }
-
-      const friendly = [
-        `EDL syntax error at line ${displayLineNo}, column ${loc.column}:`,
-        String(error?.message ?? 'Syntax error'),
-        '',
-        ...frameParts
-      ].join('\n');
-
-      throw new EDLParseError(friendly, {
-        column: loc.column,
-        line: displayLineNo
-      });
-    }
-
-    // Fallback if no location is available
-    throw new EDLParseError(String(error?.message ?? 'EDL parse error'));
-  }
-
-  // Atoms are templates that can be extended by entities (and other atoms)
-  // We'll first collect raw atoms (own + extends), then resolve into `atoms`.
-  const rawAtoms = new Map<string, { extends: string[]; own: ComponentData }>();
-  const atoms = new Map<string, ComponentData>();
-  // Track created entities and their planned components prior to reference resolution
-  const entityIdsByName = new Map<string, number>();
-  const entityNameById = new Map<number, string | undefined>();
-  const plannedComponentsById = new Map<number, ComponentData>();
+  // Create entities without components to avoid schema validation before
+  // resolving refs
   const entitiesById = new Map<number, EntityRef>();
-  const entityPlansById = new Map<
-    number,
-    { extends: string[]; own: ComponentData }
-  >();
-
-  // First pass: collect atoms and create empty entities, record merged component plans
-  for (const def of defs) {
-    if (def.type === 'atom') {
-      if (def.id) {
-        rawAtoms.set(def.id, {
-          extends: def.extends ?? [],
-          own: def.components || {}
-        });
-      }
-      continue;
-    }
-    if (def.type !== 'entity') {
-      // Ignore component definitions
-      continue;
-    }
-
-    // Create entity without components to avoid schema validation before resolving refs
+  const entityIdsByName = new Map<string, number>();
+  const ids = entities.map(def => {
     const entity = world.create();
     entitiesById.set(entity.id, entity as unknown as EntityRef);
-    if (def.id) {
-      entityIdsByName.set(def.id, entity.id);
+    if (def.name) {
+      entityIdsByName.set(def.name, entity.id);
     }
-    entityNameById.set(entity.id, def.id);
-    entityPlansById.set(entity.id, {
-      extends: def.extends ?? [],
-      own: def.components || {}
-    });
-  }
+    return entity.id;
+  });
 
-  // Collect errors during inheritance/reference resolution
-  const errors: Array<
-    | EDLUnknownEntityReferenceError
-    | EDLMissingComponentError
-    | EDLMissingPropertyError
-    | EDLCircularReferenceError
-    | EDLInvalidExtendError
-  > = [];
-
-  // Resolve atom inheritance (atoms can extend other atoms)
-  const resolvedAtoms = new Map<string, ComponentData>();
-  const resolveAtom = (
-    name: string,
-    stack: Set<string> = new Set()
-  ): ComponentData => {
-    if (resolvedAtoms.has(name)) {
-      return resolvedAtoms.get(name)!;
-    }
-    const atom = rawAtoms.get(name);
-    if (!atom) {
-      return {};
-    }
-    if (stack.has(name)) {
-      errors.push(new EDLCircularReferenceError(`extends:${name}`));
-      return {};
-    }
-    stack.add(name);
-    let inherited: ComponentData = {};
-    for (const base of atom.extends) {
-      if (!rawAtoms.has(base) && entityIdsByName.has(base)) {
-        errors.push(new EDLInvalidExtendError(name, base));
-        continue;
-      }
-      if (!rawAtoms.has(base)) {
-        continue; // unknown atom base ignored here
-      }
-      const baseResolved = resolveAtom(base, stack);
-      inherited = mergeComponents(inherited, baseResolved);
-    }
-    const combined = mergeComponents(inherited, atom.own);
-    resolvedAtoms.set(name, combined);
-    return combined;
-  };
-
-  for (const name of rawAtoms.keys()) {
-    atoms.set(name, resolveAtom(name));
-  }
-
-  // Resolve inheritance for entities: only atoms may be extended
-  for (const [eid, plan] of entityPlansById.entries()) {
-    let inherited: ComponentData = {};
-    for (const ext of plan.extends) {
-      if (atoms.has(ext)) {
-        inherited = mergeComponents(inherited, atoms.get(ext));
-      } else if (entityIdsByName.has(ext)) {
-        errors.push(
-          new EDLInvalidExtendError(entityNameById.get(eid) ?? String(eid), ext)
-        );
-      }
-    }
-    plannedComponentsById.set(eid, mergeComponents(inherited, plan.own));
-  }
-
-  // Helper to resolve reference strings like $name or $name.comp.prop
-  const resolveRef = (ref: string, seen: Set<string> = new Set()): unknown => {
-    if (!ref.startsWith('$')) {
-      return ref;
-    }
-    if (seen.has(ref)) {
-      errors.push(new EDLCircularReferenceError(ref));
-      return undefined;
-    }
-    seen.add(ref);
-    const path = ref.slice(1).split('.');
-    const [entityName = '', componentName = '', ...propPath] = path;
-    const targetId = entityIdsByName.get(entityName);
-    if (targetId === undefined) {
-      errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
-      return undefined;
-    }
-    if (!componentName) {
-      return targetId; // $name resolves to entity id
-    }
-    // Look up in planned components (pre-resolution) and then resolve recursively if needed
-    const plan = plannedComponentsById.get(targetId);
-    if (!plan) {
-      errors.push(new EDLUnknownEntityReferenceError(entityName, { ref }));
-      return undefined;
-    }
-    const compKey = componentName;
-    if (!(compKey in plan)) {
-      errors.push(new EDLMissingComponentError(entityName, componentName));
-      return undefined;
-    }
-    let value: unknown = plan[compKey];
-    for (const key of propPath) {
-      if (value == null) {
-        break;
-      }
-      value = (value as Record<string, unknown>)[key];
-      if (value === undefined) {
-        errors.push(
-          new EDLMissingPropertyError(
-            entityName,
-            `${componentName}.${propPath.join('.')}`
-          )
-        );
-        return undefined;
-      }
-    }
-    if (typeof value === 'string' && value.startsWith('$')) {
-      return resolveRef(value, seen);
-    }
-    return value;
-  };
-
-  // Deeply resolve references within an object
-  const resolveObject = (obj: unknown): unknown => {
-    if (Array.isArray(obj)) {
-      return obj.map(resolveObject);
-    }
-    if (obj && typeof obj === 'object') {
-      const out: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(obj)) {
-        out[k] = resolveObject(v);
-      }
-      return out;
-    }
-    if (typeof obj === 'string' && obj.startsWith('$')) {
-      return resolveRef(obj);
-    }
-    return obj;
-  };
-
-  // Second pass: resolve references and add components to entities
-  for (const [eid, plan] of plannedComponentsById.entries()) {
-    const resolved = resolveObject(plan) as ComponentData;
+  const resolved = resolveEDL(compiled, ids);
+  const { errors } = resolved;
+  const plannedComponentsById = new Map<number, ComponentData>();
+  for (const [i, eid] of ids.entries()) {
+    plannedComponentsById.set(eid, resolved.planned[i]!);
     const entity = entitiesById.get(eid)!;
-    addComponents(entity as Parameters<typeof addComponents>[0], resolved);
+    addComponents(
+      entity as Parameters<typeof addComponents>[0],
+      resolved.components[i]!
+    );
   }
 
   if (errors.length > 0) {
@@ -396,8 +66,8 @@ export const executeEDL = <T extends Components>(
   for (const [name, atom] of rawAtoms.entries()) {
     world.setAtomLineage(name, atom.extends);
   }
-  for (const [eid, plan] of entityPlansById.entries()) {
-    world.setEntityLineage(eid, plan.extends);
+  for (const [i, def] of entities.entries()) {
+    world.setEntityLineage(ids[i]!, def.extends);
   }
 
   // Record Script owners: only atoms and entities that declare `script`
@@ -408,12 +78,18 @@ export const executeEDL = <T extends Components>(
       world.setScriptOwner('atom', name, path);
     }
   }
-  for (const [eid, plan] of entityPlansById.entries()) {
-    const path = scriptPath(plan.own, options.path);
+  for (const [i, def] of entities.entries()) {
+    const path = scriptPath(def.own, options.path);
     if (path) {
-      world.setScriptOwner('entity', eid, path);
+      world.setScriptOwner('entity', ids[i]!, path);
     }
   }
+
+  // Record Definition names, and the EDL they came from, for migrations
+  for (const [name, eid] of entityIdsByName) {
+    world.setDefinitionName(name, eid);
+  }
+  world.setEDLHash(hashEDL(edl));
 
   // Persist initial entities/components so rows (ids) exist for command refs
   world.flush();

@@ -290,6 +290,61 @@ export class World<TComponents extends Components> {
     );
   }
 
+  /** Record, and save, the Definition name an entity was given in the EDL */
+  setDefinitionName(name: string, eid: number) {
+    this.db.exec(
+      'INSERT OR REPLACE INTO tbl_definition_name (name, eid) VALUES (?1, ?2)',
+      [name, eid]
+    );
+  }
+
+  /** Forget a Definition name, once its entity is out of play */
+  deleteDefinitionName(name: string) {
+    this.db.exec('DELETE FROM tbl_definition_name WHERE name = ?1', [name]);
+  }
+
+  /** Each Definition name the EDL gave, with the id of its entity */
+  getDefinitionNames(): Map<string, number> {
+    const rows = this.db.query('SELECT name, eid FROM tbl_definition_name') as {
+      eid: number;
+      name: string;
+    }[];
+    return new Map(rows.map(({ eid, name }) => [name, eid]));
+  }
+
+  /** Save the hash of the EDL the world was last built or migrated from */
+  setEDLHash(hash: string) {
+    this.db.exec(
+      "INSERT OR REPLACE INTO tbl_edl (key, value) VALUES ('hash', ?1)",
+      [hash]
+    );
+  }
+
+  /** The hash of the EDL the world was last built or migrated from */
+  getEDLHash(): string | undefined {
+    const rows = this.db.query(
+      "SELECT value FROM tbl_edl WHERE key = 'hash'"
+    ) as { value: string }[];
+    return rows[0]?.value;
+  }
+
+  /** Forget the saved Lineage and Script owners of every atom */
+  clearAtoms() {
+    this.atomLineage.clear();
+    this.atomScripts.clear();
+    this.db.exec("DELETE FROM tbl_lineage WHERE kind = 'atom'");
+    this.db.exec("DELETE FROM tbl_script_owner WHERE kind = 'atom'");
+  }
+
+  /** Forget the Script an entity owns */
+  deleteEntityScriptOwner(eid: number) {
+    this.entityScripts.delete(eid);
+    this.db.exec(
+      "DELETE FROM tbl_script_owner WHERE kind = 'entity' AND name = ?1",
+      [String(eid)]
+    );
+  }
+
   /** The ordered base atoms an entity was built from (empty if none) */
   getEntityLineage(eid: number): string[] {
     return [...(this.entityLineage.get(eid) ?? [])];
@@ -875,6 +930,13 @@ const initialiseWorldDb = async <TComponents extends Components>(
   );
   world.db.exec(
     `CREATE TABLE IF NOT EXISTS tbl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name))`
+  );
+  // Definition names and the EDL's hash, recorded by EDL, for migrations
+  world.db.exec(
+    `CREATE TABLE IF NOT EXISTS tbl_definition_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL)`
+  );
+  world.db.exec(
+    `CREATE TABLE IF NOT EXISTS tbl_edl (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
   );
   loadLineage(world);
 

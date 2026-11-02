@@ -99,6 +99,25 @@ entity vault_door: door {
 - `world.getScriptOwners()` lists owners as `{ kind: 'atom', name, src }` or `{ kind: 'entity', eid, src }`.
 - `serializeEDL` writes `script` like any other component.
 
+## Migrating a world
+
+`executeEDL` saves each entity's Definition name (`entity hall` → `hall`) with its id, and a hash of the EDL source. A world built once can later be brought up to date with a changed EDL (ADR 0005):
+
+```ts
+import { isEDLChanged, migrateEDL } from 'odgn-ecs/edl';
+
+if (isEDLChanged(world, edl)) {
+  const plan = migrateEDL(world, edl, { dryRun: true, path });
+}
+```
+
+- New Definition names are created. An entity deleted during play is listed in `missing` and not brought back.
+- For an entity already in the world, components the EDL now gives it are added; static components are set to exactly what the EDL says, and removed when it no longer gives them. A component defined with `playState: true` (`defineComponent({ id, playState: true, schema })`) is added if missing but never overwritten or removed.
+- Lineage and Script owners are rewritten from the EDL.
+- Entities whose name is gone from the EDL are listed in `gone`. Pass `prune: eid => …` to take them out of play; their names are then forgotten.
+- `dryRun: true` returns the plan and changes nothing. Of the commands, only `!set` is applied.
+- `adoptDefinitionNames(world, originalEDL)` names the entities of a world built before names were saved, from the EDL it was first built with.
+
 ## Commands
 
 - Lines beginning with `!` are parsed as commands and executed after definitions.

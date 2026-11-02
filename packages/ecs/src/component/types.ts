@@ -45,6 +45,8 @@ export type DefineComponentProps<
   Name extends string
 > = {
   id: Name;
+  /** Play changes this component, so a migration never overwrites it */
+  playState?: boolean;
   schema: S;
   statements?: Record<string, string>;
   tableName?: string;
