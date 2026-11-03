@@ -115,6 +115,30 @@ defmodule MuaServer.OperationsTest do
     end
   end
 
+  describe "load_players" do
+    test "refuses on a server not started for a load test" do
+      System.delete_env("MUA_LOAD_TEST")
+      assert_raise RuntimeError, ~r/MUA_LOAD_TEST/, fn -> Release.load_players(1) end
+    end
+
+    test "makes players whose tokens open the socket, the same each time" do
+      System.put_env("MUA_LOAD_TEST", "true")
+      on_exit(fn -> System.delete_env("MUA_LOAD_TEST") end)
+
+      output = capture_io(fn -> assert {:ok, 2} = Release.load_players(2) end)
+      [%{"character" => c1, "token" => token}, %{"character" => c2}] = Jason.decode!(output)
+      assert c1 != c2
+
+      assert {:ok, account} =
+               Phoenix.Token.verify(MuaServer.Endpoint, "socket", token, max_age: 60)
+
+      assert [%{id: ^c1}] = MuaWorld.characters(MuaServer.World, account)
+
+      again = capture_io(fn -> Release.load_players(2) end) |> Jason.decode!()
+      assert Enum.map(again, & &1["character"]) == [c1, c2]
+    end
+  end
+
   test "the maintenance script is valid shell" do
     script = Path.expand("../rel/maintain.sh", __DIR__)
     assert {_, 0} = System.cmd("sh", ["-n", script])
