@@ -309,8 +309,8 @@ fi
 
 # ── 4 ──────────────────────────────────────────────────────────────────────
 stage "Who may play, and who is an Admin"
-say "Comma-separated Google emails. Changing them later means editing"
-say "$ENV_FILE and restarting the container (docker restart $CONTAINER)."
+say "Comma-separated Google emails. To change them later, edit $ENV_FILE"
+say "and run packages/mua_server/rel/reload-env.sh: docker restart keeps the old values."
 if configured MUA_ALLOWLIST MUA_ADMINS; then
   note "Allowlist: $(_existing MUA_ALLOWLIST)"
   note "Admins:    $(_existing MUA_ADMINS)"
