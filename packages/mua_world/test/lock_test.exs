@@ -32,7 +32,15 @@ defmodule MuaWorld.LockTest do
   test "takes over a lock left by another OS process that is gone", %{tmp_dir: dir} do
     db = Path.join(dir, "w.db")
     # a pid no process has: beyond the usual maximum
-    File.write!(Lock.path(db), "99999999 <0.1.0>\n")
+    File.write!(Lock.path(db), "99999999 token <0.1.0>\n")
+    assert :ok = Lock.acquire(db)
+  end
+
+  test "takes over a lock left by an earlier VM with this OS process id", %{tmp_dir: dir} do
+    db = Path.join(dir, "w.db")
+    # as after a restart in a container, where the OS process id repeats
+    # and the Erlang process happens to be alive in the new VM
+    File.write!(Lock.path(db), "#{System.pid()} earlier-vm #{:erlang.pid_to_list(self())}\n")
     assert :ok = Lock.acquire(db)
   end
 

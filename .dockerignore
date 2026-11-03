@@ -1,0 +1,11 @@
+**/node_modules
+**/_build
+**/deps
+**/.elixir_ls
+**/test-results
+**/playwright-report
+**/*.db
+**/*.db-*
+**/*.db.lock
+packages/mua_server/priv/static
+.git

@@ -175,3 +175,18 @@ jobs:
       - run: mix deps.get && mix compile
         working-directory: packages/mua_server
       - run: bun run e2e
+
+  # The alpha's release image builds from a clean checkout (#130). Nothing is
+  # pushed.
+  release-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: mua:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

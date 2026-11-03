@@ -35,10 +35,10 @@ export default defineConfig({
     command: 'mix phx.server',
     cwd: resolve(import.meta.dirname, '../mua_server'),
     env: {
+      DATABASE_PATH: join(run, world.name, 'world.db'),
       MIX_ENV: 'dev',
       MUA_ADMINS: 'ada@example.com',
       MUA_ALLOWLIST: 'ada@example.com,bob@example.com',
-      MUA_DB: join(run, world.name, 'world.db'),
       MUA_EDL: resolve(import.meta.dirname, 'e2e/fixtures', world.edl),
       MUA_STARTING_ROOM: world.start,
       PORT: String(world.port)
