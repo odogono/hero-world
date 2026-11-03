@@ -68,6 +68,91 @@ const TranscriptLine = ({
   }
 };
 
+/**
+ * Fits a textarea's height to its text, up to the stylesheet's cap. Browsers
+ * with `field-sizing: content` do this themselves.
+ */
+const fit = (el: HTMLTextAreaElement | null | undefined) => {
+  if (el && !CSS.supports?.('field-sizing', 'content')) {
+    el.style.height = 'auto';
+    el.style.height = el.value ? `${el.scrollHeight}px` : '';
+  }
+};
+
+/**
+ * The command box: a card that grows with what is typed. Enter sends, and
+ * Shift+Enter starts a new line, for an admin's NorthTalk of more than one
+ * statement.
+ */
+const Composer = ({ joined }: { joined: boolean }) => {
+  const [text, setText] = useState('');
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  const command = text.trim();
+
+  const submit = (event?: Event) => {
+    event?.preventDefault();
+    if (command && sendCommand(command)) {
+      setText('');
+      const form = (event?.currentTarget as HTMLElement | null)?.closest(
+        'form'
+      );
+      const el = form?.querySelector('textarea');
+      if (el) {
+        el.value = '';
+        fit(el);
+      }
+    }
+  };
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+      submit(event);
+    }
+  };
+
+  return (
+    <form
+      class="composer"
+      onClick={() => box.current?.focus()}
+      onSubmit={submit}
+    >
+      <textarea
+        aria-label="Command"
+        autoComplete="off"
+        autoFocus
+        disabled={!joined}
+        onInput={e => {
+          setText(e.currentTarget.value);
+          fit(e.currentTarget);
+        }}
+        onKeyDown={onKeyDown}
+        placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
+        ref={box}
+        rows={1}
+        spellcheck={false}
+        value={text}
+      />
+      <div class="composer-bar">
+        <span class="hint">
+          <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new
+          line
+        </span>
+        <button
+          aria-label="Send"
+          class="send"
+          disabled={!joined || !command}
+          type="submit"
+        >
+          <svg aria-hidden="true" viewBox="0 0 16 16">
+            <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  );
+};
+
 export const Play = ({
   name,
   onLeft
@@ -75,7 +160,6 @@ export const Play = ({
   name: string;
   onLeft: () => void;
 }) => {
-  const [text, setText] = useState('');
   const end = useRef<HTMLLIElement>(null);
   const joined = status.value === 'joined';
   const count = lines.value.length;
@@ -84,13 +168,6 @@ export const Play = ({
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
   }, [count]);
-
-  const submit = (event: Event) => {
-    event.preventDefault();
-    if (text.trim() && sendCommand(text.trim())) {
-      setText('');
-    }
-  };
 
   const leave = async () => {
     await logout();
@@ -133,18 +210,7 @@ export const Play = ({
           ))}
         </nav>
       )}
-      <form class="prompt-line" onSubmit={submit}>
-        <span class="caret">&gt;</span>
-        <input
-          aria-label="Command"
-          autoComplete="off"
-          autoFocus
-          disabled={!joined}
-          onInput={e => setText(e.currentTarget.value)}
-          placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
-          value={text}
-        />
-      </form>
+      <Composer joined={joined} />
     </div>
   );
 };
