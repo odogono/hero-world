@@ -1,5 +1,8 @@
 # One World for the whole run, on a fresh database
-dir = Path.join(System.tmp_dir!(), "mua_server_test_#{System.unique_integer([:positive])}")
+# (the OS pid, as unique_integer repeats from run to run and would reuse a
+# database another checkout left behind)
+dir = Path.join(System.tmp_dir!(), "mua_server_test_#{System.pid()}")
+File.rm_rf!(dir)
 File.mkdir_p!(dir)
 
 world = [
