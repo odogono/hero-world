@@ -16,12 +16,43 @@ MUA_ALLOWLIST=you@example.com mix phx.server   # dev, on http://localhost:4000
 
 ## Configuration
 
-| Variable | Default |
-| --- | --- |
-| `MUA_DB` | `data/world.db` |
-| `MUA_EDL` | `mua_world`'s `priv/edl/main.edl` |
-| `MUA_STARTING_ROOM` | `west_of_house` |
-| `MUA_ALLOWLIST` | nobody: comma-separated emails |
-| `MUA_ADMINS` | nobody: comma-separated emails of admins, who can run NorthTalk at the prompt with `;` |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | none; the redirect defaults to `http://localhost:4000/auth/google/callback` |
-| `SECRET_KEY_BASE`, `PORT` | in production only |
+Everything comes from the environment, read at start (`config/runtime.exs`). In a release, a variable marked *required* that is missing stops the server at once, naming it.
+
+| Variable | Release | Elsewhere |
+| --- | --- | --- |
+| `DATABASE_PATH` | required; the image sets `/data/world.db` | `data/world.db` |
+| `MUA_STARTING_ROOM` | required, a Definition name | `west_of_house` |
+| `MUA_EDL` | optional | `mua_world`'s `priv/edl/main.edl` |
+| `MUA_ALLOWLIST` | comma-separated emails; empty admits nobody | the same |
+| `MUA_ADMINS` | comma-separated emails of admins, who can run NorthTalk at the prompt with `;` | the same |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | required | none |
+| `GOOGLE_REDIRECT_URI` | optional | the public address below, plus `/auth/google/callback` |
+| `SECRET_KEY_BASE` | required, at least 64 bytes (`openssl rand -base64 48`) | a fixed dev key |
+| `PHX_HOST` | required: the public host name browsers use | `localhost` |
+| `PHX_SCHEME`, `PHX_URL_PORT` | the public scheme and port: `https` and `443` by default, as behind `tailscale serve` or another TLS proxy | `http`, `4000` |
+| `PORT` | the port the server listens on, `4000` | the same |
+
+The public address (`PHX_SCHEME://PHX_HOST[:PHX_URL_PORT]`) is the only origin the Channel accepts.
+
+## The release image
+
+The [`Dockerfile`](../../Dockerfile) at the repository root builds the whole alpha: Bun bundles the client, `mix release` builds this app with the World and its EDL, and the image that runs has neither Bun nor Elixir. It runs as an unprivileged user and keeps the World on the `/data` volume, building it on first start and resuming it after.
+
+```sh
+docker build -t mua .
+docker run -d --name mua -p 4000:4000 -v mua-data:/data --env-file mua.env mua
+```
+
+with `mua.env` holding at least:
+
+```sh
+PHX_HOST=almere.example.ts.net
+SECRET_KEY_BASE=...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+MUA_STARTING_ROOM=west_of_house
+MUA_ALLOWLIST=you@example.com
+MUA_ADMINS=you@example.com
+```
+
+Development sign-in (`POST /auth/dev`) is never compiled into a release.

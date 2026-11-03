@@ -222,6 +222,10 @@ defmodule MuaWorld do
     edl_path = Keyword.fetch!(opts, :edl)
     path = Keyword.fetch!(opts, :path)
 
+    # Trapping exits lets `terminate/2` release the lock when a supervisor
+    # stops the World, as on a SIGTERM
+    Process.flag(:trap_exit, true)
+
     # The World holds the lock file while it runs, so nothing else, such as
     # `mix mua.migrate`, writes the database meanwhile; readers may still
     # open it
@@ -608,6 +612,11 @@ defmodule MuaWorld do
     Process.send_after(self(), :tick, state.tick)
     {:noreply, state}
   end
+
+  # A linked process, such as NorthTalk's owner, that dies takes the World
+  # with it, as it did before the World trapped exits
+  def handle_info({:EXIT, _pid, reason}, state) when reason not in [:normal, :shutdown],
+    do: {:stop, reason, state}
 
   def handle_info(_, state), do: {:noreply, state}
 
