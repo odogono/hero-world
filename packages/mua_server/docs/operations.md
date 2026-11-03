@@ -27,6 +27,37 @@ docker exec mua bin/mua_server rpc 'MuaServer.Release.backup()'
 
 The World writes the copy between Steps with SQLite's `VACUUM INTO`, so it holds every committed Step and nothing half-done, and play carries on. By default it goes to `/data/backups/world-<time>.db`; pass a path to choose another. Copy backups off the machine; a backup on the World's own volume doesn't survive losing the volume.
 
+### Scheduled backups
+
+[`rel/backup.sh`](../rel/backup.sh) takes that backup, copies it off the machine and keeps the newest `KEEP` (28) there and the newest `LOCAL_KEEP` (2) on the volume. `BACKUP_DEST` says where it goes:
+
+- `rsync:user@host:/path`: another machine over SSH, such as one on the tailnet. The user running the timer needs a passwordless SSH key for it.
+- `rsync:/path`: a local path, such as a mounted NAS.
+- `rclone:remote:path`: any [rclone](https://rclone.org) remote, such as S3 or B2, set up with `rclone config` by the same user.
+
+A systemd user timer runs it every six hours, and at boot when a run was missed. On almere, as the user that runs `docker`:
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp packages/mua_server/rel/systemd/mua-backup.* ~/.config/systemd/user/
+cp packages/mua_server/rel/backup.env.example ~/mua/backup.env && chmod 600 ~/mua/backup.env
+$EDITOR ~/mua/backup.env            # MUA_CHECKOUT, BACKUP_DEST, ON_FAILURE
+sudo loginctl enable-linger "$USER" # run the timer without a login session
+systemctl --user daemon-reload
+systemctl --user start mua-backup.service  # one backup now, to check it
+systemctl --user enable --now mua-backup.timer
+```
+
+Each run logs `event=backup_taken`, `backup_shipped`, `backup_pruned` and `backup_done`. A failed run logs `event=backup_failed` with the reason, runs `ON_FAILURE` with that reason on stdin (for example `curl -fsS --data-binary @- https://ntfy.sh/<topic>`), and exits non-zero, so the unit shows as failed:
+
+```sh
+systemctl --user list-timers mua-backup.timer
+systemctl --user status mua-backup.service
+journalctl --user -u mua-backup.service
+```
+
+To restore one, copy it back to almere and follow [Restoring](#restoring).
+
 ## Changing the content or the release
 
 A World built from one EDL won't start on another until it is migrated ([ADR 0005](../../../docs/adr/0005-a-changed-edl-migrates-a-world-keeping-play-state.md)), so a release that changes the EDL needs the maintenance procedure. Brief downtime is expected.

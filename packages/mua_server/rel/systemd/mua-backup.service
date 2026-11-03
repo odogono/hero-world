@@ -1,0 +1,11 @@
+# Backs up the mua World and copies it off this machine (#142). A user unit,
+# started by mua-backup.timer; install it as docs/operations.md#scheduled-backups
+# says. Its settings, BACKUP_DEST among them, are in ~/mua/backup.env.
+[Unit]
+Description=Back up the mua World off this machine
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/mua/backup.env
+ExecStart=/usr/bin/env bash ${MUA_CHECKOUT}/packages/mua_server/rel/backup.sh
