@@ -212,6 +212,10 @@ button.link {
   font-family: var(--mono);
   font-size: 0.95rem;
   line-height: 1.5;
+  /* an old-school block cursor where the browser draws one (Chromium);
+     elsewhere the usual line, in the accent colour */
+  caret-color: var(--accent);
+  caret-shape: block;
 }
 
 .composer textarea::placeholder {
