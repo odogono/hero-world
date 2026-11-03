@@ -30,6 +30,22 @@ defmodule MuaServer.Connection do
     end
   end
 
+  @doc """
+  Runs `fun` only if `pid` controls the Character, else `{:error, :replaced}`.
+  It runs in the Connection's process, so a takeover waits for a command
+  already running and a stale Channel's command can't run after one.
+  """
+  def run(character, pid, fun) do
+    case Registry.lookup(MuaServer.Connections, character) do
+      [{conn, _}] -> GenServer.call(conn, {:run, pid, fun}, 30_000)
+      [] -> {:error, :replaced}
+    end
+  catch
+    # the Connection stopped, as after logging out
+    :exit, {:noproc, _} -> {:error, :replaced}
+    :exit, {:normal, _} -> {:error, :replaced}
+  end
+
   @doc "Takes the Character out of play at once, if `pid` controls it."
   def logout(character, pid) do
     case Registry.lookup(MuaServer.Connections, character) do
@@ -77,6 +93,11 @@ defmodule MuaServer.Connection do
   end
 
   def handle_call({:controls?, pid}, _from, state), do: {:reply, state.pid == pid, state}
+
+  def handle_call({:run, pid, fun}, _from, %{pid: pid} = state) when pid != nil,
+    do: {:reply, fun.(), state}
+
+  def handle_call({:run, _pid, _fun}, _from, state), do: {:reply, {:error, :replaced}, state}
 
   def handle_call({:logout, pid}, _from, %{pid: pid} = state) when pid != nil do
     Process.demonitor(state.monitor, [:flush])

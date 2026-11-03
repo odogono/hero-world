@@ -29,20 +29,25 @@ defmodule MuaServer.CharacterChannel do
 
   @impl true
   def handle_in("command", payload, socket) do
-    with true <- Connection.controls?(socket.assigns.character, self()),
-         {:ok, %{text: text, ref: ref}} <- Protocol.command(payload) do
-      reply =
-        case MuaWorld.command(@world, socket.assigns.account, socket.assigns.character, text) do
-          {:ok, _lines} -> {:ok, %{ref: ref}}
-          {:error, reason} -> {:error, %{ref: ref, reason: to_string(reason)}}
+    %{account: account, character: character} = socket.assigns
+
+    case Protocol.command(payload) do
+      {:ok, %{text: text, ref: ref}} ->
+        # checked and run as one, so a takeover can't slip in between
+        run = fn -> MuaWorld.command(@world, account, character, text) end
+
+        case Connection.run(character, self(), run) do
+          {:error, :replaced} ->
+            {:reply, {:error, %{ref: ref, reason: "replaced"}}, socket}
+
+          result ->
+            # after the output the command produced, which is already queued
+            send(self(), :refresh)
+            {:reply, command_reply(result, ref), socket}
         end
 
-      # after the output the command produced, which is already queued
-      send(self(), :refresh)
-      {:reply, reply, socket}
-    else
-      false -> {:reply, {:error, %{reason: "replaced"}}, socket}
-      {:error, reason} -> {:reply, {:error, %{reason: reason}}, socket}
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
     end
   end
 
@@ -109,4 +114,7 @@ defmodule MuaServer.CharacterChannel do
         :ok
     end
   end
+
+  defp command_reply({:ok, _lines}, ref), do: {:ok, %{ref: ref}}
+  defp command_reply({:error, reason}, ref), do: {:error, %{ref: ref, reason: to_string(reason)}}
 end
