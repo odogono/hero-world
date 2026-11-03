@@ -39,6 +39,22 @@ defmodule MuaServer.CharacterChannelTest do
     chan
   end
 
+  defp join_as_view(p) do
+    {:ok, _, chan} =
+      subscribe_and_join(socket_for(p), CharacterChannel, "character:#{p.character}")
+
+    assert_push("status", %{status: "connected"})
+    chan
+  end
+
+  defp flush_pushes do
+    receive do
+      %Phoenix.Socket.Message{} -> flush_pushes()
+    after
+      0 -> :ok
+    end
+  end
+
   defp in_limbo?(p), do: not Enum.any?(MuaWorld.characters(@world, p.account), & &1.in_play)
 
   describe "admission" do
@@ -192,6 +208,73 @@ defmodule MuaServer.CharacterChannelTest do
 
       assert length(said) <= 1
       refute_push("output", %{lines: ["You say, \"once\""]})
+    end
+
+    test "a takeover moves nothing: others see no departure or arrival", %{ada: ada, bob: bob} do
+      _b = join_as(bob)
+      old = join_as(ada)
+      Process.unlink(old.channel_pid)
+      Process.sleep(100)
+      flush_pushes()
+
+      _new = join_as(ada)
+      assert_push("status", %{status: "replaced"})
+      bob_topic = "character:#{bob.character}"
+      refute_receive %Phoenix.Socket.Message{topic: ^bob_topic, event: "output"}, 100
+      refute in_limbo?(ada)
+    end
+
+    test "a stale Connection's command doesn't run once another has taken over", %{ada: ada} do
+      old = join_as(ada)
+      Process.unlink(old.channel_pid)
+      _new = join_as(ada)
+      assert_push("status", %{status: "replaced"})
+
+      me = self()
+      run = fn -> send(me, :ran) end
+      assert {:error, :replaced} = Connection.run(ada.character, old.channel_pid, run)
+      refute_received :ran
+    end
+
+    test "a stale Connection closing after a regrace doesn't cut the new one's control", %{
+      ada: ada
+    } do
+      old = join_as(ada)
+      Process.unlink(old.channel_pid)
+      new = join_as(ada)
+      Process.exit(old.channel_pid, :kill)
+
+      Process.sleep(@grace * 3)
+      refute in_limbo?(ada)
+      assert Connection.controls?(ada.character, new.channel_pid)
+    end
+
+    for {name, wait?} <- [{"before", false}, {"after", true}] do
+      test "an item taken by a command whose reply is lost #{name} commit is taken once",
+           %{ada: ada} do
+        a = join_as(ada)
+        Process.unlink(a.channel_pid)
+        ref = push(a, "command", %{"text" => "open mailbox", "ref" => "o"})
+        assert_reply(ref, :ok)
+
+        push(a, "command", %{"text" => "take leaflet", "ref" => "t"})
+        if unquote(wait?), do: assert_push("output", %{lines: ["Taken."]})
+        Process.exit(a.channel_pid, :kill)
+
+        _again = join_as_view(ada)
+        Process.sleep(100)
+        {:ok, view} = MuaWorld.view(@world, ada.account, ada.character)
+        held = Enum.count(view.inventory, &(&1 =~ ~r/leaflet/i))
+        if unquote(wait?), do: assert(held == 1), else: assert(held <= 1)
+        refute_push("output", %{lines: ["Taken."]})
+
+        # back in the closed mailbox, for the other tests
+        mailbox = MuaWorld.named(@world, "mailbox")
+        leaflet = MuaWorld.named(@world, "leaflet")
+        MuaWorld.set_component(@world, leaflet, "location", %{"in" => mailbox})
+        box = MuaWorld.component(@world, mailbox, "container")
+        MuaWorld.set_component(@world, mailbox, "container", %{box | "is_closed" => true})
+      end
     end
   end
 end
