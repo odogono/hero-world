@@ -47,9 +47,7 @@ test('rejects fragments without frontmatter, a type, a valid scope or text', () 
     'errors'
   );
   expect(parseFragment('---\ntype: feat\nscope: core\n---\nAdd x.')).toEqual({
-    errors: [
-      'unknown scope "core"; use one of ecs, ecs-talk, helpers, mua, repo'
-    ]
+    errors: ['unknown scope "core"; use one of ecs, helpers, mua, repo']
   });
   expect(parseFragment('---\ntype: feat\nsummary: x\n---\nAdd x.')).toEqual({
     errors: ['unknown key "summary"']

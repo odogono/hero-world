@@ -1,6 +1,0 @@
-on afterExamine role, actor
-  if role is "target" then
-    return "It hums faintly."
-  end if
-  pass afterExamine
-end afterExamine

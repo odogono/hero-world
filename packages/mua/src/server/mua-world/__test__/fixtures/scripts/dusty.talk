@@ -1,3 +1,0 @@
-on reset actor
-  show the target, "Dust settles over the shrine."
-end reset

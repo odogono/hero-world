@@ -1,8 +1,0 @@
-on chime actor
-  show the target, "The bell chimes."
-end chime
-
-on start actor
-  wait 5 s
-  show the target, "The candles flicker into life."
-end start

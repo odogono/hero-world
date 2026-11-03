@@ -16,7 +16,7 @@ export const TYPES = [
   'chore',
   'revert'
 ] as const;
-export const SCOPES = ['ecs', 'ecs-talk', 'helpers', 'mua', 'repo'] as const;
+export const SCOPES = ['ecs', 'helpers', 'mua', 'repo'] as const;
 
 // The types whose changes a reader of the changelog would want to hear about.
 export const CHANGELOG_TYPES = ['feat', 'fix', 'perf'] as const;

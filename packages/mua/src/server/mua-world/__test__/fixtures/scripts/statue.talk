@@ -1,7 +1,0 @@
-on examine role, actor
-  return "The statue winks at you."
-end examine
-
-on take role, actor
-  pass take
-end take
