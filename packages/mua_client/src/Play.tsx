@@ -79,6 +79,34 @@ const fit = (el: HTMLTextAreaElement | null | undefined) => {
   }
 };
 
+/** Browsers that draw a block cursor themselves (Chromium, so far). */
+const NATIVE_BLOCK =
+  typeof CSS !== 'undefined' && CSS.supports?.('caret-shape', 'block');
+
+/**
+ * Where a drawn block cursor goes: the caret's offset while the box has
+ * focus and nothing is selected, otherwise none.
+ */
+const caretOf = (el: HTMLTextAreaElement) =>
+  document.activeElement === el && el.selectionStart === el.selectionEnd
+    ? el.selectionStart
+    : null;
+
+/**
+ * A block cursor for browsers without `caret-shape`. A textarea can't place
+ * an element at its caret, so a mirror over it holds the same text,
+ * invisible, and draws a block over the character after the caret. The
+ * textarea's own caret is hidden.
+ */
+const BlockCaret = ({ at, text }: { at: number; text: string }) => (
+  <div aria-hidden="true" class="caret-mirror">
+    {text.slice(0, at)}
+    <span class="block-caret">
+      {text[at] && text[at] !== '\n' ? text[at] : ' '}
+    </span>
+  </div>
+);
+
 /**
  * The command box: a card that grows with what is typed. Enter sends, and
  * Shift+Enter starts a new line, for an admin's NorthTalk of more than one
@@ -86,7 +114,21 @@ const fit = (el: HTMLTextAreaElement | null | undefined) => {
  */
 const Composer = ({ joined }: { joined: boolean }) => {
   const [text, setText] = useState('');
+  const [caret, setCaret] = useState<number | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+
+  // the caret moves with keys, clicks and selection, not only typing
+  useEffect(() => {
+    if (NATIVE_BLOCK) {
+      return;
+    }
+    const track = () => {
+      const el = box.current;
+      setCaret(el ? caretOf(el) : null);
+    };
+    document.addEventListener('selectionchange', track);
+    return () => document.removeEventListener('selectionchange', track);
+  }, []);
 
   const command = text.trim();
 
@@ -117,22 +159,34 @@ const Composer = ({ joined }: { joined: boolean }) => {
       onClick={() => box.current?.focus()}
       onSubmit={submit}
     >
-      <textarea
-        aria-label="Command"
-        autoComplete="off"
-        autoFocus
-        disabled={!joined}
-        onInput={e => {
-          setText(e.currentTarget.value);
-          fit(e.currentTarget);
-        }}
-        onKeyDown={onKeyDown}
-        placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
-        ref={box}
-        rows={1}
-        spellcheck={false}
-        value={text}
-      />
+      <div class={`composer-input${NATIVE_BLOCK ? '' : ' drawn-caret'}`}>
+        {!NATIVE_BLOCK && caret !== null && (
+          <BlockCaret at={caret} text={text} />
+        )}
+        <textarea
+          aria-label="Command"
+          autoComplete="off"
+          autoFocus
+          disabled={!joined}
+          onBlur={() => setCaret(null)}
+          onInput={e => {
+            setText(e.currentTarget.value);
+            fit(e.currentTarget);
+          }}
+          onKeyDown={onKeyDown}
+          onScroll={e => {
+            const mirror = e.currentTarget.previousElementSibling;
+            if (mirror) {
+              mirror.scrollTop = e.currentTarget.scrollTop;
+            }
+          }}
+          placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
+          ref={box}
+          rows={1}
+          spellcheck={false}
+          value={text}
+        />
+      </div>
       <div class="composer-bar">
         <span class="hint">
           <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new

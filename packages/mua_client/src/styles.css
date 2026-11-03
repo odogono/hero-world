@@ -218,6 +218,51 @@ button.link {
   caret-shape: block;
 }
 
+/* The drawn block cursor, for browsers without caret-shape: a mirror of the
+   text lies over the textarea, laid out the same, with only the block shown */
+.composer-input {
+  position: relative;
+}
+
+.composer-input.drawn-caret textarea {
+  position: relative;
+  caret-color: transparent;
+}
+
+.caret-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  pointer-events: none;
+  /* above the text, so the character under the block shows inverted */
+  z-index: 1;
+}
+
+.block-caret {
+  background: var(--accent);
+  color: var(--bg);
+  animation: caret-blink 1.06s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    background: transparent;
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-caret {
+    animation: none;
+  }
+}
+
 .composer textarea::placeholder {
   color: var(--muted);
 }
