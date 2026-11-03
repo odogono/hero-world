@@ -1,24 +1,24 @@
 # Mua: Elixir server and Preact browser
 
-Agreed roadmap from the design interview. The destination, player-facing guarantees and delivery sequence are settled. Implementation has not started; the first integration proof will determine the detailed engineering design.
+Agreed roadmap from the design interview: the destination, player-facing guarantees and delivery sequence. As of November 2026 the Elixir packages (`mua_world`, `mua_server`, `mua_client`, `odgn_*`) are the live mua, the TypeScript `mua` is gone (#133), and only #103 and #101 are open. GitHub shows each ticket's current state; this table was last checked then.
 
 ## Implementation tickets
 
 Published in `odogono/hero-world` with native blocking relationships. Tickets 95 and 91 are `ready-for-human` because they need design decisions; the rest are `ready-for-agent`. Ticket 95 also needs upstream changes in `odogono/odgn-talk`.
 
-| Ticket | Blocked by |
-| --- | --- |
-| [95: Decide NorthTalk embedding surfaces and the Elixir World process model](https://github.com/odogono/hero-world/issues/95) | None |
-| [102: Prove an Elixir World with a minimal Host Adapter](https://github.com/odogono/hero-world/issues/102) | 95 |
-| [96: Port ECS and EDL to reusable Elixir libraries](https://github.com/odogono/hero-world/issues/96) | 102 |
-| [103: Port Mua gameplay to Elixir](https://github.com/odogono/hero-world/issues/103) | 96 |
-| [97: Phoenix sign-in, sessions and the browser protocol](https://github.com/odogono/hero-world/issues/97) | 102 |
-| [104: Build the Preact browser client](https://github.com/odogono/hero-world/issues/104) | 97, 103 |
-| [98: Bring scripted interactions and NPCs to the browser](https://github.com/odogono/hero-world/issues/98) | 104 |
-| [99: Make sessions and reconnects reliable](https://github.com/odogono/hero-world/issues/99) | 104 |
-| [100: Update authored content without losing play](https://github.com/odogono/hero-world/issues/100) | 103 |
-| [91: Run NorthTalk at an admin prompt](https://github.com/odogono/hero-world/issues/91) | 104, 100 |
-| [101: Deploy and validate the invite-only alpha](https://github.com/odogono/hero-world/issues/101) | 98, 99, 100, 91 |
+| Ticket | Blocked by | State |
+| --- | --- | --- |
+| [95: Decide NorthTalk embedding surfaces and the Elixir World process model](https://github.com/odogono/hero-world/issues/95) | None | done |
+| [102: Prove an Elixir World with a minimal Host Adapter](https://github.com/odogono/hero-world/issues/102) | 95 | done |
+| [96: Port ECS and EDL to reusable Elixir libraries](https://github.com/odogono/hero-world/issues/96) | 102 | done |
+| [103: Port Mua gameplay to Elixir](https://github.com/odogono/hero-world/issues/103) | 96 | open |
+| [97: Phoenix sign-in, sessions and the browser protocol](https://github.com/odogono/hero-world/issues/97) | 102 | done |
+| [104: Build the Preact browser client](https://github.com/odogono/hero-world/issues/104) | 97, 103 | done |
+| [98: Bring scripted interactions and NPCs to the browser](https://github.com/odogono/hero-world/issues/98) | 104 | done |
+| [99: Make sessions and reconnects reliable](https://github.com/odogono/hero-world/issues/99) | 104 | done |
+| [100: Update authored content without losing play](https://github.com/odogono/hero-world/issues/100) | 103 | done |
+| [91: Run NorthTalk at an admin prompt](https://github.com/odogono/hero-world/issues/91) | 104, 100 | done |
+| [101: Deploy and validate the invite-only alpha](https://github.com/odogono/hero-world/issues/101) | 98, 99, 100, 91 | open |
 
 The Phoenix work (97) runs in parallel with the ECS/EDL and gameplay ports (96, 103) because it only needs the proof's tiny World.
 
@@ -107,6 +107,8 @@ Exit condition: the deployed release passes the multiplayer journey and recovery
 Detailed library interfaces, process ownership, schema, snapshot strategy and wire formats are engineering outputs of the stages above. They are not assumed to be settled by this roadmap. Record consequential choices when the integration evidence is available.
 
 ## Integration findings
+
+Written before implementation began, from reading the source. Several gaps below have since closed: the Elixir and Phoenix projects, CI jobs and release image now exist.
 
 Source inspection of the local NorthTalk checkout found an existing `impl/elixir` package, `:north_talk`, embedding the Zig WASI reactor through Wasmex without Bun. It supplies manual driving, capabilities, segment transaction hooks and save/restore. Its README and implementation currently exclude Host Objects, properties and collections, and its public API does not expose Decisions. Mua's existing entity handles and vetoes depend on these features. Reactor v0.18.0, which the Elixir package now pins, already supports all of them, so the gap is in the Elixir wrapper only; it is requested in odogono/odgn-talk#1970. ADR 0015 records the process model and transaction boundary that follow from how the owner runs callbacks.
 
