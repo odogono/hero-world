@@ -20,6 +20,14 @@ _Avoid_: account, login
 A browser's link through which a Player controls their Character. A Character has at most one controlling Connection; a new one takes over from the old.
 _Avoid_: session, socket
 
+**Allowlist**:
+The Google identities admitted to the game while it is invite-only. Signing in proves who someone is; the Allowlist decides whether they may enter.
+_Avoid_: whitelist, invite list
+
+**Admin**:
+An Account allowed to change the World live from the browser, beyond what play allows.
+_Avoid_: operator, superuser, wizard
+
 ## World data
 
 **Entity**:
