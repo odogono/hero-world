@@ -26,7 +26,8 @@ defmodule MuaServer.AuthController do
       # a browser arrives here from Google, so it goes back to the client
       conn |> delete_session(:oauth) |> sign_in(account) |> redirect(to: "/")
     else
-      {:error, :not_admitted} -> conn |> put_status(:forbidden) |> json(%{error: "not admitted"})
+      # a browser arrives here from Google, so it gets a page, not JSON
+      {:error, :not_admitted} -> conn |> put_status(:forbidden) |> html(not_admitted_page())
       _ -> conn |> put_status(:unauthorized) |> json(%{error: "sign-in failed"})
     end
   end
@@ -45,6 +46,24 @@ defmodule MuaServer.AuthController do
     conn
     |> configure_session(renew: true)
     |> put_session(:account, account)
+  end
+
+  defp not_admitted_page do
+    """
+    <!doctype html>
+    <html lang="en">
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Not invited</title>
+    <style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5}</style>
+    </head>
+    <body>
+    <h1>This account isn't invited</h1>
+    <p>mua is an invite-only alpha, and the Google account you signed in with isn't on its list.
+    If you should be able to play, ask whoever invited you to add that address.</p>
+    <p><a href="/auth/google">Try a different Google account</a></p>
+    </body>
+    </html>
+    """
   end
 
   defp strategy, do: Application.fetch_env!(:mua_server, :oauth_strategy)

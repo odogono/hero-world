@@ -32,11 +32,13 @@ defmodule MuaServer.AuthTest do
   end
 
   test "an identity not on the allowlist, or unverified, is refused" do
-    assert json_response(google("eve@example.com"), 403) == %{"error" => "not admitted"}
+    for code <- ["eve@example.com", "ada@example.com:unverified"] do
+      assert html_response(google(code), 403) =~ "isn't invited"
+    end
 
-    assert json_response(google("ada@example.com:unverified"), 403) == %{
-             "error" => "not admitted"
-           }
+    # the fake sign-in answers in JSON
+    assert json_response(post(build_conn(), "/auth/dev", %{email: "eve@example.com"}), 403) ==
+             %{"error" => "not admitted"}
   end
 
   test "a callback without the session that started sign-in fails" do
