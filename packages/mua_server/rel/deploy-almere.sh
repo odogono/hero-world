@@ -23,7 +23,8 @@ fi
 TOTAL_STAGES=0
 
 _STAGE_INDEX=0
-ENV_FILE="${ENV_FILE:-.env}"
+# docker run --env-file reads this file, so it lives outside the checkout.
+ENV_FILE="${ENV_FILE:-$HOME/mua/mua.env}"
 WRITTEN_ENV=()    # KEYs written to ENV_FILE this run
 WRITTEN_SECRET=() # secret NAMEs set this run
 SKIPPED=()        # things we couldn't do (e.g. gh missing)
@@ -89,13 +90,13 @@ confirm() {
   [[ "$reply" =~ ^[Yy] ]]
 }
 
-# _existing KEY: current value of KEY in ENV_FILE, if any, with write_env's single
-# quotes or a plain dotenv double-quoted value undone.
+# _existing KEY: current value of KEY in ENV_FILE, if any. Single or double
+# quotes left by older versions of this wizard, or a dotenv file, are undone.
 _existing() {
   [[ -f "$ENV_FILE" ]] || return 1
-  local line value sq="'\\''"; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
+  local line value q="'" sq="'\\''"; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
   value="${line#*=}"
-  if [[ "$value" == \'*\' ]]; then value="${value:1:${#value}-2}"; value="${value//"$sq"/\'}"
+  if [[ "$value" == \'*\' ]]; then value="${value:1:${#value}-2}"; value="${value//"$sq"/$q}"
   elif [[ "$value" == \"*\" ]]; then
     value="${value:1:${#value}-2}"
     [[ "$value" == *[\\\$\"]* ]] && return 1   # escapes, $ or ": can't decode safely; ask again
@@ -134,15 +135,20 @@ ask_secret() {
   printf -v "$key" '%s' "$input"
 }
 
-# write_env KEY VALUE upserts KEY='VALUE' into ENV_FILE (replaces any existing
+# write_env KEY VALUE upserts KEY=VALUE into ENV_FILE (replaces any existing
 # line) and sets $KEY. Idempotent. Creates ENV_FILE at mode 0600; writes through
 # a symlink and keeps an existing file's mode.
+#
+# Values are written bare, with no quotes: docker run --env-file takes each
+# value literally, so quotes would become part of it. A value can't hold a
+# newline.
 write_env() {
-  local key="$1" value="$2" tmp sq="'\\''"
+  local key="$1" value="$2" tmp
+  [[ "$value" != *$'\n'* ]] || { warn "$key can't contain a newline"; return 1; }
   [[ -e "$ENV_FILE" ]] || (umask 077 && : > "$ENV_FILE")
   tmp=$(mktemp)
   grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
-  printf "%s='%s'\n" "$key" "${value//\'/$sq}" >> "$tmp"
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
   printf -v "$key" '%s' "$value"
@@ -201,13 +207,23 @@ finish() {
 # committed. Re-running keeps values already saved. See docs/operations.md.
 # ──────────────────────────────────────────────────────────────────────────
 
-ENV_FILE="${ENV_FILE:-$HOME/mua/mua.env}"
 CONTAINER="${CONTAINER:-mua}"
 IMAGE="${IMAGE:-mua}"
 VOLUME="${VOLUME:-mua-data}"
 
 # Character names and where each is, read from the World a container runs.
 SUMMARY='s = :sys.get_state(MuaServer.World); IO.puts("world_time=#{MuaWorld.world_time(MuaServer.World)}"); for e <- OdgnEcs.query(s.world, with: ["player"]), do: IO.puts("#{OdgnEcs.get(s.world, e, "player")["name"]} in #{inspect((OdgnEcs.get(s.world, e, "location") || %{})["in"])}")'
+
+# unquote_env_file rewrites any quoted KEY='value' lines left in ENV_FILE by an
+# older version of this wizard, which docker would read with the quotes.
+unquote_env_file() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  local key value
+  for key in $(sed -nE "s/^([A-Za-z_][A-Za-z0-9_]*)=[\"'].*/\1/p" "$ENV_FILE"); do
+    value=$(_existing "$key") || { warn "couldn't unquote $key in $ENV_FILE; fix it by hand"; continue; }
+    write_env "$key" "$value"
+  done
+}
 
 wait_healthy() {
   local port="$1" i
@@ -239,6 +255,7 @@ note "Browsers will reach the alpha at https://$HOST, and only from the tailnet.
 note "MagicDNS and HTTPS certificates must be on for the tailnet:"
 note "https://login.tailscale.com/admin/dns"
 mkdir -p "$(dirname "$ENV_FILE")"
+unquote_env_file
 write_env PHX_HOST "$HOST"
 pause
 
