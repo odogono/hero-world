@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { Profile } from './Profile';
 import { logout, sendCommand } from './connection';
 import { actions, lines, status, type Status } from './store';
 import type { Line } from './transcript';
@@ -130,6 +131,14 @@ const Composer = ({ joined }: { joined: boolean }) => {
     return () => document.removeEventListener('selectionchange', track);
   }, []);
 
+  // the box is disabled until the Character joins, so autoFocus finds
+  // nothing to focus on load: focus it on joining, and on rejoining
+  useEffect(() => {
+    if (joined) {
+      box.current?.focus();
+    }
+  }, [joined]);
+
   const command = text.trim();
 
   const submit = (event?: Event) => {
@@ -208,9 +217,13 @@ const Composer = ({ joined }: { joined: boolean }) => {
 };
 
 export const Play = ({
+  admin = false,
+  email = null,
   name,
   onLeft
 }: {
+  admin?: boolean;
+  email?: string | null;
   name: string;
   onLeft: () => void;
 }) => {
@@ -220,7 +233,11 @@ export const Play = ({
   const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
 
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'end' });
+    // reading back up stops the transcript following new lines, until the
+    // reader scrolls down to the newest again
+    if (end.current?.parentElement?.dataset.following !== 'no') {
+      end.current?.scrollIntoView?.({ block: 'end' });
+    }
   }, [count]);
 
   const leave = async () => {
@@ -231,15 +248,26 @@ export const Play = ({
   return (
     <div class="play">
       <header>
-        <strong>{name}</strong>
-        <span class={`status ${status.value}`} role="status">
+        <strong class="brand">MUA</strong>
+        <span class="version">v{MUA_VERSION}</span>
+        {/* always present, so a change of status is announced; the
+            profile menu and the badge's dot show it */}
+        <span class="visually-hidden" role="status">
           {STATUS_TEXT[status.value]}
         </span>
-        <button class="link" onClick={leave} type="button">
-          Log out
-        </button>
       </header>
-      <ul aria-label="Transcript" aria-live="polite" class="transcript">
+      <ul
+        aria-label="Transcript"
+        aria-live="polite"
+        class="transcript"
+        onScroll={e => {
+          const el = e.currentTarget;
+          el.dataset.following =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 48
+              ? 'yes'
+              : 'no';
+        }}
+      >
         {lines.value.map(line => (
           <TranscriptLine
             answerable={joined && line.id === lastPrompt}
@@ -264,7 +292,17 @@ export const Play = ({
           ))}
         </nav>
       )}
-      <Composer joined={joined} />
+      <div class="dock">
+        <Profile
+          admin={admin}
+          email={email}
+          name={name}
+          onSignOut={leave}
+          status={status.value}
+          statusText={STATUS_TEXT[status.value]}
+        />
+        <Composer joined={joined} />
+      </div>
     </div>
   );
 };

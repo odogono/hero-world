@@ -8,13 +8,22 @@ import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const OUT = resolve(import.meta.dir, '../mua_server/priv/static');
+
+// the release's version, from mua_server's mix.exs, shown in the header
+const mix = await Bun.file(
+  resolve(import.meta.dir, '../mua_server/mix.exs')
+).text();
+const VERSION = /version: "([^"]+)"/.exec(mix)?.[1] ?? 'dev';
 const watching = process.argv.includes('--watch');
 const dev = watching || process.argv.includes('--dev');
 
 const build = async () => {
   await rm(OUT, { force: true, recursive: true });
   const result = await Bun.build({
-    define: { MUA_DEV: JSON.stringify(dev) },
+    define: {
+      MUA_DEV: JSON.stringify(dev),
+      MUA_VERSION: JSON.stringify(VERSION)
+    },
     entrypoints: [resolve(import.meta.dir, 'index.html')],
     minify: !dev,
     naming: {

@@ -12,10 +12,7 @@ defmodule MuaServer.Admission do
           {:ok, pos_integer()} | {:error, :not_admitted}
   def admit(sub, email, verified?) do
     if verified? and admitted?(email),
-      do:
-        MuaWorld.sign_in(MuaServer.World, sub, String.downcase(email),
-          admin: String.downcase(email) in Application.get_env(:mua_server, :admins, [])
-        ),
+      do: MuaWorld.sign_in(MuaServer.World, sub, String.downcase(email), admin: admin?(email)),
       else: {:error, :not_admitted}
   end
 
@@ -24,4 +21,10 @@ defmodule MuaServer.Admission do
     do: String.downcase(email) in Application.get_env(:mua_server, :allowlist, [])
 
   def admitted?(_), do: false
+
+  @doc "Whether an email is one of the admins."
+  def admin?(email) when is_binary(email),
+    do: String.downcase(email) in Application.get_env(:mua_server, :admins, [])
+
+  def admin?(_), do: false
 end

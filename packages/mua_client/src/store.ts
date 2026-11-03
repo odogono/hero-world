@@ -6,7 +6,10 @@ export type Character = { id: number; in_play: boolean; name: string };
 
 export type Session = {
   account: number;
+  admin: boolean;
   characters: Character[];
+  /** `null` for a session signed in before the server sent it */
+  email: string | null;
   socket_token: string;
 };
 
