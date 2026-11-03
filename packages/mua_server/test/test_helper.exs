@@ -12,5 +12,6 @@ world = [
 for child <- MuaServer.Application.world_children(world),
     do: {:ok, _} = Supervisor.start_child(MuaServer.Supervisor, child)
 
-# Tests share the World and its Characters, so they run one at a time
-ExUnit.start(max_cases: 1)
+# Tests share the World and its Characters, so they run one at a time. A
+# reply waits on a World Step, which can take longer than 100 ms on CI.
+ExUnit.start(max_cases: 1, assert_receive_timeout: 2_000)
