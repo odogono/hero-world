@@ -8,6 +8,8 @@
   --rule: #e6e2da;
   --warn: #b35900;
   --error: #c92a2a;
+  --surface: #ffffff;
+  --focus: #c9c3b8;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: light dark;
@@ -20,6 +22,8 @@
     --muted: #9a9ea6;
     --accent: #8ea4ff;
     --rule: #2a2d32;
+    --surface: #1d2024;
+    --focus: #3d4249;
   }
 }
 
@@ -177,21 +181,138 @@ button.link {
   color: var(--accent);
 }
 
-.prompt-line {
+/* The command box, a card at the bottom that grows with what is typed */
+.composer {
+  margin: 0.5rem 16px 16px;
+  padding: 0.75rem 0.75rem 0.5rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--surface);
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.composer:focus-within {
+  border-color: var(--focus);
+}
+
+.composer textarea {
+  display: block;
+  width: 100%;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  /* an old-school block cursor where the browser draws one (Chromium);
+     elsewhere the usual line, in the accent colour */
+  caret-color: var(--accent);
+  caret-shape: block;
+}
+
+/* The drawn block cursor, for browsers without caret-shape: a mirror of the
+   text lies over the textarea, laid out the same, with only the block shown */
+.composer-input {
+  position: relative;
+}
+
+.composer-input.drawn-caret textarea {
+  position: relative;
+  caret-color: transparent;
+}
+
+.caret-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  pointer-events: none;
+  /* above the text, so the character under the block shows inverted */
+  z-index: 1;
+}
+
+.block-caret {
+  background: var(--accent);
+  color: var(--bg);
+  animation: caret-blink 1.06s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    background: transparent;
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-caret {
+    animation: none;
+  }
+}
+
+.composer textarea::placeholder {
+  color: var(--muted);
+}
+
+.composer-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 16px;
-  border-top: 1px solid var(--rule);
-  font-family: var(--mono);
+  margin-top: 0.5rem;
 }
 
-.prompt-line input {
-  flex: 1;
-  font-family: var(--mono);
-  border: 0;
-  padding: 0.4rem 0;
-  outline: none;
+.composer .hint {
+  margin-right: auto;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.composer kbd {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+button.send {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+button.send svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 30rem) {
+  .composer .hint {
+    visibility: hidden;
+  }
 }
 
 /* A choice the server asks for: numbered, and the latest can be clicked */

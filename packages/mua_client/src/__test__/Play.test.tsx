@@ -24,7 +24,7 @@ afterEach(() => {
   status.value = 'connecting';
 });
 
-const input = () => screen.getByLabelText('Command') as HTMLInputElement;
+const input = () => screen.getByLabelText('Command') as HTMLTextAreaElement;
 
 describe('the play screen', () => {
   test('takes commands only while joined', () => {
@@ -104,5 +104,38 @@ describe('the play screen', () => {
       name: 'north'
     }) as HTMLButtonElement;
     expect(chip.disabled).toBe(true);
+  });
+
+  test('sends the command on Enter, and Shift+Enter starts a new line', () => {
+    status.value = 'joined';
+    render(<Play name="Ada" onLeft={() => {}} />);
+
+    fireEvent.input(input(), {
+      target: { value: 'ask world to named "lamp"' }
+    });
+    fireEvent.keyDown(input(), { key: 'Enter', shiftKey: true });
+    expect(commands).toEqual([]);
+
+    fireEvent.input(input(), {
+      target: { value: ';ask world to named "lamp"\nchange it, "lit", {}' }
+    });
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(commands).toEqual([
+      ';ask world to named "lamp"\nchange it, "lit", {}'
+    ]);
+    expect(input().value).toBe('');
+  });
+
+  test('sends with the button, which waits for a command', () => {
+    status.value = 'joined';
+    render(<Play name="Ada" onLeft={() => {}} />);
+    const send = screen.getByRole('button', {
+      name: 'Send'
+    }) as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+
+    fireEvent.input(input(), { target: { value: '  look  ' } });
+    fireEvent.click(send);
+    expect(commands).toEqual(['look']);
   });
 });

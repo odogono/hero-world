@@ -68,6 +68,145 @@ const TranscriptLine = ({
   }
 };
 
+/**
+ * Fits a textarea's height to its text, up to the stylesheet's cap. Browsers
+ * with `field-sizing: content` do this themselves.
+ */
+const fit = (el: HTMLTextAreaElement | null | undefined) => {
+  if (el && !CSS.supports?.('field-sizing', 'content')) {
+    el.style.height = 'auto';
+    el.style.height = el.value ? `${el.scrollHeight}px` : '';
+  }
+};
+
+/** Browsers that draw a block cursor themselves (Chromium, so far). */
+const NATIVE_BLOCK =
+  typeof CSS !== 'undefined' && CSS.supports?.('caret-shape', 'block');
+
+/**
+ * Where a drawn block cursor goes: the caret's offset while the box has
+ * focus and nothing is selected, otherwise none.
+ */
+const caretOf = (el: HTMLTextAreaElement) =>
+  document.activeElement === el && el.selectionStart === el.selectionEnd
+    ? el.selectionStart
+    : null;
+
+/**
+ * A block cursor for browsers without `caret-shape`. A textarea can't place
+ * an element at its caret, so a mirror over it holds the same text,
+ * invisible, and draws a block over the character after the caret. The
+ * textarea's own caret is hidden.
+ */
+const BlockCaret = ({ at, text }: { at: number; text: string }) => (
+  <div aria-hidden="true" class="caret-mirror">
+    {text.slice(0, at)}
+    <span class="block-caret">
+      {text[at] && text[at] !== '\n' ? text[at] : ' '}
+    </span>
+  </div>
+);
+
+/**
+ * The command box: a card that grows with what is typed. Enter sends, and
+ * Shift+Enter starts a new line, for an admin's NorthTalk of more than one
+ * statement.
+ */
+const Composer = ({ joined }: { joined: boolean }) => {
+  const [text, setText] = useState('');
+  const [caret, setCaret] = useState<number | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  // the caret moves with keys, clicks and selection, not only typing
+  useEffect(() => {
+    if (NATIVE_BLOCK) {
+      return;
+    }
+    const track = () => {
+      const el = box.current;
+      setCaret(el ? caretOf(el) : null);
+    };
+    document.addEventListener('selectionchange', track);
+    return () => document.removeEventListener('selectionchange', track);
+  }, []);
+
+  const command = text.trim();
+
+  const submit = (event?: Event) => {
+    event?.preventDefault();
+    if (command && sendCommand(command)) {
+      setText('');
+      const form = (event?.currentTarget as HTMLElement | null)?.closest(
+        'form'
+      );
+      const el = form?.querySelector('textarea');
+      if (el) {
+        el.value = '';
+        fit(el);
+      }
+    }
+  };
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+      submit(event);
+    }
+  };
+
+  return (
+    <form
+      class="composer"
+      onClick={() => box.current?.focus()}
+      onSubmit={submit}
+    >
+      <div class={`composer-input${NATIVE_BLOCK ? '' : ' drawn-caret'}`}>
+        {!NATIVE_BLOCK && caret !== null && (
+          <BlockCaret at={caret} text={text} />
+        )}
+        <textarea
+          aria-label="Command"
+          autoComplete="off"
+          autoFocus
+          disabled={!joined}
+          onBlur={() => setCaret(null)}
+          onInput={e => {
+            setText(e.currentTarget.value);
+            fit(e.currentTarget);
+          }}
+          onKeyDown={onKeyDown}
+          onScroll={e => {
+            const mirror = e.currentTarget.previousElementSibling;
+            if (mirror) {
+              mirror.scrollTop = e.currentTarget.scrollTop;
+            }
+          }}
+          placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
+          ref={box}
+          rows={1}
+          spellcheck={false}
+          value={text}
+        />
+      </div>
+      <div class="composer-bar">
+        <span class="hint">
+          <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new
+          line
+        </span>
+        <button
+          aria-label="Send"
+          class="send"
+          disabled={!joined || !command}
+          type="submit"
+        >
+          <svg aria-hidden="true" viewBox="0 0 16 16">
+            <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  );
+};
+
 export const Play = ({
   name,
   onLeft
@@ -75,7 +214,6 @@ export const Play = ({
   name: string;
   onLeft: () => void;
 }) => {
-  const [text, setText] = useState('');
   const end = useRef<HTMLLIElement>(null);
   const joined = status.value === 'joined';
   const count = lines.value.length;
@@ -84,13 +222,6 @@ export const Play = ({
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
   }, [count]);
-
-  const submit = (event: Event) => {
-    event.preventDefault();
-    if (text.trim() && sendCommand(text.trim())) {
-      setText('');
-    }
-  };
 
   const leave = async () => {
     await logout();
@@ -133,18 +264,7 @@ export const Play = ({
           ))}
         </nav>
       )}
-      <form class="prompt-line" onSubmit={submit}>
-        <span class="caret">&gt;</span>
-        <input
-          aria-label="Command"
-          autoComplete="off"
-          autoFocus
-          disabled={!joined}
-          onInput={e => setText(e.currentTarget.value)}
-          placeholder={joined ? 'What do you do?' : STATUS_TEXT[status.value]}
-          value={text}
-        />
-      </form>
+      <Composer joined={joined} />
     </div>
   );
 };
