@@ -11,6 +11,7 @@ config :mua_server,
   grace_ms: 100,
   dev_sign_in: true,
   oauth_strategy: MuaServer.FakeGoogle,
-  allowlist: ["ada@example.com", "bob@example.com"]
+  allowlist: ["ada@example.com", "bob@example.com"],
+  admins: ["ada@example.com"]
 
 config :logger, level: :warning

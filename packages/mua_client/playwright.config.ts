@@ -36,6 +36,7 @@ export default defineConfig({
     cwd: resolve(import.meta.dirname, '../mua_server'),
     env: {
       MIX_ENV: 'dev',
+      MUA_ADMINS: 'ada@example.com',
       MUA_ALLOWLIST: 'ada@example.com,bob@example.com',
       MUA_DB: join(run, world.name, 'world.db'),
       MUA_EDL: resolve(import.meta.dirname, 'e2e/fixtures', world.edl),

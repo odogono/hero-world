@@ -23,7 +23,8 @@ defmodule OdgnEcsTalk do
     named `atom@path`. Copies don't share Script Variables.
   - **`world`:** `change` and `moveTo` are Segment-bound: each Segment is a
     SAVEPOINT, so a Segment that rolls back leaves no trace. `find`,
-    `resolve` and `show` are not; `show` calls the `:on_show` option.
+    `resolve`, `named` and `show` are not; `show` calls the `:on_show`
+    option. `named` finds an entity by its Definition name.
   - **`clock`:** `now`, the Pump's Clock reading.
   - **`timer`:** `schedule name, at, message, args` and `cancel name` keep
     durable timers in the World, owned by the entity the Run was delivered
@@ -222,6 +223,22 @@ defmodule OdgnEcsTalk do
     with :ok <- load_owned(talk, "entity:#{eid}", handle(talk, eid), source, opts) do
       :ets.insert(talk.table, {{:entity_script, eid}, true})
       :ok
+    end
+  end
+
+  @doc """
+  Loads a Service Script, or replaces its code if it is loaded already,
+  keeping its Host Object. A `NorthTalk.LoadError` leaves the Script as it
+  was.
+  """
+  def put_service_script(%__MODULE__{} = talk, service, source, opts \\ []) do
+    if :ets.member(talk.table, {:service, service}) do
+      case NorthTalk.reload(talk.group, "service:" <> service, source, variables: :reset) do
+        {:ok, _reports} -> :ok
+        {:error, _} = error -> error
+      end
+    else
+      load_service_script(talk, service, source, opts)
     end
   end
 
@@ -627,6 +644,14 @@ defmodule OdgnEcsTalk do
              case Values.from_value(id) do
                eid when is_integer(eid) -> {:ok, existing_handle(talk, eid)}
                _ -> {:ok, nil}
+             end
+           end},
+        "named" =>
+          {[args: ["text"], result: %{"optional" => entity}, cost: 1],
+           fn [name], _ ->
+             case OdgnEdl.entity_named(world, name) do
+               nil -> {:ok, nil}
+               eid -> {:ok, existing_handle(talk, eid)}
              end
            end},
         "show" =>

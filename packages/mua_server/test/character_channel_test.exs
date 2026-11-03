@@ -92,6 +92,22 @@ defmodule MuaServer.CharacterChannelTest do
     end
   end
 
+  describe "the admin prompt" do
+    test "an admin's `;` line runs, and its result comes back to them", %{ada: ada} do
+      a = join_as(ada)
+      ref = push(a, "command", %{"text" => ";return 6 * 7", "ref" => "n1"})
+      assert_reply(ref, :ok, %{ref: "n1"})
+      assert_push("output", %{lines: ["=> 42"]})
+    end
+
+    test "a player who isn't an admin can't use it", %{bob: bob} do
+      b = join_as(bob)
+      ref = push(b, "command", %{"text" => ";return 1", "ref" => "n2"})
+      assert_reply(ref, :ok, %{ref: "n2"})
+      assert_push("output", %{lines: ["You can't do that."]})
+    end
+  end
+
   describe "the controlling Connection" do
     test "a new Connection takes over, and the old one can't command", %{ada: ada} do
       old = join_as(ada)

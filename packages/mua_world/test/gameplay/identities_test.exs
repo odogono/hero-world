@@ -15,7 +15,7 @@ defmodule MuaWorld.IdentitiesTest do
     test "makes an Account the first time, and finds it after", %{world: world} do
       {:ok, account} = MuaWorld.sign_in(world, "google-1", "ada@example.com")
 
-      assert MuaWorld.component(world, account, "account") == %{}
+      assert MuaWorld.component(world, account, "account") == %{"admin" => false}
       assert {:ok, ^account} = MuaWorld.sign_in(world, "google-1", "ada@new.example.com")
       assert {:ok, other} = MuaWorld.sign_in(world, "google-2", "bob@example.com")
       assert other != account

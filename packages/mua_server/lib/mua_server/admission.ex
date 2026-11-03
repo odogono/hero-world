@@ -3,7 +3,8 @@ defmodule MuaServer.Admission do
   Who may enter: a signed-in identity whose verified email is on the
   configured allowlist (`MUA_ALLOWLIST`, comma separated), for the invite-only
   alpha (ADR 0010). Admitted identities are mapped to their Account by the
-  World (`MuaWorld.sign_in/3`).
+  World (`MuaWorld.sign_in/4`), which also learns from each sign-in whether
+  the Account is an admin, one whose email is on `MUA_ADMINS` (#91).
   """
 
   @doc "The Account for an identity, if it is admitted."
@@ -11,7 +12,10 @@ defmodule MuaServer.Admission do
           {:ok, pos_integer()} | {:error, :not_admitted}
   def admit(sub, email, verified?) do
     if verified? and admitted?(email),
-      do: MuaWorld.sign_in(MuaServer.World, sub, String.downcase(email)),
+      do:
+        MuaWorld.sign_in(MuaServer.World, sub, String.downcase(email),
+          admin: String.downcase(email) in Application.get_env(:mua_server, :admins, [])
+        ),
       else: {:error, :not_admitted}
   end
 
