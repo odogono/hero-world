@@ -71,6 +71,39 @@ defmodule MuaServer.Release do
     done(Backup.restore(backup, world[:path]), &"Restored #{backup} to #{&1}")
   end
 
+  @doc """
+  Makes `count` simulated players for the load script (#132,
+  `packages/mua_client/load`), each an Account with a Character, and prints
+  them as one line of JSON, `[{"character": id, "token": socket_token}]`.
+  It skips the allowlist, so it refuses to run unless the server was started
+  with `MUA_LOAD_TEST=true`: only on a scratch instance, never on the alpha.
+  Running it again returns the same players.
+  """
+  def load_players(count, world \\ MuaServer.World) when is_integer(count) and count > 0 do
+    unless System.get_env("MUA_LOAD_TEST") == "true",
+      do: raise("load_players needs a scratch server started with MUA_LOAD_TEST=true")
+
+    players =
+      for i <- 1..count do
+        {:ok, account} = MuaWorld.sign_in(world, "load:#{i}", "load#{i}@load.invalid")
+
+        character =
+          case MuaWorld.characters(world, account) do
+            [%{id: id} | _] ->
+              id
+
+            [] ->
+              {:ok, id} = MuaWorld.create_character(world, account, "Loader#{i}")
+              id
+          end
+
+        %{character: character, token: Phoenix.Token.sign(MuaServer.Endpoint, "socket", account)}
+      end
+
+    IO.puts(Jason.encode!(players))
+    {:ok, length(players)}
+  end
+
   defp done({:ok, value}, describe) do
     IO.puts(describe.(value))
     {:ok, value}

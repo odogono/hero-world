@@ -9,6 +9,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint --cache .",
     "test": "bun test src",
+    "load": "bun run load/load.ts",
     "e2e": "bun run build.ts --dev && playwright test"
   },
   "dependencies": {
