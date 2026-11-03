@@ -250,6 +250,11 @@ export const Play = ({
       <header>
         <strong class="brand">MUA</strong>
         <span class="version">v{MUA_VERSION}</span>
+        {/* always present, so a change of status is announced; the
+            profile menu and the badge's dot show it */}
+        <span class="visually-hidden" role="status">
+          {STATUS_TEXT[status.value]}
+        </span>
       </header>
       <ul
         aria-label="Transcript"

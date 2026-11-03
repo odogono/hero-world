@@ -60,9 +60,7 @@ export const Profile = ({
             {email && <span class="profile-email">{email}</span>}
             {admin && <span class="pill">Admin</span>}
           </div>
-          <div class={`status ${status}`} role="status">
-            {statusText}
-          </div>
+          <div class={`status ${status}`}>{statusText}</div>
           <button
             aria-disabled="true"
             class="profile-item"

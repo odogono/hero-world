@@ -39,7 +39,7 @@ describe('the play screen', () => {
     status.value = 'offline';
     const { rerender } = render(<Play name="Ada" onLeft={() => {}} />);
     expect(input().disabled).toBe(true);
-    // the status is in the profile badge's label and menu
+    expect(screen.getByRole('status').textContent).toBe('Offline');
     expect(badge().getAttribute('aria-label')).toMatch(/Offline/);
 
     status.value = 'joined';
@@ -211,7 +211,7 @@ describe('the profile badge', () => {
     expect(badge().getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('ada@example.com')).toBeTruthy();
     expect(screen.getByText('Admin')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toBe('Connecting…');
+    expect(screen.getByRole('menu').textContent).toMatch(/Connecting…/);
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
