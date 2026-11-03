@@ -225,6 +225,18 @@ unquote_env_file() {
   done
 }
 
+# configured KEY... succeeds when ENV_FILE already holds a value for every KEY.
+configured() {
+  local key
+  for key in "$@"; do [[ -n "$(_existing "$key" || true)" ]] || return 1; done
+}
+
+# keep_saved "what" asks whether to keep what a previous run saved; Enter keeps.
+keep_saved() {
+  say "$1 is already saved in $ENV_FILE."
+  ! confirm "Set it up again?"
+}
+
 wait_healthy() {
   local port="$1" i
   for i in $(seq 1 60); do
@@ -261,6 +273,13 @@ pause
 
 # ── 2 ──────────────────────────────────────────────────────────────────────
 stage "Google: consent screen in Testing mode"
+REDO_GOOGLE=1
+if configured GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET; then
+  note "Client ID $(_existing GOOGLE_CLIENT_ID | cut -c1-20)…"
+  note "Its redirect URI must still be https://$HOST/auth/google/callback."
+  keep_saved "A Google OAuth client" && REDO_GOOGLE=0
+fi
+if (( REDO_GOOGLE )); then
 open_url "https://console.cloud.google.com/auth/overview"
 step "Pick or create a project for mua (top bar project picker)."
 step "If asked, 'Get started': app name 'mua', your support email, audience External."
@@ -268,9 +287,11 @@ step "Audience → Publishing status must say 'Testing' (don't publish the app).
 step "Audience → Test users → Add users: every Google account that will play,"
 note "  including both accounts you'll use for the two-browser journey."
 pause "Press Enter once the test users are added."
+fi
 
 # ── 3 ──────────────────────────────────────────────────────────────────────
 stage "Google: OAuth client"
+if (( REDO_GOOGLE )); then
 open_url "https://console.cloud.google.com/auth/clients"
 step "Create client → Application type 'Web application', name 'mua almere'."
 step "Authorized redirect URIs → Add URI, exactly:"
@@ -282,15 +303,24 @@ ask_secret GOOGLE_CLIENT_SECRET "Paste the Client secret:"
 write_env GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
 write_env GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
 pause
+else
+  note "Keeping the saved Google client."
+fi
 
 # ── 4 ──────────────────────────────────────────────────────────────────────
 stage "Who may play, and who is an Admin"
 say "Comma-separated Google emails. Changing them later means editing"
 say "$ENV_FILE and restarting the container (docker restart $CONTAINER)."
-ask MUA_ALLOWLIST "Allowlist (both your accounts, plus known testers):"
-ask MUA_ADMINS "Admins (your main address):"
-write_env MUA_ALLOWLIST "$MUA_ALLOWLIST"
-write_env MUA_ADMINS "$MUA_ADMINS"
+if configured MUA_ALLOWLIST MUA_ADMINS; then
+  note "Allowlist: $(_existing MUA_ALLOWLIST)"
+  note "Admins:    $(_existing MUA_ADMINS)"
+fi
+if ! configured MUA_ALLOWLIST MUA_ADMINS || ! keep_saved "Who may play"; then
+  ask MUA_ALLOWLIST "Allowlist (both your accounts, plus known testers):"
+  ask MUA_ADMINS "Admins (your main address):"
+  write_env MUA_ALLOWLIST "$MUA_ALLOWLIST"
+  write_env MUA_ADMINS "$MUA_ADMINS"
+fi
 if [[ -z "$(_existing SECRET_KEY_BASE || true)" ]]; then
   write_env SECRET_KEY_BASE "$(openssl rand -base64 48 | tr -d '\n')"
 else
