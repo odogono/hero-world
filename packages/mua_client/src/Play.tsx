@@ -233,7 +233,11 @@ export const Play = ({
   const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
 
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'end' });
+    // reading back up stops the transcript following new lines, until the
+    // reader scrolls down to the newest again
+    if (end.current?.parentElement?.dataset.following !== 'no') {
+      end.current?.scrollIntoView?.({ block: 'end' });
+    }
   }, [count]);
 
   const leave = async () => {
@@ -248,9 +252,19 @@ export const Play = ({
         <span class={`status ${status.value}`} role="status">
           {STATUS_TEXT[status.value]}
         </span>
-        <Profile admin={admin} email={email} name={name} onSignOut={leave} />
       </header>
-      <ul aria-label="Transcript" aria-live="polite" class="transcript">
+      <ul
+        aria-label="Transcript"
+        aria-live="polite"
+        class="transcript"
+        onScroll={e => {
+          const el = e.currentTarget;
+          el.dataset.following =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 48
+              ? 'yes'
+              : 'no';
+        }}
+      >
         {lines.value.map(line => (
           <TranscriptLine
             answerable={joined && line.id === lastPrompt}
@@ -275,7 +289,10 @@ export const Play = ({
           ))}
         </nav>
       )}
-      <Composer joined={joined} />
+      <div class="dock">
+        <Profile admin={admin} email={email} name={name} onSignOut={leave} />
+        <Composer joined={joined} />
+      </div>
     </div>
   );
 };

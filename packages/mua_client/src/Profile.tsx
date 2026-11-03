@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 /**
  * The profile badge: the Character's initial, which opens a menu with who
- * is signed in, Settings and Sign out. Bottom left on a wide screen, in the
- * header on a narrow one.
+ * is signed in, Settings and Sign out. Always bottom left: in the page's
+ * corner on a wide screen, beside the command box on a narrow one.
  */
 export const Profile = ({
   admin,

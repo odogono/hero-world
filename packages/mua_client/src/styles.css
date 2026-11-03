@@ -90,10 +90,24 @@ button.link {
   padding: 0;
 }
 
-/* The profile badge: in the header on a narrow screen, bottom left on a wide
-   one, outside the play column; its menu opens towards the page */
+/* The bottom of the page: the profile badge beside the command box. On a
+   wide screen the badge moves out to the page's bottom-left corner */
+.dock {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0 16px 16px;
+}
+
+.dock .composer {
+  flex: 1;
+  margin: 0.5rem 0 0;
+}
+
+/* The profile badge, always bottom left; its menu opens upwards */
 .profile {
   position: relative;
+  margin-bottom: 0.4rem;
 }
 
 button.badge {
@@ -116,8 +130,8 @@ button.badge[aria-expanded='true'] {
 
 .profile-menu {
   position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
   z-index: 10;
   min-width: 15rem;
   padding: 0.35rem;
@@ -193,13 +207,7 @@ button.profile-item[aria-disabled='true'] {
     position: fixed;
     left: 16px;
     bottom: 16px;
-  }
-
-  .profile-menu {
-    top: auto;
-    right: auto;
-    bottom: calc(100% + 0.5rem);
-    left: 0;
+    margin: 0;
   }
 }
 
@@ -224,7 +232,6 @@ button.profile-item[aria-disabled='true'] {
 }
 
 .play header .status {
-  margin-right: auto;
   font-size: 0.85rem;
   color: var(--muted);
 }
@@ -240,7 +247,11 @@ button.profile-item[aria-disabled='true'] {
   color: var(--warn);
 }
 
+/* Lines sit at the bottom, newest last, and older ones rise as new ones
+   arrive, as in a chat: the first line's auto margin takes the free space */
 .transcript {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   overflow-y: auto;
   margin: 0;
@@ -249,6 +260,10 @@ button.profile-item[aria-disabled='true'] {
   font-family: var(--mono);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.transcript > :first-child {
+  margin-top: auto;
 }
 
 .line {

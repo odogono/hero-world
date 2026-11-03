@@ -158,6 +158,42 @@ describe('the play screen', () => {
   });
 });
 
+describe('the transcript', () => {
+  test('follows new lines, unless the reader has scrolled back up', () => {
+    const scrolled: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function () {
+      scrolled.push('end');
+    };
+    try {
+      lines.value = append([], { kind: 'output', text: 'one' });
+      const { rerender } = render(<Play name="Ada" onLeft={() => {}} />);
+      const transcript = screen.getByRole('list', { name: 'Transcript' });
+      expect(scrolled).toHaveLength(1);
+
+      // scrolled up: far from the bottom
+      Object.defineProperties(transcript, {
+        clientHeight: { configurable: true, value: 100 },
+        scrollHeight: { configurable: true, value: 1000 },
+        scrollTop: { configurable: true, value: 0, writable: true }
+      });
+      fireEvent.scroll(transcript);
+      lines.value = append(lines.value, { kind: 'output', text: 'two' });
+      rerender(<Play name="Ada" onLeft={() => {}} />);
+      expect(scrolled).toHaveLength(1);
+
+      // back at the bottom
+      transcript.scrollTop = 900;
+      fireEvent.scroll(transcript);
+      lines.value = append(lines.value, { kind: 'output', text: 'three' });
+      rerender(<Play name="Ada" onLeft={() => {}} />);
+      expect(scrolled).toHaveLength(2);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+});
+
 describe('the profile badge', () => {
   test('opens a menu with who is signed in, and closes on Escape', () => {
     render(<Play admin email="ada@example.com" name="ada" onLeft={() => {}} />);
