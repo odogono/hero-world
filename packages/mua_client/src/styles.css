@@ -111,6 +111,7 @@ button.link {
 }
 
 button.badge {
+  position: relative;
   display: grid;
   place-items: center;
   width: 2.25rem;
@@ -121,6 +122,23 @@ button.badge {
   background: var(--accent);
   color: white;
   font-weight: 600;
+}
+
+/* not joined: a dot on the badge, so a drop isn't hidden in the menu */
+.badge-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--warn);
+}
+
+.badge-dot.limbo,
+.badge-dot.replaced {
+  background: var(--muted);
 }
 
 button.badge:hover,
@@ -231,8 +249,22 @@ button.profile-item[aria-disabled='true'] {
   border-bottom: 1px solid var(--rule);
 }
 
-.play header .status {
-  font-size: 0.85rem;
+.play header .brand {
+  letter-spacing: 0.08em;
+}
+
+.play header .version {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* The connection's status, in the profile menu */
+.profile-menu .status {
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.8rem;
   color: var(--muted);
 }
 

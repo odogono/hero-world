@@ -39,7 +39,8 @@ describe('the play screen', () => {
     status.value = 'offline';
     const { rerender } = render(<Play name="Ada" onLeft={() => {}} />);
     expect(input().disabled).toBe(true);
-    expect(screen.getByRole('status').textContent).toBe('Offline');
+    // the status is in the profile badge's label and menu
+    expect(badge().getAttribute('aria-label')).toMatch(/Offline/);
 
     status.value = 'joined';
     rerender(<Play name="Ada" onLeft={() => {}} />);
@@ -158,6 +159,12 @@ describe('the play screen', () => {
   });
 });
 
+test('shows MUA and the version at the top', () => {
+  render(<Play name="Ada" onLeft={() => {}} />);
+  expect(screen.getByText('MUA')).toBeTruthy();
+  expect(screen.getByText('v0.0.0-test')).toBeTruthy();
+});
+
 describe('the transcript', () => {
   test('follows new lines, unless the reader has scrolled back up', () => {
     const scrolled: string[] = [];
@@ -204,6 +211,7 @@ describe('the profile badge', () => {
     expect(badge().getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('ada@example.com')).toBeTruthy();
     expect(screen.getByText('Admin')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Connecting…');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();

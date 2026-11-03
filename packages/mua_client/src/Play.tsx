@@ -248,10 +248,8 @@ export const Play = ({
   return (
     <div class="play">
       <header>
-        <strong>{name}</strong>
-        <span class={`status ${status.value}`} role="status">
-          {STATUS_TEXT[status.value]}
-        </span>
+        <strong class="brand">MUA</strong>
+        <span class="version">v{MUA_VERSION}</span>
       </header>
       <ul
         aria-label="Transcript"
@@ -290,7 +288,14 @@ export const Play = ({
         </nav>
       )}
       <div class="dock">
-        <Profile admin={admin} email={email} name={name} onSignOut={leave} />
+        <Profile
+          admin={admin}
+          email={email}
+          name={name}
+          onSignOut={leave}
+          status={status.value}
+          statusText={STATUS_TEXT[status.value]}
+        />
         <Composer joined={joined} />
       </div>
     </div>

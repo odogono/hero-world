@@ -1,20 +1,27 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import type { Status } from './store';
+
 /**
  * The profile badge: the Character's initial, which opens a menu with who
- * is signed in, Settings and Sign out. Always bottom left: in the page's
+ * is signed in, the connection's status, Settings and Sign out. A dot on the
+ * badge shows when the connection isn't joined. Always bottom left: in the page's
  * corner on a wide screen, beside the command box on a narrow one.
  */
 export const Profile = ({
   admin,
   email,
   name,
-  onSignOut
+  onSignOut,
+  status,
+  statusText
 }: {
   admin: boolean;
   email: string | null;
   name: string;
   onSignOut: () => void;
+  status: Status;
+  statusText: string;
 }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -53,6 +60,9 @@ export const Profile = ({
             {email && <span class="profile-email">{email}</span>}
             {admin && <span class="pill">Admin</span>}
           </div>
+          <div class={`status ${status}`} role="status">
+            {statusText}
+          </div>
           <button
             aria-disabled="true"
             class="profile-item"
@@ -82,13 +92,16 @@ export const Profile = ({
       <button
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`${name}: profile menu`}
+        aria-label={`${name}: profile menu (${statusText})`}
         class="badge"
         onClick={() => setOpen(!open)}
         ref={badge}
         type="button"
       >
         {name.trim().charAt(0).toUpperCase() || '?'}
+        {status !== 'joined' && (
+          <span aria-hidden="true" class={`badge-dot ${status}`} />
+        )}
       </button>
     </div>
   );
