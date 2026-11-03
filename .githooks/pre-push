@@ -4,5 +4,6 @@
 # (docs/agents/checks.md).
 set -e
 git fetch -q origin main || echo "pre-push: fetch failed; checking against the last origin/main" >&2
+[ -d node_modules ] || { echo 'pre-push: no node_modules, running bun install' >&2; bun install --frozen-lockfile >/dev/null; }
 bun tools/commits/check.ts branch
 bun run check

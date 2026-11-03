@@ -1,6 +1,6 @@
 # Commits and the changelog
 
-PRs are squash-merged, so a PR's title becomes the commit on `main`. CI's `conventions` job checks every PR title, and requires a changelog fragment for the changes a reader of the changelog would want to hear about. A `commit-msg` hook checks local commits' format. A `pre-push` hook checks that a fragment matches the branch's `feat`, `fix` or `perf` commits and that new ADR numbers are free on `origin/main`, then runs `bun run check` ([checks.md](checks.md)). After a pull, rebase or branch switch that changes `bun.lock`, the `post-merge`, `post-rewrite` and `post-checkout` hooks rerun `bun install --frozen-lockfile`. All of them live in [`.githooks/`](../../.githooks/), and `bun install` turns them on.
+PRs are squash-merged, so a PR's title becomes the commit on `main`. CI's `conventions` job checks every PR title, and requires a changelog fragment for the changes a reader of the changelog would want to hear about. A `commit-msg` hook checks local commits' format. A `pre-push` hook checks that a fragment matches the branch's `feat`, `fix` or `perf` commits and that new ADR numbers are free on `origin/main`, then runs `bun run check` ([checks.md](checks.md)). After a pull, rebase or branch switch that changes `bun.lock`, the `post-merge`, `post-rewrite` and `post-checkout` hooks rerun `bun install --frozen-lockfile`, as they do in a worktree with no `node_modules`. All of them live in [`.githooks/`](../../.githooks/), and `bun install` turns them on.
 
 ## Subject format
 
