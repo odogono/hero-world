@@ -35,6 +35,8 @@ defmodule MuaWorld do
   """
   use GenServer
 
+  require Logger
+
   alias MuaWorld.{
     Actions,
     Components,
@@ -181,6 +183,13 @@ defmodule MuaWorld do
   def unsubscribe(world, character),
     do: GenServer.call(world, {:unsubscribe, character, self()})
 
+  @doc """
+  Writes a consistent snapshot of the World's database to `dest`, which must
+  not exist yet, while play carries on: the World makes it between Steps, so
+  it holds every committed Step and nothing more (`MuaWorld.Backup`).
+  """
+  def backup(world, dest), do: GenServer.call(world, {:backup, dest}, 120_000)
+
   @doc "Advances World time and runs what is due, as a tick does."
   def tick(world), do: GenServer.call(world, :tick, 30_000)
 
@@ -239,8 +248,22 @@ defmodule MuaWorld do
     {:ok, world} = OdgnEcs.open(path)
     world = Enum.reduce(Components.all(), world, fn c, w -> ok!(OdgnEcs.define(w, c)) end)
     Tables.ensure(world)
-    {:ok, world, _built_or_resumed} = OdgnEdl.load(world, File.read!(edl_path), path: edl_path)
 
+    # A World built from another EDL won't start until it is migrated: say so
+    # plainly rather than crash
+    case OdgnEdl.load(world, File.read!(edl_path), path: edl_path) do
+      {:ok, world, how} ->
+        init_loaded(opts, world, path, how)
+
+      {:error, %OdgnEdl.Error{kind: kind, message: message}} ->
+        Logger.error("World at #{path} can't start: #{message}", event: :world_not_started)
+        OdgnEcs.close(world)
+        Lock.release(path)
+        {:stop, {kind, message}}
+    end
+  end
+
+  defp init_loaded(opts, world, path, how) do
     state = %__MODULE__{
       world: world,
       path: path,
@@ -252,7 +275,7 @@ defmodule MuaWorld do
 
     :ok = OdgnEcs.begin(world)
     Exits.expand(world)
-    Tables.abandon_waiting(world)
+    abandoned = Tables.abandon_waiting(world)
 
     case Places.ensure(world, opts[:starting_room]) do
       {:ok, places} ->
@@ -263,6 +286,7 @@ defmodule MuaWorld do
         # a test's `fault` is for the Steps that follow start-up
         state = %{start_world(%{state | fault: nil}) | fault: opts[:fault]}
         if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
+        started(path, how, state.world_ms, abandoned)
         {:ok, state}
 
       {:error, reason} ->
@@ -271,6 +295,21 @@ defmodule MuaWorld do
         Lock.release(path)
         {:stop, {:invalid_starting_room, reason}}
     end
+  end
+
+  # A World is built from its EDL the first time, and resumed after: after a
+  # crash, this is where it recovers, abandoning commands still waiting.
+  defp started(path, how, world_ms, abandoned) do
+    Logger.info(
+      "World #{how} from #{path} at World time #{world_ms} ms" <>
+        if(abandoned > 0, do: ", abandoning #{abandoned} waiting commands", else: ""),
+      event: :world_started
+    )
+
+    :telemetry.execute([:mua_world, :start], %{world_time: world_ms, abandoned: abandoned}, %{
+      path: path,
+      how: how
+    })
   end
 
   # A stopped World lets go of its database at once, and its lock with it:
@@ -492,6 +531,20 @@ defmodule MuaWorld do
     else
       error -> {:reply, error, state}
     end
+  end
+
+  # Calls run one at a time, between Steps, so no transaction is open
+  def handle_call({:backup, dest}, _from, state) do
+    started = System.monotonic_time()
+    result = MuaWorld.Backup.vacuum_into(state.world.conn, dest)
+
+    :telemetry.execute(
+      [:mua_world, :backup],
+      %{duration: System.monotonic_time() - started},
+      %{dest: dest, result: elem(result, 0)}
+    )
+
+    {:reply, result, state}
   end
 
   def handle_call(:places, _from, state), do: {:reply, state.places, state}
@@ -725,6 +778,7 @@ defmodule MuaWorld do
   # COMMIT, and only then the output.
   defp step(state, input) do
     world = state.world
+    started = System.monotonic_time()
     :ok = OdgnEcs.begin(world)
     Tables.put_world_time(world, state.world_ms)
     state = input.(state)
@@ -737,9 +791,23 @@ defmodule MuaWorld do
     # A failed COMMIT leaves NorthTalk ahead of the database, so the World
     # stops and restarts from what was committed.
     case OdgnEcs.commit(world) do
-      :ok -> :ok
-      {:error, reason} -> exit({:commit_failed, reason})
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error("World commit failed, restarting from the last commit: #{inspect(reason)}",
+          event: :commit_failed
+        )
+
+        :telemetry.execute([:mua_world, :commit, :error], %{count: 1}, %{reason: reason})
+        exit({:commit_failed, reason})
     end
+
+    :telemetry.execute(
+      [:mua_world, :step, :stop],
+      %{duration: System.monotonic_time() - started},
+      %{lines: length(lines)}
+    )
 
     fault(state, :after_commit)
     publish(state, lines)

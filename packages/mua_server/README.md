@@ -56,3 +56,5 @@ MUA_ADMINS=you@example.com
 ```
 
 Development sign-in (`POST /auth/dev`) is never compiled into a release.
+
+Backing up, changing content or the release, restoring and watching a running server are in [docs/operations.md](docs/operations.md): `GET /health`, `MuaServer.Release` commands through `bin/mua_server rpc` and `eval`, and the [`rel/maintain.sh`](rel/maintain.sh) maintenance script.

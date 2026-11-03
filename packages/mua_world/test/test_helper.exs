@@ -83,4 +83,6 @@ end
 
 # Every World starts a NorthTalk reactor, which is CPU-heavy: too many at once
 # starve each other on a small CI runner past NorthTalk's 5 s call timeout.
+# the World logs its start-up at info
+Logger.configure(level: :warning)
 ExUnit.start(max_cases: 2)
