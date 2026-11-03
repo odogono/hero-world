@@ -120,8 +120,13 @@ defmodule MuaWorld.Migration do
     :ok
   end
 
-  # Every timer a pruned entity owns, a Script's or mua's
+  # Every timer a pruned entity owns, a Script's or mua's. Its `timers` go
+  # too, or the World would arm them again when it next starts.
   defp cancel_timers(world, owners) do
+    for owner <- owners,
+        OdgnEcs.get(world, owner, "timers"),
+        do: :ok = OdgnEcs.remove(world, owner, "timers")
+
     for owner <- owners, eid <- OdgnEcs.query(world, where: [{@timer, "owner", owner}]) do
       timer = OdgnEcs.get(world, eid, @timer)
       :ok = OdgnEcs.delete(world, eid)

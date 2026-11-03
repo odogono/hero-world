@@ -195,18 +195,27 @@ defmodule MuaServer.CharacterChannelTest do
       _b = join_as(bob)
       a = join_as(ada)
       Process.unlink(a.channel_pid)
+      bob_topic = "character:#{bob.character}"
+      Process.sleep(100)
+      flush_pushes()
+
+      # the command runs (Bob hears it), but Ada's Connection drops before
+      # its reply reaches her
       push(a, "command", %{"text" => "say once", "ref" => "c1"})
+
+      assert_receive %Phoenix.Socket.Message{
+        topic: ^bob_topic,
+        event: "output",
+        payload: %{lines: [heard]}
+      }
+
+      assert heard =~ "once"
       Process.exit(a.channel_pid, :kill)
 
       _again = join_as(ada)
-      Process.sleep(50)
 
-      said =
-        for {:mua, _, line} <- Process.info(self(), :messages) |> elem(1),
-            line =~ "once",
-            do: line
-
-      assert length(said) <= 1
+      # rejoining doesn't run it a second time
+      refute_receive %Phoenix.Socket.Message{topic: ^bob_topic, event: "output"}, 200
       refute_push("output", %{lines: ["You say, \"once\""]})
     end
 

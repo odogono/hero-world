@@ -209,6 +209,46 @@ defmodule MuaWorld.MigrateTest do
     assert MuaWorld.component(world, location(world, hall), "meta")["props"]["id"] == "limbo"
   end
 
+  test "pruning a place cancels the timers it owns", %{tmp_dir: dir, db: db} do
+    # the hall chimes too, so it owns a timer
+    chiming =
+      File.read!(fixture(@before))
+      |> String.replace(
+        "entity hall : room {",
+        "entity hall : room belfry {\n  timers { every: { chime: 10 } }"
+      )
+
+    chiming = write_edl(dir, "chiming.edl", chiming)
+    world = start(chiming, dir, path: db)
+    hall = MuaWorld.named(world, "hall")
+    run_for(world, 5)
+    assert "chime" in timers_of(world, hall)
+    GenServer.stop(world)
+
+    pruned =
+      chiming
+      |> File.read!()
+      |> String.replace(~r/entity hall : room belfry \{.*?\n\}\n/s, "")
+      |> String.replace("exits { east: $hall }", "")
+
+    path = write_edl(dir, "pruned.edl", pruned)
+
+    assert {:ok, %{timers_cancelled: cancelled}} = report(db, path, prune: true)
+    assert %{owner: hall, message: "chime"} in cancelled
+    assert {:ok, _} = migrate(db, path, prune: true)
+
+    world = start(path, dir, path: db)
+    assert timers_of(world, hall) == []
+    assert "chime" in timers_of(world, MuaWorld.named(world, "west_of_house"))
+  end
+
+  defp timers_of(world, owner) do
+    for eid <- 1..200,
+        t = MuaWorld.component(world, eid, "talk_timer"),
+        t["owner"] == owner,
+        do: t["name"] || t["message"]
+  end
+
   test "refuses a Migration that leaves the Starting room invalid, changing nothing", %{
     tmp_dir: dir,
     db: db
