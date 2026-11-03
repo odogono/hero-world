@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from '@testing-library/preact';
 
 import { append, connectionLost, rejoined, sent } from '../transcript';
 
@@ -25,6 +31,8 @@ afterEach(() => {
 });
 
 const input = () => screen.getByLabelText('Command') as HTMLTextAreaElement;
+
+const badge = () => screen.getByRole('button', { name: /profile menu/ });
 
 describe('the play screen', () => {
   test('takes commands only while joined', () => {
@@ -137,5 +145,46 @@ describe('the play screen', () => {
     fireEvent.input(input(), { target: { value: '  look  ' } });
     fireEvent.click(send);
     expect(commands).toEqual(['look']);
+  });
+
+  test('focuses the command box once the Character joins', () => {
+    status.value = 'connecting';
+    const { rerender } = render(<Play name="Ada" onLeft={() => {}} />);
+    expect(document.activeElement).not.toBe(input());
+
+    status.value = 'joined';
+    rerender(<Play name="Ada" onLeft={() => {}} />);
+    expect(document.activeElement).toBe(input());
+  });
+});
+
+describe('the profile badge', () => {
+  test('opens a menu with who is signed in, and closes on Escape', () => {
+    render(<Play admin email="ada@example.com" name="ada" onLeft={() => {}} />);
+    expect(badge().textContent).toBe('A');
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.click(badge());
+    expect(badge().getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('ada@example.com')).toBeTruthy();
+    expect(screen.getByText('Admin')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(badge());
+  });
+
+  test('shows no Admin tag for a player', () => {
+    render(<Play email="bob@example.com" name="Bob" onLeft={() => {}} />);
+    fireEvent.click(badge());
+    expect(screen.queryByText('Admin')).toBeNull();
+  });
+
+  test('signs out from the menu', async () => {
+    let left = false;
+    render(<Play name="Ada" onLeft={() => (left = true)} />);
+    fireEvent.click(badge());
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    await waitFor(() => expect(left).toBe(true));
   });
 });

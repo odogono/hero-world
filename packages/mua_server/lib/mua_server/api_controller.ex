@@ -1,14 +1,18 @@
 defmodule MuaServer.ApiController do
   @moduledoc """
-  The signed-in Account's session (its Characters, and a token for the
-  Channel socket), and making its Character.
+  The signed-in Account's session (its email, whether it is an admin, its
+  Characters, and a token for the Channel socket), and making its Character.
   """
   use Phoenix.Controller, formats: [:json]
 
   def session(conn, _params) do
     with_account(conn, fn account ->
+      email = get_session(conn, :email)
+
       json(conn, %{
         account: account,
+        email: email,
+        admin: MuaServer.Admission.admin?(email),
         characters: MuaWorld.characters(MuaServer.World, account),
         socket_token: Phoenix.Token.sign(MuaServer.Endpoint, "socket", account)
       })

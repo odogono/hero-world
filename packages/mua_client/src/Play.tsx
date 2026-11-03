@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { Profile } from './Profile';
 import { logout, sendCommand } from './connection';
 import { actions, lines, status, type Status } from './store';
 import type { Line } from './transcript';
@@ -130,6 +131,14 @@ const Composer = ({ joined }: { joined: boolean }) => {
     return () => document.removeEventListener('selectionchange', track);
   }, []);
 
+  // the box is disabled until the Character joins, so autoFocus finds
+  // nothing to focus on load: focus it on joining, and on rejoining
+  useEffect(() => {
+    if (joined) {
+      box.current?.focus();
+    }
+  }, [joined]);
+
   const command = text.trim();
 
   const submit = (event?: Event) => {
@@ -208,9 +217,13 @@ const Composer = ({ joined }: { joined: boolean }) => {
 };
 
 export const Play = ({
+  admin = false,
+  email = null,
   name,
   onLeft
 }: {
+  admin?: boolean;
+  email?: string | null;
   name: string;
   onLeft: () => void;
 }) => {
@@ -235,9 +248,7 @@ export const Play = ({
         <span class={`status ${status.value}`} role="status">
           {STATUS_TEXT[status.value]}
         </span>
-        <button class="link" onClick={leave} type="button">
-          Log out
-        </button>
+        <Profile admin={admin} email={email} name={name} onSignOut={leave} />
       </header>
       <ul aria-label="Transcript" aria-live="polite" class="transcript">
         {lines.value.map(line => (

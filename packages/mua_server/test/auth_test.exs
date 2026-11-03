@@ -18,7 +18,14 @@ defmodule MuaServer.AuthTest do
     assert redirected_to(conn, 302) == "/"
 
     session = get(recycle(conn), "/api/session")
-    assert %{"account" => account, "socket_token" => token} = json_response(session, 200)
+
+    assert %{
+             "account" => account,
+             "socket_token" => token,
+             "email" => "ada@example.com",
+             "admin" => true
+           } = json_response(session, 200)
+
     assert is_binary(token)
 
     # the same identity finds the same Account
@@ -54,6 +61,10 @@ defmodule MuaServer.AuthTest do
   test "an Account makes one Character, with a public name" do
     conn = post(build_conn(), "/auth/dev", %{email: "bob@example.com"})
     assert %{"account" => _} = json_response(conn, 200)
+
+    # not an admin
+    assert %{"email" => "bob@example.com", "admin" => false} =
+             json_response(get(recycle(conn), "/api/session"), 200)
 
     created = post(recycle(conn), "/api/character", %{name: "Bob"})
 

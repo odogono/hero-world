@@ -43,5 +43,12 @@ export const App = () => {
     await signOut();
     session.value = null;
   };
-  return <Play name={character.name} onLeft={left} />;
+  return (
+    <Play
+      admin={current.admin}
+      email={current.email ?? null}
+      name={character.name}
+      onLeft={left}
+    />
+  );
 };
