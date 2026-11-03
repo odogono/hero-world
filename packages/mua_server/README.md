@@ -57,4 +57,4 @@ MUA_ADMINS=you@example.com
 
 Development sign-in (`POST /auth/dev`) is never compiled into a release.
 
-Backing up, changing content or the release, restoring and watching a running server are in [docs/operations.md](docs/operations.md): `GET /health`, `MuaServer.Release` commands through `bin/mua_server rpc` and `eval`, and the [`rel/maintain.sh`](rel/maintain.sh) maintenance script.
+Backing up, changing content or the release, restoring and watching a running server are in [docs/operations.md](docs/operations.md): `GET /health`, `MuaServer.Release` commands through `bin/mua_server rpc` and `eval`, and the [`rel/maintain.sh`](rel/maintain.sh) maintenance script. To deploy on almere behind `tailscale serve`, run [`rel/deploy-almere.sh`](rel/deploy-almere.sh) there; [`rel/mua.env.example`](rel/mua.env.example) lists the environment.
