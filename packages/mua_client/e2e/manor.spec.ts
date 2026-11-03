@@ -107,3 +107,20 @@ test('the cat wanders in on its own, and talks to whoever is there', async ({
     timeout: 10_000
   });
 });
+
+test('an admin runs NorthTalk at the prompt; nobody else can', async ({
+  browser
+}) => {
+  const ada = await enter(browser, 'ada@example.com', 'Ada');
+  const bob = await enter(browser, 'bob@example.com', 'Bob');
+
+  await play(ada, ';return 6 * 7');
+  await expect(transcript(ada)).toContainText('=> 42');
+
+  await play(ada, ';return (');
+  await expect(transcript(ada)).toContainText('!! line 1:');
+
+  await play(bob, ';return 6 * 7');
+  await expect(transcript(bob)).toContainText("You can't do that.");
+  expect(await count(bob, '=> 42')).toBe(0);
+});

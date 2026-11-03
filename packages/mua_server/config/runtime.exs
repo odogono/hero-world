@@ -12,6 +12,10 @@ if config_env() != :test do
       System.get_env("MUA_ALLOWLIST", "")
       |> String.split(",", trim: true)
       |> Enum.map(&(&1 |> String.trim() |> String.downcase())),
+    admins:
+      System.get_env("MUA_ADMINS", "")
+      |> String.split(",", trim: true)
+      |> Enum.map(&(&1 |> String.trim() |> String.downcase())),
     google: [
       client_id: System.get_env("GOOGLE_CLIENT_ID"),
       client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),

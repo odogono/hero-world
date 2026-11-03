@@ -55,7 +55,9 @@ defmodule MuaWorld.Components do
       c("described", false, [col("description", :string), col("name", :string)]),
       # A person's game identity (ADR 0016). Phoenix maps a Google identity
       # to its id; nothing in the World points at a person directly.
-      c("account", true, []),
+      # `admin` lets the Account run NorthTalk at the prompt (#91); sign-in
+      # sets it from the configured admins each time.
+      c("account", true, [col("admin", :boolean, default: false)]),
       c("player", false, [
         col("name", :string, optional: false),
         # the Account that owns the Character

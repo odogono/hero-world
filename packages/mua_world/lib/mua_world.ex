@@ -109,8 +109,21 @@ defmodule MuaWorld do
   stable id, such as Google's; `email` is kept, and updated, for operators.
   Admission is the caller's job: this maps whoever it is given.
   """
-  def sign_in(world, sub, email) when is_binary(sub) and sub != "",
-    do: GenServer.call(world, {:sign_in, sub, email}, 30_000)
+  def sign_in(world, sub, email, opts \\ []) when is_binary(sub) and sub != "",
+    do: GenServer.call(world, {:sign_in, sub, email, Keyword.get(opts, :admin, false)}, 30_000)
+
+  @doc """
+  Runs a line of NorthTalk typed by an admin, as one Step (#91). The line
+  runs as the Handler `on line actor, here`, with the Character and its
+  room; `ask world to named "lamp"` finds anything by Definition name. It
+  changes the World with the same Operations Scripts use, and a line that
+  fails, or doesn't finish within the Step, leaves no change. The admin is
+  told `=> value`, or `!! ` and what went wrong. An Account that isn't an
+  admin is told "You can't do that." A command that starts with `;` comes
+  here too.
+  """
+  def admin_line(world, account, character, text),
+    do: GenServer.call(world, {:admin_line, account, character, text}, 30_000)
 
   @doc """
   What a Character can see: its room, what it carries and the commands it
@@ -328,6 +341,28 @@ defmodule MuaWorld do
   # ---------------------------------------------------------------------
 
   @impl true
+  def handle_call({:command, account, character, ";" <> line}, from, state),
+    do: handle_call({:admin_line, account, character, line}, from, state)
+
+  def handle_call({:admin_line, account, character, line}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character) do
+      admin? = (OdgnEcs.get(state.world, account, "account") || %{})["admin"] == true
+      state = advance_clock(state)
+
+      {lines, state} =
+        step(state, fn state ->
+          if admin?,
+            do: run_admin_line(state, character, String.trim(line)),
+            else: tell(state, character, "You can't do that.")
+        end)
+
+      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:command, account, character, text}, _from, state) do
     with :ok <- owns(state, account, character),
          :ok <- in_play(state, character) do
@@ -339,7 +374,7 @@ defmodule MuaWorld do
     end
   end
 
-  def handle_call({:sign_in, sub, email}, _from, state) do
+  def handle_call({:sign_in, sub, email, admin?}, _from, state) do
     {_, state} =
       step(state, fn state ->
         world = state.world
@@ -355,6 +390,7 @@ defmodule MuaWorld do
               account
           end
 
+        :ok = OdgnEcs.put(world, account, "account", %{"admin" => admin? == true})
         Tables.put_identity(world, sub, email, account)
         %{state | result: {:ok, account}}
       end)
@@ -1004,6 +1040,61 @@ defmodule MuaWorld do
         do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, watcher, message, values)
 
     :ok
+  end
+
+  # An admin's line runs in a savepoint, released only if its Run
+  # completes, so a line that fails or is still waiting leaves no change,
+  # its output included. What the admin is told comes after.
+  defp run_admin_line(state, actor, line) do
+    world = state.world
+    talk = state.talk
+    service = "admin:#{actor}"
+    :ok = OdgnEcs.savepoint(world, "mua_admin_line")
+
+    outcome =
+      with :ok <- OdgnEcsTalk.put_service_script(talk, service, MuaWorld.Admin.source(line)),
+           {:ok, pending} <-
+             OdgnEcsTalk.request_service(
+               talk,
+               service,
+               "line",
+               [
+                 OdgnEcsTalk.handle(talk, actor),
+                 OdgnEcsTalk.handle(talk, location(state, actor))
+               ],
+               instant(state.world_ms)
+             ) do
+        settle_line(state, pending, 50)
+      end
+
+    case outcome do
+      {:ok, %NorthTalk.Result{value: value}} ->
+        :ok = OdgnEcs.release(world, "mua_admin_line")
+        tell(state, actor, "=> " <> MuaWorld.Admin.show(value))
+
+      other ->
+        :ok = OdgnEcs.rollback_to(world, "mua_admin_line")
+        # A Run still waiting is discarded with the line's code, so it can't
+        # carry on in a later Step
+        if other == :unfinished, do: OdgnEcsTalk.put_service_script(talk, service, "")
+        tell(state, actor, "!! " <> MuaWorld.Admin.failure(other, line))
+    end
+  end
+
+  defp settle_line(state, pending, tries) do
+    case NorthTalk.await(pending, 0) do
+      {:error, %NorthTalk.HostError{code: "timeout"}} when tries > 0 ->
+        {:ok, _} = OdgnEcsTalk.pump(state.talk, instant(state.world_ms))
+        settle_line(state, pending, tries - 1)
+
+      {:error, %NorthTalk.HostError{code: "timeout"}} ->
+        NorthTalk.release_pending(pending)
+        :unfinished
+
+      result ->
+        NorthTalk.release_pending(pending)
+        result
+    end
   end
 
   defp tell(state, character, text) do

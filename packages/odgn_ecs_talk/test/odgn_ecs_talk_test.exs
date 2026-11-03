@@ -82,6 +82,23 @@ defmodule OdgnEcsTalkTest do
   end
 
   describe "the world Capability" do
+    test "finds an entity by its Definition name, or Nothing" do
+      {world, talk} = setup_world()
+
+      :ok =
+        OdgnEcsTalk.load_atom_script(talk, "person", """
+        on lookup name
+          ask world to named name
+          return it
+        end lookup
+        """)
+
+      hero = id(world, "hero")
+      lamp = OdgnEcsTalk.handle(talk, id(world, "lamp"))
+      assert value(ask(talk, hero, "lookup", ["lamp"])) == lamp
+      assert value(ask(talk, hero, "lookup", ["nowhere"])) == nil
+    end
+
     test "finds, moves and shows" do
       {world, talk} = setup_world()
       hero = id(world, "hero")
@@ -546,5 +563,29 @@ defmodule OdgnEcsTalkTest do
 
       assert_received {:show, ^tower, "ding"}
     end
+  end
+
+  test "a Service Script's code can be replaced, keeping its Grants" do
+    {world, talk} = setup_world()
+    hero = OdgnEcsTalk.handle(talk, id(world, "hero"))
+    :ok = OdgnEcsTalk.put_service_script(talk, "probe", "on run who\n  return 1\nend run")
+
+    :ok =
+      OdgnEcsTalk.put_service_script(talk, "probe", """
+      on run who
+        change who, "stats", {hp: 7}
+        return 2
+      end run
+      """)
+
+    {:ok, pending} = OdgnEcsTalk.request_service(talk, "probe", "run", [hero], now())
+    assert value(settle(talk, pending)) == 2
+    assert OdgnEcs.get(world, id(world, "hero"), "stats")["hp"] == 7
+
+    assert {:error, %NorthTalk.LoadError{}} =
+             OdgnEcsTalk.put_service_script(talk, "probe", "on run\n  return (\nend run")
+
+    {:ok, pending} = OdgnEcsTalk.request_service(talk, "probe", "run", [hero], now())
+    assert value(settle(talk, pending)) == 2
   end
 end
