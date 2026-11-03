@@ -69,4 +69,26 @@ defmodule MuaWorld.DispatchTest do
       assert send_bob(c, "north") == "You can't go north from here."
     end
   end
+
+  describe "order" do
+    # No command opens one thing with another, so this asks Dispatch directly,
+    # reading the World's database beside it
+    test "asks the second object before the thing acted on", c do
+      {:ok, ecs} = OdgnEcs.open(Path.join(c.tmp_dir, "world.db"))
+      on_exit(fn -> OdgnEcs.close(ecs) end)
+
+      crate = named_thing(c.world, "Crate")
+      plinth = named_thing(c.world, "Plinth")
+      ctx = %{actor: c.bob, verb: "open", target_id: crate, indirect_id: plinth}
+
+      assert [room, indirect, target] = MuaWorld.Dispatch.questions(ecs, ctx)
+      assert {room.to, indirect.to, target.to} == {location(c.world, c.bob), plinth, crate}
+      assert indirect.response =~ "The plinth is not a key."
+      assert target.response == nil
+    end
+
+    test "falls through to the built-in action when nobody responds", c do
+      assert send_bob(c, "open crate") == "Opening the crate reveals: the coin."
+    end
+  end
 end

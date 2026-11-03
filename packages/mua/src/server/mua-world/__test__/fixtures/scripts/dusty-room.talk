@@ -1,3 +1,0 @@
-on afterTake role, actor
-  return "Dust swirls where it lay."
-end afterTake

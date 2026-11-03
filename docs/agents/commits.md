@@ -13,7 +13,7 @@ type(scope)!: lowercase imperative description (#issue)
   - `fix`: a behavior that was wrong.
   - `perf`: the same behavior, faster or smaller.
   - `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`: no change a user would notice.
-- **scope**, optional: the package, one of `ecs`, `ecs-talk`, `helpers`, `mua`, or `repo` for CI, `tools/`, docs and workspace changes.
+- **scope**, optional: the package, one of `ecs`, `helpers`, `mua` (the Elixir and browser packages), or `repo` for CI, `tools/`, docs and workspace changes.
 - **!**, before the colon, marks a breaking change. A `BREAKING CHANGE: ...` line in the PR body does too.
 - The description starts with a lowercase letter and doesn't end with a full stop. End it with the issue it closes, as `(#9)`.
 
@@ -22,7 +22,7 @@ Examples:
 ```text
 feat(mua): let things set their own action messages (#24)
 fix(ecs): keep unsaved component changes across a query (#20)
-refactor(ecs-talk)!: rename the Handle fields
+refactor(mua)!: rename the World's command reply
 ci(repo): enforce Conventional Commit titles and changelog fragments
 ```
 

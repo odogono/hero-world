@@ -5,16 +5,18 @@ A Bun workspace of game libraries and the games built on them. Package `AGENTS.m
 ## Repo layout
 
 - `packages/ecs` (`odgn-ecs`): SQLite-backed ECS, EDL world files, events, game loop. See `packages/ecs/AGENTS.md`.
-- `packages/ecs-talk`: NorthTalk Host Adapter that lets Scripts drive an `odgn-ecs` World. See `packages/ecs-talk/README.md`.
-- `packages/mua`: text-adventure server (Elysia + `mua-world` ECS) and OpenTUI client. See `packages/mua/AGENTS.md`.
+- `packages/mua_world`: the mua text adventure's World, in Elixir: gameplay, NorthTalk Scripts and the EDL content. See `packages/mua_world/README.md`.
+- `packages/mua_server`: the Phoenix server a browser plays through. See `packages/mua_server/README.md`.
+- `packages/mua_client`: the Preact browser client.
+- `packages/odgn_ecs`, `packages/odgn_edl`, `packages/odgn_ecs_talk`: the Elixir ECS, EDL loader and NorthTalk Host Adapter that `mua_world` is built on.
 - `packages/helpers` (`odgn-helpers`): logging, strings, `trycatch`.
 - `tools/`: commit, changelog and typecheck scripts.
 - `GLOSSARY.md` and `docs/adr/`: domain terms and decisions (`docs/agents/domain.md`).
 
 ## Sources outside this repo
 
-- **NorthTalk** (the Script language behind `ecs-talk` and `@northtalk/ts`): the spec is `~/work/odgn/odgn-talk/spec/` (embedding: `09-embedding.md`) and the TypeScript host guide is `~/work/odgn/odgn-talk/docs/embedding-typescript.md`. Read these before the bundled `.d.ts` files. Not checked out? Read the same paths from `odogono/odgn-talk` on GitHub with `gh api`.
-- **Ogalala** (the 1990s Java MUD that `mua` borrows from): `~/work/odgn/ogalala`. Start from `packages/mua/docs/ogalala-patterns.md`; its own `docs/` are wrong in places.
+- **NorthTalk** (the Script language behind `odgn_ecs_talk`): the spec is `~/work/odgn/odgn-talk/spec/` (embedding: `09-embedding.md`) and the TypeScript host guide is `~/work/odgn/odgn-talk/docs/embedding-typescript.md`. Read these before the bundled `.d.ts` files. Not checked out? Read the same paths from `odogono/odgn-talk` on GitHub with `gh api`.
+- **Ogalala** (the 1990s Java MUD that `mua` borrows from): `~/work/odgn/ogalala`. Start from `packages/mua_world/docs/ogalala-patterns.md`; its own `docs/` are wrong in places.
 
 ## Workflow
 

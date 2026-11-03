@@ -9,9 +9,7 @@ const ROOT = resolve(import.meta.dir, '../..');
 
 const PROJECTS = [
   'packages/ecs',
-  'packages/ecs-talk',
   'packages/helpers',
-  'packages/mua',
   'packages/mua_client',
   'tools'
 ];
