@@ -4,6 +4,8 @@ defmodule MuaServer.Application do
 
   @impl true
   def start(_type, _args) do
+    MuaServer.Telemetry.attach()
+
     children =
       [
         {Phoenix.PubSub, name: MuaServer.PubSub},

@@ -27,6 +27,7 @@ defmodule MuaServer.Router do
 
   scope "/", MuaServer do
     get("/", PageController, :index)
+    get("/health", HealthController, :show)
   end
 
   scope "/api", MuaServer do

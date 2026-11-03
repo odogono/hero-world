@@ -133,7 +133,7 @@ defmodule MuaWorld.MigrateTest do
     assert "Created: garden" in lines
 
     # the World still needs its Migration, and starts from the EDL it was built from
-    assert {:error, {{:badmatch, {:error, %OdgnEdl.Error{kind: :migration_needed}}}, _}} =
+    assert {:error, {:migration_needed, _}} =
              MuaWorld.start(
                path: db,
                edl: fixture(@after_edl),

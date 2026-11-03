@@ -79,10 +79,14 @@ defmodule MuaWorld.Tables do
   def delete_waiting(%OdgnEcs{conn: conn}, id),
     do: SQL.run!(conn, "DELETE FROM mua_waiting WHERE id = ?1", [id])
 
-  @doc "Turns every input still waiting into a notice for its Character, and clears the outbox."
+  @doc """
+  Turns every input still waiting into a notice for its Character, and clears
+  the outbox. Returns how many were abandoned.
+  """
   def abandon_waiting(%OdgnEcs{conn: conn}) do
-    for [character, command] <-
-          SQL.all!(conn, "SELECT character, command FROM mua_waiting ORDER BY id") do
+    waiting = SQL.all!(conn, "SELECT character, command FROM mua_waiting ORDER BY id")
+
+    for [character, command] <- waiting do
       SQL.run!(conn, "INSERT INTO mua_notices (character, text) VALUES (?1, ?2)", [
         character,
         "The world was restarted, and \"#{command}\" was abandoned."
@@ -90,6 +94,7 @@ defmodule MuaWorld.Tables do
     end
 
     SQL.exec!(conn, "DELETE FROM mua_waiting; DELETE FROM mua_outbox")
+    length(waiting)
   end
 
   def take_notices(%OdgnEcs{conn: conn}, character) do

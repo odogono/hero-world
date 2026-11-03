@@ -23,7 +23,8 @@ defmodule MuaWorld.MixProject do
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",
-       ref: "8708b24a873e30226268eed360eca43d4e02c97e"}
+       ref: "8708b24a873e30226268eed360eca43d4e02c97e"},
+      {:telemetry, "~> 1.2"}
     ]
   end
 end
