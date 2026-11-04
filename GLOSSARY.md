@@ -115,3 +115,7 @@ _Avoid_: me, sender
 **Message Path**:
 The route an unhandled message climbs, from an entity through the atoms in its Lineage that have Scripts, linearized rightmost first with a shared ancestor after every atom built on it. Atoms without a Script are skipped.
 _Avoid_: inheritance chain, delegation
+
+**Delivery**:
+One message handed to an entity's Message Path from outside Scripts, such as a command's question, a due timer or a lifecycle message, together with the Script work it causes. A Step holds one or more Deliveries.
+_Avoid_: dispatch, event

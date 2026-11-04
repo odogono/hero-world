@@ -30,6 +30,11 @@ defmodule OdgnEcsTalk do
     durable timers in the World, owned by the entity the Run was delivered
     to, scoped to it and the Script (an atom's name, for a copy).
     `due_timers/2` and `fire_timer/2` deliver them.
+  - **Deliveries:** `deliver`, `request` and `decide` (and their Service
+    forms) take a `:host` option, a term of the Host's own that a Capability
+    reads back with `delivery/2` while the Delivery's Runs go on. The adapter
+    forgets a Delivery once NorthTalk's `causal work` report shows its work
+    has ended: no live Runs and no queued messages.
   """
 
   alias NorthTalk.{Capability, Object, ObjectKind}
@@ -92,6 +97,9 @@ defmodule OdgnEcsTalk do
       the caller's transaction.
     * `:grants` - extra Grants for every Script, by name.
     * `:limits` - limits for every Script.
+    * `:capabilities` - functions of the started adapter, each returning a
+      `NorthTalk.Capability` that every Script is granted under its name.
+      Their callbacks may call `delivery/2` with the adapter.
   """
   @spec start(OdgnEcs.t(), keyword()) :: {:ok, t()}
   def start(%OdgnEcs{} = world, opts \\ []) do
@@ -129,15 +137,21 @@ defmodule OdgnEcsTalk do
     :ok = NorthTalk.define_capability!(owner, clock_capability())
     :ok = NorthTalk.define_capability!(owner, timer_capability(talk))
 
+    hosts =
+      for build <- Keyword.get(opts, :capabilities, []), into: %{} do
+        %Capability{name: name} = capability = build.(talk)
+        :ok = NorthTalk.define_capability!(owner, capability)
+        {name, NorthTalk.grant!(owner, name)}
+      end
+
     grants =
-      Map.merge(
-        %{
-          "world" => NorthTalk.grant!(owner, "world"),
-          "clock" => NorthTalk.grant!(owner, "clock"),
-          "timer" => NorthTalk.grant!(owner, "timer")
-        },
-        Keyword.get(opts, :grants, %{})
-      )
+      %{
+        "world" => NorthTalk.grant!(owner, "world"),
+        "clock" => NorthTalk.grant!(owner, "clock"),
+        "timer" => NorthTalk.grant!(owner, "timer")
+      }
+      |> Map.merge(hosts)
+      |> Map.merge(Keyword.get(opts, :grants, %{}))
 
     talk = %{talk | grants: grants}
     for eid <- OdgnEcs.query(world), do: handle(talk, eid)
@@ -234,7 +248,7 @@ defmodule OdgnEcsTalk do
   def put_service_script(%__MODULE__{} = talk, service, source, opts \\ []) do
     if :ets.member(talk.table, {:service, service}) do
       case NorthTalk.reload(talk.group, "service:" <> service, source, variables: :reset) do
-        {:ok, _reports} -> :ok
+        {:ok, reports} -> forget_ended(talk, reports)
         {:error, _} = error -> error
       end
     else
@@ -390,55 +404,47 @@ defmodule OdgnEcsTalk do
 
   # -- Sending ----------------------------------------------------------------
 
-  @doc "Delivers a message to an entity. Returns its delivery id."
-  def deliver(%__MODULE__{} = talk, eid, message, args \\ []) do
+  @doc """
+  Delivers a message to an entity. Returns its delivery id. Options:
+  `:host`, a term `delivery/2` gives the Delivery's Capability calls.
+  """
+  def deliver(%__MODULE__{} = talk, eid, message, args \\ [], opts \\ []) do
     with {:ok, id} <- NorthTalk.deliver(talk.group, handle(talk, eid), message, args) do
-      note(talk, id, eid)
+      note(talk, id, entry(eid, opts))
       {:ok, id}
     end
   end
 
   @doc """
   Sends a Request to an entity and Pumps once at `now`. Returns the
-  `NorthTalk.Pending`, for `NorthTalk.await/2`.
+  `NorthTalk.Pending`, for `NorthTalk.await/2`. Takes `deliver/5`'s options.
   """
-  def request(%__MODULE__{} = talk, eid, message, args, now) do
-    # `request_pump` runs the Run before it returns the delivery id, so the
-    # receiver being admitted stands in for an id not yet noted
-    obj = handle(talk, eid)
-    :ets.insert(talk.table, {:admitting, eid})
+  def request(%__MODULE__{} = talk, eid, message, args, now, opts \\ []),
+    do: send_request(talk, handle(talk, eid), entry(eid, opts), message, args, now)
 
-    try do
-      with {:ok, %NorthTalk.Pumped{pending: pending}} <-
-             NorthTalk.request_pump(talk.group, obj, message, args, now: now) do
-        note(talk, pending.id, eid)
-        {:ok, pending}
-      end
-    after
-      :ets.delete(talk.table, :admitting)
-    end
-  end
-
-  @doc "Asks an entity's Message Path by a Decision. Returns its `NorthTalk.Pending`."
-  def decide(%__MODULE__{} = talk, eid, message, args \\ []) do
+  @doc """
+  Asks an entity's Message Path by a Decision. Returns its `NorthTalk.Pending`.
+  Takes `deliver/5`'s options.
+  """
+  def decide(%__MODULE__{} = talk, eid, message, args \\ [], opts \\ []) do
     with {:ok, pending} <- NorthTalk.decide(talk.group, handle(talk, eid), message, args) do
-      note(talk, pending.id, eid)
+      note(talk, pending.delivery, entry(eid, opts))
       {:ok, pending}
     end
   end
 
-  @doc "A Request to a Service Script, Pumped once at `now`."
-  def request_service(%__MODULE__{} = talk, service, message, args, now) do
-    with {:ok, %NorthTalk.Pumped{pending: pending}} <-
-           NorthTalk.request_pump(talk.group, service_object!(talk, service), message, args,
-             now: now
-           ),
-         do: {:ok, pending}
-  end
+  @doc "A Request to a Service Script, Pumped once at `now`. Takes `deliver/5`'s options."
+  def request_service(%__MODULE__{} = talk, service, message, args, now, opts \\ []),
+    do: send_request(talk, service_object!(talk, service), entry(nil, opts), message, args, now)
 
-  @doc "A Decision asked of a Service Script."
-  def decide_service(%__MODULE__{} = talk, service, message, args \\ []),
-    do: NorthTalk.decide(talk.group, service_object!(talk, service), message, args)
+  @doc "A Decision asked of a Service Script. Takes `deliver/5`'s options."
+  def decide_service(%__MODULE__{} = talk, service, message, args \\ [], opts \\ []) do
+    with {:ok, pending} <-
+           NorthTalk.decide(talk.group, service_object!(talk, service), message, args) do
+      note(talk, pending.delivery, entry(nil, opts))
+      {:ok, pending}
+    end
+  end
 
   defp service_object!(talk, service) do
     case :ets.lookup(talk.table, {:service, service}) do
@@ -448,10 +454,50 @@ defmodule OdgnEcsTalk do
   end
 
   @doc "Pumps the Group once, with the Clock at `now` (a `DateTime`)."
-  def pump(%__MODULE__{} = talk, now), do: NorthTalk.pump(talk.group, now: now)
+  def pump(%__MODULE__{} = talk, now) do
+    with {:ok, %{reports: reports}} = result <- NorthTalk.pump(talk.group, now: now) do
+      forget_ended(talk, reports)
+      result
+    end
+  end
 
-  # A timer a Run sets belongs to the entity its delivery went to
-  defp note(talk, id, eid), do: :ets.insert(talk.table, {{:delivery, id}, eid})
+  @doc """
+  The Delivery whose work a Capability `call` is part of, as
+  `%{receiver: eid, host: term}`, or `nil` for one the adapter didn't send
+  or has forgotten. `receiver` is `nil` for a Service Script, and `host` is
+  the `:host` option it was sent with, or `nil`.
+  """
+  @spec delivery(t(), NorthTalk.Call.t()) :: %{receiver: OdgnEcs.eid() | nil, host: term()} | nil
+  def delivery(%__MODULE__{} = talk, %NorthTalk.Call{delivery: id}) when is_binary(id) do
+    case :ets.lookup(talk.table, {:delivery, id}) do
+      [{_, entry}] -> entry
+      [] -> nil
+    end
+  end
+
+  def delivery(%__MODULE__{}, _call), do: nil
+
+  defp entry(eid, opts), do: %{receiver: eid, host: opts[:host]}
+
+  defp note(talk, id, entry), do: :ets.insert(talk.table, {{:delivery, id}, entry})
+
+  # The Request is noted before its first Pump, so its Run can find it
+  defp send_request(talk, obj, entry, message, args, now) do
+    with {:ok, pending} <- NorthTalk.send_request(talk.group, obj, message, args) do
+      note(talk, pending.delivery, entry)
+      _ = pump(talk, now)
+      {:ok, pending}
+    end
+  end
+
+  # A Delivery is done with once its causal work has ended
+  defp forget_ended(talk, reports) do
+    for %{"kind" => "causal work", "rootDelivery" => id} = report <- reports,
+        Map.get(report, "liveRuns", 0) == 0 and Map.get(report, "queuedMessages", 0) == 0,
+        do: :ets.delete(talk.table, {:delivery, id})
+
+    :ok
+  end
 
   # -- Timers -----------------------------------------------------------------
 
@@ -513,19 +559,11 @@ defmodule OdgnEcsTalk do
     )
   end
 
+  # A timer a Run sets belongs to the entity its Delivery went to
   defp timer_owner(talk, call) do
-    case call.delivery && :ets.lookup(talk.table, {:delivery, call.delivery}) do
-      [{_, eid}] ->
-        {:ok, eid}
-
-      [] ->
-        case :ets.lookup(talk.table, :admitting) do
-          [{_, eid}] -> {:ok, eid}
-          [] -> no_timer_owner()
-        end
-
-      _ ->
-        no_timer_owner()
+    case delivery(talk, call) do
+      %{receiver: eid} when eid != nil -> {:ok, eid}
+      _ -> no_timer_owner()
     end
   end
 

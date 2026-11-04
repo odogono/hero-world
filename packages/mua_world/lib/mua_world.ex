@@ -336,12 +336,11 @@ defmodule MuaWorld do
     world = state.world
     table = Talk.table()
     {:ok, owner} = NorthTalk.start_link(drive: :manual)
-    :ok = NorthTalk.define_capability!(owner, Talk.mua(world, table))
 
     {:ok, talk} =
       OdgnEcsTalk.start(world,
         owner: owner,
-        grants: %{"mua" => NorthTalk.grant!(owner, "mua")},
+        capabilities: [&Talk.mua(world, table, &1)],
         limits: limits,
         on_show: &Tables.tell(world, &1, &2)
       )
@@ -1042,30 +1041,25 @@ defmodule MuaWorld do
     talk = state.talk
     now = instant(state.world_ms)
     args = Enum.map(q.args, &arg(state, &1))
-    Talk.note_context(state.table, :current, ctx)
+    host = [host: ctx]
 
     {:ok, pending} =
       case {q.asks, q.to} do
         {:offer, {:service, service}} ->
-          OdgnEcsTalk.request_service(talk, service, q.message, args, now)
+          OdgnEcsTalk.request_service(talk, service, q.message, args, now, host)
 
         {:offer, eid} ->
-          OdgnEcsTalk.request(talk, eid, q.message, args, now)
+          OdgnEcsTalk.request(talk, eid, q.message, args, now, host)
 
         {:decide, {:service, service}} ->
-          OdgnEcsTalk.decide_service(talk, service, q.message, args)
+          OdgnEcsTalk.decide_service(talk, service, q.message, args, host)
 
         {:decide, eid} ->
-          OdgnEcsTalk.decide(talk, eid, q.message, args)
+          OdgnEcsTalk.decide(talk, eid, q.message, args, host)
       end
 
-    Talk.note_context(state.table, pending.id, ctx)
     state = pump_idle(state)
-
-    answer = fn state, result ->
-      Talk.drop_context(state.table, pending.id)
-      k.(state, reply(q.asks, result))
-    end
+    answer = fn state, result -> k.(state, reply(q.asks, result)) end
 
     case NorthTalk.await(pending, 0) do
       {:error, %NorthTalk.HostError{code: "timeout"}} ->

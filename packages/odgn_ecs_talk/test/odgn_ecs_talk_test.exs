@@ -588,4 +588,102 @@ defmodule OdgnEcsTalkTest do
     {:ok, pending} = OdgnEcsTalk.request_service(talk, "probe", "run", [hero], now())
     assert value(settle(talk, pending)) == 2
   end
+
+  describe "a Delivery's host term" do
+    # `probe` answers the host term of the Run's Delivery, and its receiver
+    @probe """
+    on peek
+      ask probe to host
+      if it is nothing then
+        show the target, "nothing"
+      else
+        show the target, it
+      end if
+    end peek
+
+    on linger
+      wait 2 s
+      ask probe to host
+      show the target, it
+    end linger
+
+    on query
+      ask probe to host
+      return it
+    end query
+
+    on judge, deciding
+      ask probe to host
+      veto it
+    end judge
+    """
+
+    defp probe_capability(talk) do
+      NorthTalk.Capability.from_functions("probe", %{
+        "host" =>
+          {[args: [], result: "any", cost: 1],
+           fn [], call ->
+             case OdgnEcsTalk.delivery(talk, call) do
+               %{host: host, receiver: eid} -> {:ok, host && "#{host} for #{eid}"}
+               nil -> {:ok, nil}
+             end
+           end}
+      })
+    end
+
+    defp probed do
+      {world, _} = setup_world()
+      talk = talk(world, capabilities: [&probe_capability/1])
+      :ok = OdgnEcsTalk.load_atom_script(talk, "person", @probe)
+      {talk, id(world, "hero")}
+    end
+
+    defp entry(talk, id), do: OdgnEcsTalk.delivery(talk, %NorthTalk.Call{delivery: id})
+
+    test "is seen by a Capability in the Run, and freed once its work ends" do
+      {talk, hero} = probed()
+      {:ok, id} = OdgnEcsTalk.deliver(talk, hero, "peek", [], host: "look")
+      assert entry(talk, id) == %{receiver: hero, host: "look"}
+
+      {:ok, _} = OdgnEcsTalk.pump(talk, now())
+      assert_receive {:show, ^hero, "look for " <> _}
+      assert entry(talk, id) == nil
+    end
+
+    test "is kept while a Run waits" do
+      {talk, hero} = probed()
+      {:ok, id} = OdgnEcsTalk.deliver(talk, hero, "linger", [], host: "wait")
+
+      {:ok, _} = OdgnEcsTalk.pump(talk, now())
+      {:ok, _} = OdgnEcsTalk.pump(talk, now(1000))
+      assert entry(talk, id) == %{receiver: hero, host: "wait"}
+
+      {:ok, _} = OdgnEcsTalk.pump(talk, now(3000))
+      assert_receive {:show, ^hero, "wait for " <> _}
+      assert entry(talk, id) == nil
+    end
+
+    test "is seen by a Request's Run in its first Pump" do
+      {talk, hero} = probed()
+      {:ok, pending} = OdgnEcsTalk.request(talk, hero, "query", [], now(), host: "ask")
+      assert value(settle(talk, pending)) == "ask for #{hero}"
+      assert entry(talk, pending.delivery) == nil
+    end
+
+    test "is seen by a Decision's Run" do
+      {talk, hero} = probed()
+      {:ok, pending} = OdgnEcsTalk.decide(talk, hero, "judge", [], host: "vote")
+      assert {:ok, %Verdict{vetoes: [veto]}} = settle(talk, pending)
+      assert veto.reason == "vote for #{hero}"
+    end
+
+    test "is Nothing for a Delivery sent without one" do
+      {talk, hero} = probed()
+      {:ok, _} = OdgnEcsTalk.deliver(talk, hero, "peek")
+      {:ok, _} = OdgnEcsTalk.pump(talk, now())
+      assert_receive {:show, ^hero, "nothing"}
+
+      assert value(ask(talk, hero, "query")) == nil
+    end
+  end
 end
