@@ -4,24 +4,80 @@ defmodule OdgnEdl.Record do
   Lineage, Script owners, Definition names, the values the EDL set on each
   entity, and the EDL's hash. A later Migration compares play against the
   recorded values (ADR 0008).
+
+  A Definition name is a component, `edl_definition`, so an entity stays
+  nothing but its id. When an entity with one is deleted, its name moves to
+  `edl_deleted_name`, so a Migration knows play deleted it and doesn't make
+  it again. The rest of the record is kept in tables of its own.
   """
 
-  alias OdgnEcs.SQL
+  alias OdgnEcs.{Column, Component, SQL}
+
+  @definition "edl_definition"
 
   @schema """
   CREATE TABLE IF NOT EXISTS edl_lineage (kind TEXT NOT NULL, name TEXT NOT NULL, bases TEXT NOT NULL, PRIMARY KEY (kind, name));
   CREATE TABLE IF NOT EXISTS edl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name));
-  CREATE TABLE IF NOT EXISTS edl_definition_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS edl_value (eid INTEGER NOT NULL, component TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (eid, component));
   CREATE TABLE IF NOT EXISTS edl_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS edl_deleted_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL);
   """
 
   @type script_owner ::
           %{kind: :atom, name: String.t(), src: String.t()}
           | %{kind: :entity, eid: OdgnEcs.eid(), src: String.t()}
 
+  @doc "The component that holds an entity's Definition name."
+  @spec definition_component() :: Component.t()
+  def definition_component do
+    %Component{
+      name: @definition,
+      columns: [%Column{name: "name", type: :string, optional: false, unique: true}]
+    }
+  end
+
   @doc false
-  def ensure(%OdgnEcs{conn: conn}), do: SQL.exec!(conn, @schema)
+  # Makes the record's tables and component, moving Definition names from
+  # the table that held them before they were a component. Returns the
+  # World, which then knows the component.
+  def ensure(%OdgnEcs{conn: conn} = world) do
+    SQL.exec!(conn, @schema)
+    world = known(world)
+    table = SQL.ident(Component.table(@definition))
+
+    SQL.exec!(
+      conn,
+      "CREATE TRIGGER IF NOT EXISTS edl_definition_deleted BEFORE DELETE ON entities BEGIN " <>
+        "INSERT OR REPLACE INTO edl_deleted_name (name, eid) " <>
+        "SELECT name, eid FROM #{table} WHERE eid = OLD.eid; END;"
+    )
+
+    if SQL.one!(
+         conn,
+         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'edl_definition_name'"
+       ) do
+      SQL.exec!(
+        conn,
+        "INSERT INTO #{table} (eid, name) " <>
+          "SELECT eid, name FROM edl_definition_name WHERE eid IN (SELECT eid FROM entities) " <>
+          "ON CONFLICT DO NOTHING; " <>
+          "INSERT OR IGNORE INTO edl_deleted_name (name, eid) " <>
+          "SELECT name, eid FROM edl_definition_name WHERE eid NOT IN (SELECT eid FROM entities); " <>
+          "DROP TABLE edl_definition_name"
+      )
+    end
+
+    world
+  end
+
+  defp known(world) do
+    if OdgnEcs.component(world, @definition) do
+      world
+    else
+      {:ok, world} = OdgnEcs.define(world, definition_component())
+      world
+    end
+  end
 
   # -- Reads ------------------------------------------------------------------
 
@@ -73,24 +129,31 @@ defmodule OdgnEdl.Record do
     end)
   end
 
-  @doc "Each Definition name, with its entity."
+  @doc """
+  Each Definition name, with its entity: the entities that have one, and
+  those play has deleted, under the id they had.
+  """
   @spec definition_names(OdgnEcs.t()) :: %{String.t() => OdgnEcs.eid()}
-  def definition_names(%OdgnEcs{conn: conn} = world) do
-    ensure(world)
+  def definition_names(world) do
+    world = ensure(world)
 
-    conn
-    |> SQL.all!("SELECT name, eid FROM edl_definition_name")
-    |> Map.new(fn [n, e] -> {n, e} end)
+    deleted =
+      for [name, eid] <- SQL.all!(world.conn, "SELECT name, eid FROM edl_deleted_name"),
+          into: %{},
+          do: {name, eid}
+
+    world
+    |> OdgnEcs.select([@definition], with: [@definition])
+    |> Map.new(fn {eid, %{@definition => %{"name" => name}}} -> {name, eid} end)
+    |> then(&Map.merge(deleted, &1))
   end
 
   @doc "The entity with a Definition name, or `nil`."
   @spec entity_named(OdgnEcs.t(), String.t()) :: OdgnEcs.eid() | nil
-  def entity_named(%OdgnEcs{conn: conn} = world, name) do
-    ensure(world)
-
-    case SQL.one!(conn, "SELECT eid FROM edl_definition_name WHERE name = ?1", [name]) do
+  def entity_named(world, name) do
+    case OdgnEcs.query(known(world), where: [{@definition, "name", name}]) do
       [eid] -> eid
-      nil -> nil
+      [] -> nil
     end
   end
 
@@ -134,11 +197,16 @@ defmodule OdgnEdl.Record do
   end
 
   @doc false
-  def put_definition_name(%OdgnEcs{conn: conn}, name, eid) do
-    SQL.run!(conn, "INSERT OR REPLACE INTO edl_definition_name (name, eid) VALUES (?1, ?2)", [
-      name,
-      eid
-    ])
+  # Gives an entity a Definition name, taking it from any other first
+  def put_definition_name(world, name, eid) do
+    world = known(world)
+
+    for other <- OdgnEcs.query(world, where: [{@definition, "name", name}]),
+        other != eid,
+        do: :ok = OdgnEcs.remove(world, other, @definition)
+
+    SQL.run!(world.conn, "DELETE FROM edl_deleted_name WHERE name = ?1", [name])
+    :ok = OdgnEcs.put(world, eid, @definition, %{"name" => name})
   end
 
   @doc false
@@ -184,8 +252,13 @@ defmodule OdgnEdl.Record do
   end
 
   @doc false
-  def delete_definition_name(%OdgnEcs{conn: conn}, name) do
-    SQL.run!(conn, "DELETE FROM edl_definition_name WHERE name = ?1", [name])
+  def delete_definition_name(world, name) do
+    world = known(world)
+
+    for eid <- OdgnEcs.query(world, where: [{@definition, "name", name}]),
+        do: :ok = OdgnEcs.remove(world, eid, @definition)
+
+    SQL.run!(world.conn, "DELETE FROM edl_deleted_name WHERE name = ?1", [name])
   end
 
   @doc false

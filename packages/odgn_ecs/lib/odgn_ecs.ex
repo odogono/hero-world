@@ -106,6 +106,8 @@ defmodule OdgnEcs do
       else: in_savepoint(world, "odgn_ecs_rebuild", fn -> rebuild(world, component) end)
   end
 
+  # Makes the table again from its definition, keeping its rows, unless they
+  # break a unique column or hold a Reference to a missing entity
   defp rebuild(world, component) do
     table = Component.table(component)
     refs = for %{type: :eid} = col <- component.columns, do: col.name
@@ -121,32 +123,68 @@ defmodule OdgnEcs do
           n > 0,
           do: "#{n} in '#{col}'"
 
-    if dangling == [] do
-      new = table <> "__rebuild"
-      cols = Enum.map_join(["eid" | Enum.map(component.columns, & &1.name)], ", ", &SQL.ident/1)
-      SQL.exec!(world.conn, Component.create_sql(component, new))
+    duplicated =
+      for %{unique: true} = col <- component.columns,
+          collate = if(col.case_insensitive, do: " COLLATE NOCASE", else: ""),
+          [n] =
+            SQL.one!(
+              world.conn,
+              "SELECT count(*) FROM (SELECT 1 FROM #{SQL.ident(table)} " <>
+                "WHERE #{SQL.ident(col.name)} IS NOT NULL " <>
+                "GROUP BY #{SQL.ident(col.name)}#{collate} HAVING count(*) > 1)"
+            ),
+          n > 0,
+          do: "'#{col.name}' has #{n} value(s) held more than once"
 
-      SQL.exec!(
-        world.conn,
-        "INSERT INTO #{SQL.ident(new)} (#{cols}) SELECT #{cols} FROM #{SQL.ident(table)}; " <>
-          "DROP TABLE #{SQL.ident(table)}; " <>
-          "ALTER TABLE #{SQL.ident(new)} RENAME TO #{SQL.ident(table)}"
-      )
-    else
-      {:error,
-       Error.new(
-         :dangling_reference,
-         "Component '#{component.name}' can't get its Reference keys: " <>
-           "#{Enum.join(dangling, ", ")} refer to entities that don't exist."
-       )}
+    cond do
+      duplicated != [] ->
+        {:error,
+         Error.new(
+           :incompatible_change,
+           "Component '#{component.name}' can't be made unique: #{Enum.join(duplicated, ", ")}."
+         )}
+
+      dangling != [] ->
+        {:error,
+         Error.new(
+           :dangling_reference,
+           "Component '#{component.name}' can't get its Reference keys: " <>
+             "#{Enum.join(dangling, ", ")} refer to entities that don't exist."
+         )}
+
+      true ->
+        copy_table(world, component)
     end
   end
 
+  defp copy_table(world, component) do
+    table = Component.table(component)
+    new = table <> "__rebuild"
+    cols = Enum.map_join(["eid" | Enum.map(component.columns, & &1.name)], ", ", &SQL.ident/1)
+    SQL.exec!(world.conn, Component.create_sql(component, new))
+
+    SQL.exec!(
+      world.conn,
+      "INSERT INTO #{SQL.ident(new)} (#{cols}) SELECT #{cols} FROM #{SQL.ident(table)}; " <>
+        "DROP TABLE #{SQL.ident(table)}; " <>
+        "ALTER TABLE #{SQL.ident(new)} RENAME TO #{SQL.ident(table)}"
+    )
+  end
+
   defp define_table(world, %Component{name: name} = component) do
-    case world.components do
+    # A definition another copy of this World struct stored is read back
+    stored =
+      Map.get_lazy(world.components, name, fn ->
+        case SQL.one!(world.conn, "SELECT columns FROM ecs_components WHERE name = ?1", [name]) do
+          [json] -> Component.from_json(name, json)
+          nil -> nil
+        end
+      end)
+
+    case if(stored, do: %{name => stored}, else: %{}) do
       %{^name => existing} ->
         if Component.to_json(existing) == Component.to_json(component),
-          do: {:ok, world},
+          do: {:ok, %{world | components: Map.put(world.components, name, existing)}},
           else: change(world, existing, component)
 
       _ ->
@@ -162,14 +200,21 @@ defmodule OdgnEcs do
   end
 
   # A definition that differs from the stored one: its compatible changes
-  # are made to the table in place (`OdgnEcs.Component.changes/2`)
-  defp change(world, existing, %Component{name: name} = component) do
+  # are made to the table (`OdgnEcs.Component.changes/2`), all or none
+  defp change(world, existing, component) do
+    in_savepoint(world, "odgn_ecs_change", fn -> change_table(world, existing, component) end)
+  end
+
+  defp change_table(world, existing, %Component{name: name} = component) do
     case Component.changes(existing, component) do
       {:ok, changes} ->
         table = SQL.ident(Component.table(component))
 
         for change <- changes do
           case change do
+            :rebuild ->
+              :ok
+
             {:add, col} ->
               SQL.exec!(
                 world.conn,
@@ -206,7 +251,8 @@ defmodule OdgnEcs do
           Component.to_json(component)
         ])
 
-        {:ok, %{world | components: Map.put(world.components, name, component)}}
+        with :ok <- if(:rebuild in changes, do: rebuild(world, component), else: :ok),
+             do: {:ok, %{world | components: Map.put(world.components, name, component)}}
 
       {:error, reason} ->
         {:error, Error.new(:incompatible_change, reason)}

@@ -194,7 +194,6 @@ defmodule OdgnEcsTest do
 
       for {columns, reason} <- [
             {[%Column{name: "health", type: :float}], ~r/change type/},
-            {[%Column{name: "health", type: :int, unique: true}], ~r/unique/},
             {[%Column{name: "health", type: :int, optional: false}],
              ~r/required with no default/},
             {[
@@ -211,6 +210,55 @@ defmodule OdgnEcsTest do
       end
 
       assert OdgnEcs.component(w, "stats") == @stats
+    end
+  end
+
+  describe "unique and case_insensitive" do
+    @named %Component{name: "named", columns: [%Column{name: "name", type: :string}]}
+
+    defp named(w, names) do
+      for n <- names do
+        {:ok, eid} = OdgnEcs.create(w)
+        :ok = OdgnEcs.put(w, eid, "named", %{"name" => n})
+        eid
+      end
+    end
+
+    defp unique_named(opts), do: %{@named | columns: [struct(hd(@named.columns), opts)]}
+
+    test "a column becomes unique when its data allows, keeping its rows" do
+      w = world([@named])
+      [a, _b] = named(w, ["Bob", "bob"])
+
+      assert {:ok, w} = OdgnEcs.define(w, unique_named(unique: true))
+      assert OdgnEcs.query(w, where: [{"named", "name", "Bob"}]) == [a]
+
+      assert {:error, %Error{kind: :constraint}} =
+               OdgnEcs.put(w, elem(OdgnEcs.create(w), 1), "named", %{"name" => "Bob"})
+    end
+
+    test "a column held more than once can't become unique, and nothing changes" do
+      w = world([@named])
+      named(w, ["Bob", "bob"])
+
+      assert {:error, %Error{kind: :incompatible_change, message: message}} =
+               OdgnEcs.define(w, unique_named(unique: true, case_insensitive: true))
+
+      assert message =~ "'name' has 1 value(s) held more than once"
+      assert OdgnEcs.component(w, "named") == @named
+      [json] = OdgnEcs.SQL.one!(w.conn, "SELECT columns FROM ecs_components WHERE name = 'named'")
+      assert Component.from_json("named", json) == @named
+    end
+
+    test "a case-insensitive column matches and clashes ignoring case" do
+      w = world([unique_named(unique: true, case_insensitive: true)])
+      [bob] = named(w, ["Bob"])
+
+      assert OdgnEcs.query(w, where: [{"named", "name", "BOB"}]) == [bob]
+      assert OdgnEcs.query(w, where: [{"named", "name", :in, ["bob"]}]) == [bob]
+
+      assert {:error, %Error{kind: :constraint}} =
+               OdgnEcs.put(w, elem(OdgnEcs.create(w), 1), "named", %{"name" => "bOB"})
     end
   end
 

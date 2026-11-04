@@ -136,6 +136,13 @@ defmodule OdgnEdl do
     end
   end
 
+  @doc """
+  The components EDL keeps in a World: `edl_definition`, which holds an
+  entity's Definition name. A host defines them when it opens a World, so
+  its World struct knows them.
+  """
+  def components, do: [OdgnEdl.Record.definition_component()]
+
   defdelegate built?(world), to: OdgnEdl.Record
   defdelegate atom_lineage(world, name), to: OdgnEdl.Record
   defdelegate entity_lineage(world, eid), to: OdgnEdl.Record

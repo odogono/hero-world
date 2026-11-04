@@ -14,8 +14,8 @@ defmodule MuaWorld.Components do
 
   @directions ~w(north northeast east southeast south southwest west northwest up down in out)
 
-  @doc "Every component a mua World defines, `odgn_ecs_talk`'s included."
-  def all, do: OdgnEcsTalk.components() ++ mua()
+  @doc "Every component a mua World defines, `odgn_ecs_talk`'s and `odgn_edl`'s included."
+  def all, do: OdgnEcsTalk.components() ++ OdgnEdl.components() ++ mua()
 
   defp mua do
     [
@@ -59,7 +59,8 @@ defmodule MuaWorld.Components do
       # sets it from the configured admins each time.
       c("account", true, [col("admin", :boolean, default: false)]),
       c("player", false, [
-        col("name", :string, optional: false),
+        # unique among Characters, ignoring case
+        col("name", :string, optional: false, unique: true, case_insensitive: true),
         # the Account that owns the Character
         col("account", :eid),
         col("last_input", :string),

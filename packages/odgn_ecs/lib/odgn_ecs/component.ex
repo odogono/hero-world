@@ -5,6 +5,9 @@ defmodule OdgnEcs.Column do
   `index: true` makes queries on it fast; an `:eid` column (a Reference to
   another entity) is always indexed.
 
+  `case_insensitive: true` makes a text column compare ignoring case, in
+  queries and for `unique`.
+
   An `:eid` column must hold an entity that exists. `on_delete` says what
   deleting that entity does: `:restrict` (the default) refuses, `:nullify`
   empties the column, and `:cascade` deletes the entity holding it too.
@@ -15,6 +18,7 @@ defmodule OdgnEcs.Column do
             unique: false,
             default: nil,
             index: false,
+            case_insensitive: false,
             on_delete: :restrict
 
   @type type ::
@@ -39,6 +43,7 @@ defmodule OdgnEcs.Column do
           unique: boolean(),
           default: term(),
           index: boolean(),
+          case_insensitive: boolean(),
           on_delete: :restrict | :nullify | :cascade
         }
 
@@ -124,7 +129,10 @@ defmodule OdgnEcs.Component do
     cols =
       Enum.map(c.columns, fn col ->
         OdgnEcs.SQL.ident(col.name) <>
-          " " <> sql_type(col.type) <> if(col.unique, do: " UNIQUE", else: "") <> references(col)
+          " " <>
+          sql_type(col.type) <>
+          if(col.case_insensitive, do: " COLLATE NOCASE", else: "") <>
+          if(col.unique, do: " UNIQUE", else: "") <> references(col)
       end)
 
     "CREATE TABLE #{OdgnEcs.SQL.ident(table || table(c))} (" <>
@@ -195,15 +203,20 @@ defmodule OdgnEcs.Component do
   defp indexed?(%Column{index: index}), do: index == true
 
   @doc false
-  def sql_column(%Column{} = col), do: OdgnEcs.SQL.ident(col.name) <> " " <> sql_type(col.type)
+  def sql_column(%Column{} = col),
+    do:
+      OdgnEcs.SQL.ident(col.name) <>
+        " " <> sql_type(col.type) <> if(col.case_insensitive, do: " COLLATE NOCASE", else: "")
 
   @doc """
   How the table of `existing` changes to hold `new`: `{:ok, changes}`, each
-  `{:add, column}`, `{:drop, name}` or `{:fill, column}` (a column whose empty
-  values take its default), or `{:error, reason}` for a change the data can't
-  follow. Compatible: adding a column that is optional or has a default,
+  `{:add, column}`, `{:drop, name}`, `{:fill, column}` (a column whose empty
+  values take its default) or `:rebuild` (the table is made again, for a
+  change SQLite can't make in place, such as to `unique`), or
+  `{:error, reason}` for a change the data can't follow. Compatible: adding a column that is optional or has a default,
   removing one, making one optional, changing a default, `index` or
-  `on_delete`, and flipping `play_state`. Incompatible: changing a column's type or `unique`, adding a
+  `on_delete`, changing `unique` or `case_insensitive` where the data allows,
+  and flipping `play_state`. Incompatible: changing a column's type, adding a
   unique column, and making one required with no default.
   """
   def changes(%__MODULE__{columns: old}, %__MODULE__{name: name, columns: new}) do
@@ -229,9 +242,9 @@ defmodule OdgnEcs.Component do
            {:error,
             "Component '#{name}' column '#{col.name}' can't change type from #{t} to #{t2}."}}
 
-        {%Column{unique: u}, %Column{unique: u2}} when u != u2 ->
-          {:halt,
-           {:error, "Component '#{name}' column '#{col.name}' can't change whether it is unique."}}
+        {%Column{unique: u, case_insensitive: ci}, %Column{unique: u2, case_insensitive: ci2}}
+        when u != u2 or ci != ci2 ->
+          {:cont, {:ok, [:rebuild | acc]}}
 
         {%Column{optional: true}, %Column{optional: false, default: nil}} ->
           {:halt,
@@ -373,6 +386,7 @@ defmodule OdgnEcs.Component do
         "unique" => c.unique,
         "default" => c.default,
         "index" => c.index,
+        "case_insensitive" => c.case_insensitive,
         "on_delete" => Atom.to_string(c.on_delete)
       }
     end)
@@ -398,6 +412,7 @@ defmodule OdgnEcs.Component do
           unique: c["unique"],
           default: c["default"],
           index: c["index"] == true,
+          case_insensitive: c["case_insensitive"] == true,
           on_delete: String.to_existing_atom(c["on_delete"] || "restrict")
         }
       end
