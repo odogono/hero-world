@@ -319,7 +319,10 @@ button.profile-item[aria-disabled='true'] {
   line-height: 1.5;
 }
 
-.transcript > :first-child {
+/* an empty first item takes the spare height, so lines sit at the bottom
+   like a chat; a real line's own margin can't override it */
+.transcript::before {
+  content: '';
   margin-top: auto;
 }
 
