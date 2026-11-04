@@ -1,0 +1,3 @@
+on heartbeat actor
+  tell mua to act the target, "say tick"
+end heartbeat
