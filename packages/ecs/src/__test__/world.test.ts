@@ -122,7 +122,7 @@ describe('World', () => {
     const def = world.defs.get('metrics');
     expect(def).toBeDefined();
     // console.log('def', def);
-    expect(def?.byLevel).toBeDefined();
+    expect(def?.statements.byLevel).toBeDefined();
 
     world.close();
   });
@@ -168,7 +168,7 @@ describe('World', () => {
         allowRedefineDefinitions: false,
         path: tempFile.name
       })
-    ).rejects.toThrow(/Component definition compatibility check failed/);
+    ).rejects.toThrow(/can.t add required column/);
 
     // Loading with the same original component should work
     const world2 = await createWorld([health], {

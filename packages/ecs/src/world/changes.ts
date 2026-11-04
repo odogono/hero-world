@@ -77,7 +77,7 @@ export class ChangeScope<TComponents extends Components = Components> {
     const { world } = this;
     for (const [eid, snapshot] of this.snapshots) {
       if (snapshot.created) {
-        world.db.exec('DELETE FROM tbl_entity WHERE id = ?1', eid);
+        world.db.exec('DELETE FROM entities WHERE eid = ?1', eid);
         world.entityCache.delete(eid);
         world.dirtyEntities.delete(eid);
         world.entitiesToDelete.delete(eid);

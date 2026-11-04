@@ -629,12 +629,12 @@ describe('Component (next)', () => {
 
       // Component is marked for deletion but not yet removed from database
       const stmt = world.db.prepare(
-        'SELECT * FROM tbl_inventory_test_voscjs WHERE eid = ?'
+        'SELECT * FROM c_inventoryTest WHERE eid = ?'
       );
       expect(stmt.get(entity.id)).toBeDefined();
 
       // Verify entity still exists
-      const estmt = world.db.prepare('SELECT * FROM tbl_entity WHERE id = ?');
+      const estmt = world.db.prepare('SELECT * FROM entities WHERE eid = ?');
       expect(estmt.get(entity.id)).toBeDefined();
 
       // Entity is marked as dirty for deletion

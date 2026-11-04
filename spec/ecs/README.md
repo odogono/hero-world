@@ -1,6 +1,6 @@
 # ECS conformance suite
 
-Language-neutral cases that both ECS implementations run: `packages/odgn_ecs` (Elixir) now, and `packages/ecs` (TypeScript) from #162. The suite, not either implementation, defines what the store does ([ADR 0019](../../docs/adr/0019-the-typescript-ecs-is-kept-at-parity-for-the-browser.md)).
+Language-neutral cases that both ECS implementations run: `packages/odgn_ecs` (Elixir, `test/conformance_test.exs`) and `packages/ecs` (TypeScript, `src/store/__test__/conformance.test.ts`). The suite, not either implementation, defines what the store does. A change to the store or EDL lands in both languages in the same PR ([ADR 0019](../../docs/adr/0019-the-typescript-ecs-is-kept-at-parity-for-the-browser.md)).
 
 ## Query cases (`query/*.json`)
 

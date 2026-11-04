@@ -45,7 +45,8 @@ describe('Component Definition', () => {
       id: 'test',
       schema: {
         name: s.string(),
-        uuid: s.uuid()
+        // a new column must be optional or have a default
+        uuid: s.uuid().optional()
       }
     });
     expect(createWorld([defA, defB], worldOpts)).resolves.toBeTruthy();

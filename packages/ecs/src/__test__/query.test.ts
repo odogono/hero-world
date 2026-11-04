@@ -717,7 +717,7 @@ describe('query', () => {
       world.flush();
 
       const result = world.query({
-        where: `name.full_name = 'Jane Smith'`,
+        where: `name.fullName = 'Jane Smith'`,
         with: ['name']
       })!;
       expect(result).not.toBeNull();

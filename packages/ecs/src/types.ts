@@ -3,7 +3,7 @@ import type {
   InferComponentType
 } from './component/types';
 import type { Statement } from './db';
-import type { ColumnInfo } from './schema/types';
+import type { Component } from './store/component';
 import type { World } from './world';
 
 export type EntityId = number;
@@ -39,7 +39,8 @@ export type CDefColumnType =
   | 'timestamp'
   | 'json'
   | 'array'
-  | 'uuid';
+  | 'uuid'
+  | 'eid';
 
 export type CDefColumnInfo = {
   default?:
@@ -49,6 +50,8 @@ export type CDefColumnInfo = {
   isIndexed?: boolean;
   isUnique?: boolean;
   name: string;
+  /** For an `eid` column: what deleting the entity it refers to does */
+  onDelete?: 'restrict' | 'nullify' | 'cascade';
   optional?: boolean;
   type: CDefColumnType;
   values?: string[];
@@ -77,16 +80,13 @@ export type CDefWithSchema<
 // //////////////////////////////////////////////////////////////
 
 export type ComponentDef = {
-  columns: ColumnInfo[];
+  /** The definition as the store holds it */
+  component: Component;
   name: string;
   schema: CDef; // Add schema to access defaults
-  stmtExists: Statement;
-  stmtInsert: Statement;
-  stmtUpdate: Statement;
+  /** The definition's own prepared statements, by name */
+  statements: Record<string, Statement>;
   tableName: string;
-  url: string;
-} & {
-  [key: string]: Statement;
 };
 
 export type Components = Record<string, unknown>;

@@ -1,23 +1,17 @@
-import { getUnixTime } from 'odgn-helpers/time';
-
 import { defineComponent, s, type InferComponentType } from '../component';
-import type { ColumnBuilder } from '../component/types';
 import { createSystem } from '../system';
-import type { EntityExecProps } from '../system/types';
+import type { ExecProps } from '../system/types';
 import type { Components, EntityWithComponents } from '../types';
 import type { World } from '../world';
 
-// Event component definition
+// Event component definition. An event is due once World time reaches
+// `at` (ADR 0019): events run on World time, not the wall clock.
 export const eventComponent = defineComponent({
   id: 'event' as const,
   schema: {
-    // Any value: stored as text and parsed back on read. The column stays a
-    // string, so its definition hash, which saved worlds check, is unchanged.
-    payload: s.string() as ColumnBuilder<'string', false, unknown>,
-    scheduledAt: s.number(), // timestamp in seconds (float)
-    type: s.string().indexed(),
-    // eslint-disable-next-line perfectionist/sort-objects
-    createdAt: s.datetime()
+    at: s.float().indexed(),
+    payload: s.json(),
+    type: s.string().indexed()
   }
 });
 
@@ -35,44 +29,48 @@ type EventExecProps<
   world: World<TComponents>;
 };
 
-// Helper function to create event system
+type EventWorld = World<Components & { event: EventComponent }>;
+
+/** Events of `type` whose time has come, earliest first */
+const dueEvents = (world: EventWorld, type: string | string[]) => {
+  const { args, clause } = buildTypeWhereClause(type);
+  return world.queryAll({
+    args: [...args, world.time],
+    orderBy: [['event', 'at']],
+    where: `${clause} AND event.at <= ?`,
+    with: ['event'] as const
+  });
+};
+
+/**
+ * A System that runs `exec` on each event of `type` that is due. An event is
+ * deleted after it runs unless `exec` returns false.
+ */
 export const createEventSystem = <
   TComponents extends Components & { event: EventComponent }
 >(
   type: string | string[],
   exec: (props: EventExecProps<TComponents>) => boolean | void
-) => {
-  const { args, clause } = buildTypeWhereClause(type);
-
-  const system = createSystem<
-    TComponents,
-    EntityExecProps<EntityWithComponents<TComponents, 'event'>, TComponents>
-  >(
-    ({ entity, world }) => {
-      const payload = entity.event.payload;
+) =>
+  createSystem<TComponents, ExecProps<TComponents>>(({ world }) => {
+    for (const entity of dueEvents(world as unknown as EventWorld, type)) {
       const shouldDelete =
         exec({
-          event: entity as EntityWithComponents<TComponents, 'event'>,
-          payload,
+          event: entity as unknown as EntityWithComponents<
+            TComponents,
+            'event'
+          >,
+          payload: entity.event.payload,
           type: entity.event.type,
           world
         }) ?? true;
-
       if (shouldDelete) {
         world.delete(entity);
       }
-    },
-    {
-      args,
-      where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
-      with: ['event'] as const
     }
-  );
+  });
 
-  return system;
-};
-
-// Schedule an event.
+/** Schedule an event for World time `at`, by default now */
 export const scheduleEvent = <
   TComponents extends Components & { event: EventComponent } = Components & {
     event: EventComponent;
@@ -81,28 +79,20 @@ export const scheduleEvent = <
   world: World<TComponents>,
   type: string,
   payload: unknown,
-  scheduledAt?: number
+  at?: number
 ): EntityWithComponents<TComponents, 'event'> => {
-  const when = scheduledAt ?? getUnixTime();
-
-  const event: EventComponent = {
-    createdAt: new Date(),
-    payload,
-    scheduledAt: when,
-    type
-  };
+  const event: EventComponent = { at: at ?? world.time, payload, type };
   const e = world.create({ event } as Parameters<typeof world.create>[0]);
-
   return e as EntityWithComponents<TComponents, 'event'>;
 };
 
-/**
- * Returns upcomning events for a given type
- *
- * @param world
- * @param type
- * @returns
- */
+const toEvents = <TPayload>(
+  entities: { event: EventComponent }[]
+): Array<EventComponentWithPayload<TPayload>> =>
+  // the caller says what the stored payloads are
+  entities.map(e => ({ ...e.event, payload: e.event.payload as TPayload }));
+
+/** The events of `type` that are due */
 export const getEvents = <
   TPayload = Record<string, unknown>,
   TComponents extends Components & { event: EventComponent } = Components & {
@@ -111,22 +101,12 @@ export const getEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponentWithPayload<TPayload>> => {
-  const { args, clause } = buildTypeWhereClause(type);
+) => toEvents<TPayload>(dueEvents(world as unknown as EventWorld, type));
 
-  const entities = world.queryAll({
-    args,
-    where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
-    with: ['event'] as const
-  });
+/** The events of `type` that are due; the same as `getEvents` */
+export const getPendingEvents = getEvents;
 
-  // the caller says what the stored payloads are
-  return entities.map(e => ({
-    ...e.event,
-    payload: e.event.payload as TPayload
-  }));
-};
-
+/** Every event of `type`, due or not, earliest first */
 export const getAllEvents = <
   TPayload = Record<string, unknown>,
   TComponents extends Components & { event: EventComponent } = Components & {
@@ -135,45 +115,16 @@ export const getAllEvents = <
 >(
   world: World<TComponents>,
   type: string | string[]
-): Array<EventComponentWithPayload<TPayload>> => {
+) => {
   const { args, clause } = buildTypeWhereClause(type);
-
-  const entities = world.queryAll({
-    args,
-    where: clause,
-    with: ['event'] as const
-  });
-
-  // the caller says what the stored payloads are
-  return entities.map(e => ({
-    ...e.event,
-    payload: e.event.payload as TPayload
-  }));
-};
-
-export const getPendingEvents = <
-  TPayload = Record<string, unknown>,
-  TComponents extends Components & { event: EventComponent } = Components & {
-    event: EventComponent;
-  }
->(
-  world: World<TComponents>,
-  type: string | string[]
-): Array<EventComponentWithPayload<TPayload>> => {
-  const { args, clause } = buildTypeWhereClause(type);
-
-  const entities = world.queryAll({
-    args,
-    // Ready-to-process events: scheduled_at <= now
-    where: `${clause} AND event.scheduled_at <= ((julianday('now') - 2440587.5) * 86400000)`,
-    with: ['event'] as const
-  });
-
-  // the caller says what the stored payloads are
-  return entities.map(e => ({
-    ...e.event,
-    payload: e.event.payload as TPayload
-  }));
+  return toEvents<TPayload>(
+    (world as unknown as EventWorld).queryAll({
+      args,
+      orderBy: [['event', 'at']],
+      where: clause,
+      with: ['event'] as const
+    })
+  );
 };
 
 // Build a WHERE clause (and args) that supports:

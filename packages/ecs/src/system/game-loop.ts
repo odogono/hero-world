@@ -143,6 +143,8 @@ export const createGameLoop = <TComponents extends Components>(
 
   const update = (deltaTime: number): void => {
     frameCount++;
+    // World time moves with the loop, so events fall due by it
+    world.advanceTime(deltaTime);
     const sortedSystems = getSortedSystems();
 
     // console.log('[GameLoop][update] sortedSystems', sortedSystems);

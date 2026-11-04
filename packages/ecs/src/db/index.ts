@@ -1,6 +1,5 @@
 // Database type enum
 export const DatabaseType = {
-  ALASQL: 'alasql',
   BUN: 'bun',
   WASM: 'wasm'
 } as const;
@@ -70,11 +69,6 @@ export const createDatabase = async (
 ): Promise<Database> => {
   const { type } = options;
   switch (type) {
-    case DatabaseType.ALASQL: {
-      const { createAlasqlDatabaseInstance } = await import('./alasql');
-      return createAlasqlDatabaseInstance(options);
-    }
-
     case DatabaseType.BUN: {
       const { createBunDatabaseInstance } = await import('./bun');
       return createBunDatabaseInstance(options);
@@ -91,14 +85,6 @@ export const createDatabase = async (
 };
 
 // Convenience functions for common use cases
-export const createAlasqlDatabase = async (
-  options: Omit<CreateDatabaseOptions, 'type'> = {}
-): Promise<Database> =>
-  createDatabase({
-    ...options,
-    type: DatabaseType.ALASQL
-  });
-
 export const createBunDatabase = async (
   options: Omit<CreateDatabaseOptions, 'type'> = {}
 ): Promise<Database> =>

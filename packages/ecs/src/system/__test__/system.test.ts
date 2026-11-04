@@ -156,7 +156,7 @@ describe('Systems', () => {
         processedEntities.push(entity.id);
       },
       {
-        where: 'constitution_current < 50',
+        where: 'constitution.current < 50',
         with: ['constitution']
       }
     );
@@ -446,7 +446,7 @@ describe('Systems', () => {
       },
       {
         limit: 1,
-        where: `constitution_current < 75 AND system_location.region = 'North'`,
+        where: `constitution.current < 75 AND systemLocation.region = 'North'`,
         with: ['constitution', 'systemLocation']
       }
     );

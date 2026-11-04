@@ -179,7 +179,7 @@ describe('migrateEDL', () => {
     const { world } = await played();
     const entityCount = () =>
       (
-        world.db.query('SELECT COUNT(*) AS n FROM tbl_entity') as {
+        world.db.query('SELECT COUNT(*) AS n FROM entities') as {
           n: number;
         }[]
       )[0]!.n;
@@ -314,7 +314,7 @@ entity key {
 
   it('keeps Play state when the world never saved what the EDL set', async () => {
     const { world } = await played();
-    world.db.exec('DELETE FROM tbl_edl_value');
+    world.db.exec('DELETE FROM edl_value');
 
     const plan = migrateEDL(world, AFTER, { dryRun: true });
 

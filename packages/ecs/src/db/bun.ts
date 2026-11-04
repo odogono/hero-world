@@ -29,7 +29,7 @@ export class BunDatabaseWrapper implements Database {
   }
 
   addEntity(): number {
-    const r = this.db.run('INSERT INTO tbl_entity DEFAULT VALUES');
+    const r = this.db.run('INSERT INTO entities DEFAULT VALUES');
     return r.lastInsertRowid as number;
   }
 
@@ -211,7 +211,7 @@ export const createBunDatabaseInstance = async (
     clearExisting = false,
     path = ':memory:',
     readonly = false,
-    walMode = 'OFF'
+    walMode = path === ':memory:' ? 'OFF' : 'WAL'
   } = options;
   const { Database } = await import('bun:sqlite');
 
