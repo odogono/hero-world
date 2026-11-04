@@ -63,6 +63,14 @@ defmodule MuaWorld.AccountsTest do
       assert look =~ "West of house"
     end
 
+    test "only a Character coming out of Limbo is welcomed", %{world: world} do
+      {:ok, account} = MuaWorld.create_account(world)
+      {:ok, bob} = MuaWorld.create_character(world, account, "bob")
+
+      assert {:ok, [_welcome]} = MuaWorld.enter(world, account, bob)
+      assert {:ok, []} = MuaWorld.enter(world, account, bob)
+    end
+
     test "names are unique among Characters, ignoring case", %{world: world} do
       {:ok, account} = MuaWorld.create_account(world)
       {:ok, _} = MuaWorld.create_character(world, account, "Bob")

@@ -160,7 +160,8 @@ defmodule MuaWorld do
   @doc """
   Brings a Character into play from Limbo, as one Step: to the room it left,
   if that is still a place, otherwise to the Starting room. Returns what the
-  Character is told. A Character already in play stays where it is.
+  Character is told: a welcome, or nothing for a Character already in play,
+  which stays where it is.
   """
   def enter(world, account, character),
     do: GenServer.call(world, {:enter, account, character}, 30_000)
@@ -623,6 +624,8 @@ defmodule MuaWorld do
 
   # A Character in Limbo returns to the room it left, if that is still a
   # place, otherwise to the Starting room. Those already there see it appear.
+  # Only a Character coming out of Limbo is welcomed: one already in play,
+  # such as after a page reload, carries on without a fresh greeting.
   defp enter_play(state, character) do
     world = state.world
     player = OdgnEcs.get(world, character, "player")
@@ -634,13 +637,15 @@ defmodule MuaWorld do
 
       if player["return_to"] != nil,
         do: Tables.tell(world, room, "#{player["name"]} appears.", character)
-    end
 
-    tell(
-      state,
-      character,
-      "Welcome, #{player["name"]}! Type 'look' to begin, or 'help' for the commands."
-    )
+      tell(
+        state,
+        character,
+        "Welcome, #{player["name"]}! Type 'look' to begin, or 'help' for the commands."
+      )
+    else
+      state
+    end
   end
 
   # A Character who leaves waits in Limbo, out of the World, and remembers
