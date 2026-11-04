@@ -13,6 +13,7 @@ mix test
 {:ok, eid} = OdgnEcs.create(world)
 :ok = OdgnEcs.put(world, eid, "stats", %{"hp" => 10})
 [^eid] = OdgnEcs.query(world, where: [{"stats", "hp", 10}])
+[{^eid, %{"stats" => %{"hp" => 10}}}] = OdgnEcs.select(world, ["stats"], where: [{"stats", "hp", :<, 20}])
 ```
 
 ## How it works
@@ -21,6 +22,9 @@ mix test
 - **No implicit transactions:** callers decide where changes commit, with `begin`, `commit`, `rollback`, `savepoint`, `release`, `rollback_to` and `in_savepoint`.
 - **One table per component:** each component has one typed column per property, so SQL enforces types and `unique` columns.
 - **Values are checked when they are put:** properties left out take their defaults, and unknown properties, wrong types and missing required values are errors. Putting a component replaces it whole.
+- **Queries are one statement:** `query/2` finds entities by components (`with`), conditions (`where`, with `==`, `!=`, `<`, `<=`, `>`, `>=` and `in`), `eids`, `order_by` and `limit`. `select/3` takes the same options and reads the named components' data with each result, so callers needn't `get` each entity in turn. The operators are a closed set: a query that needs more is a sign the store is missing something.
+- **References and chosen columns are indexed:** an `:eid` column, which holds another entity, always has an index, as does a column with `index: true`. Defining a component makes sure its indexes exist, so an existing World gains them when it next starts.
+- **The conformance suite** in [`spec/ecs`](../../spec/ecs) is shared with the TypeScript ECS ([ADR 0019](../../docs/adr/0019-the-typescript-ecs-is-kept-at-parity-for-the-browser.md)); `test/conformance_test.exs` runs it.
 - **Definitions are stored in the World:** a reopened World knows its components.
 - **A changed definition is applied in place when the data can follow it:** defining a component again may add a column that is optional or has a default (existing rows get the default), remove a column, make a column optional, change a default, or flip `play_state`. Changing a column's type or `unique`, adding a unique column, or making one required with no default is an `:incompatible_change` error.
 - **`open/2` with `exclusive: true`** keeps SQLite's lock from the first write until the connection closes, so no other process can write the World meanwhile.

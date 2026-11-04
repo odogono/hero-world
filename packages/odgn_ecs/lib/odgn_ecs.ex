@@ -77,24 +77,31 @@ defmodule OdgnEcs do
   error (see `OdgnEcs.Component.changes/2`).
   """
   @spec define(t(), Component.t()) :: {:ok, t()} | {:error, Error.t()}
-  def define(%__MODULE__{} = world, %Component{name: name} = component) do
-    with :ok <- Component.validate(component) do
-      case world.components do
-        %{^name => existing} ->
-          if Component.to_json(existing) == Component.to_json(component),
-            do: {:ok, world},
-            else: change(world, existing, component)
+  def define(%__MODULE__{} = world, %Component{} = component) do
+    with :ok <- Component.validate(component),
+         {:ok, world} <- define_table(world, component) do
+      # Every time, so a World made before a column was indexed gets the index
+      SQL.exec!(world.conn, Component.index_sql(component))
+      {:ok, world}
+    end
+  end
 
-        _ ->
-          SQL.exec!(world.conn, Component.create_sql(component))
+  defp define_table(world, %Component{name: name} = component) do
+    case world.components do
+      %{^name => existing} ->
+        if Component.to_json(existing) == Component.to_json(component),
+          do: {:ok, world},
+          else: change(world, existing, component)
 
-          SQL.run!(world.conn, "INSERT INTO ecs_components (name, columns) VALUES (?1, ?2)", [
-            name,
-            Component.to_json(component)
-          ])
+      _ ->
+        SQL.exec!(world.conn, Component.create_sql(component))
 
-          {:ok, %{world | components: Map.put(world.components, name, component)}}
-      end
+        SQL.run!(world.conn, "INSERT INTO ecs_components (name, columns) VALUES (?1, ?2)", [
+          name,
+          Component.to_json(component)
+        ])
+
+        {:ok, %{world | components: Map.put(world.components, name, component)}}
     end
   end
 
@@ -119,6 +126,12 @@ defmodule OdgnEcs do
               fill(world, table, component, col, " WHERE #{SQL.ident(col.name)} IS NULL")
 
             {:drop, column} ->
+              # SQLite won't drop an indexed column
+              SQL.exec!(
+                world.conn,
+                "DROP INDEX IF EXISTS #{SQL.ident("i_#{Component.table(component)}_#{column}")}"
+              )
+
               case SQL.exec(world.conn, "ALTER TABLE #{table} DROP COLUMN #{SQL.ident(column)}") do
                 :ok ->
                   :ok
@@ -261,55 +274,192 @@ defmodule OdgnEcs do
   @doc "Every component an entity has, by name."
   @spec components(t(), eid()) :: %{String.t() => data()}
   def components(%__MODULE__{} = world, eid) do
-    for {name, _} <- world.components, data = get(world, eid, name), into: %{}, do: {name, data}
+    case select(world, Map.keys(world.components), eids: [eid]) do
+      [{^eid, data}] -> data
+      [] -> %{}
+    end
   end
 
   # -- Queries ----------------------------------------------------------------
 
+  # SQLite joins at most 64 tables in one statement
+  @max_joins 60
+
+  @ops [:==, :!=, :<, :<=, :>, :>=, :in]
+
   @doc """
-  The entities, in id order, that have every component in `:with` and match
-  every `{component, property, value}` in `:where`. With neither, every
-  entity.
+  The entities that match every option, in id order unless `:order_by` says
+  otherwise. With no options, every entity.
+
+    * `:with` - components every result has.
+    * `:where` - conditions that all hold. `{component, property, value}`
+      tests equality, and a `nil` value matches a missing one.
+      `{component, property, op, value}` takes an `op` from `:==`, `:!=`,
+      `:<`, `:<=`, `:>`, `:>=` and `:in` (with a list). A condition implies
+      its component.
+    * `:eids` - only these entities.
+    * `:order_by` - `{component, property}` or `{component, property, :desc}`,
+      or a list of them. Entity id breaks ties.
+    * `:limit` - at most this many.
   """
   @spec query(t(), keyword()) :: [eid()]
   def query(%__MODULE__{} = world, opts \\ []) do
-    with_names = Keyword.get(opts, :with, [])
-    where = Keyword.get(opts, :where, [])
-    names = Enum.uniq(with_names ++ Enum.map(where, &elem(&1, 0)))
-
-    if Enum.any?(names, &is_nil(component(world, &1))) do
-      []
-    else
-      joins =
-        names
-        |> Enum.with_index()
-        |> Enum.map_join(" ", fn {name, i} ->
-          "JOIN #{SQL.ident(Component.table(name))} t#{i} ON t#{i}.eid = e.eid"
-        end)
-
-      alias_of = names |> Enum.with_index() |> Map.new(fn {n, i} -> {n, "t#{i}"} end)
-
-      {conds, args} =
-        where
-        |> Enum.with_index(1)
-        |> Enum.map(fn {{name, prop, value}, i} ->
-          col = Enum.find(component(world, name).columns, &(&1.name == prop))
-          {"#{alias_of[name]}.#{SQL.ident(prop)} IS ?#{i}", query_value(col, value)}
-        end)
-        |> Enum.unzip()
-
-      where_sql = if conds == [], do: "", else: " WHERE " <> Enum.join(conds, " AND ")
-
-      world.conn
-      |> SQL.all!("SELECT e.eid FROM entities e #{joins}#{where_sql} ORDER BY e.eid", args)
-      |> Enum.map(&hd/1)
+    case plan(world, [], opts) do
+      nil -> []
+      {sql, args, _} -> world.conn |> SQL.all!(sql, args) |> Enum.map(&hd/1)
     end
   end
 
-  defp query_value(nil, v), do: v
-  defp query_value(%{type: :boolean}, v) when is_boolean(v), do: if(v, do: 1, else: 0)
-  defp query_value(%{type: t}, v) when t in [:json, :array], do: JSON.encode!(v)
-  defp query_value(_, v), do: v
+  @doc """
+  The entities `query/2` finds for `opts`, each with its data for the
+  components in `names` that it has: `[{eid, %{name => data}}]`. One
+  statement reads them all.
+  """
+  @spec select(t(), [String.t()], keyword()) :: [{eid(), %{String.t() => data()}}]
+  def select(%__MODULE__{} = world, names, opts \\ []) do
+    names = names |> Enum.uniq() |> Enum.filter(&component(world, &1))
+
+    if length(names) > @max_joins do
+      names
+      |> Enum.chunk_every(@max_joins)
+      |> Enum.map(&select(world, &1, opts))
+      |> Enum.zip_with(fn parts ->
+        {eid, _} = hd(parts)
+        {eid, parts |> Enum.map(&elem(&1, 1)) |> Enum.reduce(&Map.merge/2)}
+      end)
+    else
+      case plan(world, names, opts) do
+        nil -> []
+        {sql, args, read} -> world.conn |> SQL.all!(sql, args) |> Enum.map(read)
+      end
+    end
+  end
+
+  # The SQL for a query, its arguments, and how to read a row into
+  # `{eid, data}`; `nil` when a component it requires isn't defined, so
+  # nothing can match.
+  defp plan(world, selected, opts) do
+    where = opts |> Keyword.get(:where, []) |> Enum.map(&condition/1)
+    order_by = opts |> Keyword.get(:order_by, []) |> List.wrap() |> Enum.map(&order/1)
+    required = Enum.uniq(Keyword.get(opts, :with, []) ++ Enum.map(where, &elem(&1, 0)))
+
+    if Enum.any?(required, &is_nil(component(world, &1))) do
+      nil
+    else
+      optional =
+        (selected ++ Enum.map(order_by, &elem(&1, 0)))
+        |> Enum.uniq()
+        |> Enum.reject(&(&1 in required))
+
+      names = required ++ optional
+      alias_of = names |> Enum.with_index() |> Map.new(fn {n, i} -> {n, "t#{i}"} end)
+
+      joins =
+        Enum.map_join(names, "", fn name ->
+          kind = if name in required, do: "JOIN", else: "LEFT JOIN"
+          a = alias_of[name]
+          " #{kind} #{SQL.ident(Component.table(name))} #{a} ON #{a}.eid = e.eid"
+        end)
+
+      {conds, args} =
+        where
+        |> Enum.map(fn {name, prop, op, value} ->
+          col = fetch_column!(world, name, prop)
+          sql_condition("#{alias_of[name]}.#{SQL.ident(prop)}", op, col, value)
+        end)
+        |> Enum.unzip()
+
+      {conds, args} =
+        case Keyword.fetch(opts, :eids) do
+          {:ok, eids} ->
+            {conds ++ ["e.eid IN (SELECT value FROM json_each(?))"],
+             args ++ [[JSON.encode!(eids)]]}
+
+          :error ->
+            {conds, args}
+        end
+
+      args = List.flatten(args)
+
+      where_sql = if conds == [], do: "", else: " WHERE " <> Enum.join(conds, " AND ")
+
+      order_sql =
+        order_by
+        |> Enum.map(fn {name, prop, dir} ->
+          fetch_column!(world, name, prop)
+          "#{alias_of[name]}.#{SQL.ident(prop)} #{if dir == :desc, do: "DESC", else: "ASC"}"
+        end)
+        |> Kernel.++(["e.eid"])
+        |> Enum.join(", ")
+
+      {limit_sql, args} =
+        case Keyword.fetch(opts, :limit) do
+          {:ok, n} when is_integer(n) and n >= 0 -> {" LIMIT ?", args ++ [n]}
+          {:ok, n} -> raise ArgumentError, "Bad query limit: #{inspect(n)}"
+          :error -> {"", args}
+        end
+
+      defs = Enum.map(selected, &component(world, &1))
+
+      cols =
+        Enum.flat_map(defs, fn c ->
+          a = alias_of[c.name]
+          ["#{a}.eid" | Enum.map(c.columns, &"#{a}.#{SQL.ident(&1.name)}")]
+        end)
+
+      sql =
+        "SELECT #{Enum.join(["e.eid" | cols], ", ")} FROM entities e#{joins}" <>
+          "#{where_sql} ORDER BY #{order_sql}#{limit_sql}"
+
+      {sql, args, &read_row(defs, &1)}
+    end
+  end
+
+  defp condition({name, prop, value}), do: {name, prop, :==, value}
+  defp condition({name, prop, op, value}) when op in @ops, do: {name, prop, op, value}
+
+  defp condition(other),
+    do: raise(ArgumentError, "Unknown query condition: #{inspect(other)}")
+
+  defp order({name, prop}), do: {name, prop, :asc}
+  defp order({name, prop, dir}) when dir in [:asc, :desc], do: {name, prop, dir}
+  defp order(other), do: raise(ArgumentError, "Unknown query order: #{inspect(other)}")
+
+  defp fetch_column!(world, name, prop) do
+    case component(world, name) && Enum.find(component(world, name).columns, &(&1.name == prop)) do
+      nil -> raise ArgumentError, "Component '#{name}' has no property '#{prop}'."
+      col -> col
+    end
+  end
+
+  defp sql_condition(lhs, :==, col, value),
+    do: {"#{lhs} IS ?", [Component.query_value(col, value)]}
+
+  defp sql_condition(lhs, :!=, col, value),
+    do: {"#{lhs} IS NOT ?", [Component.query_value(col, value)]}
+
+  defp sql_condition(lhs, :in, col, values) when is_list(values) do
+    {"#{lhs} IN (SELECT value FROM json_each(?))",
+     [JSON.encode!(Enum.map(values, &Component.query_value(col, &1)))]}
+  end
+
+  defp sql_condition(lhs, op, col, value) when op in [:<, :<=, :>, :>=] do
+    {"#{lhs} #{op} ?", [Component.query_value(col, value)]}
+  end
+
+  defp sql_condition(_lhs, op, _col, value),
+    do: raise(ArgumentError, "Bad value for #{inspect(op)}: #{inspect(value)}")
+
+  defp read_row(defs, [eid | values]) do
+    {data, []} =
+      Enum.reduce(defs, {%{}, values}, fn c, {acc, vals} ->
+        {[present | row], rest} = Enum.split(vals, length(c.columns) + 1)
+        acc = if present == nil, do: acc, else: Map.put(acc, c.name, Component.decode(c, row))
+        {acc, rest}
+      end)
+
+    {eid, data}
+  end
 
   # -- Transactions -----------------------------------------------------------
 

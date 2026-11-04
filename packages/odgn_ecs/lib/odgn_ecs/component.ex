@@ -2,8 +2,10 @@ defmodule OdgnEcs.Column do
   @moduledoc """
   One column of a component: a property every entity with the component has.
   `optional: false` means it must have a value, from the data or `default`.
+  `index: true` makes queries on it fast; an `:eid` column (a Reference to
+  another entity) is always indexed.
   """
-  defstruct name: nil, type: :string, optional: true, unique: false, default: nil
+  defstruct name: nil, type: :string, optional: true, unique: false, default: nil, index: false
 
   @type type ::
           :string
@@ -25,7 +27,8 @@ defmodule OdgnEcs.Column do
           type: type(),
           optional: boolean(),
           unique: boolean(),
-          default: term()
+          default: term(),
+          index: boolean()
         }
 
   @types ~w(string email enum datetime date time timestamp int float boolean eid json array)a
@@ -111,6 +114,26 @@ defmodule OdgnEcs.Component do
   end
 
   @doc false
+  # The SQL that gives each indexed column an index, and drops the index of
+  # any other, so that it can run on every definition, changed or not.
+  def index_sql(%__MODULE__{} = c) do
+    table = table(c)
+
+    Enum.map_join(c.columns, " ", fn col ->
+      index = OdgnEcs.SQL.ident("i_#{table}_#{col.name}")
+
+      if indexed?(col),
+        do:
+          "CREATE INDEX IF NOT EXISTS #{index} ON #{OdgnEcs.SQL.ident(table)} (#{OdgnEcs.SQL.ident(col.name)});",
+        else: "DROP INDEX IF EXISTS #{index};"
+    end)
+  end
+
+  defp indexed?(%Column{unique: true}), do: false
+  defp indexed?(%Column{type: :eid}), do: true
+  defp indexed?(%Column{index: index}), do: index == true
+
+  @doc false
   def sql_column(%Column{} = col), do: OdgnEcs.SQL.ident(col.name) <> " " <> sql_type(col.type)
 
   @doc """
@@ -118,8 +141,8 @@ defmodule OdgnEcs.Component do
   `{:add, column}`, `{:drop, name}` or `{:fill, column}` (a column whose empty
   values take its default), or `{:error, reason}` for a change the data can't
   follow. Compatible: adding a column that is optional or has a default,
-  removing one, making one optional, changing a default, and flipping
-  `play_state`. Incompatible: changing a column's type or `unique`, adding a
+  removing one, making one optional, changing a default or `index`, and
+  flipping `play_state`. Incompatible: changing a column's type or `unique`, adding a
   unique column, and making one required with no default.
   """
   def changes(%__MODULE__{columns: old}, %__MODULE__{name: name, columns: new}) do
@@ -257,6 +280,15 @@ defmodule OdgnEcs.Component do
   end
 
   @doc false
+  # One stored value of a column, as it is compared in a query
+  def query_value(%Column{type: :boolean}, v) when is_boolean(v), do: if(v, do: 1, else: 0)
+
+  def query_value(%Column{type: t}, v) when t in [:json, :array] and not is_nil(v),
+    do: JSON.encode!(v)
+
+  def query_value(_, v), do: v
+
+  @doc false
   def decode(%__MODULE__{columns: columns}, values) do
     columns
     |> Enum.zip(values)
@@ -278,7 +310,8 @@ defmodule OdgnEcs.Component do
         "type" => Atom.to_string(c.type),
         "optional" => c.optional,
         "unique" => c.unique,
-        "default" => c.default
+        "default" => c.default,
+        "index" => c.index
       }
     end)
     |> then(&%{"columns" => &1, "play_state" => play_state})
@@ -301,7 +334,8 @@ defmodule OdgnEcs.Component do
           type: String.to_existing_atom(c["type"]),
           optional: c["optional"],
           unique: c["unique"],
-          default: c["default"]
+          default: c["default"],
+          index: c["index"] == true
         }
       end
 

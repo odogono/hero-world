@@ -74,7 +74,7 @@ defmodule OdgnEcsTalk do
           %Column{name: "owner", type: :eid, optional: false},
           %Column{name: "script", type: :string, optional: false},
           %Column{name: "name", type: :string, optional: false},
-          %Column{name: "at", type: :int, optional: false},
+          %Column{name: "at", type: :int, optional: false, index: true},
           %Column{name: "message", type: :string, optional: false},
           %Column{name: "args", type: :string, optional: false}
         ]
@@ -578,11 +578,11 @@ defmodule OdgnEcsTalk do
   @doc "The timers due at or before `now_us` (microseconds), earliest first."
   def due_timers(%__MODULE__{world: world}, now_us) do
     world
-    |> OdgnEcs.query(with: [@timer])
-    |> Enum.map(&Map.put(OdgnEcs.get(world, &1, @timer), "eid", &1))
-    |> Enum.filter(&(&1["at"] <= now_us))
-    |> Enum.sort_by(&{&1["at"], &1["eid"]})
+    |> OdgnEcs.select([@timer], where: [{@timer, "at", :<=, now_us}], order_by: {@timer, "at"})
+    |> Enum.map(&timer/1)
   end
+
+  defp timer({eid, %{@timer => timer}}), do: Map.put(timer, "eid", eid)
 
   @doc """
   Stores a timer of the Host's own, as a Script's `schedule` does, replacing
@@ -611,8 +611,8 @@ defmodule OdgnEcsTalk do
   @doc "Every timer stored under `script`, as `due_timers/2` gives them."
   def timers(%__MODULE__{world: world}, script) do
     world
-    |> OdgnEcs.query(where: [{@timer, "script", script}])
-    |> Enum.map(&Map.put(OdgnEcs.get(world, &1, @timer), "eid", &1))
+    |> OdgnEcs.select([@timer], where: [{@timer, "script", script}])
+    |> Enum.map(&timer/1)
   end
 
   @doc "Removes a timer, as `due_timers/2` gave it, without delivering it."

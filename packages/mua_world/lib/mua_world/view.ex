@@ -18,23 +18,24 @@ defmodule MuaWorld.View do
   def for_character(world, character, room) do
     case room && OdgnEcs.get(world, room, "described") do
       %{} = described ->
-        contents = Enum.reject(entities_in(world, room), &(&1 == character))
-        exits = for e <- contents, portal = OdgnEcs.get(world, e, "portal"), do: {portal, e}
-        things = for e <- contents, thing?(world, e), n = name(world, e), do: {e, n}
-        carried = for e <- entities_in(world, character), n = name(world, e), do: n
+        contents = Enum.reject(entities_in(world, room), &(elem(&1, 0) == character))
+        exits = for {_e, %{"portal" => portal}} <- contents, do: portal
+        closed = closed_doors(world, exits)
+        things = for {e, data} <- contents, thing?(data), n = name(data), do: {e, data, n}
+        carried = for {_e, data} <- entities_in(world, character), n = name(data), do: n
 
         %{
           room: %{
             name: described["name"],
             description: described["description"],
-            exits: Enum.map(exits, fn {p, _} -> exit_label(world, p) end),
-            items: Enum.map(things, &elem(&1, 1)),
-            players: for(e <- contents, person?(world, e), n = name(world, e), do: n)
+            exits: Enum.map(exits, &exit_label(&1, closed)),
+            items: Enum.map(things, &elem(&1, 2)),
+            players: for({_e, data} <- contents, person?(data), n = name(data), do: n)
           },
           inventory: carried,
           actions:
-            Enum.map(exits, fn {p, _} -> p["dir"] end) ++
-              for({e, n} <- things, takeable?(world, e), do: "take " <> String.downcase(n)) ++
+            Enum.map(exits, & &1["dir"]) ++
+              for({_e, data, n} <- things, takeable?(data), do: "take " <> String.downcase(n)) ++
               Enum.flat_map(
                 carried,
                 &["examine " <> String.downcase(&1), "drop " <> String.downcase(&1)]
@@ -46,26 +47,35 @@ defmodule MuaWorld.View do
     end
   end
 
-  defp entities_in(world, place), do: OdgnEcs.query(world, where: [{"location", "in", place}])
+  @read ~w(portal item container player npc described)
 
-  defp exit_label(world, %{"dir" => dir, "door" => door}) when is_integer(door) do
-    if (OdgnEcs.get(world, door, "door") || %{})["is_closed"] == true,
-      do: dir <> " (closed)",
-      else: dir
+  # The entities in a place, each with the components the view reads
+  defp entities_in(world, place),
+    do: OdgnEcs.select(world, @read, where: [{"location", "in", place}])
+
+  # The exits' doors that are closed
+  defp closed_doors(world, exits) do
+    doors = for %{"door" => door} <- exits, is_integer(door), do: door
+
+    world
+    |> OdgnEcs.select(["door"], eids: doors, where: [{"door", "is_closed", true}])
+    |> MapSet.new(&elem(&1, 0))
   end
 
-  defp exit_label(_world, %{"dir" => dir}), do: dir
+  defp exit_label(%{"dir" => dir, "door" => door}, closed) when is_integer(door) do
+    if MapSet.member?(closed, door), do: dir <> " (closed)", else: dir
+  end
 
-  defp thing?(world, e),
-    do: OdgnEcs.get(world, e, "item") != nil or OdgnEcs.get(world, e, "container") != nil
+  defp exit_label(%{"dir" => dir}, _closed), do: dir
 
-  defp takeable?(world, e), do: (OdgnEcs.get(world, e, "item") || %{})["is_takeable"] == true
+  defp thing?(data), do: Map.has_key?(data, "item") or Map.has_key?(data, "container")
 
-  defp person?(world, e),
-    do: OdgnEcs.get(world, e, "player") != nil or OdgnEcs.get(world, e, "npc") != nil
+  defp takeable?(data), do: (data["item"] || %{})["is_takeable"] == true
 
-  defp name(world, e) do
-    case OdgnEcs.get(world, e, "player") || OdgnEcs.get(world, e, "described") do
+  defp person?(data), do: Map.has_key?(data, "player") or Map.has_key?(data, "npc")
+
+  defp name(data) do
+    case data["player"] || data["described"] do
       %{"name" => n} when is_binary(n) -> n
       _ -> nil
     end

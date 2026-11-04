@@ -1,0 +1,229 @@
+{
+  "components": [
+    { "name": "place", "columns": [{ "name": "title", "type": "string" }] },
+    { "name": "location", "columns": [{ "name": "in", "type": "eid" }] },
+    {
+      "name": "thing",
+      "columns": [
+        { "name": "label", "type": "string", "optional": false },
+        { "name": "weight", "type": "float", "default": 1 },
+        { "name": "open", "type": "boolean", "default": false },
+        { "name": "tags", "type": "array" }
+      ]
+    },
+    {
+      "name": "timer",
+      "columns": [{ "name": "at", "type": "int", "index": true }]
+    }
+  ],
+  "entities": [
+    { "id": "hall", "components": { "place": { "title": "Hall" } } },
+    { "id": "cellar", "components": { "place": { "title": "Cellar" } } },
+    {
+      "id": "lamp",
+      "components": {
+        "thing": { "label": "lamp", "weight": 2, "tags": ["light"] },
+        "location": { "in": { "$ref": "hall" } }
+      }
+    },
+    {
+      "id": "box",
+      "components": {
+        "thing": { "label": "box", "weight": 5, "open": true },
+        "location": { "in": { "$ref": "hall" } }
+      }
+    },
+    {
+      "id": "coin",
+      "components": {
+        "thing": { "label": "coin", "weight": 0.5 },
+        "location": { "in": { "$ref": "cellar" } }
+      }
+    },
+    { "id": "ghost", "components": { "location": { "in": null } } },
+    { "id": "t1", "components": { "timer": { "at": 300 } } },
+    { "id": "t2", "components": { "timer": { "at": 100 } } },
+    { "id": "t3", "components": { "timer": { "at": 200 } } }
+  ],
+  "cases": [
+    {
+      "name": "no options lists every entity",
+      "query": {},
+      "expect": [
+        "hall",
+        "cellar",
+        "lamp",
+        "box",
+        "coin",
+        "ghost",
+        "t1",
+        "t2",
+        "t3"
+      ]
+    },
+    {
+      "name": "with one component",
+      "query": { "with": ["place"] },
+      "expect": ["hall", "cellar"]
+    },
+    {
+      "name": "with two components",
+      "query": { "with": ["thing", "location"] },
+      "expect": ["lamp", "box", "coin"]
+    },
+    {
+      "name": "with an undefined component finds nothing",
+      "query": { "with": ["nothing"] },
+      "expect": []
+    },
+    {
+      "name": "equality",
+      "query": { "where": [["thing", "label", "box"]] },
+      "expect": ["box"]
+    },
+    {
+      "name": "equality on a Reference",
+      "query": { "where": [["location", "in", { "$ref": "hall" }]] },
+      "expect": ["lamp", "box"]
+    },
+    {
+      "name": "null equals a missing value",
+      "query": { "where": [["location", "in", null]] },
+      "expect": ["ghost"]
+    },
+    {
+      "name": "boolean equality",
+      "query": { "where": [["thing", "open", true]] },
+      "expect": ["box"]
+    },
+    {
+      "name": "explicit ==",
+      "query": { "where": [["thing", "open", "==", false]] },
+      "expect": ["lamp", "coin"]
+    },
+    {
+      "name": "!= keeps missing values",
+      "query": { "where": [["location", "in", "!=", { "$ref": "hall" }]] },
+      "expect": ["coin", "ghost"]
+    },
+    {
+      "name": "<",
+      "query": { "where": [["thing", "weight", "<", 2]] },
+      "expect": ["coin"]
+    },
+    {
+      "name": "<=",
+      "query": { "where": [["thing", "weight", "<=", 2]] },
+      "expect": ["lamp", "coin"]
+    },
+    {
+      "name": ">",
+      "query": { "where": [["thing", "weight", ">", 2]] },
+      "expect": ["box"]
+    },
+    {
+      "name": ">=",
+      "query": { "where": [["thing", "weight", ">=", 2]] },
+      "expect": ["lamp", "box"]
+    },
+    {
+      "name": "in",
+      "query": {
+        "where": [["thing", "label", "in", ["coin", "lamp", "nope"]]]
+      },
+      "expect": ["lamp", "coin"]
+    },
+    {
+      "name": "in an empty list finds nothing",
+      "query": { "where": [["thing", "label", "in", []]] },
+      "expect": []
+    },
+    {
+      "name": "conditions all hold",
+      "query": {
+        "where": [
+          ["thing", "weight", ">", 1],
+          ["location", "in", { "$ref": "hall" }]
+        ]
+      },
+      "expect": ["lamp", "box"]
+    },
+    {
+      "name": "eids",
+      "query": { "eids": ["coin", "hall", "t2"], "with": ["thing"] },
+      "expect": ["coin"]
+    },
+    {
+      "name": "order_by ascending",
+      "query": { "order_by": [["timer", "at"]], "with": ["timer"] },
+      "expect": ["t2", "t3", "t1"]
+    },
+    {
+      "name": "order_by descending",
+      "query": { "order_by": [["thing", "weight", "desc"]], "with": ["thing"] },
+      "expect": ["box", "lamp", "coin"]
+    },
+    {
+      "name": "entity id breaks ties",
+      "query": { "order_by": [["thing", "open"]], "with": ["thing"] },
+      "expect": ["lamp", "coin", "box"]
+    },
+    {
+      "name": "due timers, earliest first",
+      "query": {
+        "where": [["timer", "at", "<=", 200]],
+        "order_by": [["timer", "at"]]
+      },
+      "expect": ["t2", "t3"]
+    },
+    {
+      "name": "limit",
+      "query": { "order_by": [["timer", "at"]], "with": ["timer"], "limit": 1 },
+      "expect": ["t2"]
+    },
+    {
+      "name": "select reads data with the results",
+      "query": { "where": [["location", "in", { "$ref": "hall" }]] },
+      "select": ["thing", "place"],
+      "expect": [
+        [
+          "lamp",
+          {
+            "thing": {
+              "label": "lamp",
+              "weight": 2.0,
+              "open": false,
+              "tags": ["light"]
+            }
+          }
+        ],
+        [
+          "box",
+          {
+            "thing": {
+              "label": "box",
+              "weight": 5.0,
+              "open": true,
+              "tags": null
+            }
+          }
+        ]
+      ]
+    },
+    {
+      "name": "select lists entities without a selected component",
+      "query": { "eids": ["hall", "coin"] },
+      "select": ["location", "place"],
+      "expect": [
+        ["hall", { "place": { "title": "Hall" } }],
+        ["coin", { "location": { "in": { "$ref": "cellar" } } }]
+      ]
+    },
+    {
+      "name": "select ignores an undefined component",
+      "query": { "eids": ["hall"] },
+      "select": ["nothing"],
+      "expect": [["hall", {}]]
+    }
+  ]
+}
