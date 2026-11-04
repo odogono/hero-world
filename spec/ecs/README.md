@@ -22,7 +22,7 @@ Each file builds one World and runs cases against it:
 }
 ```
 
-- **`components`**: Component Definitions. A column has `name` and `type`, and may have `optional`, `unique`, `default` and `index`, as in `odgn_ecs`.
+- **`components`**: Component Definitions. A column has `name` and `type`, and may have `optional`, `unique`, `default`, `index` and, for an `eid` column, `on_delete` (`restrict`, `nullify` or `cascade`), as in `odgn_ecs`.
 - **`entities`**: created in order, so ids ascend in file order. `id` is a label that cases use instead of a real id. Anywhere in component data or a query, `{"$ref": "label"}` stands for that entity's id.
 - **`query`** options:
   - `with`: component names.

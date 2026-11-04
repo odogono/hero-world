@@ -68,7 +68,8 @@ defmodule OdgnEcs.ConformanceTest do
             optional: Map.get(col, "optional", true),
             unique: Map.get(col, "unique", false),
             default: col["default"],
-            index: Map.get(col, "index", false)
+            index: Map.get(col, "index", false),
+            on_delete: String.to_existing_atom(Map.get(col, "on_delete", "restrict"))
           }
         end
     }

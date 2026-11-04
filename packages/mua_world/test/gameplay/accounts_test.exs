@@ -165,7 +165,13 @@ defmodule MuaWorld.AccountsTest do
          c do
       start = c.places.starting_room
 
-      assert returning_to(c, 999_999) == start
+      # Deleting the room empties `return_to`, which can't hold a gone room
+      {:ok, gone} = OdgnEcs.create(c.ecs)
+      :ok = OdgnEcs.put(c.ecs, c.bob, "player", %{"name" => "bob", "return_to" => gone})
+      :ok = OdgnEcs.delete(c.ecs, gone)
+      assert OdgnEcs.get(c.ecs, c.bob, "player")["return_to"] == nil
+      assert Places.destination(c.ecs, c.bob, c.places) == start
+
       assert returning_to(c, c.places.limbo) == start
       assert returning_to(c, nil) == start
 

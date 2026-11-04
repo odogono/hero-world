@@ -274,6 +274,126 @@ defmodule OdgnEcsTest do
     end
   end
 
+  describe "References" do
+    @located %Component{name: "located", columns: [%Column{name: "in", type: :eid}]}
+    @noticed %Component{
+      name: "noticed",
+      columns: [%Column{name: "last", type: :eid, on_delete: :nullify}]
+    }
+    @owned %Component{
+      name: "owned",
+      columns: [%Column{name: "by", type: :eid, on_delete: :cascade, optional: false}]
+    }
+
+    defp refs_world, do: world([@located, @noticed, @owned])
+
+    defp entity(w, components) do
+      {:ok, eid} = OdgnEcs.create(w)
+      for {name, data} <- components, do: :ok = OdgnEcs.put(w, eid, name, data)
+      eid
+    end
+
+    test "must refer to an entity that exists" do
+      w = refs_world()
+
+      assert {:error, %Error{kind: :constraint}} =
+               OdgnEcs.put(w, entity(w, []), "located", %{"in" => 999})
+    end
+
+    test ":restrict refuses to delete a referenced entity, saying what refers to it" do
+      w = refs_world()
+      room = entity(w, [])
+      lamp = entity(w, [{"located", %{"in" => room}}])
+
+      assert {:error, %Error{kind: :referenced, message: message}} = OdgnEcs.delete(w, room)
+      assert message =~ "located.in of #{lamp} refers to it"
+      assert OdgnEcs.exists?(w, room)
+
+      :ok = OdgnEcs.remove(w, lamp, "located")
+      assert :ok = OdgnEcs.delete(w, room)
+    end
+
+    test ":nullify empties the Reference" do
+      w = refs_world()
+      lamp = entity(w, [])
+      player = entity(w, [{"noticed", %{"last" => lamp}}])
+
+      :ok = OdgnEcs.delete(w, lamp)
+      assert OdgnEcs.get(w, player, "noticed") == %{"last" => nil}
+    end
+
+    test ":cascade deletes the entity holding the Reference, and so on down" do
+      w = refs_world()
+      npc = entity(w, [])
+      timer = entity(w, [{"owned", %{"by" => npc}}])
+      sub = entity(w, [{"owned", %{"by" => timer}}])
+      other = entity(w, [{"owned", %{"by" => entity(w, [])}}])
+
+      :ok = OdgnEcs.delete(w, npc)
+      refute Enum.any?([npc, timer, sub], &OdgnEcs.exists?(w, &1))
+      assert OdgnEcs.exists?(w, other)
+    end
+
+    test "a cascade stops at a :restrict Reference, and changes nothing" do
+      w = refs_world()
+      npc = entity(w, [])
+      timer = entity(w, [{"owned", %{"by" => npc}}])
+      _thing = entity(w, [{"located", %{"in" => timer}}])
+
+      assert {:error, %Error{kind: :referenced}} = OdgnEcs.delete(w, npc)
+      assert OdgnEcs.exists?(w, npc) and OdgnEcs.exists?(w, timer)
+    end
+
+    # A table as odgn_ecs made it before References had keys
+    defp unkeyed(w, component) do
+      table = OdgnEcs.SQL.ident(Component.table(component))
+
+      OdgnEcs.SQL.exec!(
+        w.conn,
+        "CREATE TABLE plain AS SELECT * FROM #{table}; DROP TABLE #{table}; " <>
+          "CREATE TABLE #{table} (eid INTEGER PRIMARY KEY REFERENCES entities(eid) ON DELETE CASCADE, \"in\" INTEGER); " <>
+          "INSERT INTO #{table} SELECT * FROM plain; DROP TABLE plain"
+      )
+    end
+
+    test "a table made before References had keys is rebuilt with them, keeping its rows" do
+      w = refs_world()
+      room = entity(w, [])
+      lamp = entity(w, [{"located", %{"in" => room}}])
+      unkeyed(w, @located)
+      assert :ok = OdgnEcs.delete(w, entity(w, []))
+
+      assert {:ok, w} = OdgnEcs.define(w, @located)
+      assert OdgnEcs.get(w, lamp, "located") == %{"in" => room}
+      assert OdgnEcs.query(w, where: [{"located", "in", room}]) == [lamp]
+      assert {:error, %Error{kind: :referenced}} = OdgnEcs.delete(w, room)
+    end
+
+    test "a table with a dangling Reference isn't rebuilt" do
+      w = refs_world()
+      lamp = entity(w, [])
+      unkeyed(w, @located)
+      OdgnEcs.SQL.exec!(w.conn, ~s|INSERT INTO "c_located" VALUES (#{lamp}, 999)|)
+
+      assert {:error, %Error{kind: :dangling_reference, message: message}} =
+               OdgnEcs.define(w, @located)
+
+      assert message =~ "1 in 'in'"
+      assert OdgnEcs.get(w, lamp, "located") == %{"in" => 999}
+    end
+
+    test "changing on_delete rebuilds the table" do
+      w = refs_world()
+      room = entity(w, [])
+      lamp = entity(w, [{"located", %{"in" => room}}])
+      [col] = @located.columns
+      {:ok, w} = OdgnEcs.define(w, %{@located | columns: [%{col | on_delete: :nullify}]})
+
+      :ok = OdgnEcs.delete(w, room)
+      assert OdgnEcs.get(w, lamp, "located") == %{"in" => nil}
+    end
+  end
+
   describe "select" do
     test "reads every component of an entity in one go" do
       w = world()
