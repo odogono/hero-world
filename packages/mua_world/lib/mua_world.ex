@@ -366,6 +366,7 @@ defmodule MuaWorld do
     {_, state} =
       Step.run(state, fn state ->
         Lifecycle.arm(state.world, state.talk, instant_us(state.world_ms))
+        :ok = OdgnEcs.System.arm(state.world, MuaWorld.Systems.all(), state.world_ms)
         system = OdgnEcsTalk.handle(state.talk, state.places.system)
 
         for eid <- OdgnEcs.query(state.world, with: ["described"]),
@@ -679,7 +680,7 @@ defmodule MuaWorld do
   defp now_ms, do: System.monotonic_time(:millisecond)
 
   # Due timers each run as a Step, and so does a NorthTalk deadline, such as
-  # the end of a Script's `wait`.
+  # the end of a Script's `wait`, and each due System.
   defp run_due(state) do
     # World time is kept on every tick, so a restart resumes close to where
     # it stopped even when nothing happened in between.
@@ -698,7 +699,20 @@ defmodule MuaWorld do
         do: elem(Step.run(state, & &1), 1),
         else: state
 
+    state = run_systems(state)
     run_npcs(state)
+  end
+
+  # Each due System runs as a Step of its own
+  defp run_systems(state) do
+    state.world
+    |> OdgnEcs.System.due(MuaWorld.Systems.all(), state.world_ms)
+    |> Enum.reduce(state, fn system, state ->
+      {_, state} =
+        Step.run(state, &OdgnEcs.System.run(&1.world, system, &1.world_ms, &1))
+
+      state
+    end)
   end
 
   # A Script's timer goes to its entity; mua's own `timers` are handled here.

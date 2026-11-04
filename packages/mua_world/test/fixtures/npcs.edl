@@ -23,6 +23,11 @@ atom cat {
   script { src: "scripts/cat.talk" }
 }
 
+# Says so on every heartbeat
+atom fidget {
+  script { src: "scripts/fidget.talk" }
+}
+
 entity west_of_house : room {
   meta { props: { id: "west_of_house" } }
   described { name: "Square" description: "A busy town square." }
@@ -48,4 +53,15 @@ entity tom : npc cat {
 entity trader : npc greeter {
   described { name: "Trader" description: "A cheerful trader." }
   location { in: $market }
+}
+
+entity kid : npc fidget {
+  described { name: "Kid" description: "A fidgety kid." }
+  location { in: $west_of_house }
+}
+
+entity statue : fidget {
+  npc { active: false }
+  described { name: "Statue" description: "A statue of a fidgety kid." }
+  location { in: $west_of_house }
 }

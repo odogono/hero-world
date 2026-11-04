@@ -32,6 +32,20 @@ defmodule MuaWorld.NpcsTest do
     assert ~s(Trader says, "Welcome to the market!") in received(bob)
   end
 
+  test "gives every active NPC a heartbeat, every 45 seconds", %{world: world, bob: bob} do
+    received(bob)
+    run_for(world, 44)
+    refute ~s(Kid says, "tick") in received(bob)
+
+    run_for(world, 1)
+    lines = received(bob)
+    assert ~s(Kid says, "tick") in lines
+    refute ~s(Statue says, "tick") in lines
+
+    run_for(world, 45)
+    assert ~s(Kid says, "tick") in received(bob)
+  end
+
   test "lets an NPC act on its own timer", %{world: world, bob: bob} do
     cat = MuaWorld.named(world, "tom")
     square = location(world, cat)
