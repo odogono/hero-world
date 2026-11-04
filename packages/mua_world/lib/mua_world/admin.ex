@@ -37,7 +37,8 @@ defmodule MuaWorld.Admin do
     do: "#{code}: #{error["message"] || ""}" |> String.trim_trailing(": ")
 
   def failure({:error, %NorthTalk.ScriptError{outcome: outcome}}, _), do: outcome
-  def failure(:unfinished, _), do: "the line didn't finish, so nothing changed"
+  def failure({:failed, error}, line), do: failure({:error, error}, line)
+  def failure(:waiting, _), do: "the line didn't finish, so nothing changed"
   def failure({:error, other}, _), do: inspect(other)
   def failure(other, _), do: inspect(other)
 end

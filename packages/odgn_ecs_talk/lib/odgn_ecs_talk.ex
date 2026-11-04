@@ -462,6 +462,80 @@ defmodule OdgnEcsTalk do
   end
 
   @doc """
+  Pumps the Group with the Clock at `now` until it is idle: no Run is
+  sliced, and `:between`, called after each Pump, gave no more work.
+  `:between` is a function of no arguments returning whether it sent more,
+  such as notices a Capability queued. Returns when NorthTalk next needs
+  pumping, as a `DateTime`, or `nil`.
+  """
+  @spec pump_until_idle(t(), DateTime.t(), keyword()) :: {:ok, DateTime.t() | nil}
+  def pump_until_idle(%__MODULE__{} = talk, now, opts \\ []) do
+    between = Keyword.get(opts, :between, fn -> false end)
+    {:ok, pump} = pump(talk, now)
+    more? = between.()
+
+    if pump.state == "sliced" or more?,
+      do: pump_until_idle(talk, now, opts),
+      else: {:ok, deadline(pump.next_deadline)}
+  end
+
+  defp deadline(nil), do: nil
+
+  defp deadline(text) do
+    {:ok, dt, _} = DateTime.from_iso8601(text)
+    dt
+  end
+
+  @typedoc """
+  How a Request or Decision stands: its Handler `replied` with a value,
+  `passed` (no Handler, or a Decision allowed), was `vetoed` with a reason,
+  `failed` with an error, or is still `waiting`.
+  """
+  @type outcome ::
+          {:replied, term()}
+          | :passed
+          | {:vetoed, term()}
+          | {:failed, term()}
+          | :waiting
+
+  @doc """
+  The outcome of a Request or Decision as the Group stands now, without
+  Pumping. Once it is anything but `:waiting`, the adapter is done with it,
+  and asking again is an error.
+  """
+  @spec outcome(term()) :: outcome()
+  def outcome(%NorthTalk.Pending{} = pending) do
+    case NorthTalk.await(pending, 0) do
+      {:error, %NorthTalk.HostError{code: "timeout"}} ->
+        :waiting
+
+      result ->
+        NorthTalk.release_pending(pending)
+        normalise(result)
+    end
+  end
+
+  defp normalise({:ok, %NorthTalk.Result{value: value}}), do: {:replied, value}
+  defp normalise({:ok, %NorthTalk.Verdict{verdict: :allowed}}), do: :passed
+
+  defp normalise({:ok, %NorthTalk.Verdict{verdict: :vetoed, vetoes: [veto | _]}}),
+    do: {:vetoed, veto.reason}
+
+  defp normalise({:ok, %NorthTalk.Verdict{verdict: :vetoed}}), do: {:vetoed, nil}
+  defp normalise({:error, %NorthTalk.ScriptError{outcome: "unhandled"}}), do: :passed
+  defp normalise({:error, error}), do: {:failed, error}
+  defp normalise(other), do: {:failed, other}
+
+  @doc """
+  Gives up on a Request or Decision still waiting, so the adapter holds
+  nothing for it. Its Run carries on unless its Script is replaced.
+  """
+  def abandon(%NorthTalk.Pending{} = pending) do
+    NorthTalk.release_pending(pending)
+    :ok
+  end
+
+  @doc """
   The Delivery whose work a Capability `call` is part of, as
   `%{receiver: eid, host: term}`, or `nil` for one the adapter didn't send
   or has forgotten. `receiver` is `nil` for a Service Script, and `host` is
