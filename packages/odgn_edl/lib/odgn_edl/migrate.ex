@@ -15,7 +15,7 @@ defmodule OdgnEdl.Migrate do
   @savepoint "odgn_edl_migrate"
 
   def run(%OdgnEcs{} = world, source, definitions, opts) do
-    Record.ensure(world)
+    world = Record.ensure(world)
     :ok = OdgnEcs.savepoint(world, @savepoint)
 
     result =
@@ -281,6 +281,8 @@ defmodule OdgnEdl.Migrate do
       for {component, _} <- Enum.sort_by(current, &elem(&1, 0)),
           not Map.has_key?(desired, component),
           not play_state?(world, component),
+          # the record's own, which no EDL sets
+          component != Record.definition_component().name,
           do: component
 
     lineage = Record.entity_lineage(world, eid)

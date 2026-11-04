@@ -6,7 +6,7 @@ defmodule OdgnEdl.Build do
   alias OdgnEdl.{Error, Migrate, Record}
 
   def run(%OdgnEcs{} = world, source, definitions, opts) do
-    Record.ensure(world)
+    world = Record.ensure(world)
 
     if Record.built?(world) do
       {:error,

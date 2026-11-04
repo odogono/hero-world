@@ -343,4 +343,38 @@ defmodule OdgnEdl.BuildTest do
                OdgnEdl.load(world, @edl <> "entity extra {}")
     end
   end
+
+  describe "Definition names" do
+    test "are a component, and a deleted entity's name is remembered" do
+      world = build!("entity hall {} entity lamp {}")
+      lamp = OdgnEdl.entity_named(world, "lamp")
+      assert OdgnEcs.get(world, lamp, "edl_definition") == %{"name" => "lamp"}
+
+      :ok = OdgnEcs.delete(world, lamp)
+      assert OdgnEdl.entity_named(world, "lamp") == nil
+      assert OdgnEdl.definition_names(world)["lamp"] == lamp
+    end
+
+    test "move from the table that held them before" do
+      world = build!("entity hall {} entity lamp {}")
+      names = OdgnEdl.definition_names(world)
+
+      OdgnEcs.SQL.exec!(
+        world.conn,
+        "CREATE TABLE edl_definition_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL); " <>
+          "INSERT INTO edl_definition_name SELECT name, eid FROM c_edl_definition; " <>
+          "INSERT INTO edl_definition_name VALUES ('ghost', 999); " <>
+          "DELETE FROM c_edl_definition"
+      )
+
+      assert OdgnEdl.definition_names(world) == Map.put(names, "ghost", 999)
+      assert OdgnEdl.entity_named(world, "hall") == names["hall"]
+      assert OdgnEdl.entity_named(world, "ghost") == nil
+
+      assert OdgnEcs.SQL.one!(
+               world.conn,
+               "SELECT 1 FROM sqlite_master WHERE name = 'edl_definition_name'"
+             ) == nil
+    end
+  end
 end

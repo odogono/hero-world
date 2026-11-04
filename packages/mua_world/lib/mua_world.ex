@@ -612,13 +612,8 @@ defmodule MuaWorld do
 
   defp location(state, eid), do: (OdgnEcs.get(state.world, eid, "location") || %{})["in"]
 
-  defp name_taken?(world, name) do
-    wanted = String.downcase(name)
-
-    world
-    |> OdgnEcs.query(with: ["player"])
-    |> Enum.any?(&(String.downcase(OdgnEcs.get(world, &1, "player")["name"]) == wanted))
-  end
+  # `player.name` compares ignoring case
+  defp name_taken?(world, name), do: OdgnEcs.query(world, where: [{"player", "name", name}]) != []
 
   # A Character in Limbo returns to the room it left, if that is still a
   # place, otherwise to the Starting room. Those already there see it appear.
