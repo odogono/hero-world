@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { Profile } from './Profile';
 import { logout, sendCommand } from './connection';
-import { actions, lines, status, type Status } from './store';
+import { actions, commands, lines, status, type Status } from './store';
 import type { Line } from './transcript';
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -38,7 +38,9 @@ const TranscriptLine = ({
     case 'gap':
       return (
         <li class="line gap" role="separator">
-          connection lost: you may have missed something
+          {line.reason === 'reload'
+            ? 'reloaded: the lines above are from before, and you may have missed something'
+            : 'connection lost: you may have missed something'}
         </li>
       );
     case 'prompt':
@@ -116,7 +118,40 @@ const BlockCaret = ({ at, text }: { at: number; text: string }) => (
 const Composer = ({ joined }: { joined: boolean }) => {
   const [text, setText] = useState('');
   const [caret, setCaret] = useState<number | null>(null);
+  /** how far back ↑ has gone through sent commands; null while typing anew */
+  const [recalling, setRecalling] = useState<number | null>(null);
+  /** what was being typed before ↑, brought back by ↓ */
+  const [draft, setDraft] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
+
+  const show = (el: HTMLTextAreaElement, value: string) => {
+    setText(value);
+    el.value = value;
+    el.setSelectionRange(value.length, value.length);
+    fit(el);
+  };
+
+  /** ↑ and ↓ step through sent commands, from the first or last line only */
+  const recall = (event: KeyboardEvent, step: -1 | 1) => {
+    const el = event.currentTarget as HTMLTextAreaElement;
+    const before = el.value.slice(0, el.selectionStart);
+    const after = el.value.slice(el.selectionEnd);
+    if (step === -1 ? before.includes('\n') : after.includes('\n')) {
+      return;
+    }
+    const sent = commands.value;
+    const from = recalling ?? sent.length;
+    const to = from + step;
+    if (to < 0 || to > sent.length || (recalling === null && step === 1)) {
+      return;
+    }
+    event.preventDefault();
+    if (recalling === null) {
+      setDraft(el.value);
+    }
+    setRecalling(to === sent.length ? null : to);
+    show(el, to === sent.length ? draft : (sent[to] ?? ''));
+  };
 
   // the caret moves with keys, clicks and selection, not only typing
   useEffect(() => {
@@ -144,6 +179,10 @@ const Composer = ({ joined }: { joined: boolean }) => {
   const submit = (event?: Event) => {
     event?.preventDefault();
     if (command && sendCommand(command)) {
+      if (commands.value.at(-1) !== command) {
+        commands.value = [...commands.value, command];
+      }
+      setRecalling(null);
       setText('');
       const form = (event?.currentTarget as HTMLElement | null)?.closest(
         'form'
@@ -159,6 +198,10 @@ const Composer = ({ joined }: { joined: boolean }) => {
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       submit(event);
+    } else if (event.key === 'ArrowUp') {
+      recall(event, -1);
+    } else if (event.key === 'ArrowDown') {
+      recall(event, 1);
     }
   };
 
@@ -179,6 +222,7 @@ const Composer = ({ joined }: { joined: boolean }) => {
           disabled={!joined}
           onBlur={() => setCaret(null)}
           onInput={e => {
+            setRecalling(null);
             setText(e.currentTarget.value);
             fit(e.currentTarget);
           }}
@@ -255,6 +299,17 @@ export const Play = ({
         <span class="visually-hidden" role="status">
           {STATUS_TEXT[status.value]}
         </span>
+        {count > 0 && (
+          <button
+            class="clear"
+            onClick={() => {
+              lines.value = [];
+            }}
+            type="button"
+          >
+            Clear
+          </button>
+        )}
       </header>
       <ul
         aria-label="Transcript"

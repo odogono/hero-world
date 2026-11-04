@@ -26,5 +26,7 @@ export type Status = 'connecting' | 'joined' | 'limbo' | 'offline' | 'replaced';
 export const session = signal<Session | null | undefined>(undefined);
 export const status = signal<Status>('connecting');
 export const lines = signal<Line[]>([]);
+/** Commands this Character has sent, oldest first, for recalling with ↑ */
+export const commands = signal<string[]>([]);
 /** Commands the Character could type next, from the latest `state` */
 export const actions = signal<string[]>([]);

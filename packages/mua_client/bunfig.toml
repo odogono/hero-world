@@ -1,2 +1,4 @@
 [test]
+# e2e/ holds Playwright specs, run with `playwright test`
+root = "src"
 preload = ["./src/__test__/setup.ts"]
