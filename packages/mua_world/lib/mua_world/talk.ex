@@ -21,7 +21,8 @@ defmodule MuaWorld.Talk do
 
   Callbacks run in NorthTalk's Tasks while the World process is blocked in a
   Pump (ADR 0015). They write the outbox inside the World's transaction, and
-  share the World process's table for command contexts and queued notices.
+  share the World process's table for queued notices. The command a Run
+  handles is the host term of its Delivery (`OdgnEcsTalk.delivery/2`).
   """
   alias MuaWorld.Messages
   alias NorthTalk.{Capability, Object}
@@ -30,18 +31,8 @@ defmodule MuaWorld.Talk do
   # odgn_ecs_talk's default Group, whose Handles are `entity` Objects
   @group "world"
 
-  @doc "A table for command contexts and queued notices, shared with callbacks."
+  @doc "A table for queued notices, shared with callbacks."
   def table, do: :ets.new(:mua_talk, [:set, :public])
-
-  @doc """
-  Notes the command a Request or Decision is for. `delivery` is its delivery
-  id, or `:current` for a Request whose id isn't known until its first Pump
-  has run.
-  """
-  def note_context(table, delivery, context),
-    do: :ets.insert(table, {{:context, delivery}, context})
-
-  def drop_context(table, delivery), do: :ets.delete(table, {:context, delivery})
 
   @doc "The notices Scripts asked for since the last call, oldest first."
   def take_notices(table) do
@@ -52,23 +43,19 @@ defmodule MuaWorld.Talk do
     notices |> Enum.sort() |> Enum.map(&elem(&1, 1))
   end
 
-  defp context(table, call) do
-    case call.delivery && :ets.lookup(table, {:context, call.delivery}) do
-      [{_, context}] ->
-        context
-
-      _ ->
-        case :ets.lookup(table, {:context, :current}) do
-          [{_, context}] -> context
-          [] -> nil
-        end
+  # The command a Run handles, or `nil` for a Delivery sent without one
+  defp context(talk, call) do
+    case OdgnEcsTalk.delivery(talk, call) do
+      %{host: context} -> context
+      nil -> nil
     end
   end
 
   defp handle(nil), do: nil
   defp handle(eid), do: %Object{kind: "entity", id: Integer.to_string(eid), group: @group}
 
-  def mua(world, table) do
+  @doc "The `mua` Capability, for `OdgnEcsTalk.start/2`'s `:capabilities`."
+  def mua(world, table, talk) do
     entity = %{"object" => "entity"}
     optional = %{"optional" => entity}
 
@@ -93,7 +80,7 @@ defmodule MuaWorld.Talk do
       "command" =>
         {[args: [], result: "any", cost: 1],
          fn [], call ->
-           case context(table, call) do
+           case context(talk, call) do
              nil ->
                {:ok, nil}
 
@@ -114,7 +101,7 @@ defmodule MuaWorld.Talk do
         [args: ["text", "text", optional, optional], result: "any", cost: 1],
         fn [handler, kind | rest], call ->
           [indirect, owner] = Enum.take(rest ++ [nil, nil], 2)
-          ctx = context(table, call)
+          ctx = context(talk, call)
 
           if ctx && kind in ["msg", "omsg"] do
             ctx =

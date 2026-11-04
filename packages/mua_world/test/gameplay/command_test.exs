@@ -34,4 +34,13 @@ defmodule MuaWorld.CommandTest do
     assert "bob fiddles with the puzzle box." in received(alice)
     refute output =~ "fiddles"
   end
+
+  test "a Run started by a due timer has no command", c do
+    send_bob(c, "take feather")
+    send_bob(c, "unlock box with feather")
+    received(c.bob)
+
+    run_for(c.world, 2)
+    assert "The panels settle." in received(c.bob)
+  end
 end

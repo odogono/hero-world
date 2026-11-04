@@ -15,7 +15,7 @@ defmodule OdgnEcsTalk.MixProject do
 
   # NorthTalk's Elixir Host isn't on Hex yet (odogono/odgn-talk#1983), so it
   # is pinned to a commit of odgn-talk, one with Host Commands and Library
-  # declarations (odogono/odgn-talk#1993).
+  # declarations (odogono/odgn-talk#1993) and `send_request/4` (#2052).
   defp deps do
     [
       {:odgn_ecs, path: "../odgn_ecs"},
@@ -23,7 +23,7 @@ defmodule OdgnEcsTalk.MixProject do
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",
-       ref: "8708b24a873e30226268eed360eca43d4e02c97e"}
+       ref: "5cf8ce78d855def7bfe1632e6b1f596e70db6cb8"}
     ]
   end
 end
