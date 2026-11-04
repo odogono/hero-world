@@ -20,13 +20,19 @@ void mock.module('../connection', () => ({
 }));
 
 const { Play } = await import('../Play');
-const { actions, lines, status } = await import('../store');
+const {
+  actions,
+  commands: sentCommands,
+  lines,
+  status
+} = await import('../store');
 
 afterEach(() => {
   cleanup();
   commands.length = 0;
   actions.value = [];
   lines.value = [];
+  sentCommands.value = [];
   status.value = 'connecting';
 });
 
@@ -230,5 +236,41 @@ describe('the profile badge', () => {
     fireEvent.click(badge());
     fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     await waitFor(() => expect(left).toBe(true));
+  });
+
+  test('recalls sent commands with the arrow keys, keeping the draft', () => {
+    status.value = 'joined';
+    render(<Play name="Ada" onLeft={() => {}} />);
+    for (const text of ['look', 'north']) {
+      fireEvent.input(input(), { target: { value: text } });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+    }
+    expect(sentCommands.value).toEqual(['look', 'north']);
+
+    fireEvent.input(input(), { target: { value: 'ta' } });
+    fireEvent.keyDown(input(), { key: 'ArrowUp' });
+    expect(input().value).toBe('north');
+    fireEvent.keyDown(input(), { key: 'ArrowUp' });
+    expect(input().value).toBe('look');
+    fireEvent.keyDown(input(), { key: 'ArrowDown' });
+    fireEvent.keyDown(input(), { key: 'ArrowDown' });
+    expect(input().value).toBe('ta');
+  });
+
+  test('clears the transcript', () => {
+    lines.value = append([], { kind: 'output', text: 'Hall' });
+    render(<Play name="Ada" onLeft={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(lines.value).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
+  });
+
+  test('tells a reload apart from a dropped connection', () => {
+    lines.value = append(append([], { kind: 'output', text: 'Hall' }), {
+      kind: 'gap',
+      reason: 'reload'
+    });
+    render(<Play name="Ada" onLeft={() => {}} />);
+    expect(screen.getByRole('separator').textContent).toContain('reloaded');
   });
 });

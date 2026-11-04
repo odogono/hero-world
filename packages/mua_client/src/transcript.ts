@@ -9,7 +9,8 @@ export type CommandState = 'pending' | 'confirmed' | 'unconfirmed';
 export type Line =
   | { id: number; kind: 'command'; state: CommandState; text: string }
   | { id: number; kind: 'error'; text: string }
-  | { id: number; kind: 'gap' }
+  /** output may have been missed: after a dropped Connection, or a reload */
+  | { id: number; kind: 'gap'; reason?: 'drop' | 'reload' }
   | { id: number; kind: 'output'; text: string }
   | { id: number; kind: 'prompt'; options: string[]; text: string }
   | { id: number; kind: 'status'; text: string };
@@ -56,4 +57,19 @@ export const connectionLost = (lines: Line[]) =>
 
 /** Joined again after a drop: mark the gap, as output may have been missed */
 export const rejoined = (lines: Line[]) =>
-  lines.length === 0 ? lines : append(lines, { kind: 'gap' });
+  lines.length === 0 ? lines : append(lines, { kind: 'gap', reason: 'drop' });
+
+/**
+ * A transcript read back after a reload: commands that were waiting may or
+ * may not have run, and output may have been missed while the page was gone.
+ * New lines are numbered after the restored ones.
+ */
+export const restored = (saved: Line[]): Line[] => {
+  for (const line of saved) {
+    nextId = Math.max(nextId, line.id + 1);
+  }
+  const lines = connectionLost(saved);
+  return lines.length === 0
+    ? lines
+    : append(lines, { kind: 'gap', reason: 'reload' });
+};

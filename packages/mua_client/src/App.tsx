@@ -1,11 +1,22 @@
 import { useEffect } from 'preact/hooks';
 
+import { effect } from '@preact/signals';
+
 import { NameForm } from './NameForm';
 import { Play } from './Play';
 import { SignIn } from './SignIn';
 import { getSession, signOut } from './api';
 import { connect } from './connection';
-import { lines, session, status } from './store';
+import {
+  clearHistory,
+  keepOnly,
+  loadCommands,
+  loadHistory,
+  saveCommands,
+  saveHistory
+} from './history';
+import { commands, lines, session, status } from './store';
+import { restored } from './transcript';
 
 const refresh = async () => {
   session.value = await getSession();
@@ -24,9 +35,19 @@ export const App = () => {
 
   useEffect(() => {
     if (token && characterId !== undefined) {
-      lines.value = [];
+      keepOnly(characterId);
+      lines.value = restored(loadHistory(characterId));
+      commands.value = loadCommands(characterId);
       status.value = 'connecting';
       connect(token, characterId);
+      const stopLines = effect(() => saveHistory(characterId, lines.value));
+      const stopCommands = effect(() =>
+        saveCommands(characterId, commands.value)
+      );
+      return () => {
+        stopLines();
+        stopCommands();
+      };
     }
   }, [token, characterId]);
 
@@ -41,6 +62,7 @@ export const App = () => {
   }
   const left = async () => {
     await signOut();
+    clearHistory();
     session.value = null;
   };
   return (

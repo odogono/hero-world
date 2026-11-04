@@ -5,6 +5,7 @@ import {
   confirmed,
   connectionLost,
   rejoined,
+  restored,
   sent,
   type Line
 } from '../transcript';
@@ -35,5 +36,23 @@ describe('the transcript', () => {
 
     const lines = append([], { kind: 'output', text: 'Plaza' });
     expect(kinds(rejoined(lines))).toEqual(['output', 'gap']);
+  });
+});
+
+describe('a transcript restored after a reload', () => {
+  test('marks waiting commands unconfirmed and adds a gap', () => {
+    const [lines] = sent(append([], { kind: 'output', text: 'Hall' }), 'north');
+    expect(kinds(restored(lines))).toEqual(['output', 'command', 'gap']);
+    expect(commandStates(restored(lines))).toEqual(['unconfirmed']);
+  });
+
+  test('stays empty when nothing was saved', () => {
+    expect(restored([])).toEqual([]);
+  });
+
+  test('numbers new lines after the restored ones', () => {
+    const saved: Line[] = [{ id: 10_000, kind: 'output', text: 'Hall' }];
+    const next = append(restored(saved), { kind: 'output', text: 'Yard' });
+    expect(next.at(-1)!.id).toBeGreaterThan(10_000);
   });
 });
