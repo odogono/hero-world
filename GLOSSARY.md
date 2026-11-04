@@ -30,9 +30,25 @@ _Avoid_: operator, superuser, wizard
 
 ## World data
 
+**World**:
+The complete, persistent state of one game: its entities and their components. It has one writer at a time.
+_Avoid_: store, database (for the concept), scene
+
 **Entity**:
-A thing that exists in a World and carries components.
+A thing that exists in a World and carries components. It is nothing but its id.
 _Avoid_: object, instance
+
+**Component Definition**:
+The named schema for one kind of component. Its name is its identity.
+_Avoid_: cdef, CDef, def (outside EDL syntax), component type
+
+**Component**:
+One entity's data for one Component Definition.
+_Avoid_: attribute, property bag
+
+**Reference**:
+A component property whose value is another entity, such as a Location.
+_Avoid_: link, pointer, foreign key (for the concept)
 
 **Atom**:
 A named template of components that entities and other atoms extend. It is never itself an entity, and only atoms can be extended.
@@ -54,6 +70,10 @@ _Avoid_: contents, children
 Where a thing starts, so that a reset can put it back. Characters and exits have none.
 _Avoid_: starting room, origin
 
+**Perception**:
+What a Character can currently know about the World: its place, the Elements there that it can see, and what it carries. Nothing outside it reaches that Character's Player.
+_Avoid_: view, visibility, scope
+
 **Starting room**:
 Where a Character enters the World when it has nowhere valid to return to.
 _Avoid_: home, spawn
@@ -63,7 +83,7 @@ The World's clock, which advances while the server runs, even with no Players co
 _Avoid_: game time, wall-clock time
 
 **Step**:
-One input to the World, such as a command or a due timer, and the Script work it causes, ending in one commit. Output that confirms it is published only after that commit.
+One input to the World, such as a command, a due timer or a run of a System, and the Script work it causes, ending in one commit. Output that confirms it is published only after that commit.
 _Avoid_: tick, transaction, turn
 
 **Limbo**:
@@ -91,6 +111,14 @@ The first Migration of a world: from empty to what the EDL describes.
 _Avoid_: execute, load (for EDL)
 
 ## Behaviour
+
+**System**:
+Logic that runs at its own interval of World time over every entity matching its query. In mua, a System chooses which entities to give a Delivery and leaves the behaviour to their Scripts.
+_Avoid_: processor, handler
+
+**Event**:
+An entity that a System consumes once, possibly at a scheduled World time. It is the Systems' counterpart of a Delivery, never a name for one.
+_Avoid_: signal, message (for this)
 
 **NPC**:
 An entity that acts by issuing commands as a player does, driven by its Scripts.

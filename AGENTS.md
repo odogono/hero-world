@@ -8,7 +8,7 @@ Game libraries and the games built on them: Elixir (Mix) packages, and a Bun wor
 - `packages/mua_server`: the Phoenix server a browser plays through. See `packages/mua_server/AGENTS.md`.
 - `packages/mua_client`: the Preact browser client, and the `bun run load` load test.
 - `packages/odgn_ecs`, `packages/odgn_edl`, `packages/odgn_ecs_talk`: the Elixir ECS, EDL loader and NorthTalk Host Adapter that `mua_world` is built on.
-- `packages/ecs` (`odgn-ecs`): the TypeScript ECS, kept while tank-world uses it. See `packages/ecs/AGENTS.md`.
+- `packages/ecs` (`odgn-ecs`): the TypeScript ECS, kept at parity with the Elixir libraries for the browser (ADR 0019). See `packages/ecs/AGENTS.md`.
 - `packages/helpers` (`odgn-helpers`): logging, strings, `trycatch`.
 - `tools/`: commit, changelog and typecheck scripts.
 - `GLOSSARY.md` and `docs/adr/`: domain terms and decisions (`docs/agents/domain.md`).
