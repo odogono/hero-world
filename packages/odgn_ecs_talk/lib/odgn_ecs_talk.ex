@@ -849,10 +849,33 @@ defmodule OdgnEcsTalk do
   end
 
   @doc "The entities whose Location is `eid`, in id order."
-  def element_ids(%__MODULE__{world: world, location: {location, field}}, eid) do
-    if OdgnEcs.component(world, location),
-      do: OdgnEcs.query(world, where: [{location, field, eid}]),
-      else: []
+  def element_ids(%__MODULE__{world: world, location: location}, eid),
+    do: elements(world, eid, location: location)
+
+  @doc """
+  The Elements of `place`: the entities whose Location it is, in id order.
+  The one place a World is asked what is in a place, through the indexed
+  Location Reference.
+
+    * `:select` - component names to read with each one, giving
+      `[{eid, %{name => data}}]` as `OdgnEcs.select/3` does.
+    * `:with` and `:where` - narrow them, as in `OdgnEcs.query/2`.
+    * `:location` - the `{component, property}` that holds a Location,
+      `{"location", "in"}` by default.
+  """
+  def elements(%OdgnEcs{} = world, place, opts \\ []) do
+    {location, field} = Keyword.get(opts, :location, {"location", "in"})
+
+    query = [
+      with: Keyword.get(opts, :with, []),
+      where: [{location, field, place} | Keyword.get(opts, :where, [])]
+    ]
+
+    case {OdgnEcs.component(world, location), opts[:select]} do
+      {nil, _} -> []
+      {_, nil} -> OdgnEcs.query(world, query)
+      {_, names} -> OdgnEcs.select(world, names, query)
+    end
   end
 
   @doc "An Element's name, from the naming field, or `nil`."

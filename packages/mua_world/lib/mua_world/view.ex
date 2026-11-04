@@ -51,7 +51,7 @@ defmodule MuaWorld.View do
 
   # The entities in a place, each with the components the view reads
   defp entities_in(world, place),
-    do: OdgnEcs.select(world, @read, where: [{"location", "in", place}])
+    do: OdgnEcsTalk.elements(world, place, select: @read)
 
   # The exits' doors that are closed
   defp closed_doors(world, exits) do
