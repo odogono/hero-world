@@ -9,6 +9,9 @@ defmodule MuaWorld.Commands.Scope do
   what they carry, and `here` both.
   """
 
+  # The components a candidate is made from
+  @read ~w(described player container item location noun portal)
+
   @doc "The entities located directly in a place, in id order."
   def entities_in(world, place), do: OdgnEcs.query(world, where: [{"location", "in", place}])
 
@@ -26,10 +29,10 @@ defmodule MuaWorld.Commands.Scope do
   """
   def elements(world, place, exclude \\ nil) do
     world
-    |> entities_in(place)
-    |> Enum.reject(&(&1 == exclude or OdgnEcs.get(world, &1, "portal") != nil))
-    |> Enum.flat_map(fn eid ->
-      candidate = candidate(world, eid)
+    |> OdgnEcs.select(@read, where: [{"location", "in", place}])
+    |> Enum.reject(fn {eid, data} -> eid == exclude or Map.has_key?(data, "portal") end)
+    |> Enum.flat_map(fn {eid, data} ->
+      candidate = to_candidate(eid, data)
 
       inside =
         if candidate && candidate.container && !candidate.container.closed? && !candidate.player?,
@@ -56,19 +59,26 @@ defmodule MuaWorld.Commands.Scope do
 
   @doc "An entity as a candidate, or `nil` if it has no name or location."
   def candidate(world, eid) do
-    described = OdgnEcs.get(world, eid, "described")
-    player = OdgnEcs.get(world, eid, "player")
+    case OdgnEcs.select(world, @read, eids: [eid]) do
+      [{^eid, data}] -> to_candidate(eid, data)
+      [] -> nil
+    end
+  end
+
+  defp to_candidate(eid, data) do
+    described = data["described"]
+    player = data["player"]
     name = (described && described["name"]) || (player && player["name"])
-    place = location(world, eid)
+    place = data["location"] && data["location"]["in"]
 
     if name && place do
-      container = OdgnEcs.get(world, eid, "container")
-      item = OdgnEcs.get(world, eid, "item")
+      container = data["container"]
+      item = data["item"]
 
       %{
         id: eid,
         name: name,
-        words: words(world, eid, name),
+        words: words(data["noun"], name),
         player?: player != nil,
         takeable?: (item && item["is_takeable"]) || false,
         location: place,
@@ -79,38 +89,40 @@ defmodule MuaWorld.Commands.Scope do
 
   # The doors of a room's exits, named as if they were in the room.
   defp doors(world, room) do
-    world
-    |> entities_in(room)
-    |> Enum.flat_map(fn eid ->
-      case OdgnEcs.get(world, eid, "portal") do
-        %{"door" => door} when is_integer(door) -> [door]
+    doors =
+      world
+      |> OdgnEcs.select(["portal"], with: ["portal"], where: [{"location", "in", room}])
+      |> Enum.flat_map(fn
+        {_eid, %{"portal" => %{"door" => door}}} when is_integer(door) -> [door]
         _ -> []
-      end
-    end)
-    |> Enum.uniq()
-    |> Enum.flat_map(fn door ->
-      with %{"name" => name} <- OdgnEcs.get(world, door, "described"),
-           %{} <- OdgnEcs.get(world, door, "door") do
+      end)
+      |> Enum.uniq()
+
+    world
+    |> OdgnEcs.select(["described", "noun"], eids: doors, with: ["described", "door"])
+    |> Enum.sort_by(fn {eid, _} -> Enum.find_index(doors, &(&1 == eid)) end)
+    |> Enum.flat_map(fn
+      {door, %{"described" => %{"name" => name}} = data} when is_binary(name) ->
         [
           %{
             id: door,
             name: name,
-            words: words(world, door, name),
+            words: words(data["noun"], name),
             player?: false,
             takeable?: false,
             location: room,
             container: nil
           }
         ]
-      else
-        _ -> []
-      end
+
+      _ ->
+        []
     end)
   end
 
-  defp words(world, eid, name) do
+  defp words(noun, name) do
     nouns =
-      case OdgnEcs.get(world, eid, "noun") do
+      case noun do
         %{"words" => words} when is_list(words) -> Enum.map(words, &String.downcase/1)
         _ -> []
       end

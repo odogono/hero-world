@@ -231,6 +231,98 @@ defmodule OdgnEcsTest do
     end
   end
 
+  describe "indexes" do
+    defp indexes(w, table) do
+      OdgnEcs.SQL.all!(
+        w.conn,
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?1 AND sql IS NOT NULL ORDER BY name",
+        [table]
+      )
+      |> List.flatten()
+    end
+
+    @placed %Component{
+      name: "placed",
+      columns: [
+        %Column{name: "in", type: :eid},
+        %Column{name: "at", type: :int, index: true},
+        %Column{name: "note", type: :string}
+      ]
+    }
+
+    test "Reference and indexed columns get an index" do
+      w = world([@placed])
+      assert indexes(w, "c_placed") == ["i_c_placed_at", "i_c_placed_in"]
+    end
+
+    test "a World made before a column was indexed gets the index when it is defined" do
+      plain = %{@placed | columns: Enum.map(@placed.columns, &%{&1 | index: false})}
+      w = world([plain])
+      assert indexes(w, "c_placed") == ["i_c_placed_in"]
+
+      {:ok, w} = OdgnEcs.define(w, @placed)
+      assert indexes(w, "c_placed") == ["i_c_placed_at", "i_c_placed_in"]
+
+      {:ok, w} = OdgnEcs.define(w, plain)
+      assert indexes(w, "c_placed") == ["i_c_placed_in"]
+    end
+
+    test "an indexed column can be dropped" do
+      w = world([@placed])
+      {:ok, w} = OdgnEcs.define(w, %{@placed | columns: tl(@placed.columns)})
+      assert indexes(w, "c_placed") == ["i_c_placed_at"]
+    end
+  end
+
+  describe "select" do
+    test "reads every component of an entity in one go" do
+      w = world()
+      eid = with_health(w, 3)
+      :ok = OdgnEcs.put(w, eid, "thing", %{"label" => "x"})
+
+      assert OdgnEcs.components(w, eid) == %{
+               "stats" => %{"health" => 3},
+               "thing" => %{
+                 "label" => "x",
+                 "size" => 1.0,
+                 "open" => false,
+                 "tags" => nil,
+                 "props" => nil
+               }
+             }
+
+      {:ok, empty} = OdgnEcs.create(w)
+      assert OdgnEcs.components(w, empty) == %{}
+      assert OdgnEcs.components(w, 999) == %{}
+    end
+
+    test "reads more components than SQLite can join at once" do
+      defs =
+        for i <- 1..70, do: %Component{name: "c#{i}", columns: [%Column{name: "n", type: :int}]}
+
+      w = world(defs)
+      {:ok, a} = OdgnEcs.create(w)
+      {:ok, b} = OdgnEcs.create(w)
+      for i <- 1..70, do: :ok = OdgnEcs.put(w, a, "c#{i}", %{"n" => i})
+      :ok = OdgnEcs.put(w, b, "c70", %{"n" => 0})
+
+      assert [{^a, data_a}, {^b, data_b}] = OdgnEcs.select(w, Enum.map(1..70, &"c#{&1}"))
+      assert map_size(data_a) == 70 and data_a["c64"] == %{"n" => 64}
+      assert data_b == %{"c70" => %{"n" => 0}}
+    end
+
+    test "an unknown property or condition is an error" do
+      w = world()
+      assert_raise ArgumentError, fn -> OdgnEcs.query(w, where: [{"stats", "nope", 1}]) end
+
+      assert_raise ArgumentError, fn ->
+        OdgnEcs.query(w, where: [{"stats", "health", :like, 1}])
+      end
+
+      assert_raise ArgumentError, fn -> OdgnEcs.query(w, order_by: {"stats", "nope"}) end
+    end
+  end
+
   describe "changes" do
     test "a rolled-back savepoint leaves no trace" do
       w = world()
