@@ -58,8 +58,8 @@ defmodule MuaWorld.Places do
     else
       seen = MapSet.put(seen, eid)
 
-      Enum.flat_map(OdgnEcs.query(world, where: [{"location", "in", eid}]), fn element ->
-        own = if OdgnEcs.get(world, element, "player"), do: [element], else: []
+      Enum.flat_map(OdgnEcsTalk.elements(world, eid, select: ["player"]), fn {element, data} ->
+        own = if Map.has_key?(data, "player"), do: [element], else: []
         own ++ characters_within(world, element, seen)
       end)
     end

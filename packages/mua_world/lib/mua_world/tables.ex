@@ -35,7 +35,7 @@ defmodule MuaWorld.Tables do
 
   @doc "The Characters (entities with `player`) whose Location is `place`."
   def characters_at(world, place) do
-    OdgnEcs.query(world, with: ["player"], where: [{"location", "in", place}])
+    OdgnEcsTalk.elements(world, place, with: ["player"])
   end
 
   @doc """

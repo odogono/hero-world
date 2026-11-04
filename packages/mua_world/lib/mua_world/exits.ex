@@ -70,7 +70,7 @@ defmodule MuaWorld.Exits do
   @doc "The exit from a room in a direction, or `nil`."
   def find(world, room, dir) do
     world
-    |> OdgnEcs.query(where: [{"location", "in", room}, {"portal", "dir", dir}])
+    |> OdgnEcsTalk.elements(room, where: [{"portal", "dir", dir}])
     |> List.first()
   end
 end

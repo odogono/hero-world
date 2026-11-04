@@ -13,7 +13,7 @@ defmodule MuaWorld.Commands.Scope do
   @read ~w(described player container item location noun portal)
 
   @doc "The entities located directly in a place, in id order."
-  def entities_in(world, place), do: OdgnEcs.query(world, where: [{"location", "in", place}])
+  def entities_in(world, place), do: OdgnEcsTalk.elements(world, place)
 
   @doc "The entity this one is located in, or `nil`."
   def location(world, eid) do
@@ -29,7 +29,7 @@ defmodule MuaWorld.Commands.Scope do
   """
   def elements(world, place, exclude \\ nil) do
     world
-    |> OdgnEcs.select(@read, where: [{"location", "in", place}])
+    |> OdgnEcsTalk.elements(place, select: @read)
     |> Enum.reject(fn {eid, data} -> eid == exclude or Map.has_key?(data, "portal") end)
     |> Enum.flat_map(fn {eid, data} ->
       candidate = to_candidate(eid, data)
@@ -91,7 +91,7 @@ defmodule MuaWorld.Commands.Scope do
   defp doors(world, room) do
     doors =
       world
-      |> OdgnEcs.select(["portal"], with: ["portal"], where: [{"location", "in", room}])
+      |> OdgnEcsTalk.elements(room, select: ["portal"], with: ["portal"])
       |> Enum.flat_map(fn
         {_eid, %{"portal" => %{"door" => door}}} when is_integer(door) -> [door]
         _ -> []
