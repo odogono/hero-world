@@ -1,0 +1,29 @@
+# NPCs that act on the heartbeat mua's npc_heartbeat System gives them
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom npc {
+  npc { active: true }
+}
+
+# Says so on every heartbeat
+atom fidget {
+  script { src: "scripts/fidget.talk" }
+}
+
+entity west_of_house : room {
+  described { name: "Square" description: "A quiet square." }
+}
+
+entity kid : npc fidget {
+  described { name: "Kid" description: "A fidgety kid." }
+  location { in: $west_of_house }
+}
+
+entity statue : fidget {
+  npc { active: false }
+  described { name: "Statue" description: "A statue of a fidgety kid." }
+  location { in: $west_of_house }
+}
