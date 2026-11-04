@@ -46,6 +46,11 @@ describe('a transcript restored after a reload', () => {
     expect(commandStates(restored(lines))).toEqual(['unconfirmed']);
   });
 
+  test('adds no second marker when nothing came after the last', () => {
+    const once = restored(append([], { kind: 'output', text: 'Hall' }));
+    expect(kinds(restored(once))).toEqual(['output', 'gap']);
+  });
+
   test('stays empty when nothing was saved', () => {
     expect(restored([])).toEqual([]);
   });

@@ -69,7 +69,8 @@ export const restored = (saved: Line[]): Line[] => {
     nextId = Math.max(nextId, line.id + 1);
   }
   const lines = connectionLost(saved);
-  return lines.length === 0
+  // reloading again with nothing new since keeps the one marker
+  return lines.length === 0 || lines.at(-1)?.kind === 'gap'
     ? lines
     : append(lines, { kind: 'gap', reason: 'reload' });
 };
