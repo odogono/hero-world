@@ -13,7 +13,7 @@ def authenticated {
 }
 
 def withAdmin {
-  rights: string[]
+  rights: array
 }
 
 def watching {
@@ -63,7 +63,7 @@ describe('Query Extended', () => {
     // querying with only returns that component
     const e123 = world.query({
       args: ['123'],
-      where: 'conn_id = ?1',
+      where: 'connId = ?1',
       with: ['connected']
     });
     expect(e123).not.toBeNull();
@@ -72,7 +72,7 @@ describe('Query Extended', () => {
     const e123Ex = world.query({
       args: ['123'],
       maybe: ['authenticated', 'watching', 'withAdmin'],
-      where: 'conn_id = ?1',
+      where: 'connId = ?1',
       with: ['connected']
     });
 
@@ -83,7 +83,7 @@ describe('Query Extended', () => {
     const e101Ex = world.query({
       args: ['101'],
       maybe: ['authenticated', 'watching', 'withAdmin'],
-      where: 'conn_id = ?1',
+      where: 'connId = ?1',
       with: ['connected']
     });
 

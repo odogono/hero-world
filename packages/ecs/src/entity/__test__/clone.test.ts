@@ -72,7 +72,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['name']
       });
 
@@ -127,7 +127,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = anotherWorld.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['name']
       });
       expect(queriedClone!.name!.nickname).toBe('test');
@@ -175,7 +175,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['position', 'velocity', 'name']
       });
       expect(queriedClone).not.toBeNull();
@@ -224,7 +224,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['inventory', 'stats']
       });
       expect(queriedClone!.inventory!.items).toEqual([
@@ -290,7 +290,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['stats']
       });
       expect(queriedClone!.stats!.health).toBe(200);
@@ -330,7 +330,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['mixed']
       });
       expect(queriedClone!.mixed!.str).toBe('test');
@@ -359,7 +359,7 @@ describe('Entity', () => {
       // Query the cloned entity to verify components were copied
       const queriedClone = world.query({
         args: [clonedEntity.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['counter']
       });
       expect(queriedClone!.counter!.value).toBe(1);

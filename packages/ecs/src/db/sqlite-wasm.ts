@@ -27,7 +27,7 @@ export class WasmDatabaseWrapper implements Database {
   }
 
   addEntity(): number {
-    this.db.exec('INSERT INTO tbl_entity DEFAULT VALUES');
+    this.db.exec('INSERT INTO entities DEFAULT VALUES');
     return this.lastInsertRowId();
   }
 

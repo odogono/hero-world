@@ -1,6 +1,20 @@
 import type { Database } from '../db';
+import {
+  component,
+  define,
+  put,
+  query,
+  remove,
+  select,
+  type Store
+} from '../store';
 import type { Components } from '../types';
 import type { World } from '../world';
+
+/** The component that holds an entity's Definition name, as `odgn_edl` has it */
+export const DEFINITION = component('edl_definition', [
+  { name: 'name', optional: false, type: 'string', unique: true }
+]);
 
 /** An atom or entity that owns a Script, with the Script's source path */
 export type ScriptOwner =
@@ -19,24 +33,38 @@ export class EDLRecord {
   private readonly atomScripts = new Map<string, string>();
   private readonly entityScripts = new Map<number, string>();
 
-  constructor(private readonly db: Database) {
+  private readonly db: Database;
+
+  constructor(private readonly store: Store) {
+    const { db } = store;
+    this.db = db;
     db.exec(
-      `CREATE TABLE IF NOT EXISTS tbl_lineage (kind TEXT NOT NULL, name TEXT NOT NULL, bases TEXT NOT NULL, PRIMARY KEY (kind, name))`
+      `CREATE TABLE IF NOT EXISTS edl_lineage (kind TEXT NOT NULL, name TEXT NOT NULL, bases TEXT NOT NULL, PRIMARY KEY (kind, name))`
     );
     db.exec(
-      `CREATE TABLE IF NOT EXISTS tbl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name))`
+      `CREATE TABLE IF NOT EXISTS edl_script_owner (kind TEXT NOT NULL, name TEXT NOT NULL, src TEXT NOT NULL, PRIMARY KEY (kind, name))`
     );
     db.exec(
-      `CREATE TABLE IF NOT EXISTS tbl_definition_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS edl_deleted_name (name TEXT PRIMARY KEY, eid INTEGER NOT NULL)`
+    );
+    // A Definition name is a component, so an entity stays nothing but its
+    // id. It is kept out of the World's own components, which are the EDL's.
+    define(store, DEFINITION);
+    // When an entity with one is deleted, its name moves to
+    // `edl_deleted_name`, so a Migration knows play deleted it
+    db.exec(
+      `CREATE TRIGGER IF NOT EXISTS edl_definition_deleted BEFORE DELETE ON entities BEGIN ` +
+        `INSERT OR REPLACE INTO edl_deleted_name (name, eid) ` +
+        `SELECT name, eid FROM c_edl_definition WHERE eid = OLD.eid; END;`
     );
     db.exec(
-      `CREATE TABLE IF NOT EXISTS tbl_edl (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS edl_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
     );
     db.exec(
-      `CREATE TABLE IF NOT EXISTS tbl_edl_value (eid INTEGER NOT NULL, component TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (eid, component))`
+      `CREATE TABLE IF NOT EXISTS edl_value (eid INTEGER NOT NULL, component TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (eid, component))`
     );
 
-    const lineage = db.query('SELECT kind, name, bases FROM tbl_lineage') as {
+    const lineage = db.query('SELECT kind, name, bases FROM edl_lineage') as {
       bases: string;
       kind: string;
       name: string;
@@ -49,7 +77,7 @@ export class EDLRecord {
         this.entityLineage.set(Number(name), parsed);
       }
     }
-    const owners = db.query('SELECT kind, name, src FROM tbl_script_owner') as {
+    const owners = db.query('SELECT kind, name, src FROM edl_script_owner') as {
       kind: string;
       name: string;
       src: string;
@@ -86,21 +114,21 @@ export class EDLRecord {
   clearAtoms() {
     this.atomLineage.clear();
     this.atomScripts.clear();
-    this.db.exec("DELETE FROM tbl_lineage WHERE kind = 'atom'");
-    this.db.exec("DELETE FROM tbl_script_owner WHERE kind = 'atom'");
+    this.db.exec("DELETE FROM edl_lineage WHERE kind = 'atom'");
+    this.db.exec("DELETE FROM edl_script_owner WHERE kind = 'atom'");
   }
 
   /** Record an atom's bases, and the Script it owns, if any */
   setAtom(name: string, bases: readonly string[], src: string | undefined) {
     this.atomLineage.set(name, [...bases]);
     this.db.exec(
-      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
+      'INSERT OR REPLACE INTO edl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
       ['atom', name, JSON.stringify(bases)]
     );
     if (src) {
       this.atomScripts.set(name, src);
       this.db.exec(
-        'INSERT OR REPLACE INTO tbl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
+        'INSERT OR REPLACE INTO edl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
         ['atom', name, src]
       );
     }
@@ -116,7 +144,7 @@ export class EDLRecord {
   setEntityLineage(eid: number, bases: readonly string[]) {
     this.entityLineage.set(eid, [...bases]);
     this.db.exec(
-      'INSERT OR REPLACE INTO tbl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
+      'INSERT OR REPLACE INTO edl_lineage (kind, name, bases) VALUES (?1, ?2, ?3)',
       ['entity', String(eid), JSON.stringify(bases)]
     );
   }
@@ -125,13 +153,13 @@ export class EDLRecord {
   setEntityScript(eid: number, src: string | undefined) {
     this.entityScripts.delete(eid);
     this.db.exec(
-      "DELETE FROM tbl_script_owner WHERE kind = 'entity' AND name = ?1",
+      "DELETE FROM edl_script_owner WHERE kind = 'entity' AND name = ?1",
       [String(eid)]
     );
     if (src) {
       this.entityScripts.set(eid, src);
       this.db.exec(
-        'INSERT OR REPLACE INTO tbl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
+        'INSERT OR REPLACE INTO edl_script_owner (kind, name, src) VALUES (?1, ?2, ?3)',
         ['entity', String(eid), src]
       );
     }
@@ -155,25 +183,47 @@ export class EDLRecord {
 
   // Definition names
 
-  /** Each Definition name the EDL gave, with the id of its entity */
+  /**
+   * Each Definition name the EDL gave, with the id of its entity: the
+   * entities that have one, and those play has deleted, under the id they had
+   */
   getDefinitionNames(): Map<string, number> {
-    const rows = this.db.query('SELECT name, eid FROM tbl_definition_name') as {
+    const deleted = this.db.query('SELECT name, eid FROM edl_deleted_name') as {
       eid: number;
       name: string;
     }[];
-    return new Map(rows.map(({ eid, name }) => [name, eid]));
+    const names = new Map(deleted.map(({ eid, name }) => [name, eid]));
+    for (const [eid, { edl_definition }] of select(
+      this.store,
+      [DEFINITION.name],
+      { with: [DEFINITION.name] }
+    )) {
+      names.set(edl_definition!.name as string, eid);
+    }
+    return names;
   }
 
+  /** Gives an entity a Definition name, taking it from any other first */
   setDefinitionName(name: string, eid: number) {
-    this.db.exec(
-      'INSERT OR REPLACE INTO tbl_definition_name (name, eid) VALUES (?1, ?2)',
-      [name, eid]
-    );
+    for (const other of query(this.store, {
+      where: [[DEFINITION.name, 'name', name]]
+    })) {
+      if (other !== eid) {
+        remove(this.store, other, DEFINITION.name);
+      }
+    }
+    this.db.exec('DELETE FROM edl_deleted_name WHERE name = ?1', [name]);
+    put(this.store, eid, DEFINITION.name, { name });
   }
 
   /** Forget a Definition name, once its entity is out of play */
   deleteDefinitionName(name: string) {
-    this.db.exec('DELETE FROM tbl_definition_name WHERE name = ?1', [name]);
+    for (const eid of query(this.store, {
+      where: [[DEFINITION.name, 'name', name]]
+    })) {
+      remove(this.store, eid, DEFINITION.name);
+    }
+    this.db.exec('DELETE FROM edl_deleted_name WHERE name = ?1', [name]);
   }
 
   // EDL values
@@ -181,7 +231,7 @@ export class EDLRecord {
   /** Each component's value, normalised, as the EDL last set it */
   getEDLValues(eid: number): Map<string, string> {
     const rows = this.db.query(
-      'SELECT component, value FROM tbl_edl_value WHERE eid = ?1',
+      'SELECT component, value FROM edl_value WHERE eid = ?1',
       [eid]
     ) as { component: string; value: string }[];
     return new Map(rows.map(({ component, value }) => [component, value]));
@@ -189,10 +239,10 @@ export class EDLRecord {
 
   /** Replace the values the EDL last set on an entity */
   setEDLValues(eid: number, values: ReadonlyMap<string, string>) {
-    this.db.exec('DELETE FROM tbl_edl_value WHERE eid = ?1', [eid]);
+    this.db.exec('DELETE FROM edl_value WHERE eid = ?1', [eid]);
     for (const [component, value] of values) {
       this.db.exec(
-        'INSERT INTO tbl_edl_value (eid, component, value) VALUES (?1, ?2, ?3)',
+        'INSERT INTO edl_value (eid, component, value) VALUES (?1, ?2, ?3)',
         [eid, component, value]
       );
     }
@@ -203,14 +253,14 @@ export class EDLRecord {
   /** The hash of the EDL the world was last built or migrated from */
   getEDLHash(): string | undefined {
     const rows = this.db.query(
-      "SELECT value FROM tbl_edl WHERE key = 'hash'"
+      "SELECT value FROM edl_meta WHERE key = 'hash'"
     ) as { value: string }[];
     return rows[0]?.value;
   }
 
   setEDLHash(hash: string) {
     this.db.exec(
-      "INSERT OR REPLACE INTO tbl_edl (key, value) VALUES ('hash', ?1)",
+      "INSERT OR REPLACE INTO edl_meta (key, value) VALUES ('hash', ?1)",
       [hash]
     );
   }
@@ -222,7 +272,7 @@ const records = new WeakMap<object, EDLRecord>();
 export const edlRecord = <T extends Components>(world: World<T>): EDLRecord => {
   let record = records.get(world);
   if (!record) {
-    record = new EDLRecord(world.db);
+    record = new EDLRecord(world.store);
     records.set(world, record);
   }
   return record;

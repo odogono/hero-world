@@ -386,11 +386,11 @@ entity lockable_chest: chest {
 
       const parent = world.query({
         with: ['thing'],
-        where: 'thing_weight = 20'
+        where: 'thing.weight = 20'
       })!;
       const child = world.query({
         with: ['thing'],
-        where: 'thing_weight = 5'
+        where: 'thing.weight = 5'
       })!;
 
       expect(child.thing.size).toBe(parent.thing.size);
@@ -477,7 +477,7 @@ entity lockable_chest: chest {
 
       const child = world.query({
         with: ['thing'],
-        where: 'thing_weight = 5'
+        where: 'thing.weight = 5'
       })!;
       expect(child.thing.size).toBe(20);
       expect(child.thing.weight).toBe(5);
@@ -494,7 +494,7 @@ entity lockable_chest: chest {
 
       const inherited = world.query({
         with: ['thing'],
-        where: 'thing_size = 7 AND thing_weight = 9'
+        where: 'thing.size = 7 AND thing.weight = 9'
       });
 
       expect(inherited).not.toBeNull();
@@ -512,7 +512,7 @@ entity lockable_chest: chest {
 
       const e = world.query({
         with: ['thing'],
-        where: 'thing_size = 10 AND thing_weight = 2'
+        where: 'thing.size = 10 AND thing.weight = 2'
       });
 
       expect(e).not.toBeNull();
@@ -554,13 +554,13 @@ entity lockable_chest: chest {
       const world = await createWorld([thingComponent]);
       executeEDL(world, edl);
 
-      const rock = world.query({ with: ['thing'], where: 'thing_size = 99' })!;
+      const rock = world.query({ with: ['thing'], where: 'thing.size = 99' })!;
       expect(rock.thing.weight).toBe(50);
       expect(world.getEntityLineage(rock.id)).toEqual(['heavy', 'big']);
 
       const pebble = world.query({
         with: ['thing'],
-        where: 'thing_size = 1'
+        where: 'thing.size = 1'
       })!;
       expect(world.getEntityLineage(pebble.id)).toEqual([]);
 

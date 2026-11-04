@@ -13,7 +13,7 @@ const statsComponent = defineComponent({
     mana: s.number()
   },
   statements: {
-    statsByLevel: 'SELECT * FROM tbl_te_stats WHERE level = ?'
+    statsByLevel: 'SELECT * FROM c_teStats WHERE level = ?'
   }
 });
 
@@ -24,7 +24,7 @@ const inventoryComponent = defineComponent({
     items: s.string() // JSON string for simplicity
   },
   statements: {
-    inventoryByCapacity: 'SELECT * FROM tbl_te_inventory WHERE capacity = ?'
+    inventoryByCapacity: 'SELECT * FROM c_teInventory WHERE capacity = ?'
   }
 });
 
@@ -35,9 +35,8 @@ const locationComponent = defineComponent({
     region: s.string()
   },
   statements: {
-    locationSelectByName: 'SELECT eid as id FROM tbl_te_location WHERE name = ?'
-  },
-  tableName: 'tbl_te_location'
+    locationSelectByName: 'SELECT eid as id FROM c_teLocation WHERE name = ?'
+  }
 });
 
 const worldOpts = {
@@ -417,10 +416,10 @@ describe('createEntity', () => {
     // Test custom statement from component definition
     const def = world.defs.get('teStats');
     expect(def).toBeDefined();
-    expect(def!.statsByLevel).toBeDefined();
+    expect(def!.statements.statsByLevel).toBeDefined();
 
     // Execute custom statement
-    const results = def!.statsByLevel!.all([5]);
+    const results = def!.statements.statsByLevel!.all([5]);
 
     // console.log(results);
 
@@ -565,11 +564,9 @@ describe('delete entity', () => {
 
     // Verify components exist in database
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_location_1stfrln WHERE eid = ?'
+      'SELECT * FROM c_teLocation WHERE eid = ?'
     );
-    const statsStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_stats_j940n6 WHERE eid = ?'
-    );
+    const statsStmt = world.db.prepare('SELECT * FROM c_teStats WHERE eid = ?');
 
     expect(locationStmt.get(entity.id)).toBeDefined();
     expect(statsStmt.get(entity.id)).toBeDefined();
@@ -741,13 +738,11 @@ describe('delete entity', () => {
     // Verify database cascade delete worked
 
     const locationStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_location_1stfrln WHERE eid = ?'
+      'SELECT * FROM c_teLocation WHERE eid = ?'
     );
-    const statsStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_stats_j940n6 WHERE eid = ?'
-    );
+    const statsStmt = world.db.prepare('SELECT * FROM c_teStats WHERE eid = ?');
     const inventoryStmt = world.db.prepare(
-      'SELECT * FROM tbl_te_inventory_18a10gf WHERE eid = ?'
+      'SELECT * FROM c_teInventory WHERE eid = ?'
     );
 
     expect(locationStmt.get(entity.id)).toBeNull();

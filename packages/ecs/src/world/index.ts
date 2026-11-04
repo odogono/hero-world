@@ -1,5 +1,4 @@
 import { createLog } from 'odgn-helpers/log';
-import { trycatch } from 'odgn-helpers/try-catch';
 
 import {
   addComponent,
@@ -15,8 +14,7 @@ import {
   type CreateDatabaseOptions,
   type Database,
   type LoadFromJSONOptions,
-  type SaveToJSONOptions,
-  type Statement
+  type SaveToJSONOptions
 } from '../db';
 import {
   loadFromJSON as sharedLoadFromJSON,
@@ -38,17 +36,19 @@ import {
   createEntityNotFoundError,
   createWorldNotInitializedError
 } from '../error';
-import { convertKeysToSnakeCase } from '../helpers/convert-keys';
 import {
-  cdefToSqlCreate,
-  cdefToSqlInsert,
-  cdefToSqlUpdate
-} from '../schema/cdef-to-sql';
-import {
-  initializeComponentMetadataTable,
-  updateComponentMetadata,
-  validateComponentCompatibility
-} from '../schema/component-metadata';
+  createEntity as createInStore,
+  define as defineInStore,
+  deleteEntity as deleteInStore,
+  exists as existsInStore,
+  ident,
+  openStore,
+  put as putInStore,
+  remove as removeFromStore,
+  tableName,
+  type Store
+} from '../store';
+import { cdefToComponent } from '../store/cdef';
 import type {
   CDef,
   ComponentDef,
@@ -69,24 +69,36 @@ const log = createLog('world');
 const isDate = (value: unknown): value is Date =>
   Object.prototype.toString.call(value) === '[object Date]';
 
-const serializeValues = (obj: Record<string, unknown>) => {
+/**
+ * A component's data as the store takes it: only its columns, with Dates as
+ * ISO strings
+ */
+const toStored = (def: ComponentDef, data: Record<string, unknown>) => {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === null || v === undefined) {
-      out[k] = v;
-      continue;
-    }
-    if (isDate(v)) {
-      out[k] = v.toISOString();
-      continue;
-    }
-    if (typeof v === 'object') {
-      out[k] = JSON.stringify(v);
-      continue;
-    }
-    out[k] = v;
+  for (const { name } of def.component.columns) {
+    const v = data[name];
+    out[name] = isDate(v) ? v.toISOString() : v;
   }
   return out;
+};
+
+/** Copies an entity's row of a component onto another entity, replacing its own */
+const copyRow = <T extends Components>(
+  world: World<T>,
+  def: ComponentDef,
+  from: number,
+  to: number
+) => {
+  const table = ident(def.tableName);
+  const cols = def.component.columns.map(c => ident(c.name));
+  const updates =
+    cols.length === 0
+      ? 'NOTHING'
+      : `UPDATE SET ${cols.map(c => `${c} = excluded.${c}`).join(', ')}`;
+  world.db.exec(
+    `INSERT INTO ${table} (${['eid', ...cols].join(', ')}) SELECT ${['?1', ...cols].join(', ')} FROM ${table} WHERE eid = ?2 ON CONFLICT(eid) DO ${updates}`,
+    [to, from]
+  );
 };
 
 const proxyEntity = <T extends Components>(
@@ -133,79 +145,34 @@ type CreateWorldOptions = Partial<CreateDatabaseOptions> & {
   dbType?: DatabaseType;
 };
 
-/**
- * Keeps one row per entity in a component table. A world file written before
- * the flush updated existing rows may hold several; the newest (highest id)
- * holds the value last written, so the others are dropped. The unique index
- * then makes a later duplicate fail loudly. The index sits outside the table
- * SQL so the component's definition hash is unchanged.
- */
-const enforceOneRowPerEntity = (db: Database, tableName: string): void => {
-  const createIndex = `CREATE UNIQUE INDEX IF NOT EXISTS uidx_${tableName}_eid ON ${tableName} (eid)`;
-  const [, error] = trycatch(() => db.exec(createIndex));
-  if (!error) {
-    return;
-  }
-  const dropped = db
-    .prepare(
-      `DELETE FROM ${tableName} WHERE eid IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM ${tableName} WHERE eid IS NOT NULL GROUP BY eid)`
-    )
-    .run();
-  log.warn(
-    `${tableName}: dropped ${dropped.changes} duplicate row(s), keeping the newest per entity`
-  );
-  db.exec(createIndex);
-};
-
 const registerComponentDef = <TComponents extends Components>(
   world: World<TComponents>,
-  componentDef: CDef
-  // statements: Record<string, string> = {}
+  cdef: CDef
 ): void => {
-  if (!world.db) {
-    throw new Error('Database not open');
-  }
+  // A definition the World already has keeps whether it is Play state,
+  // unless this one says
+  const stored = world.store.components.get(cdef.id);
+  const component = defineInStore(
+    world.store,
+    cdefToComponent(cdef, cdef.playState ?? stored?.playState)
+  );
+  const table = tableName(component);
 
-  const name = componentDef.id;
-
-  const result = cdefToSqlCreate(componentDef);
-  world.db.exec(result.sql);
-  enforceOneRowPerEntity(world.db, result.tableName);
-
-  const sqlInsert = cdefToSqlInsert(componentDef, {
-    namedParams: true
-  });
-  const sqlUpdate = cdefToSqlUpdate(componentDef, {
-    namedParams: true
-  });
-
-  const statements = componentDef.statements || {};
-
-  const additionalStmts = Object.entries(statements).reduce(
-    (acc, [key, sql]) => {
-      // replace any tbl_ table names with the actual table name
-      sql = sql.replace(toTableName(componentDef.id), result.tableName);
-      acc[key] = world.db!.prepare(sql);
-      return acc;
-    },
-    {} as Record<string, Statement>
+  const statements = Object.fromEntries(
+    Object.entries(cdef.statements ?? {}).map(([key, sql]) => [
+      key,
+      // a definition's own SQL names its table `tbl_<id>`
+      world.db.prepare(sql.replaceAll(toTableName(cdef.id), table))
+    ])
   );
 
-  const def = {
-    columns: result.columns,
-    name,
-    schema: componentDef,
-    stmtExists: world.db.prepare(
-      `SELECT 1 AS found FROM ${result.tableName} WHERE eid = ?1 LIMIT 1`
-    ),
-    stmtInsert: world.db.prepare(sqlInsert),
-    stmtUpdate: world.db.prepare(sqlUpdate),
-    tableName: result.tableName,
-    url: componentDef.id!,
-    ...additionalStmts
-  } as ComponentDef;
-
-  world.defs.set(name, def);
+  world.defs.set(cdef.id, {
+    component,
+    name: cdef.id,
+    schema: cdef,
+    statements,
+    tableName: table
+  });
 };
 
 export type { ScriptOwner } from '../edl/record';
@@ -219,7 +186,13 @@ export class World<TComponents extends Components> {
   entitiesToDelete: Set<number>;
   entityCache: EntityCache<TComponents>;
   defs: Map<string, ComponentDef>;
-  stmts: Record<string, Statement>;
+  /** The shared World layout this World is stored in */
+  store!: Store;
+  /**
+   * World time: advanced by the game loop (by its `deltaTime`) or by
+   * `advanceTime`, never by the wall clock. Events are due by it.
+   */
+  time = 0;
   /** The Change Scope that writes join, while one is running */
   activeChanges: ChangeScope<TComponents> | undefined;
   /** The open Change Scope holding each entity it has touched */
@@ -232,7 +205,6 @@ export class World<TComponents extends Components> {
     this.entitiesToDelete = new Set<number>();
     this.entityCache = new Map();
     this.defs = new Map<string, ComponentDef>();
-    this.stmts = {};
     this.activeChanges = undefined;
     this.changeHolders = new Map();
   }
@@ -243,6 +215,20 @@ export class World<TComponents extends Components> {
    */
   openChanges(): ChangeScope<TComponents> {
     return new ChangeScope(this);
+  }
+
+  /** Moves World time on, and keeps it with the World */
+  advanceTime(delta: number) {
+    this.setTime(this.time + delta);
+  }
+
+  /** Sets World time, and keeps it with the World */
+  setTime(time: number) {
+    this.time = time;
+    this.db.exec(
+      "INSERT OR REPLACE INTO ecs_meta (key, value) VALUES ('time', ?1)",
+      [JSON.stringify(time)]
+    );
   }
 
   /**
@@ -365,51 +351,10 @@ export class World<TComponents extends Components> {
       throw createEntityNotFoundError(sourceEid);
     }
 
-    // Create new entity
-    const newEid = this.db.addEntity();
-
-    // Clone component rows using SQL
+    const newEid = createInStore(this.store);
     this.db.transaction(() => {
-      for (const [componentName, def] of this.defs.entries()) {
-        // Check if source entity has this component
-        const hasComponent =
-          this.db.query(
-            `SELECT 1 FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`,
-            sourceEid
-          ).length > 0;
-
-        if (hasComponent) {
-          // Query the source component data
-          const sourceRows = this.db.query(
-            `SELECT * FROM ${def.tableName} WHERE eid = ?`,
-            sourceEid
-          );
-          if (sourceRows.length > 0) {
-            const sourceRow = sourceRows[0] as Record<string, unknown>;
-
-            // Create new data with new eid
-            const newData: Record<string, unknown> = {
-              ...sourceRow,
-              eid: newEid
-            };
-            delete newData.id; // Remove id so it gets auto-increment
-
-            // Only keep the columns that the insert statement expects
-            const expectedColumns = def.columns
-              .filter(col => col.name !== 'id')
-              .map(col => col.name);
-
-            const insertData: Record<string, unknown> = {};
-            for (const col of expectedColumns) {
-              if (col in newData) {
-                insertData[col] = newData[col];
-              }
-            }
-
-            // Use the existing prepared statement to insert
-            def.stmtInsert.run(insertData);
-          }
-        }
+      for (const def of this.defs.values()) {
+        copyRow(this, def, sourceEid, newEid);
       }
     });
 
@@ -439,28 +384,9 @@ export class World<TComponents extends Components> {
       throw createEntityNotFoundError(targetEid);
     }
 
-    // SQL-based copy of components from source -> target
     this.db.transaction(() => {
-      for (const [, def] of this.defs) {
-        // Only operate if source has rows for this component
-        const hasSource =
-          this.db.query(
-            `SELECT 1 FROM ${def.tableName} WHERE eid = ?1 LIMIT 1`,
-            sourceEid
-          ).length > 0;
-        if (!hasSource) {
-          continue;
-        }
-
-        // Overwrite target rows for this component
-        this.db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, targetEid);
-
-        // Build INSERT ... SELECT excluding id column
-        const cols = def.columns.map(c => c.name).filter(n => n !== 'id');
-        const insertCols = cols.join(', ');
-        const selectCols = cols.map(n => (n === 'eid' ? '?1' : n)).join(', ');
-        const sql = `INSERT INTO ${def.tableName} (${insertCols}) SELECT ${selectCols} FROM ${def.tableName} WHERE eid = ?2`;
-        this.db.exec(sql, targetEid, sourceEid);
+      for (const def of this.defs.values()) {
+        copyRow(this, def, sourceEid, targetEid);
       }
     });
 
@@ -482,15 +408,11 @@ export class World<TComponents extends Components> {
    * @returns The entity instance or null if the entity does not exist
    */
   get(id: number): GenericEntity<TComponents> | null {
-    // return this.entityCache.get(eid)! as EntityWithComponents<TComponents, keyof TComponents>;
-    const stmt = this.stmts.selectEntityById;
-    if (!stmt) {
+    if (!this.store) {
       throw createWorldNotInitializedError();
     }
-    const eid = stmt.get(id) as { id: number } | null;
-
-    return eid
-      ? ({ id: eid.id, world: this } as GenericEntity<TComponents>)
+    return existsInStore(this.store, id)
+      ? ({ id, world: this } as GenericEntity<TComponents>)
       : null;
   }
 
@@ -627,117 +549,39 @@ export class World<TComponents extends Components> {
 
     db.transaction(() => {
       // Handle entity deletions first
-      if (entitiesToDelete.size > 0) {
-        const entityIds = Array.from(entitiesToDelete);
-        const placeholders = entityIds
-          .map((_, index) => `?${index + 1}`)
-          .join(',');
-        const deleteSql = `DELETE FROM tbl_entity WHERE id IN (${placeholders})`;
-
-        db.exec(deleteSql, entityIds);
-
-        for (const eid of entityIds) {
-          entityCache.delete(eid);
-          dirtyEntities.delete(eid);
-          this.dirtyEntities.delete(eid);
-        }
+      for (const eid of entitiesToDelete) {
+        deleteInStore(this.store, eid);
+        entityCache.delete(eid);
+        dirtyEntities.delete(eid);
+        this.dirtyEntities.delete(eid);
       }
 
-      // Handle component updates and insertions
-      for (const [eid, components] of dirtyEntities.entries()) {
-        if (!entityCache.has(eid)) {
-          continue;
-        }
-
-        const cache = entityCache.get(eid);
-
-        for (const c of components) {
-          const entry = cache![c as string]!;
-          const def = defs.get(c as string);
-          if (!def) {
-            throw createComponentNotFoundError(c as string, eid);
-          }
-
-          if (entry.exists === false && entry.data === null) {
-            continue;
-          }
-
-          // The cache may not know about a row it never loaded, so check the
-          // table before inserting: an entity has at most one row per component.
-          if (!entry.exists && def.stmtExists.get([eid])) {
-            entry.exists = true;
-          }
-
-          if (entry.exists) {
-            // update
-            const { id, ...dataWithoutId } = entry.data as Record<
-              string,
-              unknown
-            >;
-            const updateData = serializeValues(
-              convertKeysToSnakeCase({ ...dataWithoutId, eid })
-            );
-
-            // Ensure all named params for UPDATE are present (bind null for missing)
-            // cdefToSqlUpdate uses all non-id, non-eid columns in SET and :eid in WHERE
-            for (const col of def.columns) {
-              const name = col.name;
-              if (name === 'id' || name === 'eid') {
-                continue;
-              }
-              if (!(name in updateData)) {
-                updateData[name] = null;
-              }
-            }
-            def!.stmtUpdate.run(updateData);
-          } else {
-            // insert
-            const { id, ...dataWithoutId } = entry.data as Record<
-              string,
-              unknown
-            >;
-            const insertData = serializeValues(
-              convertKeysToSnakeCase({ ...dataWithoutId, eid })
-            );
-
-            // Ensure all named params for INSERT are present (bind null for missing)
-            // cdefToSqlInsert uses all columns except id
-            for (const col of def.columns) {
-              const name = col.name;
-              if (name === 'id') {
-                continue;
-              }
-              if (!(name in insertData)) {
-                insertData[name] = null;
-              }
-            }
-
-            def!.stmtInsert.run(insertData);
-            entry.exists = true;
-          }
-        }
-      }
-
-      // Handle deferred component deletions
-      for (const [eid, components] of dirtyEntities.entries()) {
-        if (!entityCache.has(eid)) {
-          continue;
-        }
-
+      for (const [eid, components] of dirtyEntities) {
         const cache = entityCache.get(eid);
         if (!cache) {
           continue;
         }
-
         for (const c of components) {
-          const entry = cache[c as string];
-          if (entry && entry.exists === false && entry.data === null) {
-            const def = defs.get(c as string);
-            if (def) {
-              db.exec(`DELETE FROM ${def.tableName} WHERE eid = ?1`, eid);
-              delete cache[c as string];
-            }
+          const name = c as string;
+          const entry = cache[name];
+          if (!defs.has(name)) {
+            throw createComponentNotFoundError(name, eid);
           }
+          if (!entry) {
+            continue;
+          }
+          if (entry.exists === false && entry.data === null) {
+            removeFromStore(this.store, eid, name);
+            delete cache[name];
+            continue;
+          }
+          putInStore(
+            this.store,
+            eid,
+            name,
+            toStored(defs.get(name)!, entry.data as Record<string, unknown>)
+          );
+          entry.exists = true;
         }
       }
     });
@@ -819,53 +663,18 @@ const initialiseWorldDb = async <TComponents extends Components>(
   }
   const allowRedefineDefinitions = options?.allowRedefineDefinitions ?? true;
 
-  world.db.exec('PRAGMA foreign_keys = ON');
-
-  const sysSql = `CREATE TABLE IF NOT EXISTS tbl_ecs (version TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP); 
-   INSERT INTO tbl_ecs (version) VALUES ('1.0');`;
-  world.db.exec(sysSql);
-
-  // Create entity table
-  const sql =
-    'CREATE TABLE IF NOT EXISTS tbl_entity (id INTEGER PRIMARY KEY AUTOINCREMENT)';
-  world.db.exec(sql);
+  world.store = openStore(world.db);
+  // TypeScript-only for now: World time, which Events are scheduled on
+  world.db.exec(
+    'CREATE TABLE IF NOT EXISTS ecs_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)'
+  );
+  const time = world.db.query(
+    "SELECT value FROM ecs_meta WHERE key = 'time'"
+  )[0] as { value: string } | undefined;
+  world.time = time ? (JSON.parse(time.value) as number) : 0;
 
   // The EDL record's tables, and its Lineage and Script owners
   edlRecord(world);
-
-  // Initialize component metadata table for compatibility checking
-  initializeComponentMetadataTable(world.db);
-
-  // Validate component compatibility
-  const validation = validateComponentCompatibility(
-    world.db,
-    [...componentDefs],
-    { allowRedefineDefinitions }
-  );
-
-  // console.log('validation', validation);
-
-  if (!validation.compatible) {
-    const errorMessage = [
-      'Component definition compatibility check failed:',
-      ...validation.errors,
-      '',
-      'This usually means the component definitions in your code have changed',
-      'in a way that is incompatible with the existing database.',
-      '',
-      'To resolve this:',
-      '1. Update your component definitions to match the existing schema, or',
-      '2. Create a new database file'
-    ].join('\n');
-
-    throw new Error(errorMessage);
-  }
-
-  // Log warnings if any
-  if (validation.warnings.length > 0) {
-    // log.warn('Component definition warnings:');
-    // validation.warnings.forEach(warning => log.warn(`  ${warning}`));
-  }
 
   // Check for duplicate component definitions
   const seenIds = new Set<string>();
@@ -882,28 +691,12 @@ const initialiseWorldDb = async <TComponents extends Components>(
       for (const def of componentDefs) {
         registerComponentDef(world, def);
       }
-
-      // Update component metadata after successful registration
-      updateComponentMetadata(world.db, [...componentDefs]);
     });
   }
-
-  if (!world.db) {
-    throw new Error('Database not open');
-  }
-
-  const deleteEntity = world.db.prepare('DELETE FROM tbl_entity WHERE id = ?;');
-  const selectEntityById = world.db.prepare(
-    'SELECT id FROM tbl_entity WHERE id = ?;'
-  );
 
   world.componentTypes = componentDefs.map(
     def => def.id
   ) as (keyof TComponents)[];
-  world.stmts = {
-    deleteEntity,
-    selectEntityById
-  };
 };
 
 export const saveWorld = async <T extends Components>(

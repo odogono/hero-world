@@ -42,7 +42,7 @@ describe('EventSystem', () => {
     const world = await createTestWorld();
 
     // Schedule an event for 1 hour in the future
-    const futureTime = Date.now() + 60 * 60 * 1000;
+    const futureTime = world.time + 60 * 60 * 1000;
     const eventEntity = scheduleEvent(
       world,
       'future-event',
@@ -51,7 +51,7 @@ describe('EventSystem', () => {
     );
     world.flush();
 
-    expect(eventEntity.event.scheduledAt).toBe(futureTime);
+    expect(eventEntity.event.at).toBe(futureTime);
 
     // collectEventsByType should not return future events
     const readyEvents = getPendingEvents(world, 'future-event');

@@ -14,16 +14,18 @@ const stats = defineComponent({
 ```
 
 - The schema builders are `s` in `component/builder.ts`: `int`, `float`, `number`, `string`, `boolean`, `enum`, `json`, `array`, `entityId`, `date`, `datetime`, `time`, `timestamp`, `now`, `uuid`, `email`, `pk`.
-- Field types are what a read from the database returns: `datetime` is a `Date`; `date` and `time` are strings; `timestamp` is a number. Write those types too: a write stays in the cache as given until the next query reloads it.
+- `s.entityId()` is a Reference (an `eid` column): it must name an entity that exists. `.onDelete('restrict' | 'nullify' | 'cascade')` says what deleting that entity does; `restrict`, the default, makes the delete fail.
+- Field types are what a read from the database returns: `datetime` is a `Date`; `date`, `time` and `timestamp` are strings. Write those types too: a write stays in the cache as given until the next query reloads it.
 - `s.json<T>()` types the value as `T`, `unknown` without it. `s.array('string')` types the items, but neither is checked at runtime.
 - `s.enum(['idle', 'walking'])` types the field as `'idle' | 'walking'`.
 - `world.create` may leave out fields that have a `.default()`; reads still type them as present.
-- camelCase fields become snake_case columns; `id` and `eid` are reserved field names.
+- Each field is a column of the same name; `id` and `eid` are reserved field names.
+- A column is required unless made `.optional()`. A required column with no `.default()` gets a zero value (`''`, `0`, `false`) on create.
 - `addComponent` / `removeComponent` (`component/add.ts`, `remove.ts`) are the function forms of assigning to an entity.
 
 ## World: `src/world/index.ts`
 
-- `await createWorld([defs], options?)`, or `await createWorld(edlSource)`, which reads the component defs from the EDL and loads its entities. The database type defaults to Bun SQLite; `DatabaseType` is `bun | wasm | alasql` (`src/db/index.ts`).
+- `await createWorld([defs], options?)`, or `await createWorld(edlSource)`, which reads the component defs from the EDL and loads its entities. The database type defaults to Bun SQLite; `DatabaseType` is `bun | wasm` (`src/db/index.ts`).
 - `world.create(components?)` returns a proxied entity.
 - `world.get(id)` returns `{ id, world }` with no components loaded, or `null`.
 - `world.delete(entity)` marks the entity for deletion when the world is next flushed.
@@ -32,12 +34,20 @@ const stats = defineComponent({
 - `world.executeEDL(source, { path })`: see `docs/EDL.md`. `migrateEDL(world, source, { dryRun, prune })` brings a built world up to date with a changed EDL (`docs/EDL.md`, Migrating a world).
 - Lineage and Scripts: `getEntityLineage(eid)`, `getAtomLineage(name)` and `getScriptOwners()`.
 - `saveWorld` / `loadWorld` and `world.saveToJSON` / `loadFromJSON` persist a world.
+- Redefining a component the World file already has changes its table in place when the change is compatible (adding an optional column or one with a default, dropping one, making one optional, changing a default or index). Anything else, such as changing a column's type or adding a required column with no default, throws a `StoreError` with code `incompatible_change`.
+- World time: `world.time`, moved on by `world.advanceTime(delta)` and by the game loop, which adds each frame's `deltaTime`. It is kept with the World. Events fall due by it, never by the wall clock.
+
+## Storage: `src/store/`
+
+The World is stored in the layout `odgn_ecs` uses, so a World file opens in either implementation (ADR 0019): `entities`, `ecs_components` (each definition as JSON) and a table `c_<name>` per component, one row per entity. `src/store/` is the port of `OdgnEcs`: `define`, `createEntity`, `put`, `remove`, `deleteEntity`, `get`, `query` and `select`. It writes straight to the database. The World's pending changes and proxies are layered over it, and `flush()` writes through it. The EDL record lives in the `edl_*` tables, and a Definition name is the `edl_definition` component, which the World keeps out of `world.defs`.
 
 ## Queries: `src/entity/index.ts`
 
-`QueryOptions`: `with`, `without`, `maybe` (included only when present), `where`, `args`, `limit`, `offset`, `entity`, `asProxy`.
+`QueryOptions`: `with`, `without`, `maybe` (included only when present), `where`, `args`, `orderBy`, `limit`, `offset`, `entity`, `asProxy`.
 
-- `where` is SQL over component aliases: `'location.in = ?1'` with `args: [roomId]`. A dotted path into a `json` column (`meta.props.id`) becomes a JSON lookup.
+- `where` is a list of conditions, as in `odgn_ecs`: `[component, property, value]` for equality (`null` matches a missing value), or `[component, property, op, value]` with `op` one of `==`, `!=`, `<`, `<=`, `>`, `>=` and `in` (with a list). A condition implies its component.
+- `where` may instead be raw SQL in which each component is joined under its own name: `'location.in = ?1'` with `args: [roomId]`. A dotted path into a `json` column (`meta.props.id`) becomes a JSON lookup.
+- `orderBy`: `[[component, property, 'desc'?], …]`. Entity id breaks ties, and is the order without it.
 - `with` narrows the result type: `query({ with: ['stats'] })!.stats` is typed.
 
 ## Changes and flush
@@ -46,7 +56,7 @@ All of these were checked against the code:
 
 - **Field writes on any result are saved.** Every queried component is change-tracked, so `e.stats.hp = 7` then `flush()` writes it.
 - **Assigning a component adds it; assigning `null` removes it.** `world.create` and query results are proxies that turn `e.tag = {…}` into `addComponent`. With `asProxy: false` a query returns plain objects, and such an assignment is lost.
-- **Adding a component the entity has replaces it whole.** `addComponent`, `addComponents` and assignment all do this: fields left out go back to their defaults and are not merged with the old value. The flush updates the entity's existing row, so an entity never has two rows for one component. Each component table has a unique index on `eid`, so a second row fails loudly. Opening a world file that already holds duplicates keeps the newest row (highest `id`) for each entity and logs a warning with the count dropped.
+- **Adding a component the entity has replaces it whole.** `addComponent`, `addComponents` and assignment all do this: fields left out go back to their defaults and are not merged with the old value. `eid` is each component table's primary key, so an entity has at most one row per component.
 - **Queries see unflushed changes.** Entities are cached in `world.entityCache`, so a later query returns the pending value until the next flush.
 - The tracking lives in `component/helpers/make-tracked.ts`, and the dirty set is `world.dirtyEntities`.
 

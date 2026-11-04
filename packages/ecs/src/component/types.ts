@@ -17,6 +17,10 @@ export type ColumnBuilder<
     foreignKey: string
   ) => ColumnBuilder<TType, TOptional, TValue, TDefault>;
   indexed: () => ColumnBuilder<TType, TOptional, TValue, TDefault>;
+  /** For an `eid` column: what deleting the entity it refers to does */
+  onDelete: (
+    action: 'restrict' | 'nullify' | 'cascade'
+  ) => ColumnBuilder<TType, TOptional, TValue, TDefault>;
   optional: () => ColumnBuilder<TType, true, TValue, TDefault>;
   unique: () => ColumnBuilder<TType, TOptional, TValue, TDefault>;
 };
@@ -58,9 +62,9 @@ export type DefineComponentProps<
  * and `time` stay the strings they were stored as.
  */
 export type ValueFromType<T> = T extends
-  'string' | 'email' | 'enum' | 'uuid' | 'date' | 'time'
+  'string' | 'email' | 'enum' | 'uuid' | 'date' | 'time' | 'timestamp'
   ? string
-  : T extends 'int' | 'float' | 'pk' | 'timestamp'
+  : T extends 'int' | 'float' | 'pk' | 'eid'
     ? number
     : T extends 'boolean'
       ? boolean

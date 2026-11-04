@@ -34,6 +34,10 @@ const columnBuilder = <
       column.isIndexed = true;
       return builder;
     },
+    onDelete: action => {
+      column.onDelete = action;
+      return builder;
+    },
     optional: () => {
       column.optional = true;
       return builder as unknown as ColumnBuilder<TType, true, TValue>;
@@ -54,7 +58,8 @@ const boolean = () => columnBuilder('boolean');
 const date = () => columnBuilder('date');
 const datetime = () => columnBuilder('datetime');
 const email = () => columnBuilder('email');
-const entityId = () => columnBuilder('int').optional().foreignKey('tbl_entity');
+/** A Reference to another entity, which must exist */
+const entityId = () => columnBuilder('eid').optional();
 /** A string limited to `values`, typed as their union */
 const enumBuilder = <const TValues extends readonly string[]>(
   values: TValues

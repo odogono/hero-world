@@ -38,7 +38,7 @@ describe('Entity', () => {
       // Re-query the target from DB to observe copied components
       const refreshed = world.query({
         args: [entity2.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['name']
       });
 
@@ -82,7 +82,7 @@ describe('Entity', () => {
       // Query the target entity to verify components were copied
       const queriedTarget = anotherWorld.query({
         args: [entity2.id],
-        where: 'e.id = ?',
+        where: 'e.eid = ?',
         with: ['name', 'stats']
       });
       expect(queriedTarget).toBeDefined();

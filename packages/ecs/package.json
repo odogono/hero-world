@@ -39,7 +39,6 @@
     "unused": "knip"
   },
   "dependencies": {
-    "alasql": "^4.22.0",
     "mitt": "^3.0.1",
     "odgn-helpers": "workspace:*",
     "peggy": "^5.1.1",

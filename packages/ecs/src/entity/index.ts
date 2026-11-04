@@ -1,13 +1,17 @@
-import { toCamelCase, toSnakeCase } from 'odgn-helpers/string';
-
 import {
   addComponent,
   applyComponentDefaults,
   makeTrackedComponent,
   removeComponent
 } from '../component';
-import { needsQuoting, q } from '../db/sql-helpers';
 import { SQLiteError } from '../error';
+import {
+  ident,
+  select,
+  type Condition,
+  type Order,
+  type QueryOptions as StoreQueryOptions
+} from '../store';
 import type {
   Components,
   Entity,
@@ -33,9 +37,6 @@ type CreateEntityOverloads = {
 // ) => void
 //   ? I
 //   : never;
-
-/** The suffix of the field that says whether a joined component is there */
-const PRESENT = '__present';
 
 export const createEntity: CreateEntityOverloads = <
   TComponents extends Components,
@@ -103,273 +104,138 @@ export type QueryOptions<T extends Components> = {
   // They are not required to exist and will be omitted if missing.
   maybe?: readonly (keyof T)[];
   offset?: number;
-  where?: string;
+  /** `[component, property, direction?]`; entity id breaks ties */
+  orderBy?: readonly Order[];
+  /**
+   * Conditions that all hold, as the store takes them
+   * (`[component, property, op?, value]`), or a raw SQL condition in which
+   * each component is joined under its name, with `args` for its `?`s
+   */
+  where?: string | readonly Condition[];
   with?: readonly (keyof T)[];
   without?: readonly (keyof T)[];
 };
 
+/**
+ * Rewrites `component.column.path` in a raw condition, for a json column, to
+ * `json_extract(component.column, '$.path')`
+ */
 const rewriteJsonDotPaths = <T extends Components>(
   world: World<T>,
-  included: (keyof T)[] | undefined,
   where: string
 ) => {
-  // Build alias → set(json columns) map
-  const aliasInfo = new Map<string, Set<string>>();
-  const names =
-    included && included.length
-      ? included
-      : (Array.from(world.defs.keys()) as (keyof T)[]);
-  for (const c of names) {
-    const def = world.defs.get(c as string);
-    if (!def) {
-      continue;
-    }
-    const alias = toSnakeCase(def.name) ?? def.name;
-    const jsonCols = new Set(
-      (def.schema?.columns ?? [])
-        .filter(col => col.type === 'json')
-        .map(col => toSnakeCase(col.name) || col.name)
-    );
-    aliasInfo.set(alias, jsonCols);
-  }
-
-  // Match alias.col or alias.col.path...
   const re =
     /\b([A-Z_a-z]\w*)\.([A-Z_a-z]\w*)(?:\.((?:[A-Z_a-z]\w*|\d+)(?:\.(?:[A-Z_a-z]\w*|\d+))*))?/g;
-
-  return where.replaceAll(re, (full, alias, col, rest) => {
-    const jsonCols = aliasInfo.get(alias);
-    const snakeCol = toSnakeCase(col) ?? col;
-    if (rest) {
-      // alias.col.rest - check if JSON
-      if (!jsonCols || !jsonCols.has(snakeCol)) {
+  return where.replaceAll(
+    re,
+    (full, alias: string, col: string, rest: string | undefined) => {
+      const column = world.defs
+        .get(alias)
+        ?.component.columns.find(c => c.name === col);
+      if (!column) {
         return full;
       }
-      const jsonPath = `$.${rest}`;
-      return `json_extract(${alias}.${q(snakeCol)}, '${jsonPath}')`;
-    } else {
-      // alias.col - quote if reserved
-      if (needsQuoting(col)) {
-        return `${alias}.${q(col)}`;
+      // quoted, so a column may be named like a keyword (`contained.in`)
+      const ref = `${ident(alias)}.${ident(col)}`;
+      if (!rest) {
+        return ref;
       }
-      return full;
+      return column.type === 'json'
+        ? `json_extract(${ref}, '$.${rest}')`
+        : full;
     }
-  });
+  );
 };
 
+/** The store query for a World query, and the components it reads */
 const buildQuery = <T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
-) => {
-  const base = `SELECT e.id AS eid`;
-  const joins: string[] = [];
-  const fields: string[] = [];
-  const withoutConditions: string[] = [];
-
-  // Determine which components to include in the query
-  const needsJoins =
-    Boolean(options?.where) || (options?.without?.length ?? 0) > 0;
-  const withList = (options?.with ?? []) as (keyof T)[];
-  const maybeList = (options?.maybe ?? []) as (keyof T)[];
-  const explicitWith = withList.length > 0;
-
-  // Include both required (`with`) and optional (`maybe`) components.
-  let componentsToInclude = Array.from(
-    new Set([...withList, ...maybeList])
-  ) as (keyof T)[];
-
-  // If none explicitly requested but joins are needed for filtering, include all defs
-  if (componentsToInclude.length === 0 && needsJoins) {
-    componentsToInclude = Array.from(world.defs.keys()) as (keyof T)[];
-  }
-
-  const withSet = new Set(withList as (keyof T)[]);
-
-  // Handle components that entities must have (with) and may have (maybe)
-  componentsToInclude.forEach(c => {
-    const def = world.defs.get(c as string);
-    if (!def) {
-      throw new Error(`Component def not found for ${String(c)}`);
+): { names: string[]; opts: StoreQueryOptions } => {
+  const withList = (options?.with ?? []) as string[];
+  const maybeList = (options?.maybe ?? []) as string[];
+  for (const c of [
+    ...withList,
+    ...maybeList,
+    ...((options?.without ?? []) as string[])
+  ]) {
+    if (!world.defs.has(c)) {
+      throw new Error(`Component def not found for ${c}`);
     }
-    const alias = toSnakeCase(def.name);
-    const joinType =
-      withSet.has(c) || (!explicitWith && needsJoins)
-        ? 'INNER JOIN'
-        : 'LEFT JOIN';
-    const join = `${joinType} ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
-    joins.push(join);
-    // whether the entity has the component, read apart from its fields
-    // (a missing boolean field would otherwise read as false)
-    fields.push(`${alias}.eid AS ${alias}${PRESENT}`);
-    def.columns.forEach(column => {
-      const name = column.name;
-      const field = `${alias}.${q(name)} AS ${alias}_${name}`;
-      fields.push(field);
-    });
-  });
-
-  // Handle components that entities must NOT have
-  if (options?.without) {
-    options.without.forEach(c => {
-      const def = world.defs.get(c as string);
-      if (!def) {
-        throw new Error(`Component def not found for ${String(c)}`);
-      }
-      const alias = `${def.name}_not`;
-      const join = `LEFT JOIN ${def.tableName} AS ${alias} ON ${alias}.eid = e.id`;
-      joins.push(join);
-      withoutConditions.push(`${alias}.eid IS NULL`);
-    });
   }
-
-  let whereClause = '';
-  const conditions: string[] = [];
-
-  if (options?.entity) {
-    conditions.push(`e.id = ${options.entity.id}`);
-  } else if (options?.where) {
-    const clause = rewriteJsonDotPaths(
-      world,
-      componentsToInclude,
-      options.where
-    );
-    conditions.push(clause);
+  const raw = typeof options?.where === 'string' ? options.where : undefined;
+  let names = [...new Set([...withList, ...maybeList])];
+  // a raw condition can name any component
+  const joinAll = raw !== undefined && names.length === 0;
+  if (joinAll) {
+    names = [...world.defs.keys()];
   }
-
-  // Add WITHOUT conditions
-  if (withoutConditions.length > 0) {
-    conditions.push(...withoutConditions);
-  }
-
-  if (conditions.length > 0) {
-    whereClause = `WHERE ${conditions.join(' AND ')}`;
-  }
-
-  // Build LIMIT and OFFSET clauses
-  let limitOffsetClause = '';
-  if (options?.limit !== undefined) {
-    limitOffsetClause += ` LIMIT ${options.limit}`;
-    if (options?.offset !== undefined) {
-      limitOffsetClause += ` OFFSET ${options.offset}`;
-    }
-  } else if (options?.offset !== undefined) {
-    // In SQLite, OFFSET requires LIMIT, so we use a very large limit
-    limitOffsetClause += ` LIMIT -1 OFFSET ${options.offset}`;
-  }
-
-  // TODO cache sql against components
-  const selectFields = fields.length > 0 ? `, ${fields.join(', ')}` : '';
-  const sql = `${base}${selectFields}\nFROM tbl_entity AS e\n${joins.join('\n')}\n${whereClause}${limitOffsetClause}`;
-
-  // console.log('sql', sql);
-  return {
-    args: options?.args,
-    componentsToInclude,
-    sql
+  const opts: StoreQueryOptions = {
+    with: withList,
+    ...(options?.without ? { without: options.without as string[] } : {}),
+    ...(Array.isArray(options?.where)
+      ? { where: options.where as Condition[] }
+      : {}),
+    ...(raw !== undefined
+      ? {
+          sql: {
+            args: options?.args ?? [],
+            where: rewriteJsonDotPaths(world, raw)
+          }
+        }
+      : {}),
+    ...(options?.entity ? { eids: [options.entity.id] } : {}),
+    ...(options?.orderBy ? { orderBy: options.orderBy } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+    ...(options?.offset !== undefined ? { offset: options.offset } : {})
   };
+  return { names: joinAll ? names : names, opts };
 };
+
+/** A stored value as the entity holds it: a `datetime` is a Date */
+const fromStored = (type: string | undefined, value: unknown) =>
+  type === 'datetime' && typeof value === 'string' ? new Date(value) : value;
 
 export const mapRowToEntity = <T extends Components>(
   world: World<T>,
-  componentsToInclude: (keyof T)[],
-  row: unknown,
-  maybe?: readonly (keyof T)[]
+  [eid, components]: [number, Record<string, Record<string, unknown>>]
 ) => {
-  const entity: Entity<keyof Components> = {
-    id: (row as { eid: number }).eid,
-    world
-  } as Entity<keyof Components>;
-
-  for (const c of componentsToInclude) {
-    const def = world.defs.get(c as string)!;
-    const defName = toSnakeCase(def.name);
+  const entity = { id: eid, world } as Entity<keyof Components>;
+  for (const [name, stored] of Object.entries(components)) {
+    const def = world.defs.get(name)!;
     const data: Record<string, unknown> = {};
-    for (const column of def.columns) {
-      if (column.name === 'id' || column.name === 'eid') {
-        continue;
-      } // Skip id and eid columns
-      const schemaColumn = def.schema.columns.find(
-        c => (toSnakeCase(c.name) || c.name) === column.name
-      );
-      const key = toCamelCase(column.name);
-      const value = (row as Record<string, unknown>)[
-        `${defName}_${column.name}`
-      ];
-      let processedValue = value;
-
-      if (schemaColumn) {
-        if (
-          schemaColumn.type === 'boolean' ||
-          (schemaColumn.type as string) === 'bool'
-        ) {
-          processedValue = value === 1 || value === '1' ? true : false;
-        } else if (
-          schemaColumn.type === 'int' ||
-          schemaColumn.type === 'float'
-        ) {
-          processedValue =
-            typeof value === 'string' ? Number.parseFloat(value) : value;
-        } else if (
-          schemaColumn.type === 'json' ||
-          (schemaColumn.type as string) === 'array'
-        ) {
-          processedValue = value !== null ? JSON.parse(value as string) : value;
-        } else if (schemaColumn.type === 'datetime') {
-          processedValue = value !== null ? new Date(value as string) : value;
-        } else {
-          processedValue = value;
-        }
-      } else {
-        // If no schemaColumn info, heuristically parse JSON-like strings
-        if (
-          typeof value === 'string' &&
-          ((value as string).startsWith('[') ||
-            (value as string).startsWith('{'))
-        ) {
-          try {
-            processedValue = JSON.parse(value as string);
-          } catch {
-            processedValue = value;
-          }
-        }
-      }
-
-      // As a final fallback, attempt to parse JSON-looking strings
-      if (
-        typeof processedValue === 'string' &&
-        (processedValue.startsWith('[') || processedValue.startsWith('{'))
-      ) {
-        try {
-          processedValue = JSON.parse(processedValue);
-        } catch {
-          /* ignore */
-        }
-      }
-
-      data[key] = processedValue;
+    for (const col of def.schema.columns) {
+      data[col.name] = fromStored(col.type, stored[col.name]);
     }
-
-    const isMaybe = (maybe ?? []).includes(c);
-    const presence = (row as Record<string, unknown>)[`${defName}${PRESENT}`];
-    const isPresent =
-      presence === undefined
-        ? Object.values(data).some(v => v !== null && v !== undefined)
-        : presence !== null;
-    if (isMaybe && !isPresent) {
-      // Component not present on this entity; omit it
-      continue;
-    }
-
-    (entity as Record<PropertyKey, unknown>)[c] = makeTrackedComponent(
+    (entity as Record<PropertyKey, unknown>)[name] = makeTrackedComponent(
       entity,
-      c as string,
+      name,
       data,
       true,
       'read'
     );
   }
-
   return entity;
+};
+
+const run = <T extends Components>(
+  world: World<T>,
+  options: QueryOptions<T> | undefined
+) => {
+  const { names, opts } = buildQuery(world, options);
+  try {
+    return select(world.store, names, opts).map(row =>
+      mapRowToEntity(world, row)
+    );
+  } catch (error) {
+    if (typeof options?.where === 'string') {
+      throw SQLiteError.executionError(options.where, error as Error, {
+        args: options.args,
+        context: options
+      });
+    }
+    throw error;
+  }
 };
 
 /**
@@ -448,18 +314,7 @@ export function queryEntity<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
 ) {
-  const { args, componentsToInclude, sql } = buildQuery(world, {
-    ...options,
-    limit: 1
-  });
-  // console.debug('queryEntity', sql);
-  const stmt = world.db.prepare(sql);
-  const row = args && args.length > 0 ? stmt.get(...args) : stmt.get();
-  // console.debug('row', row);
-  let result = row
-    ? mapRowToEntity(world, componentsToInclude, row, options?.maybe)
-    : null;
-  stmt.finalize();
+  let result = run(world, { ...options, limit: 1 })[0] ?? null;
   if (result && (options?.asProxy ?? true)) {
     result = asProxiedEntity(result as GenericEntity<T>) as typeof result;
   }
@@ -481,14 +336,8 @@ export function queryEntities<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
 ) {
-  const { args, componentsToInclude, sql } = buildQuery(world, options);
   const asProxy = options?.asProxy ?? true;
-
-  const rows = world.db.query(sql, args);
-
-  const entities = rows.map(row =>
-    mapRowToEntity(world, componentsToInclude, row, options?.maybe)
-  );
+  const entities = run(world, options);
 
   if (asProxy) {
     return entities.map(e => asProxiedEntity(e as GenericEntity<T>));
@@ -518,55 +367,13 @@ export function queryEntitiesIterator<T extends Components>(
   world: World<T>,
   options?: QueryOptions<T>
 ) {
-  const { args, componentsToInclude, sql } = buildQuery(world, options);
-  const stmt = world.db.prepare(sql);
   const asProxy = options?.asProxy ?? true;
-  let finalized = false;
-
-  const finalize = () => {
-    if (finalized) {
-      return;
-    }
-    finalized = true;
-    try {
-      stmt.finalize();
-    } catch {
-      /* ignore double finalize */
-    }
-  };
-
-  // Use Bun's iterate capability for incremental results
-  const iterator = (
-    args && args.length > 0 ? stmt.iterate(args) : stmt.iterate()
-  ) as Iterable<unknown>;
-
+  const entities = run(world, options);
   return {
-    [Symbol.dispose]: () => {
-      finalize();
-    },
+    [Symbol.dispose]: () => {},
     *[Symbol.iterator]() {
-      try {
-        for (const row of iterator) {
-          let entity = mapRowToEntity(
-            world,
-            componentsToInclude,
-            row,
-            options?.maybe
-          );
-          if (asProxy) {
-            entity = asProxiedEntity(
-              entity as GenericEntity<T>
-            ) as typeof entity;
-          }
-          yield entity;
-        }
-      } catch (error) {
-        throw SQLiteError.executionError(sql, error as Error, {
-          args,
-          context: options
-        });
-      } finally {
-        finalize();
+      for (const entity of entities) {
+        yield asProxy ? asProxiedEntity(entity as GenericEntity<T>) : entity;
       }
     }
   };
