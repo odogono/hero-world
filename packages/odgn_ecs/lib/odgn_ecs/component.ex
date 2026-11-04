@@ -4,8 +4,18 @@ defmodule OdgnEcs.Column do
   `optional: false` means it must have a value, from the data or `default`.
   `index: true` makes queries on it fast; an `:eid` column (a Reference to
   another entity) is always indexed.
+
+  An `:eid` column must hold an entity that exists. `on_delete` says what
+  deleting that entity does: `:restrict` (the default) refuses, `:nullify`
+  empties the column, and `:cascade` deletes the entity holding it too.
   """
-  defstruct name: nil, type: :string, optional: true, unique: false, default: nil, index: false
+  defstruct name: nil,
+            type: :string,
+            optional: true,
+            unique: false,
+            default: nil,
+            index: false,
+            on_delete: :restrict
 
   @type type ::
           :string
@@ -28,13 +38,18 @@ defmodule OdgnEcs.Column do
           optional: boolean(),
           unique: boolean(),
           default: term(),
-          index: boolean()
+          index: boolean(),
+          on_delete: :restrict | :nullify | :cascade
         }
 
   @types ~w(string email enum datetime date time timestamp int float boolean eid json array)a
+  @on_delete ~w(restrict nullify cascade)a
 
   @doc "The column types, as atoms."
   def types, do: @types
+
+  @doc "What deleting a referenced entity can do, as atoms."
+  def on_delete, do: @on_delete
 end
 
 defmodule OdgnEcs.Component do
@@ -87,6 +102,13 @@ defmodule OdgnEcs.Component do
            "Component '#{name}' column '#{bad.name}' has unknown type '#{bad.type}'."
          )}
 
+      bad = Enum.find(columns, &(&1.on_delete not in Column.on_delete())) ->
+        {:error,
+         Error.new(
+           :invalid_component,
+           "Component '#{name}' column '#{bad.name}' has unknown on_delete '#{inspect(bad.on_delete)}'."
+         )}
+
       length(Enum.uniq(names)) != length(names) ->
         {:error, Error.new(:invalid_component, "Component '#{name}' defines a column twice.")}
 
@@ -98,19 +120,58 @@ defmodule OdgnEcs.Component do
   defp identifier?(s), do: is_binary(s) and Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, s)
 
   @doc false
-  def create_sql(%__MODULE__{} = c) do
+  def create_sql(%__MODULE__{} = c, table \\ nil) do
     cols =
       Enum.map(c.columns, fn col ->
         OdgnEcs.SQL.ident(col.name) <>
-          " " <> sql_type(col.type) <> if(col.unique, do: " UNIQUE", else: "")
+          " " <> sql_type(col.type) <> if(col.unique, do: " UNIQUE", else: "") <> references(col)
       end)
 
-    "CREATE TABLE #{OdgnEcs.SQL.ident(table(c))} (" <>
+    "CREATE TABLE #{OdgnEcs.SQL.ident(table || table(c))} (" <>
       Enum.join(
         ["eid INTEGER PRIMARY KEY REFERENCES entities(eid) ON DELETE CASCADE" | cols],
         ", "
       ) <>
       ")"
+  end
+
+  defp references(%Column{type: :eid, on_delete: on_delete}),
+    do: " REFERENCES entities(eid) ON DELETE #{sql_action(on_delete)}"
+
+  defp references(_col), do: ""
+
+  # A cascade deletes the holding entity by trigger, so the key itself only
+  # needs to stay out of the way
+  defp sql_action(:restrict), do: "RESTRICT"
+  defp sql_action(:nullify), do: "SET NULL"
+  defp sql_action(:cascade), do: "CASCADE"
+
+  @doc false
+  # The foreign keys the table should have, as `{column, action}` pairs in
+  # the form `PRAGMA foreign_key_list` gives them
+  def foreign_keys(%__MODULE__{columns: columns}) do
+    keys = for %Column{type: :eid} = col <- columns, do: {col.name, sql_action(col.on_delete)}
+    MapSet.new([{"eid", "CASCADE"} | keys])
+  end
+
+  @doc false
+  # Triggers that delete an entity holding a `:cascade` Reference to one
+  # being deleted, and drop those of any other column, so it can run on
+  # every definition
+  def cascade_sql(%__MODULE__{} = c) do
+    table = table(c)
+
+    Enum.map_join(c.columns, " ", fn col ->
+      trigger = OdgnEcs.SQL.ident("t_#{table}_#{col.name}")
+
+      if col.type == :eid and col.on_delete == :cascade do
+        "CREATE TRIGGER IF NOT EXISTS #{trigger} BEFORE DELETE ON entities BEGIN " <>
+          "DELETE FROM entities WHERE eid IN " <>
+          "(SELECT eid FROM #{OdgnEcs.SQL.ident(table)} WHERE #{OdgnEcs.SQL.ident(col.name)} = OLD.eid); END;"
+      else
+        "DROP TRIGGER IF EXISTS #{trigger};"
+      end
+    end)
   end
 
   @doc false
@@ -141,8 +202,8 @@ defmodule OdgnEcs.Component do
   `{:add, column}`, `{:drop, name}` or `{:fill, column}` (a column whose empty
   values take its default), or `{:error, reason}` for a change the data can't
   follow. Compatible: adding a column that is optional or has a default,
-  removing one, making one optional, changing a default or `index`, and
-  flipping `play_state`. Incompatible: changing a column's type or `unique`, adding a
+  removing one, making one optional, changing a default, `index` or
+  `on_delete`, and flipping `play_state`. Incompatible: changing a column's type or `unique`, adding a
   unique column, and making one required with no default.
   """
   def changes(%__MODULE__{columns: old}, %__MODULE__{name: name, columns: new}) do
@@ -311,7 +372,8 @@ defmodule OdgnEcs.Component do
         "optional" => c.optional,
         "unique" => c.unique,
         "default" => c.default,
-        "index" => c.index
+        "index" => c.index,
+        "on_delete" => Atom.to_string(c.on_delete)
       }
     end)
     |> then(&%{"columns" => &1, "play_state" => play_state})
@@ -335,7 +397,8 @@ defmodule OdgnEcs.Component do
           optional: c["optional"],
           unique: c["unique"],
           default: c["default"],
-          index: c["index"] == true
+          index: c["index"] == true,
+          on_delete: String.to_existing_atom(c["on_delete"] || "restrict")
         }
       end
 

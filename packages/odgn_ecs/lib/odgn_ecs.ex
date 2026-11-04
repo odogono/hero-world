@@ -45,7 +45,8 @@ defmodule OdgnEcs do
            SQL.exec(
              conn,
              locking <>
-               "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL"
+               "PRAGMA foreign_keys = ON; PRAGMA recursive_triggers = ON; " <>
+               "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL"
            ),
          :ok <- SQL.exec(conn, @schema) do
       components =
@@ -79,10 +80,65 @@ defmodule OdgnEcs do
   @spec define(t(), Component.t()) :: {:ok, t()} | {:error, Error.t()}
   def define(%__MODULE__{} = world, %Component{} = component) do
     with :ok <- Component.validate(component),
-         {:ok, world} <- define_table(world, component) do
-      # Every time, so a World made before a column was indexed gets the index
+         {:ok, world} <- define_table(world, component),
+         :ok <- ensure_keys(world, component) do
+      # Every time, so a World made before a column was indexed or
+      # cascaded gets its index or trigger
       SQL.exec!(world.conn, Component.index_sql(component))
+      SQL.exec!(world.conn, Component.cascade_sql(component))
       {:ok, world}
+    end
+  end
+
+  # A table whose foreign keys aren't those its definition asks for, such as
+  # one made before References had keys, is rebuilt with them. SQLite can't
+  # add a foreign key to an existing table.
+  defp ensure_keys(world, component) do
+    table = Component.table(component)
+
+    actual =
+      world.conn
+      |> SQL.all!("SELECT \"from\", on_delete FROM pragma_foreign_key_list(?1)", [table])
+      |> MapSet.new(fn [from, action] -> {from, action} end)
+
+    if actual == Component.foreign_keys(component),
+      do: :ok,
+      else: in_savepoint(world, "odgn_ecs_rebuild", fn -> rebuild(world, component) end)
+  end
+
+  defp rebuild(world, component) do
+    table = Component.table(component)
+    refs = for %{type: :eid} = col <- component.columns, do: col.name
+
+    dangling =
+      for col <- refs,
+          [n] =
+            SQL.one!(
+              world.conn,
+              "SELECT count(*) FROM #{SQL.ident(table)} WHERE #{SQL.ident(col)} IS NOT NULL " <>
+                "AND #{SQL.ident(col)} NOT IN (SELECT eid FROM entities)"
+            ),
+          n > 0,
+          do: "#{n} in '#{col}'"
+
+    if dangling == [] do
+      new = table <> "__rebuild"
+      cols = Enum.map_join(["eid" | Enum.map(component.columns, & &1.name)], ", ", &SQL.ident/1)
+      SQL.exec!(world.conn, Component.create_sql(component, new))
+
+      SQL.exec!(
+        world.conn,
+        "INSERT INTO #{SQL.ident(new)} (#{cols}) SELECT #{cols} FROM #{SQL.ident(table)}; " <>
+          "DROP TABLE #{SQL.ident(table)}; " <>
+          "ALTER TABLE #{SQL.ident(new)} RENAME TO #{SQL.ident(table)}"
+      )
+    else
+      {:error,
+       Error.new(
+         :dangling_reference,
+         "Component '#{component.name}' can't get its Reference keys: " <>
+           "#{Enum.join(dangling, ", ")} refer to entities that don't exist."
+       )}
     end
   end
 
@@ -183,10 +239,33 @@ defmodule OdgnEcs do
     {:ok, eid}
   end
 
-  @doc "Deletes an entity and its components."
-  @spec delete(t(), eid()) :: :ok
-  def delete(%__MODULE__{conn: conn}, eid) do
-    SQL.run!(conn, "DELETE FROM entities WHERE eid = ?1", [eid])
+  @doc """
+  Deletes an entity and its components. Entities holding a `:cascade`
+  Reference to it are deleted too, and `:nullify` References to it are
+  emptied. A `:restrict` Reference to it, the default, refuses the delete
+  with a `:referenced` error and changes nothing.
+  """
+  @spec delete(t(), eid()) :: :ok | {:error, Error.t()}
+  def delete(%__MODULE__{} = world, eid) do
+    SQL.run!(world.conn, "DELETE FROM entities WHERE eid = ?1", [eid])
+  rescue
+    e in Error ->
+      if e.message =~ "FOREIGN KEY constraint failed",
+        do:
+          {:error,
+           Error.new(:referenced, "Entity #{eid} can't be deleted: #{referrers(world, eid)}.")},
+        else: reraise(e, __STACKTRACE__)
+  end
+
+  # What holds a `:restrict` Reference to an entity, for an error message
+  defp referrers(world, eid) do
+    for {name, c} <- world.components,
+        %{type: :eid, on_delete: :restrict} = col <- c.columns,
+        holders = query(world, where: [{name, col.name, eid}]),
+        holders != [] do
+      "#{name}.#{col.name} of #{Enum.map_join(holders, ", ", &to_string/1)} refers to it"
+    end
+    |> Enum.join("; ")
   end
 
   @doc "Whether the entity exists."

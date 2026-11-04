@@ -63,9 +63,10 @@ defmodule MuaWorld.Components do
         # the Account that owns the Character
         col("account", :eid),
         col("last_input", :string),
-        col("last_target_id", :eid),
+        # what the player last referred to, gone when that is
+        col("last_target_id", :eid, on_delete: :nullify),
         col("pending", :json),
-        col("return_to", :eid)
+        col("return_to", :eid, on_delete: :nullify)
       ])
     ]
   end

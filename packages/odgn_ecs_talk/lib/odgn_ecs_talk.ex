@@ -71,7 +71,8 @@ defmodule OdgnEcsTalk do
         name: @timer,
         play_state: true,
         columns: [
-          %Column{name: "owner", type: :eid, optional: false},
+          # a timer goes with the entity it belongs to
+          %Column{name: "owner", type: :eid, optional: false, on_delete: :cascade},
           %Column{name: "script", type: :string, optional: false},
           %Column{name: "name", type: :string, optional: false},
           %Column{name: "at", type: :int, optional: false, index: true},
