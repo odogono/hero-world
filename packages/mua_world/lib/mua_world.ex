@@ -46,15 +46,14 @@ defmodule MuaWorld do
     Lifecycle,
     Lock,
     Places,
+    Step,
     Tables,
     Talk
   }
 
-  alias MuaWorld.Commands.{Scope, Verbs}
-  alias NorthTalk.{Pending, Result, ScriptError, Verdict}
+  alias MuaWorld.Commands.Verbs
 
-  # World time 0, as the Instant NorthTalk's Clock reads.
-  @epoch ~U[2000-01-01 00:00:00Z]
+  import MuaWorld.Step, only: [instant: 1, instant_us: 1]
 
   defstruct [
     :world,
@@ -77,8 +76,8 @@ defmodule MuaWorld do
     # When NorthTalk next needs pumping, in World time, if ever.
     :next_deadline,
     subscribers: %{},
-    # Inputs whose Runs are still waiting, by Pending id: what to do with
-    # the result, and their `mua_waiting` row.
+    # Inputs whose Runs are still waiting (`MuaWorld.Step.await/5`): what to
+    # do with the outcome, and their `mua_waiting` row.
     waiting: %{}
   ]
 
@@ -365,7 +364,7 @@ defmodule MuaWorld do
   # this is where they set themselves up again.
   defp start_world(state) do
     {_, state} =
-      step(state, fn state ->
+      Step.run(state, fn state ->
         Lifecycle.arm(state.world, state.talk, instant_us(state.world_ms))
         system = OdgnEcsTalk.handle(state.talk, state.places.system)
 
@@ -394,7 +393,7 @@ defmodule MuaWorld do
       state = advance_clock(state)
 
       {lines, state} =
-        step(state, fn state ->
+        Step.run(state, fn state ->
           if admin?,
             do: run_admin_line(state, character, String.trim(line)),
             else: tell(state, character, "You can't do that.")
@@ -410,7 +409,7 @@ defmodule MuaWorld do
     with :ok <- owns(state, account, character),
          :ok <- in_play(state, character) do
       state = advance_clock(state)
-      {lines, state} = step(state, fn state -> input(state, character, String.trim(text)) end)
+      {lines, state} = Step.run(state, fn state -> input(state, character, String.trim(text)) end)
       {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
     else
       error -> {:reply, error, state}
@@ -419,7 +418,7 @@ defmodule MuaWorld do
 
   def handle_call({:sign_in, sub, email, admin?}, _from, state) do
     {_, state} =
-      step(state, fn state ->
+      Step.run(state, fn state ->
         world = state.world
 
         account =
@@ -475,7 +474,7 @@ defmodule MuaWorld do
 
   def handle_call(:create_account, _from, state) do
     {_, state} =
-      step(state, fn state ->
+      Step.run(state, fn state ->
         {:ok, eid} = OdgnEcs.create(state.world)
         :ok = OdgnEcs.put(state.world, eid, "account", %{})
         %{state | result: {:ok, eid}}
@@ -499,7 +498,7 @@ defmodule MuaWorld do
 
       true ->
         {_, state} =
-          step(state, fn state ->
+          Step.run(state, fn state ->
             world = state.world
             {:ok, eid} = OdgnEcs.create(world)
             :ok = OdgnEcs.put(world, eid, "player", %{"name" => name, "account" => account})
@@ -516,7 +515,7 @@ defmodule MuaWorld do
   def handle_call({:enter, account, character}, _from, state) do
     with :ok <- owns(state, account, character) do
       state = advance_clock(state)
-      {lines, state} = step(state, &enter_play(&1, character))
+      {lines, state} = Step.run(state, &enter_play(&1, character))
       {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
     else
       error -> {:reply, error, state}
@@ -526,7 +525,7 @@ defmodule MuaWorld do
   def handle_call({:leave, account, character}, _from, state) do
     with :ok <- owns(state, account, character) do
       state = advance_clock(state)
-      {_, state} = step(state, &leave_play(&1, character))
+      {_, state} = Step.run(state, &leave_play(&1, character))
       {:reply, :ok, run_npcs(state)}
     else
       error -> {:reply, error, state}
@@ -551,7 +550,7 @@ defmodule MuaWorld do
 
   def handle_call({:reset, place}, _from, state) do
     state = advance_clock(state)
-    {_, state} = step(state, &reset_place(&1, place))
+    {_, state} = Step.run(state, &reset_place(&1, place))
     reply_result(state)
   end
 
@@ -582,7 +581,7 @@ defmodule MuaWorld do
 
   def handle_call({:set_component, eid, name, data}, _from, state) do
     {_, state} =
-      step(state, fn state -> %{state | result: OdgnEcs.put(state.world, eid, name, data)} end)
+      Step.run(state, fn state -> %{state | result: OdgnEcs.put(state.world, eid, name, data)} end)
 
     reply_result(state)
   end
@@ -695,13 +694,13 @@ defmodule MuaWorld do
       state.talk
       |> OdgnEcsTalk.due_timers(instant_us(state.world_ms))
       |> Enum.reduce(state, fn timer, state ->
-        {_, state} = step(state, &fire(&1, timer))
+        {_, state} = Step.run(state, &fire(&1, timer))
         state
       end)
 
     state =
       if state.next_deadline != nil and state.next_deadline <= state.world_ms,
-        do: elem(step(state, & &1), 1),
+        do: elem(Step.run(state, & &1), 1),
         else: state
 
     run_npcs(state)
@@ -754,7 +753,7 @@ defmodule MuaWorld do
   defp run_npcs(state) do
     Enum.reduce(Tables.queued_acts(state.world), state, fn {id, actor, text}, state ->
       {_, state} =
-        step(state, fn state ->
+        Step.run(state, fn state ->
           Tables.delete_act(state.world, id)
           npc_input(state, actor, text)
         end)
@@ -772,105 +771,6 @@ defmodule MuaWorld do
     else
       _ -> state
     end
-  end
-
-  # ---------------------------------------------------------------------
-  # Steps
-  # ---------------------------------------------------------------------
-
-  # One Step: the input, pumps until idle, the results it settles, then one
-  # COMMIT, and only then the output.
-  defp step(state, input) do
-    world = state.world
-    started = System.monotonic_time()
-    :ok = OdgnEcs.begin(world)
-    Tables.put_world_time(world, state.world_ms)
-    state = input.(state)
-    state = pump_idle(state)
-    state = settle_waiting(state)
-    Tables.put_world_time(world, state.world_ms)
-    lines = Tables.take_outbox(world)
-    fault(state, :before_commit)
-
-    # A failed COMMIT leaves NorthTalk ahead of the database, so the World
-    # stops and restarts from what was committed.
-    case OdgnEcs.commit(world) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        Logger.error("World commit failed, restarting from the last commit: #{inspect(reason)}",
-          event: :commit_failed
-        )
-
-        :telemetry.execute([:mua_world, :commit, :error], %{count: 1}, %{reason: reason})
-        exit({:commit_failed, reason})
-    end
-
-    :telemetry.execute(
-      [:mua_world, :step, :stop],
-      %{duration: System.monotonic_time() - started},
-      %{lines: length(lines)}
-    )
-
-    fault(state, :after_commit)
-    publish(state, lines)
-    {lines, state}
-  end
-
-  defp fault(%{fault: point}, point), do: Process.exit(self(), :kill)
-  defp fault(_, _), do: :ok
-
-  # Pumps until the Group is idle, sending the notices Scripts asked for
-  # along the way.
-  defp pump_idle(state) do
-    {:ok, pump} = OdgnEcsTalk.pump(state.talk, instant(state.world_ms))
-    state = %{state | next_deadline: deadline(pump.next_deadline)}
-    notices = Talk.take_notices(state.table)
-
-    for {place, message, who} <- notices,
-        do: send_notice(state, place, message, [{:entity, who}])
-
-    if pump.state == "sliced" or notices != [], do: pump_idle(state), else: state
-  end
-
-  defp instant(ms), do: DateTime.add(@epoch, ms, :millisecond)
-  defp instant_us(ms), do: DateTime.to_unix(instant(ms), :microsecond)
-
-  defp deadline(nil), do: nil
-
-  defp deadline(text) do
-    {:ok, dt, _} = DateTime.from_iso8601(text)
-    DateTime.diff(dt, @epoch, :millisecond)
-  end
-
-  # Every input still waiting whose Run has now ended gets its result, in
-  # this Step; any still waiting keeps or gains its `mua_waiting` row.
-  defp settle_waiting(state) do
-    Enum.reduce(state.waiting, state, fn {id, w}, state ->
-      case NorthTalk.await(w.pending, 0) do
-        {:error, %NorthTalk.HostError{code: "timeout"}} ->
-          if w.row,
-            do: state,
-            else:
-              put_in(
-                state.waiting[id].row,
-                Tables.insert_waiting(state.world, w.character, w.command)
-              )
-
-        result ->
-          NorthTalk.release_pending(w.pending)
-          if w.row, do: Tables.delete_waiting(state.world, w.row)
-          state = %{state | waiting: Map.delete(state.waiting, id)}
-          w.then.(state, result)
-      end
-    end)
-  end
-
-  defp publish(state, lines) do
-    for {character, text} <- lines,
-        pid <- Map.get(state.subscribers, character, []),
-        do: send(pid, {:mua, character, text})
   end
 
   # ---------------------------------------------------------------------
@@ -1058,31 +958,18 @@ defmodule MuaWorld do
           OdgnEcsTalk.decide(talk, eid, q.message, args, host)
       end
 
-    state = pump_idle(state)
-    answer = fn state, result -> k.(state, reply(q.asks, result)) end
-
-    case NorthTalk.await(pending, 0) do
-      {:error, %NorthTalk.HostError{code: "timeout"}} ->
-        wait(state, pending, ctx.actor, ctx.raw, answer)
-
-      result ->
-        NorthTalk.release_pending(pending)
-        answer.(state, result)
-    end
+    Step.await(state, pending, ctx.actor, ctx.raw, fn state, outcome ->
+      k.(state, reply(q.asks, outcome))
+    end)
   end
 
-  defp arg(state, {:entity, eid}), do: OdgnEcsTalk.handle(state.talk, eid)
-  defp arg(_state, text), do: text
+  defp arg(state, value), do: Step.value(state, value)
 
-  defp reply(:offer, {:ok, %Result{value: value}}),
-    do: {:replied, if(is_binary(value), do: value)}
-
-  defp reply(:offer, {:error, %ScriptError{outcome: "unhandled"}}), do: :passed
-
-  defp reply(:decide, {:ok, %Verdict{verdict: :vetoed, vetoes: [veto | _]}}),
-    do: {:replied, if(is_binary(veto.reason), do: veto.reason)}
-
-  defp reply(:decide, {:ok, %Verdict{verdict: :allowed}}), do: :passed
+  # What a question's outcome means to Dispatch: a Decision's veto is its
+  # answer, as a reply is a Request's.
+  defp reply(:offer, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
+  defp reply(:decide, {:vetoed, reason}), do: {:replied, if(is_binary(reason), do: reason)}
+  defp reply(_, :passed), do: :passed
   defp reply(_, _), do: :failed
 
   # Tells the actor, the Scripts that notice it, and everyone else who saw it.
@@ -1095,27 +982,13 @@ defmodule MuaWorld do
         else: state
 
     if outcome.kind == :done do
-      for {place, notice, args} <- outcome.notices, do: send_notice(state, place, notice, args)
+      for {place, notice, args} <- outcome.notices, do: Step.notify(state, place, notice, args)
 
       for {place, line, except} <- outcome.broadcasts,
           do: Tables.tell(state.world, place, line, except)
     end
 
     state
-  end
-
-  # A notice goes to the Scripts of the things in its place, but not the one
-  # it is about (its first argument), such as the actor who arrived.
-  defp send_notice(state, place, message, args) do
-    about = with [{:entity, eid} | _] <- args, do: eid
-    values = Enum.map(args, &arg(state, &1))
-
-    for watcher <- Scope.entities_in(state.world, place),
-        watcher != about,
-        OdgnEcsTalk.scripted?(state.talk, watcher),
-        do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, watcher, message, values)
-
-    :ok
   end
 
   # An admin's line runs in a savepoint, released only if its Run
@@ -1127,7 +1000,7 @@ defmodule MuaWorld do
     service = "admin:#{actor}"
     :ok = OdgnEcs.savepoint(world, "mua_admin_line")
 
-    outcome =
+    {outcome, state} =
       with :ok <- OdgnEcsTalk.put_service_script(talk, service, MuaWorld.Admin.source(line)),
            {:ok, pending} <-
              OdgnEcsTalk.request_service(
@@ -1140,11 +1013,16 @@ defmodule MuaWorld do
                ],
                instant(state.world_ms)
              ) do
-        settle_line(state, pending, 50)
+        state = Step.pump(state)
+        outcome = OdgnEcsTalk.outcome(pending)
+        if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
+        {outcome, state}
+      else
+        error -> {error, state}
       end
 
     case outcome do
-      {:ok, %NorthTalk.Result{value: value}} ->
+      {:replied, value} ->
         :ok = OdgnEcs.release(world, "mua_admin_line")
         tell(state, actor, "=> " <> MuaWorld.Admin.show(value))
 
@@ -1152,24 +1030,8 @@ defmodule MuaWorld do
         :ok = OdgnEcs.rollback_to(world, "mua_admin_line")
         # A Run still waiting is discarded with the line's code, so it can't
         # carry on in a later Step
-        if other == :unfinished, do: OdgnEcsTalk.put_service_script(talk, service, "")
+        if other == :waiting, do: OdgnEcsTalk.put_service_script(talk, service, "")
         tell(state, actor, "!! " <> MuaWorld.Admin.failure(other, line))
-    end
-  end
-
-  defp settle_line(state, pending, tries) do
-    case NorthTalk.await(pending, 0) do
-      {:error, %NorthTalk.HostError{code: "timeout"}} when tries > 0 ->
-        {:ok, _} = OdgnEcsTalk.pump(state.talk, instant(state.world_ms))
-        settle_line(state, pending, tries - 1)
-
-      {:error, %NorthTalk.HostError{code: "timeout"}} ->
-        NorthTalk.release_pending(pending)
-        :unfinished
-
-      result ->
-        NorthTalk.release_pending(pending)
-        result
     end
   end
 
@@ -1177,14 +1039,4 @@ defmodule MuaWorld do
     Tables.output(state.world, character, text)
     state
   end
-
-  defp wait(state, %Pending{id: id} = pending, character, command, then),
-    do:
-      put_in(state.waiting[id], %{
-        pending: pending,
-        character: character,
-        command: command,
-        then: then,
-        row: nil
-      })
 end

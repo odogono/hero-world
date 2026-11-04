@@ -686,4 +686,87 @@ defmodule OdgnEcsTalkTest do
       assert value(ask(talk, hero, "query")) == nil
     end
   end
+
+  describe "outcomes" do
+    @outcomes """
+    on greet
+      return "hello"
+    end greet
+
+    on enrage
+      change the target, "stats", {hp: "lots"}
+    end enrage
+
+    on linger
+      wait 2 s
+      return "late"
+    end linger
+
+    on beforeGo, deciding
+      veto "locked"
+    end beforeGo
+    """
+
+    defp outcomes do
+      {world, talk} = setup_world()
+      :ok = OdgnEcsTalk.load_atom_script(talk, "person", @outcomes)
+      {talk, id(world, "hero")}
+    end
+
+    defp idle(talk, pending, ms \\ 0) do
+      {:ok, _} = OdgnEcsTalk.pump_until_idle(talk, now(ms))
+      OdgnEcsTalk.outcome(pending)
+    end
+
+    test "a Handler that returns has replied" do
+      {talk, hero} = outcomes()
+      {:ok, pending} = OdgnEcsTalk.request(talk, hero, "greet", [], now())
+      assert idle(talk, pending) == {:replied, "hello"}
+    end
+
+    test "a message nobody handles, or a Decision allowed, has passed" do
+      {talk, hero} = outcomes()
+      {:ok, unhandled} = OdgnEcsTalk.request(talk, hero, "dance", [], now())
+      {:ok, allowed} = OdgnEcsTalk.decide(talk, hero, "beforeSit")
+      assert idle(talk, unhandled) == :passed
+      assert idle(talk, allowed) == :passed
+    end
+
+    test "a Decision vetoed gives its reason" do
+      {talk, hero} = outcomes()
+      {:ok, pending} = OdgnEcsTalk.decide(talk, hero, "beforeGo")
+      assert idle(talk, pending) == {:vetoed, "locked"}
+    end
+
+    test "a Run that fails gives its error" do
+      {talk, hero} = outcomes()
+      {:ok, pending} = OdgnEcsTalk.request(talk, hero, "enrage", [], now())
+      assert {:failed, %ScriptError{}} = idle(talk, pending)
+    end
+
+    test "a Run still waiting once idle is waiting, and replies in a later Pump" do
+      {talk, hero} = outcomes()
+      {:ok, pending} = OdgnEcsTalk.request(talk, hero, "linger", [], now())
+      assert {:ok, deadline} = OdgnEcsTalk.pump_until_idle(talk, now())
+      assert DateTime.compare(deadline, now(2000)) == :eq
+      assert OdgnEcsTalk.outcome(pending) == :waiting
+      assert idle(talk, pending, 2000) == {:replied, "late"}
+    end
+
+    test "pumps again while `between` sends more work" do
+      {talk, hero} = outcomes()
+      {:ok, ref} = Agent.start_link(fn -> 2 end)
+
+      between = fn ->
+        Agent.get_and_update(ref, fn
+          0 -> {false, 0}
+          n -> {true, n - 1}
+        end)
+      end
+
+      {:ok, _} = OdgnEcsTalk.deliver(talk, hero, "greet")
+      assert {:ok, nil} = OdgnEcsTalk.pump_until_idle(talk, now(), between: between)
+      assert Agent.get(ref, & &1) == 0
+    end
+  end
 end
