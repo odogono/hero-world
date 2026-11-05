@@ -31,3 +31,10 @@ Each file builds one World and runs cases against it:
   - `order_by`: a list of `[component, property]` or `[component, property, "desc"]`.
   - `limit`: a number.
 - **`select`** (optional): component names to read with each result. `expect` is then a list of `[label, {component: data}]`, holding only the selected components the entity has. Without `select`, `expect` lists labels in order.
+
+## Change-set cases (`changes/*.json`)
+
+Each case builds the World from `components` and `entities`, as the query cases do, and takes its change set. It then runs `ops` in order, takes the change set again, and compares it with `expect`.
+
+- **`ops`**: `["create", label]`, `["put", label, component, data]`, `["remove", label, component]`, `["delete", label]`, `["begin"]`, `["commit"]`, `["rollback"]`, `["savepoint", name]` and `["rollback_to", name]`.
+- **`expect`**: `[label, component, kind, data]` in entity then component order. `kind` is `added`, `changed` or `removed`. `data` is the component's data now, or `null` when removed.

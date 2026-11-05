@@ -183,6 +183,46 @@ defmodule OdgnEcs.Component do
   end
 
   @doc false
+  # Temporary triggers, on this connection only, that note in
+  # `temp.ecs_changes` each entity whose component is added, changed or
+  # removed, and whether it had the component before (see
+  # `OdgnEcs.take_changes/1`). Nothing is written to the World file.
+  def change_sql(%__MODULE__{} = c) do
+    table = OdgnEcs.SQL.ident(table(c))
+    name = "'" <> String.replace(c.name, "'", "''") <> "'"
+    trigger = &OdgnEcs.SQL.ident("ecs_changes_#{table(c)}_#{&1}")
+    # Not INSERT OR IGNORE: an outer statement's conflict policy overrides it
+    note =
+      &("INSERT INTO ecs_changes (name, eid, existed) SELECT #{name}, #{&1}, #{&2} " <>
+          "WHERE NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = #{name} AND eid = #{&1}); END;")
+
+    differs =
+      Enum.map_join(c.columns, " OR ", fn col ->
+        col = OdgnEcs.SQL.ident(col.name)
+        "OLD.#{col} IS NOT NEW.#{col}"
+      end)
+
+    "CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("i")} AFTER INSERT ON main.#{table} " <>
+      "BEGIN #{note.("NEW.eid", 0)} " <>
+      "CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("d")} AFTER DELETE ON main.#{table} " <>
+      "BEGIN #{note.("OLD.eid", 1)}" <>
+      if(differs == "",
+        do: "",
+        else:
+          " CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("u")} AFTER UPDATE ON main.#{table} " <>
+            "WHEN #{differs} BEGIN #{note.("OLD.eid", 1)}"
+      )
+  end
+
+  @doc false
+  # Drops the triggers of `change_sql/1`, so the table can change
+  def drop_change_sql(%__MODULE__{} = c) do
+    Enum.map_join(~w(i u d), " ", fn op ->
+      "DROP TRIGGER IF EXISTS temp.#{OdgnEcs.SQL.ident("ecs_changes_#{table(c)}_#{op}")};"
+    end)
+  end
+
+  @doc false
   # The SQL that gives each indexed column an index, and drops the index of
   # any other, so that it can run on every definition, changed or not.
   def index_sql(%__MODULE__{} = c) do

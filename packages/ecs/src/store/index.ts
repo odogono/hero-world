@@ -14,9 +14,11 @@
 import type { Database } from '../db';
 import {
   cascadeSql,
+  changeSql,
   changes,
   createSql,
   decode,
+  dropChangeSql,
   encode,
   foreignKeys,
   fromJSON,
@@ -40,7 +42,10 @@ export type Eid = number;
 export type Data = Record<string, unknown>;
 
 export const SCHEMA = `CREATE TABLE IF NOT EXISTS entities (eid INTEGER PRIMARY KEY);
-CREATE TABLE IF NOT EXISTS ecs_components (name TEXT PRIMARY KEY, columns TEXT NOT NULL);`;
+CREATE TABLE IF NOT EXISTS ecs_components (name TEXT PRIMARY KEY, columns TEXT NOT NULL);
+CREATE TEMP TABLE IF NOT EXISTS ecs_changes (
+  name TEXT NOT NULL, eid INTEGER NOT NULL, existed INTEGER NOT NULL,
+  PRIMARY KEY (name, eid));`;
 
 export type Store = {
   components: Map<string, Component>;
@@ -66,9 +71,18 @@ export const openStore = (db: Database): Store => {
     db,
     'SELECT name, columns FROM ecs_components'
   )) {
-    components.set(name, fromJSON(name, columns));
+    const c = fromJSON(name, columns);
+    components.set(name, c);
+    db.exec(changeSql(c));
   }
   return { components, db };
+};
+
+/** Runs `sql`, which is blank for a component with no columns */
+const execAll = (store: Store, sql: string) => {
+  if (sql.trim() !== '') {
+    store.db.exec(sql);
+  }
 };
 
 // -- Savepoints -------------------------------------------------------------
@@ -108,14 +122,24 @@ const sameDefinition = (a: Component, b: Component) => toJSON(a) === toJSON(b);
  */
 export const define = (store: Store, c: Component): Component => {
   validate(c);
-  inSavepoint(store, 'odgn_ecs_define', () => {
-    defineTable(store, c);
-    ensureKeys(store, c);
-    // Every time, so a World made before a column was indexed or cascaded
-    // gets its index or trigger
-    store.db.exec(indexSql(c));
-    store.db.exec(cascadeSql(c));
-  });
+  store.db.exec(dropChangeSql(c));
+  try {
+    inSavepoint(store, 'odgn_ecs_define', () => {
+      defineTable(store, c);
+      ensureKeys(store, c);
+      // Every time, so a World made before a column was indexed or cascaded
+      // gets its index or trigger
+      execAll(store, indexSql(c));
+      execAll(store, cascadeSql(c));
+    });
+  } finally {
+    // After any rebuild, which drops the table's triggers; on an error the
+    // table is as it was, and gets them back
+    const defined = store.components.get(c.name);
+    if (defined) {
+      store.db.exec(changeSql(defined));
+    }
+  }
   return store.components.get(c.name)!;
 };
 
@@ -379,6 +403,49 @@ export const get = (store: Store, eid: Eid, name: string): Data | undefined =>
 /** Every component an entity has, by name */
 export const components = (store: Store, eid: Eid): Record<string, Data> =>
   select(store, [...store.components.keys()], { eids: [eid] })[0]?.[1] ?? {};
+
+// -- Change sets ------------------------------------------------------------------
+
+/**
+ * A component that changed: `added` and `changed` carry its data now,
+ * `removed` carries null.
+ */
+export type ChangeSetEntry = [
+  eid: Eid,
+  name: string,
+  kind: 'added' | 'changed' | 'removed',
+  data: Data | null
+];
+
+/**
+ * The components added, changed or removed since the change set was last
+ * taken, in entity then component order, and starts a new one. Taking it
+ * after a transaction commits gives that transaction's change set; see
+ * `OdgnEcs.take_changes/1`.
+ *
+ * Only the net change shows: a component added then removed is not there,
+ * and one put again with the same values is not changed. Changes rolled
+ * back are not there either. Removes made by deleting an entity, or by a
+ * `cascade` Reference, are. The change set lives on the connection, not in
+ * the World file, so it starts empty when the store opens.
+ */
+export const takeChanges = (store: Store): ChangeSetEntry[] => {
+  const rows = all<{ eid: Eid; existed: number; name: string }>(
+    store.db,
+    'SELECT eid, name, existed FROM temp.ecs_changes ORDER BY eid, name'
+  );
+  store.db.exec('DELETE FROM temp.ecs_changes');
+  const out: ChangeSetEntry[] = [];
+  for (const { eid, existed, name } of rows) {
+    const data = store.components.has(name) ? get(store, eid, name) : undefined;
+    if (data) {
+      out.push([eid, name, existed ? 'changed' : 'added', data]);
+    } else if (existed) {
+      out.push([eid, name, 'removed', null]);
+    }
+  }
+  return out;
+};
 
 // -- Queries ----------------------------------------------------------------------
 

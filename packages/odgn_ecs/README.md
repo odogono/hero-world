@@ -20,6 +20,7 @@ mix test
 
 - **No process:** a World is a struct over one SQLite connection. Whoever holds it is its only writer, as Mua's World process is in [ADR 0015](../../docs/adr/0015-the-world-process-drives-northtalk-and-commits-once-per-step.md).
 - **No implicit transactions:** callers decide where changes commit, with `begin`, `commit`, `rollback`, `savepoint`, `release`, `rollback_to` and `in_savepoint`.
+- **Change sets:** `take_changes/1` returns the components added, changed or removed since it was last called, with their data, and starts a new set. Called after a commit, it gives that transaction's change set. Temporary triggers on the connection record changes, so cascades are included and rolled-back changes are not, and nothing is added to the World file. There is no persistent change log.
 - **One table per component:** each component has one typed column per property, so SQL enforces types and `unique` columns.
 - **Values are checked when they are put:** properties left out take their defaults, and unknown properties, wrong types and missing required values are errors. Putting a component replaces it whole.
 - **Queries are one statement:** `query/2` finds entities by components (`with`), conditions (`where`, with `==`, `!=`, `<`, `<=`, `>`, `>=` and `in`), `eids`, `order_by` and `limit`. `select/3` takes the same options and reads the named components' data with each result, so callers needn't `get` each entity in turn. The operators are a closed set: a query that needs more is a sign the store is missing something.

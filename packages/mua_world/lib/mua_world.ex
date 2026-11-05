@@ -78,7 +78,10 @@ defmodule MuaWorld do
     subscribers: %{},
     # Inputs whose Runs are still waiting (`MuaWorld.Step.await/5`): what to
     # do with the outcome, and their `mua_waiting` row.
-    waiting: %{}
+    waiting: %{},
+    # The last Step's change set (`OdgnEcs.take_changes/1`), for the client
+    # mirror
+    changes: []
   ]
 
   @doc """
