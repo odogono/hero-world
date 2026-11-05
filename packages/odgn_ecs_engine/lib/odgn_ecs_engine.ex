@@ -39,11 +39,17 @@ defmodule OdgnEcsEngine do
   back. A failed `COMMIT` leaves NorthTalk ahead of the database, so it
   exits the Host's process, which restarts from the last commit.
 
+  ## Timers
+
+  Timers are the engine's (`OdgnEcsEngine.Timers`), kept in the World. A
+  Host gives Scripts the `timer` Capability by starting its adapter with
+  `capabilities: [&OdgnEcsEngine.Timers.capability/1]`.
+
   ## Order at one World time
 
   `advance/2` keeps World time, then runs, each as its own Step:
 
-  1. the timers due, earliest first, and by entity id at the same time;
+  1. the timers due, earliest first, and oldest first at the same time;
   2. one Step for NorthTalk, if its deadline (such as the end of a Script's
      `wait`) has come;
   3. the Systems due, in the order the Host gave them.
@@ -55,7 +61,7 @@ defmodule OdgnEcsEngine do
     * `:systems` - the `OdgnEcs.System`s to run. Each runs with the Step
       handle as its context.
     * `:timers` - `%{script => fun}`: the Host's own timers, by the script
-      name it stored them under (`OdgnEcsTalk.schedule/2`). Each due one is
+      name it stored them under (`OdgnEcsEngine.Timers.schedule/2`). Each due one is
       given to `fun.(step, timer)` instead of being delivered, and is the
       Host's to remove.
     * `:between` - called after each Pump with no arguments; returns whether
@@ -75,7 +81,7 @@ defmodule OdgnEcsEngine do
   """
   require Logger
 
-  alias OdgnEcsEngine.{Delivery, Step, Tables}
+  alias OdgnEcsEngine.{Delivery, Step, Tables, Timers}
 
   # World time 0, as the Instant NorthTalk's Clock reads.
   @epoch ~U[2000-01-01 00:00:00Z]
@@ -384,8 +390,8 @@ defmodule OdgnEcsEngine do
     Tables.put_world_time(engine.world, world_time)
 
     engine =
-      engine.talk
-      |> OdgnEcsTalk.due_timers(instant_us(world_time))
+      engine.world
+      |> Timers.due(instant_us(world_time))
       |> Enum.reduce(engine, fn timer, engine ->
         elem(step(engine, &fire(&1, timer, engine.timers)), 1)
       end)
@@ -406,7 +412,7 @@ defmodule OdgnEcsEngine do
   defp fire(step, %{"script" => script} = timer, handlers) do
     case handlers do
       %{^script => handler} -> handler.(step, timer)
-      _ -> OdgnEcsTalk.fire_timer(step.talk, timer)
+      _ -> Timers.fire(step.talk, timer)
     end
   end
 
@@ -424,7 +430,7 @@ defmodule OdgnEcsEngine do
   """
   def next_deadline(%__MODULE__{} = engine) do
     timer =
-      case OdgnEcsTalk.next_timer_at(engine.talk) do
+      case Timers.next_at(engine.world) do
         nil -> nil
         us -> ceil_ms(us - instant_us(0))
       end

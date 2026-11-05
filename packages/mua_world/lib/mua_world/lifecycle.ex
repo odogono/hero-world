@@ -7,11 +7,13 @@ defmodule MuaWorld.Lifecycle do
     already given a home keep it; Characters and exits have none.
   - **Reset:** decided by the `lifecycle` Service Script
     (`packages/mua-scripts`, ADR 0024). This module only schedules it.
-  - **`timers { every: { message: seconds } }`:** kept as `talk_timer`s
-    under the script name `mua:timers`, one interval apart. `reset` resets
+  - **`timers { every: { message: seconds } }`:** kept as the engine's
+    timers (`OdgnEcsEngine.Timers`) under the script name `mua:timers`, one interval apart. `reset` resets
     the place; any other message goes to the entity's Scripts from the
     system actor.
   """
+
+  alias OdgnEcsEngine.Timers
 
   @timers "mua:timers"
 
@@ -42,14 +44,14 @@ defmodule MuaWorld.Lifecycle do
   Stores the first of each entity's `timers`, one interval from `now_us`,
   unless one is stored already, as after a restart.
   """
-  def arm(world, talk, now_us) do
-    stored = MapSet.new(OdgnEcsTalk.timers(talk, @timers), &{&1["owner"], &1["name"]})
+  def arm(world, now_us) do
+    stored = MapSet.new(Timers.timers(world, @timers), &{&1["owner"], &1["name"]})
 
     for owner <- OdgnEcs.query(world, with: ["timers"]),
         {message, _} <- OdgnEcs.get(world, owner, "timers")["every"] || %{},
         seconds = interval(world, owner, message),
         not MapSet.member?(stored, {owner, message}),
-        do: store(talk, owner, message, now_us + round(seconds * 1_000_000))
+        do: store(world, owner, message, now_us + round(seconds * 1_000_000))
 
     :ok
   end
@@ -58,14 +60,14 @@ defmodule MuaWorld.Lifecycle do
   The next of a timer that has fallen due: one interval after it, or, after
   a long pause, once rather than once per interval missed.
   """
-  def rearm(world, talk, timer, now_us) do
+  def rearm(world, timer, now_us) do
     case interval(world, timer["owner"], timer["message"]) do
       nil ->
         :ok
 
       seconds ->
         store(
-          talk,
+          world,
           timer["owner"],
           timer["message"],
           max(timer["at"] + round(seconds * 1_000_000), now_us + 1)
@@ -73,10 +75,10 @@ defmodule MuaWorld.Lifecycle do
     end
   end
 
-  defp store(talk, owner, message, at),
+  defp store(world, owner, message, at),
     do:
       :ok =
-        OdgnEcsTalk.schedule(talk, %{
+        Timers.schedule(world, %{
           owner: owner,
           script: @timers,
           name: message,

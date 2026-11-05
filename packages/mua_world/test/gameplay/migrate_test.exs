@@ -103,10 +103,7 @@ defmodule MuaWorld.MigrateTest do
            )
 
     timers =
-      for eid <- 1..200,
-          t = MuaWorld.component(world, eid, "talk_timer"),
-          t["script"] == "mua:timers",
-          do: t["name"]
+      for t <- MuaWorld.timers(world), t["script"] == "mua:timers", do: t["name"]
 
     refute "chime" in timers
   end
@@ -243,10 +240,7 @@ defmodule MuaWorld.MigrateTest do
   end
 
   defp timers_of(world, owner) do
-    for eid <- 1..200,
-        t = MuaWorld.component(world, eid, "talk_timer"),
-        t["owner"] == owner,
-        do: t["name"] || t["message"]
+    for t <- MuaWorld.timers(world), t["owner"] == owner, do: t["name"]
   end
 
   test "refuses a Migration that leaves the Starting room invalid, changing nothing", %{

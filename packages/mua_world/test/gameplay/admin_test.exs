@@ -136,6 +136,6 @@ defmodule MuaWorld.AdminTest do
   end
 
   defp timers(world) do
-    for eid <- 1..300, t = MuaWorld.component(world, eid, "talk_timer"), do: {eid, t}
+    MuaWorld.timers(world)
   end
 end

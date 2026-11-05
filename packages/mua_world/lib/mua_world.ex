@@ -204,6 +204,9 @@ defmodule MuaWorld do
   @doc "Reads a component, through the World process."
   def component(world, eid, name), do: GenServer.call(world, {:component, eid, name})
 
+  @doc "Every timer kept in the World (`OdgnEcsEngine.Timers`). For tests and operators."
+  def timers(world), do: GenServer.call(world, :timers)
+
   @doc "Writes a component, through the World process, as one Step. For tests and operators."
   def set_component(world, eid, name, data),
     do: GenServer.call(world, {:set_component, eid, name, data}, 30_000)
@@ -358,7 +361,7 @@ defmodule MuaWorld do
     {:ok, talk} =
       OdgnEcsTalk.start(world,
         owner: owner,
-        capabilities: [&Talk.mua(world, table, &1)],
+        capabilities: [&OdgnEcsEngine.Timers.capability/1, &Talk.mua(world, table, &1)],
         limits: limits,
         on_show: &Tables.tell(world, &1, &2)
       )
@@ -475,7 +478,7 @@ defmodule MuaWorld do
   defp start_world(state) do
     {{:ok, _}, state} =
       run_step(state, fn state ->
-        Lifecycle.arm(state.world, state.talk, instant_us(state.world_ms))
+        Lifecycle.arm(state.world, instant_us(state.world_ms))
         :ok = OdgnEcs.System.arm(state.world, state.engine.systems, state.world_ms)
         system = OdgnEcsTalk.handle(state.talk, state.places.system)
 
@@ -672,6 +675,9 @@ defmodule MuaWorld do
   def handle_call({:advance, ms}, _from, state),
     do: {:reply, :ok, %{state | world_ms: state.world_ms + ms}}
 
+  def handle_call(:timers, _from, state),
+    do: {:reply, OdgnEcsEngine.Timers.all(state.world), state}
+
   def handle_call({:component, eid, name}, _from, state),
     do: {:reply, OdgnEcs.get(state.world, eid, name), state}
 
@@ -776,7 +782,7 @@ defmodule MuaWorld do
 
   # mua's own `timers`: a Script's timers go to its entity, from the engine.
   defp fire_lifecycle(state, timer) do
-    OdgnEcsTalk.remove_timer(state.talk, timer)
+    :ok = OdgnEcsEngine.Timers.remove(state.world, timer)
     owner = timer["owner"]
 
     cond do
@@ -794,7 +800,7 @@ defmodule MuaWorld do
         :ok
     end
 
-    Lifecycle.rearm(state.world, state.talk, timer, instant_us(state.world_ms))
+    Lifecycle.rearm(state.world, timer, instant_us(state.world_ms))
   end
 
   # What a reset does is the lifecycle Service's to decide (ADR 0024); the

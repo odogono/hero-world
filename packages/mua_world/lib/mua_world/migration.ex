@@ -21,7 +21,7 @@ defmodule MuaWorld.Migration do
 
   alias MuaWorld.{Exits, Lifecycle, Places}
 
-  @timer "talk_timer"
+  alias OdgnEcsEngine.Timers
 
   @type report :: %{
           plan: OdgnEdl.Plan.t(),
@@ -128,20 +128,18 @@ defmodule MuaWorld.Migration do
         OdgnEcs.get(world, owner, "timers"),
         do: :ok = OdgnEcs.remove(world, owner, "timers")
 
-    for owner <- owners, eid <- OdgnEcs.query(world, where: [{@timer, "owner", owner}]) do
-      timer = OdgnEcs.get(world, eid, @timer)
-      :ok = OdgnEcs.delete(world, eid)
+    for owner <- owners, timer <- Timers.owned_by(world, owner) do
+      :ok = Timers.remove(world, timer)
       %{owner: owner, message: timer["message"]}
     end
   end
 
-  # mua's timers whose entity is gone, or whose `timers` no longer declares them
+  # mua's timers whose `timers` no longer declares them; a timer goes with
+  # its entity
   defp cancel_stale_timers(world) do
-    for eid <- OdgnEcs.query(world, where: [{@timer, "script", Lifecycle.timers_script()}]),
-        timer = OdgnEcs.get(world, eid, @timer),
-        not OdgnEcs.exists?(world, timer["owner"]) or
-          Lifecycle.interval(world, timer["owner"], timer["name"]) == nil do
-      :ok = OdgnEcs.delete(world, eid)
+    for timer <- Timers.timers(world, Lifecycle.timers_script()),
+        Lifecycle.interval(world, timer["owner"], timer["name"]) == nil do
+      :ok = Timers.remove(world, timer)
       %{owner: timer["owner"], message: timer["name"]}
     end
   end
