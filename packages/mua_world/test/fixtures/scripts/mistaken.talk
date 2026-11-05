@@ -1,0 +1,8 @@
+-- Says no with the wrong shape of refusal
+on examine role, actor
+  return {refuse: "Not now."}
+end examine
+
+on read role, actor
+  return {refused: 3}
+end read

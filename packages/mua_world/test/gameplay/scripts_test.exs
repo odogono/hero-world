@@ -2,6 +2,7 @@
 defmodule MuaWorld.ScriptsTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
   import MuaWorld.Case
 
   @moduletag :tmp_dir
@@ -41,6 +42,18 @@ defmodule MuaWorld.ScriptsTest do
     assert ~s(bob says, "hello") in lines
     # `show the target` from the room's Script reaches everyone in the room
     assert "The guard grunts." in lines
+  end
+
+  test "fails a reply that is a map but not a refusal, and logs it", c do
+    log =
+      capture_log(fn ->
+        assert send_bob(c, "examine scroll") == "Something went wrong."
+        assert send_bob(c, "read scroll") == "Something went wrong."
+      end)
+
+    assert log =~ ~s(examine to )
+    assert log =~ ~s({refuse: "Not now."})
+    assert log =~ ~s({refused: 3})
   end
 
   test "reports a Script that fails, leaving no change", c do
