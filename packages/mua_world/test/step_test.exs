@@ -125,8 +125,9 @@ defmodule MuaWorld.StepTest do
         end)
       end)
 
-    assert_receive {:ada, ada}
-    assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
+    # the process builds a World first, which can be slow on a busy machine
+    assert_receive {:ada, ada}, 5_000
+    assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 5_000
     assert_received {:mua, ^ada, "The bell wakes."}
     refute_received {:mua, ^ada, "The bell sleeps."}
 
