@@ -7,26 +7,29 @@ defmodule MuaWorld.Systems do
 
   alias OdgnEcs.System
 
-  @doc "Every System a mua World runs."
-  def all do
+  @doc """
+  Every System a mua World runs, sending from `system`, the system actor.
+  Each runs with the Step's handle (`OdgnEcsEngine.Step`).
+  """
+  def all(system) do
     [
       # Every active NPC gets `heartbeat`, for its Scripts to act on
       %System{
         name: "npc_heartbeat",
         every: 45_000,
         query: [where: [{"npc", "active", true}]],
-        run: &heartbeat/2
+        run: &heartbeat(&1, &2, system)
       }
     ]
   end
 
-  defp heartbeat(npcs, state) do
-    system = OdgnEcsTalk.handle(state.talk, state.places.system)
+  defp heartbeat(npcs, step, system) do
+    system = OdgnEcsTalk.handle(step.talk, system)
 
     for npc <- npcs,
-        OdgnEcsTalk.scripted?(state.talk, npc),
-        do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, npc, "heartbeat", [system])
+        OdgnEcsTalk.scripted?(step.talk, npc),
+        do: {:ok, _} = OdgnEcsTalk.deliver(step.talk, npc, "heartbeat", [system])
 
-    state
+    :ok
   end
 end

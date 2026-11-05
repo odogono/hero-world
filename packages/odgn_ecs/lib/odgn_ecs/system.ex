@@ -60,6 +60,20 @@ defmodule OdgnEcs.System do
     Enum.filter(systems, &(now >= last[&1.name] + &1.every))
   end
 
+  @doc """
+  When the first of `systems` is next due, or `nil` for none. A System the
+  World hasn't seen yet isn't counted: it is armed when `due/3` first sees it.
+  """
+  @spec next_due(OdgnEcs.t(), [t()]) :: integer() | nil
+  def next_due(%OdgnEcs{} = world, systems) do
+    last = last_runs(world)
+
+    systems
+    |> Enum.filter(&Map.has_key?(last, &1.name))
+    |> Enum.map(&(last[&1.name] + &1.every))
+    |> Enum.min(fn -> nil end)
+  end
+
   defp last_runs(%OdgnEcs{conn: conn}) do
     SQL.exec!(conn, @schema)
 

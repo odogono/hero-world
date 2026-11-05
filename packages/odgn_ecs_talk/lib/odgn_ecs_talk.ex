@@ -595,6 +595,14 @@ defmodule OdgnEcsTalk do
 
   defp timer({eid, %{@timer => timer}}), do: Map.put(timer, "eid", eid)
 
+  @doc "When the earliest timer falls due, in microseconds, or `nil` if there is none."
+  def next_timer_at(%__MODULE__{world: world}) do
+    case OdgnEcs.select(world, [@timer], with: [@timer], order_by: {@timer, "at"}, limit: 1) do
+      [{_, %{@timer => %{"at" => at}}}] -> at
+      [] -> nil
+    end
+  end
+
   @doc """
   Stores a timer of the Host's own, as a Script's `schedule` does, replacing
   one of the same owner, `script` and name. `script` is a name of the Host's

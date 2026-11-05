@@ -20,6 +20,7 @@ defmodule MuaWorld.MixProject do
       {:odgn_ecs, path: "../odgn_ecs"},
       {:odgn_edl, path: "../odgn_edl"},
       {:odgn_ecs_talk, path: "../odgn_ecs_talk"},
+      {:odgn_ecs_engine, path: "../odgn_ecs_engine"},
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",

@@ -4,11 +4,16 @@ defmodule MuaWorld do
   instance, and orders every change to it (ADRs 0011 and 0015).
 
   The World is an `odgn_ecs` store, built from EDL once and resumed after
-  (`OdgnEdl.load/3`), and its Scripts run through `odgn_ecs_talk`.
+  (`OdgnEdl.load/3`), and its Scripts run through `odgn_ecs_talk`. The
+  World process is the Host of an `OdgnEcsEngine`, which runs its Steps,
+  timers and Systems (ADR 0021); mua adds its commands, outbox, notices,
+  identities and NPC queue.
 
   Inputs (commands and due timers) enter one at a time. Each is one Step:
-  the input, then `pump` until the Group is idle, then one `COMMIT`. Output
-  confirming the Step goes to subscribers only after that commit (ADR 0012).
+  the input, then Pumps until the Group is idle, then one `COMMIT`. Output
+  goes to the outbox (`MuaWorld.Tables`) inside the Step's transaction, so
+  output from a Segment that rolls back goes with it, and reaches
+  subscribers only after the commit that confirms it (ADR 0012).
 
   On start, timers carry on from the saved World time, every Script is loaded
   fresh, and each Character whose command was still waiting at the last stop
@@ -45,42 +50,37 @@ defmodule MuaWorld do
     Lifecycle,
     Lock,
     Places,
-    Step,
     Tables,
     Talk
   }
 
   alias MuaWorld.Commands.Verbs
+  alias OdgnEcsEngine.Delivery
 
-  import MuaWorld.Step, only: [instant: 1, instant_us: 1]
+  import OdgnEcsEngine, only: [instant_us: 1]
 
   defstruct [
     :world,
     # the database's path, whose lock file the World holds
     :path,
     :talk,
-    # Command contexts and notices, shared with `mua`'s callbacks.
+    # Notices, shared with `mua`'s callbacks, and each Character's
+    # subscribers, which the engine's hook publishes to.
     :table,
     # The verbs the World understands.
     :vocabulary,
     # Limbo, the system actor and the Starting room (`MuaWorld.Places`).
     :places,
-    # What the input of the current Step returns to its caller.
-    :result,
-    :fault,
+    # The engine (`OdgnEcsEngine`), whose `changes` are the last Step's
+    # change set, for the client mirror.
+    :engine,
+    # The current Step's handle (`OdgnEcsEngine.Step`), while one runs.
+    :step,
     :tick,
     # World time at the last reading, and the monotonic time it was read.
+    # The World keeps the clock, and gives the engine World time.
     :world_ms,
-    :read_at,
-    # When NorthTalk next needs pumping, in World time, if ever.
-    :next_deadline,
-    subscribers: %{},
-    # Inputs whose Runs are still waiting (`MuaWorld.Step.await/5`): what to
-    # do with the outcome, and their `mua_waiting` row.
-    waiting: %{},
-    # The last Step's change set (`OdgnEcs.take_changes/1`), for the client
-    # mirror
-    changes: []
+    :read_at
   ]
 
   @doc """
@@ -272,9 +272,8 @@ defmodule MuaWorld do
     state = %__MODULE__{
       world: world,
       path: path,
-      fault: opts[:fault],
       tick: Keyword.get(opts, :tick, 100),
-      world_ms: Tables.world_time(world),
+      world_ms: OdgnEcsEngine.Tables.world_time(world),
       read_at: now_ms()
     }
 
@@ -290,8 +289,9 @@ defmodule MuaWorld do
 
         case start_talk(state, Keyword.get(opts, :limits, [])) do
           {:ok, state} ->
+            state = start_world(start_engine(state))
             # a test's `fault` is for the Steps that follow start-up
-            state = %{start_world(%{state | fault: nil}) | fault: opts[:fault]}
+            state = put_in(state.engine.fault, opts[:fault])
             if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
             started(path, how, state.world_ms, abandoned)
             {:ok, state}
@@ -399,21 +399,91 @@ defmodule MuaWorld do
 
   defp diagnostics(reason), do: [%{"message" => inspect(reason)}]
 
+  # The engine runs mua's Systems and its own `timers`, sends the notices
+  # Scripts ask for between Pumps, takes each Step's outbox before its
+  # commit, and publishes it after.
+  defp start_engine(state) do
+    %{world: world, talk: talk, table: table} = state
+
+    engine =
+      OdgnEcsEngine.new(world, talk,
+        world_time: state.world_ms,
+        systems: MuaWorld.Systems.all(state.places.system),
+        timers: %{Lifecycle.timers_script() => &fire_lifecycle(in_step(state, &1), &2)},
+        between: Talk.between(talk, world, table),
+        output: fn -> Tables.take_outbox(world) end,
+        on_step: &on_step(table, &1),
+        telemetry: [:mua_world],
+        metadata: &%{lines: length(&1)}
+      )
+
+    %{state | engine: engine}
+  end
+
+  defp on_step(table, {:ok, %{output: lines}}), do: publish(table, lines)
+  # notices queued by the Step's Scripts went with it
+  defp on_step(table, {:error, _}), do: Talk.take_notices(table)
+
+  defp publish(table, lines) do
+    for {character, text} <- lines,
+        pid <- subscribers(table, character),
+        do: send(pid, {:mua, character, text})
+  end
+
+  defp subscribers(table, character) do
+    case :ets.lookup(table, {:subscribers, character}) do
+      [{_, pids}] -> pids
+      [] -> []
+    end
+  end
+
+  # The state as a Step's input sees it, with that Step's handle and time
+  defp in_step(state, step), do: %{state | step: step, world_ms: step.now}
+
+  # Runs `input`, a function of the state returning the Step's result, as
+  # one Step at the World's time.
+  defp run_step(state, input) do
+    {result, engine} =
+      OdgnEcsEngine.step(state.engine, &input.(in_step(state, &1)), at: state.world_ms)
+
+    {result, %{state | engine: engine}}
+  end
+
+  # Runs `input` as one Step for a Character, replying with the lines it
+  # was told, then runs the NPCs' commands.
+  defp reply_lines(state, character, input) do
+    case run_step(state, input) do
+      {{:ok, %{output: lines}}, state} ->
+        {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+
+      {{:error, _}, state} ->
+        {:reply, {:error, :step_failed}, run_npcs(state)}
+    end
+  end
+
+  # Runs `input` as one Step, replying with its result
+  defp reply_result(state, input) do
+    case run_step(state, input) do
+      {{:ok, %{result: result}}, state} -> {:reply, result, state}
+      {{:error, _}, state} -> {:reply, {:error, :step_failed}, state}
+    end
+  end
+
   # Arms mua's timers, then tells every scripted thing the World has
   # started, as one Step. Scripts load fresh on every start (ADR 0014), so
   # this is where they set themselves up again.
   defp start_world(state) do
-    {_, state} =
-      Step.run(state, fn state ->
+    {{:ok, _}, state} =
+      run_step(state, fn state ->
         Lifecycle.arm(state.world, state.talk, instant_us(state.world_ms))
-        :ok = OdgnEcs.System.arm(state.world, MuaWorld.Systems.all(), state.world_ms)
+        :ok = OdgnEcs.System.arm(state.world, state.engine.systems, state.world_ms)
         system = OdgnEcsTalk.handle(state.talk, state.places.system)
 
         for eid <- OdgnEcs.query(state.world, with: ["described"]),
             OdgnEcsTalk.scripted?(state.talk, eid),
             do: {:ok, _} = OdgnEcsTalk.deliver(state.talk, eid, "start", [system])
 
-        state
+        :ok
       end)
 
     state
@@ -431,16 +501,12 @@ defmodule MuaWorld do
     with :ok <- owns(state, account, character),
          :ok <- in_play(state, character) do
       admin? = (OdgnEcs.get(state.world, account, "account") || %{})["admin"] == true
-      state = advance_clock(state)
 
-      {lines, state} =
-        Step.run(state, fn state ->
-          if admin?,
-            do: run_admin_line(state, character, String.trim(line)),
-            else: tell(state, character, "You can't do that.")
-        end)
-
-      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+      reply_lines(advance_clock(state), character, fn state ->
+        if admin?,
+          do: run_admin_line(state, character, String.trim(line)),
+          else: tell(state, character, "You can't do that.")
+      end)
     else
       error -> {:reply, error, state}
     end
@@ -449,36 +515,31 @@ defmodule MuaWorld do
   def handle_call({:command, account, character, text}, _from, state) do
     with :ok <- owns(state, account, character),
          :ok <- in_play(state, character) do
-      state = advance_clock(state)
-      {lines, state} = Step.run(state, fn state -> input(state, character, String.trim(text)) end)
-      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+      reply_lines(advance_clock(state), character, &input(&1, character, String.trim(text)))
     else
       error -> {:reply, error, state}
     end
   end
 
   def handle_call({:sign_in, sub, email, admin?}, _from, state) do
-    {_, state} =
-      Step.run(state, fn state ->
-        world = state.world
+    reply_result(state, fn state ->
+      world = state.world
 
-        account =
-          case Tables.account_for(world, sub) do
-            nil ->
-              {:ok, eid} = OdgnEcs.create(world)
-              :ok = OdgnEcs.put(world, eid, "account", %{})
-              eid
+      account =
+        case Tables.account_for(world, sub) do
+          nil ->
+            {:ok, eid} = OdgnEcs.create(world)
+            :ok = OdgnEcs.put(world, eid, "account", %{})
+            eid
 
-            account ->
-              account
-          end
+          account ->
+            account
+        end
 
-        :ok = OdgnEcs.put(world, account, "account", %{"admin" => admin? == true})
-        Tables.put_identity(world, sub, email, account)
-        %{state | result: {:ok, account}}
-      end)
-
-    reply_result(state)
+      :ok = OdgnEcs.put(world, account, "account", %{"admin" => admin? == true})
+      Tables.put_identity(world, sub, email, account)
+      {:ok, account}
+    end)
   end
 
   def handle_call({:view, account, character}, _from, state) do
@@ -514,14 +575,11 @@ defmodule MuaWorld do
   end
 
   def handle_call(:create_account, _from, state) do
-    {_, state} =
-      Step.run(state, fn state ->
-        {:ok, eid} = OdgnEcs.create(state.world)
-        :ok = OdgnEcs.put(state.world, eid, "account", %{})
-        %{state | result: {:ok, eid}}
-      end)
-
-    reply_result(state)
+    reply_result(state, fn state ->
+      {:ok, eid} = OdgnEcs.create(state.world)
+      :ok = OdgnEcs.put(state.world, eid, "account", %{})
+      {:ok, eid}
+    end)
   end
 
   def handle_call({:create_character, account, name}, _from, state) do
@@ -538,26 +596,21 @@ defmodule MuaWorld do
         {:reply, {:error, :name_taken}, state}
 
       true ->
-        {_, state} =
-          Step.run(state, fn state ->
-            world = state.world
-            {:ok, eid} = OdgnEcs.create(world)
-            :ok = OdgnEcs.put(world, eid, "player", %{"name" => name, "account" => account})
-            :ok = OdgnEcs.put(world, eid, "meta", %{"props" => %{"id" => String.downcase(name)}})
-            :ok = OdgnEcs.put(world, eid, "location", %{"in" => state.places.limbo})
-            OdgnEcsTalk.handle(state.talk, eid)
-            %{state | result: {:ok, eid}}
-          end)
-
-        reply_result(state)
+        reply_result(state, fn state ->
+          world = state.world
+          {:ok, eid} = OdgnEcs.create(world)
+          :ok = OdgnEcs.put(world, eid, "player", %{"name" => name, "account" => account})
+          :ok = OdgnEcs.put(world, eid, "meta", %{"props" => %{"id" => String.downcase(name)}})
+          :ok = OdgnEcs.put(world, eid, "location", %{"in" => state.places.limbo})
+          OdgnEcsTalk.handle(state.talk, eid)
+          {:ok, eid}
+        end)
     end
   end
 
   def handle_call({:enter, account, character}, _from, state) do
     with :ok <- owns(state, account, character) do
-      state = advance_clock(state)
-      {lines, state} = Step.run(state, &enter_play(&1, character))
-      {:reply, {:ok, for({^character, t} <- lines, do: t)}, run_npcs(state)}
+      reply_lines(advance_clock(state), character, &enter_play(&1, character))
     else
       error -> {:reply, error, state}
     end
@@ -565,9 +618,10 @@ defmodule MuaWorld do
 
   def handle_call({:leave, account, character}, _from, state) do
     with :ok <- owns(state, account, character) do
-      state = advance_clock(state)
-      {_, state} = Step.run(state, &leave_play(&1, character))
-      {:reply, :ok, run_npcs(state)}
+      case reply_lines(advance_clock(state), character, &leave_play(&1, character)) do
+        {:reply, {:ok, _}, state} -> {:reply, :ok, state}
+        reply -> reply
+      end
     else
       error -> {:reply, error, state}
     end
@@ -589,23 +643,24 @@ defmodule MuaWorld do
 
   def handle_call(:places, _from, state), do: {:reply, state.places, state}
 
-  def handle_call({:reset, place}, _from, state) do
-    state = advance_clock(state)
-    {_, state} = Step.run(state, &reset_place(&1, place))
-    reply_result(state)
-  end
+  def handle_call({:reset, place}, _from, state),
+    do: reply_result(advance_clock(state), &reset_place(&1, place))
 
   def handle_call({:subscribe, character, pid}, _from, state) do
     :ok = OdgnEcs.begin(state.world)
     notices = Tables.take_notices(state.world, character)
     :ok = OdgnEcs.commit(state.world)
     for t <- notices, do: send(pid, {:mua, character, t})
-    live = Enum.filter(Map.get(state.subscribers, character, []), &Process.alive?/1)
-    {:reply, :ok, put_in(state.subscribers[character], [pid | live -- [pid]])}
+    live = Enum.filter(subscribers(state.table, character), &Process.alive?/1)
+    :ets.insert(state.table, {{:subscribers, character}, [pid | live -- [pid]]})
+    {:reply, :ok, state}
   end
 
-  def handle_call({:unsubscribe, character, pid}, _from, state),
-    do: {:reply, :ok, update_in(state.subscribers[character], &List.delete(&1 || [], pid))}
+  def handle_call({:unsubscribe, character, pid}, _from, state) do
+    pids = List.delete(subscribers(state.table, character), pid)
+    :ets.insert(state.table, {{:subscribers, character}, pids})
+    {:reply, :ok, state}
+  end
 
   def handle_call(:tick, _from, state), do: {:reply, :ok, run_due(advance_clock(state))}
 
@@ -620,19 +675,13 @@ defmodule MuaWorld do
   def handle_call({:component, eid, name}, _from, state),
     do: {:reply, OdgnEcs.get(state.world, eid, name), state}
 
-  def handle_call({:set_component, eid, name, data}, _from, state) do
-    {_, state} =
-      Step.run(state, fn state -> %{state | result: OdgnEcs.put(state.world, eid, name, data)} end)
-
-    reply_result(state)
-  end
+  def handle_call({:set_component, eid, name, data}, _from, state),
+    do: reply_result(state, &OdgnEcs.put(&1.world, eid, name, data))
 
   def handle_call({:named, name}, _from, state),
     do: {:reply, OdgnEdl.entity_named(state.world, name), state}
 
   def handle_call(:verbs, _from, state), do: {:reply, Verbs.list(state.vocabulary), state}
-
-  defp reply_result(state), do: {:reply, state.result, %{state | result: nil}}
 
   # ---------------------------------------------------------------------
   # Accounts and Characters
@@ -719,71 +768,33 @@ defmodule MuaWorld do
 
   defp now_ms, do: System.monotonic_time(:millisecond)
 
-  # Due timers each run as a Step, and so does a NorthTalk deadline, such as
-  # the end of a Script's `wait`, and each due System.
+  # The engine runs what is due at World time, each as its own Step (due
+  # timers, NorthTalk's deadline, due Systems), then the NPCs' commands run.
   defp run_due(state) do
-    # World time is kept on every tick, so a restart resumes close to where
-    # it stopped even when nothing happened in between.
-    Tables.put_world_time(state.world, state.world_ms)
-
-    state =
-      state.talk
-      |> OdgnEcsTalk.due_timers(instant_us(state.world_ms))
-      |> Enum.reduce(state, fn timer, state ->
-        {_, state} = Step.run(state, &fire(&1, timer))
-        state
-      end)
-
-    state =
-      if state.next_deadline != nil and state.next_deadline <= state.world_ms,
-        do: elem(Step.run(state, & &1), 1),
-        else: state
-
-    state = run_systems(state)
-    run_npcs(state)
+    run_npcs(%{state | engine: OdgnEcsEngine.advance(state.engine, state.world_ms)})
   end
 
-  # Each due System runs as a Step of its own
-  defp run_systems(state) do
-    state.world
-    |> OdgnEcs.System.due(MuaWorld.Systems.all(), state.world_ms)
-    |> Enum.reduce(state, fn system, state ->
-      {_, state} =
-        Step.run(state, &OdgnEcs.System.run(&1.world, system, &1.world_ms, &1))
+  # mua's own `timers`: a Script's timers go to its entity, from the engine.
+  defp fire_lifecycle(state, timer) do
+    OdgnEcsTalk.remove_timer(state.talk, timer)
+    owner = timer["owner"]
 
-      state
-    end)
-  end
+    cond do
+      not OdgnEcs.exists?(state.world, owner) ->
+        :ok
 
-  # A Script's timer goes to its entity; mua's own `timers` are handled here.
-  defp fire(state, %{"script" => script} = timer) do
-    if script == Lifecycle.timers_script() do
-      OdgnEcsTalk.remove_timer(state.talk, timer)
-      owner = timer["owner"]
+      timer["message"] == "reset" ->
+        reset_place(state, owner)
 
-      state =
-        cond do
-          not OdgnEcs.exists?(state.world, owner) ->
-            state
+      OdgnEcsTalk.scripted?(state.talk, owner) ->
+        system = OdgnEcsTalk.handle(state.talk, state.places.system)
+        {:ok, _} = OdgnEcsTalk.deliver(state.talk, owner, timer["message"], [system])
 
-          timer["message"] == "reset" ->
-            reset_place(state, owner)
-
-          OdgnEcsTalk.scripted?(state.talk, owner) ->
-            system = OdgnEcsTalk.handle(state.talk, state.places.system)
-            {:ok, _} = OdgnEcsTalk.deliver(state.talk, owner, timer["message"], [system])
-            state
-
-          true ->
-            state
-        end
-
-      Lifecycle.rearm(state.world, state.talk, timer, instant_us(state.world_ms))
-      state
-    else
-      OdgnEcsTalk.fire_timer(state.talk, timer)
-      state
+      true ->
+        :ok
     end
+
+    Lifecycle.rearm(state.world, state.talk, timer, instant_us(state.world_ms))
   end
 
   # What a reset does is the lifecycle Service's to decide (ADR 0024); the
@@ -793,9 +804,14 @@ defmodule MuaWorld do
     handle = OdgnEcsTalk.handle(talk, place)
 
     {:ok, pending} =
-      OdgnEcsTalk.request_service(talk, "lifecycle", "reset", [handle], instant(state.world_ms))
+      OdgnEcsEngine.deliver(state.step, %Delivery{
+        to: {:service, "lifecycle"},
+        message: "reset",
+        args: [handle],
+        asks: :request
+      })
 
-    state = Step.pump(state)
+    :ok = OdgnEcsEngine.pump(state.step)
 
     moved =
       case OdgnEcsTalk.outcome(pending) do
@@ -813,7 +829,7 @@ defmodule MuaWorld do
       {:ok, _} = OdgnEcsTalk.deliver(state.talk, place, "reset", [system])
     end
 
-    %{state | result: moved}
+    moved
   end
 
   # The NPC commands queued so far, each a Step of its own. Any they queue
@@ -821,7 +837,7 @@ defmodule MuaWorld do
   defp run_npcs(state) do
     Enum.reduce(Tables.queued_acts(state.world), state, fn {id, actor, text}, state ->
       {_, state} =
-        Step.run(state, fn state ->
+        run_step(state, fn state ->
           Tables.delete_act(state.world, id)
           npc_input(state, actor, text)
         end)
@@ -985,34 +1001,25 @@ defmodule MuaWorld do
   defp answerable?(state, eid), do: OdgnEcsTalk.scripted?(state.talk, eid)
 
   # Sends one question, Pumps until idle, and answers `k` now or, if its Run
-  # is still waiting, in the Step that sees it end.
+  # is still waiting, in the Step that sees it end: a Waiting input.
   defp ask(state, ctx, q, k) do
-    talk = state.talk
-    now = instant(state.world_ms)
-    args = Enum.map(q.args, &arg(state, &1))
-    host = [host: ctx]
+    delivery = %Delivery{
+      to: q.to,
+      message: q.message,
+      args: Enum.map(q.args, &Talk.value(state.talk, &1)),
+      asks: if(q.asks == :offer, do: :request, else: :decide),
+      host: ctx
+    }
 
-    {:ok, pending} =
-      case {q.asks, q.to} do
-        {:offer, {:service, service}} ->
-          OdgnEcsTalk.request_service(talk, service, q.message, args, now, host)
+    waiting = %{actor: ctx.actor, input: ctx.raw}
 
-        {:offer, eid} ->
-          OdgnEcsTalk.request(talk, eid, q.message, args, now, host)
-
-        {:decide, {:service, service}} ->
-          OdgnEcsTalk.decide_service(talk, service, q.message, args, host)
-
-        {:decide, eid} ->
-          OdgnEcsTalk.decide(talk, eid, q.message, args, host)
-      end
-
-    Step.await(state, pending, ctx.actor, ctx.raw, fn state, outcome ->
-      k.(state, reply(q, outcome))
-    end)
+    case OdgnEcsEngine.ask(state.step, delivery, waiting, fn step, outcome ->
+           k.(in_step(state, step), reply(q, outcome))
+         end) do
+      :waiting -> state
+      state -> state
+    end
   end
-
-  defp arg(state, value), do: Step.value(state, value)
 
   # What a question's outcome means to Dispatch: a Decision's veto is its
   # answer, as a reply is a Request's.
@@ -1062,17 +1069,16 @@ defmodule MuaWorld do
     {outcome, state} =
       with :ok <- OdgnEcsTalk.put_service_script(talk, service, MuaWorld.Admin.source(line)),
            {:ok, pending} <-
-             OdgnEcsTalk.request_service(
-               talk,
-               service,
-               "line",
-               [
+             OdgnEcsEngine.deliver(state.step, %Delivery{
+               to: {:service, service},
+               message: "line",
+               args: [
                  OdgnEcsTalk.handle(talk, actor),
                  OdgnEcsTalk.handle(talk, location(state, actor))
                ],
-               instant(state.world_ms)
-             ) do
-        state = Step.pump(state)
+               asks: :request
+             }) do
+        :ok = OdgnEcsEngine.pump(state.step)
         outcome = OdgnEcsTalk.outcome(pending)
         if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
         {outcome, state}
