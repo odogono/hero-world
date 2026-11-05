@@ -10,7 +10,7 @@ function carried thing, seen
   if the location of thing is nothing then
     return false
   end if
-  ask world to resolve the in of the location of thing into holder
+  put the in of the location of thing into holder
   if holder is nothing or holder is in seen then
     return false
   end if
@@ -26,7 +26,7 @@ on reset place
   repeat for each thing in homed
     put nothing into here
     if the location of thing is not nothing then
-      ask world to resolve the in of the location of thing into here
+      put the in of the location of thing into here
     end if
     if here is not place and not carried(thing, []) then
       moveTo thing, place

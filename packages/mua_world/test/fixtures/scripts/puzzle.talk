@@ -8,8 +8,7 @@ on unlock role, actor
     return "There is no keyhole you can see."
   end if
   put the name of the described of the indirect of cmd into thing
-  ask world to resolve the in of the location of actor
-  tell mua to announce it, the name of the player of actor & " fiddles with the puzzle box.", actor
+  tell mua to announce the in of the location of actor, the name of the player of actor & " fiddles with the puzzle box.", actor
   ask clock to now
   tell timer to schedule "settle", it + 1 s, "settle", []
   return "You press the " & thing & " into a gap between the panels."
@@ -19,10 +18,10 @@ end unlock
 on settle
   ask mua to command
   put it into cmd
-  ask world to resolve the in of the location of the target
+  put the in of the location of the target into here
   if cmd is nothing then
-    tell mua to announce it, "The panels settle.", nothing
+    tell mua to announce here, "The panels settle.", nothing
   else
-    tell mua to announce it, "The panels remember " & the verb of cmd & ".", nothing
+    tell mua to announce here, "The panels remember " & the verb of cmd & ".", nothing
   end if
 end settle

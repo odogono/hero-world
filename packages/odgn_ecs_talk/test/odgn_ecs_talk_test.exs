@@ -190,9 +190,12 @@ defmodule OdgnEcsTalkTest do
 
     @place """
     on go
-      ask world to resolve the to of the link of the target
-      send arrive to it
+      send arrive to the to of the link of the target
     end go
+
+    on leadsTo place
+      return the to of the link of the target is place
+    end leadsTo
 
     on arrive
       show the target, "arrived"
@@ -222,6 +225,15 @@ defmodule OdgnEcsTalkTest do
       for _ <- 1..3, do: OdgnEcsTalk.pump(talk, now())
 
       assert_received {:show, ^far, "arrived"}
+    end
+
+    test "give a Script a reference field as the Handle it names" do
+      {world, talk} = links()
+      far = OdgnEcsTalk.handle(talk, id(world, "far"))
+      near = OdgnEcsTalk.handle(talk, id(world, "near"))
+
+      assert value(ask(talk, id(world, "near"), "leadsTo", [far])) == true
+      assert value(ask(talk, id(world, "near"), "leadsTo", [near])) == false
     end
 
     test "resolve an id that names no entity to Nothing" do

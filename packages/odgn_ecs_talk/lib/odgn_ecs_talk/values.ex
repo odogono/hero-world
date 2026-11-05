@@ -2,14 +2,27 @@ defmodule OdgnEcsTalk.Values do
   @moduledoc false
   # Between component data and NorthTalk Values. NorthTalk refuses floats and
   # takes ordered maps, so floats become Decimals and maps NorthTalk.Maps; an
-  # entity's Handle stands for its id.
+  # entity's Handle stands for its id, both ways: a reference column (`:eid`)
+  # reaches a Script as the Handle, and a Handle is stored as the id.
 
   alias NorthTalk.Object
 
-  @doc "Component data for a Script, as a map in column order."
-  def component(%OdgnEcs.Component{columns: columns}, data) do
-    NorthTalk.Map.new(for c <- columns, do: {c.name, to_value(Map.get(data, c.name))})
+  @doc """
+  Component data for a Script, as a map in column order. `handle` gives the
+  Handle for a reference column's id, or nil when it has none.
+  """
+  def component(%OdgnEcs.Component{columns: columns}, data, handle) do
+    NorthTalk.Map.new(
+      for c <- columns do
+        {c.name, column_value(c, Map.get(data, c.name), handle)}
+      end
+    )
   end
+
+  defp column_value(%OdgnEcs.Column{type: :eid}, eid, handle) when is_integer(eid),
+    do: handle.(eid)
+
+  defp column_value(_column, v, _handle), do: to_value(v)
 
   def to_value(f) when is_float(f), do: Decimal.from_float(f)
 

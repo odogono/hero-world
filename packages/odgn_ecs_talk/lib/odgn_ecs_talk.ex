@@ -13,7 +13,10 @@ defmodule OdgnEcsTalk do
   - **Handles:** each entity's Host Object, made by `start/2` for every entity
     and by `handle/2` for one made later. Callbacks can't make Objects, so an
     entity made during play needs `handle/2` before a Script can reach it.
-    Every component is a read-only property: its data, or Nothing. Elements
+    Every component is a read-only property: its data, or Nothing. A
+    reference field (an `:eid` column) holds the entity's Handle, or Nothing
+    when it has none, so `the in of the location of x is y` compares Handles.
+    `world`'s `resolve` still turns a bare id into a Handle. Elements
     are the entities whose Location field holds the entity, in id order,
     named by the naming field.
   - **Message Path:** an unhandled message climbs the scripted atoms of the
@@ -826,8 +829,11 @@ defmodule OdgnEcsTalk do
            get_cost: 1,
            get: fn eid ->
              case OdgnEcs.exists?(world, eid) && OdgnEcs.get(world, eid, name) do
-               data when is_map(data) -> {:ok, Values.component(component, data)}
-               _ -> {:ok, nil}
+               data when is_map(data) ->
+                 {:ok, Values.component(component, data, &existing_handle(talk, &1))}
+
+               _ ->
+                 {:ok, nil}
              end
            end
          ]}

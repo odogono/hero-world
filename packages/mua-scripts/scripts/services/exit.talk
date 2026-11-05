@@ -14,8 +14,7 @@ on beforeTraverse actor, way, deciding
   if the door of the portal of way is nothing then
     pass beforeTraverse
   end if
-  ask world to resolve the door of the portal of way
-  put it into door
+  put the door of the portal of way into door
   if isClosed(door) then
     put "door" into doorName
     if the described of door is not nothing then

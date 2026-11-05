@@ -47,7 +47,7 @@ on setClosed target, actor, verb, closing
 
   change target, kind, merge(data, {is_closed: closing})
 
-  ask world to resolve the in of the location of actor into here
+  put the in of the location of actor into here
   put messageFor(verb, "omsg", {actor: actor, target: target}) into others
   if others is not nothing then
     tell mua to announce here, others, actor
@@ -62,8 +62,8 @@ on setClosed target, actor, verb, closing
     ask world to find here, "portal" into ways
     repeat for each way in ways
       if the optional door of the portal of way is not nothing and the optional to of the portal of way is not nothing then
-        ask world to resolve the door of the portal of way into door
-        ask world to resolve the to of the portal of way into beyond
+        put the door of the portal of way into door
+        put the to of the portal of way into beyond
         if door is target and beyond is not here then
           tell mua to announce beyond, line, nothing
         end if

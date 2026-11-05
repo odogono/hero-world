@@ -3,8 +3,7 @@
 
 -- Every NPC's heartbeat (mua's npc_heartbeat System) is a chance to potter
 on heartbeat actor
-  ask world to resolve the in of the location of the target
-  if the name of the described of it is "Orchard" then
+  if the name of the described of the in of the location of the target is "Orchard" then
     tell mua to act the target, "south"
   else
     tell mua to act the target, "north"
