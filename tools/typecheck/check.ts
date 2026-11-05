@@ -11,6 +11,7 @@ const PROJECTS = [
   'packages/ecs',
   'packages/helpers',
   'packages/mua_client',
+  'packages/mua-world',
   'tools'
 ];
 

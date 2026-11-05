@@ -191,7 +191,7 @@ Properties
 
 Property
   = key:Identifier _ ':' _ value:Value {
-      return [toCamelCase(key), value] as [string, unknown];
+      return [key, value] as [string, unknown];
     }
 
 IdentifierOrString

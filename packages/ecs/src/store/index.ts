@@ -693,3 +693,4 @@ export const select = (
   const p = plan(store, known, opts);
   return p ? all(store.db, p.sql, p.args).map(p.read) : [];
 };
+export { elements, type ElementsOptions } from './elements';

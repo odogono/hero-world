@@ -1,0 +1,21 @@
+{
+  "name": "mua-world",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --cache .",
+    "lint:fix": "eslint --fix .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "odgn-ecs": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}

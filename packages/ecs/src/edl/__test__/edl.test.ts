@@ -163,7 +163,7 @@ entity lockable_chest: chest {
           components: {
             described: { name: 'Chest', description: 'A simple wooden chest.' },
             thing: { size: 10, weight: 20 },
-            container: { capacity: 50, isClosed: false }
+            container: { capacity: 50, is_closed: false }
           }
         },
         {
@@ -171,8 +171,8 @@ entity lockable_chest: chest {
           id: 'lockable_chest',
           extends: ['chest'],
           components: {
-            lockable: { isLocked: false, key: 'brass_key' },
-            container: { isClosed: true }
+            lockable: { is_locked: false, key: 'brass_key' },
+            container: { is_closed: true }
           }
         }
       ]);
@@ -356,7 +356,7 @@ entity lockable_chest: chest {
         thing { size: 10 weight: 20 }
       }
       entity child {
-        link { target_id: $parent }
+        link { targetId: $parent }
       }
       `;
 
@@ -400,7 +400,7 @@ entity lockable_chest: chest {
     it('should support forward references', async () => {
       const edl = `
       entity child {
-        link { target_id: $parent }
+        link { targetId: $parent }
       }
       entity parent {
         thing { size: 10 weight: 20 }
@@ -427,7 +427,7 @@ entity lockable_chest: chest {
 
     it('should throw on unknown entity reference', async () => {
       const edl = `
-      entity child { link { target_id: $missing } }
+      entity child { link { targetId: $missing } }
       `;
 
       const world = await createWorld([linkComponent]);

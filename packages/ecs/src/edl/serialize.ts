@@ -1,5 +1,3 @@
-import { toSnakeCase } from 'odgn-helpers/string';
-
 import type { CDef, CDefColumnInfo, EntityWithComponents } from '../types';
 
 const isDate = (value: unknown): value is Date =>
@@ -12,10 +10,8 @@ type SerializableEntity =
       name?: string;
     };
 
-const normalizeIdentifier = (value: string): string => {
-  const normalized = toSnakeCase(value);
-  return normalized && normalized.length > 0 ? normalized : value;
-};
+// EDL keeps names and keys as written, as `odgn_edl` does
+const normalizeIdentifier = (value: string): string => value;
 
 const escapeString = (value: string): string =>
   value
