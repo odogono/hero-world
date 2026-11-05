@@ -17,12 +17,12 @@ The caller drives it: it Pumps with `pump/2` inside its own transaction, as Mua'
 
 ## What Scripts get
 
-- **Handles:** each component is a read-only property of an entity: its data, or Nothing. Floats reach Scripts as Decimals, and maps as ordered maps. Elements are the entities whose Location (`location.in` by default) is the entity, in id order, named by `meta.props.id` by default.
+- **Handles:** each component is a read-only property of an entity: its data, or Nothing. Floats reach Scripts as Decimals, and maps as ordered maps. A reference field (an `:eid` column, such as `location.in`) holds the Handle of the entity it names, or Nothing if that entity has none, so `the in of the location of x is y` compares Handles. Elements are the entities whose Location (`location.in` by default) is the entity, in id order, named by `meta.props.id` by default.
 - **Message Path:** an unhandled message climbs the scripted atoms of the entity's Lineage, linearized: each base, rightmost first, then that base's own bases, with a shared ancestor after every atom built on it (`OdgnEcsTalk.MessagePath`). An atom that sits on several paths gets a Host Object for each, running a copy of its Script named `atom@path`.
 - **`world`:**
   - `change` and `moveTo` are Segment-bound Host Commands: each Segment is a SAVEPOINT, so a Segment that rolls back leaves no trace.
   - `show` is a fire-and-forget Host Command that calls the `:on_show` option.
-  - `find`, `resolve` and `named` (an entity by Definition name) are lookups.
+  - `find`, `resolve` (a bare id to its Handle) and `named` (an entity by Definition name) are lookups.
 - **`clock`:** `now`, the Pump's Clock reading.
 - **`timer`:** `schedule name, at, message, args` and `cancel name`. Timers are kept in the World as `talk_timer` entities, so they outlive the adapter. Each belongs to the entity its Run was delivered to. `due_timers/2` lists the timers due, and `fire_timer/2` delivers one. A Host keeps timers of its own in the same store with `schedule/2`, under a script name of its choosing, lists them with `timers/2`, and handles them itself, removing each with `remove_timer/2`.
 - **Libraries:** `add_library/5` compiles a Library whose functions may call `world`, `clock`, `timer` and any Capabilities named, with their caller's Grants.

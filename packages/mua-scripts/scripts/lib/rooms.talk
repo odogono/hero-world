@@ -29,8 +29,7 @@ function wayName way
   if the door of the portal of way is nothing then
     return dir
   end if
-  ask world to resolve the door of the portal of way
-  if isClosed(it) then
+  if isClosed(the door of the portal of way) then
     return dir & " (closed)"
   end if
   return dir

@@ -21,8 +21,7 @@ end listNames
 function report verb, target, actor
   put messageFor(verb, "omsg", {actor: actor, target: target}) into others
   if others is not nothing and the location of actor is not nothing then
-    ask world to resolve the in of the location of actor
-    tell mua to announce it, others, actor
+    tell mua to announce the in of the location of actor, others, actor
   end if
   return messageFor(verb, "msg", {actor: actor, target: target}) otherwise ""
 end report
@@ -95,8 +94,7 @@ function takeRefusal target, actor
     end if
     return "Take what?"
   end if
-  ask world to resolve the in of the location of target
-  if it is actor then
+  if the in of the location of target is actor then
     return "You already have that."
   end if
   if the player of target is not nothing then
@@ -129,8 +127,7 @@ on drop target, actor
   if target is nothing or the location of target is nothing or the location of actor is nothing then
     return {refused: "Drop what?"}
   end if
-  ask world to resolve the in of the location of actor
-  moveTo target, it
+  moveTo target, the in of the location of actor
   return report("drop", target, actor)
 end drop
 

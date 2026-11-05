@@ -16,7 +16,6 @@ on water role, actor
   if nameOf(what) is not "watering can" then
     return `The ${nameOf(what)} won't help the roses.`
   end if
-  ask world to resolve the in of the location of actor
-  tell mua to announce it, `${the name of the player of actor} waters the roses.`, actor
+  tell mua to announce the in of the location of actor, `${the name of the player of actor} waters the roses.`, actor
   return "You water the roses. They drink gratefully and lift their heads."
 end water
