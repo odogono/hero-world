@@ -2,6 +2,8 @@
 # the hall and the study, a chest holding a closed box, two keys, and a cat
 # that wanders in from the kitchen and talks on a short timer.
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

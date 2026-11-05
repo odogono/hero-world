@@ -122,7 +122,7 @@ defmodule MuaWorld.Input do
         listener? =
           first != nil and
             Enum.any?(
-              Scope.in_scope(world, actor, "room"),
+              Scope.in_reach(world, actor, "room"),
               &(&1.player? and Bind.matches?(&1, [first]))
             )
 

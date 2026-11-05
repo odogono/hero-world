@@ -1,5 +1,7 @@
 # A small world with non-player characters driven by Scripts
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

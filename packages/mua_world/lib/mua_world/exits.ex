@@ -16,6 +16,7 @@ defmodule MuaWorld.Exits do
   @doc "Makes the missing exits. Returns the ids of the exits it made."
   @spec expand(OdgnEcs.t()) :: [OdgnEcs.eid()]
   def expand(world) do
+    vocabulary = Verbs.from_world(world)
     rooms = OdgnEcs.query(world, with: ["exits"])
 
     # ways back wait until every room's own exits exist, so an exit a room
@@ -24,14 +25,14 @@ defmodule MuaWorld.Exits do
       Enum.reduce(rooms, {[], []}, fn room, {made, back} ->
         exits = OdgnEcs.get(world, room, "exits")
 
-        Enum.reduce(Verbs.directions(), {made, back}, fn dir, {made, back} ->
+        Enum.reduce(Verbs.directions(vocabulary), {made, back}, fn dir, {made, back} ->
           case spec(exits[dir]) do
             nil ->
               {made, back}
 
             spec ->
               made = made ++ List.wrap(add(world, room, dir, spec))
-              opposite = Verbs.opposite(dir)
+              opposite = Verbs.opposite(vocabulary, dir)
 
               if is_integer(spec["to"]) and spec["one_way"] != true and opposite,
                 do:

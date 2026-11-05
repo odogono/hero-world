@@ -254,7 +254,10 @@ defmodule MuaWorld do
 
     # A World built from another EDL won't start until it is migrated: say so
     # plainly rather than crash
-    case OdgnEdl.load(world, File.read!(edl_path), path: edl_path) do
+    case OdgnEdl.load(world, File.read!(edl_path),
+           path: edl_path,
+           roots: MuaWorld.Scripts.roots()
+         ) do
       {:ok, world, how} ->
         init_loaded(opts, world, path, how)
 
@@ -332,7 +335,7 @@ defmodule MuaWorld do
   @libraries ~w(rooms things)
   @services ~w(room exit)
 
-  defp behaviour(path), do: Path.join([:code.priv_dir(:mua_world), "behaviours", path])
+  defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
 
   defp start_talk(state, limits) do
     world = state.world
@@ -356,7 +359,12 @@ defmodule MuaWorld do
 
     for name <- @services,
         do:
-          :ok = OdgnEcsTalk.load_service_script(talk, name, File.read!(behaviour("#{name}.talk")))
+          :ok =
+            OdgnEcsTalk.load_service_script(
+              talk,
+              name,
+              File.read!(behaviour("services/#{name}.talk"))
+            )
 
     :ok = OdgnEcsTalk.load_scripts(talk, &File.read!/1)
     %{state | talk: talk, table: table}

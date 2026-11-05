@@ -1,6 +1,6 @@
 # Hero World
 
-Game worlds described in EDL, stored in an ECS, and driven by NorthTalk Scripts.
+Game worlds described in EDL, the text format a World is declared in, stored in an ECS, and driven by NorthTalk Scripts.
 
 ## Players
 
@@ -181,3 +181,15 @@ _Avoid_: built-in, effect
 **Reach**:
 The part of a Character's Perception that a Verb's noun can name: here, carried, or the room. It never extends past Perception.
 _Avoid_: scope, range
+
+**Base Verbs**:
+The Verbs, Directions, Aliases and articles every World starts with, included from shared EDL.
+_Avoid_: built-in verbs, default verbs
+
+**Direction**:
+A named way out of a room, such as north or up, paired with its opposite.
+_Avoid_: exit (for the word)
+
+**Alias**:
+A short word that stands for a Direction or Verb name, such as `n` for north.
+_Avoid_: abbreviation, shortcut

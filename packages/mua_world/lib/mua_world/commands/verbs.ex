@@ -1,157 +1,90 @@
 defmodule MuaWorld.Commands.Verbs do
   @moduledoc """
-  Verb definitions: the words a player can type and the forms each verb
-  accepts, ported from `commands/verbs.ts`. The parser tries a verb's forms
-  in order, and the first match picks the handler (an action id).
+  A World's vocabulary: its Verbs, with the forms each can be typed in, and
+  its Directions, Aliases and articles. All of it is World data (ADR 0024):
+  the Base Verbs come from `mua-scripts/edl/base.edl`, which a World's EDL
+  includes, and a World adds its own with more `verbs` and `words`
+  components. The parser tries a verb's forms in order, and the first match
+  picks the handler (an action id).
 
   A form's pattern is a space-separated list of slots and literal words:
 
-  - `dir`: a direction word (`north`, `n`, ...)
+  - `dir`: a Direction word (`north`, `n`, ...)
   - `obj`: a noun phrase, captured as the target (the direct object)
   - `obj2`: a second noun phrase after a preposition, captured as the indirect
   - `text`: the rest of the input, case preserved
   - any other word: a literal, such as a preposition, matched exactly
 
   An empty pattern matches the verb on its own. Noun phrases are bound to
-  entities after parsing, in the form's scope: `inv` (carried), `room` (not
+  entities after parsing, within the form's Reach: `carried`, `room` (not
   carried) or `here` (both, the default).
 
-  A world adds verbs with a `verbs` component (`from_world/1`).
+  A Verb's `vetoes` are the `before…` Decisions asked before its Action:
+  `%{event, asks, about}`, where `asks` and `about` are roles that
+  `MuaWorld.Dispatch` resolves.
   """
 
   @type form :: %{
           handler: String.t(),
           pattern: String.t(),
-          scope: String.t() | nil,
-          indirect_scope: String.t() | nil
+          reach: String.t() | nil,
+          indirect_reach: String.t() | nil
         }
-  @type verb :: %{names: [String.t()], forms: [form()], incomplete: String.t() | nil}
-  @type vocabulary :: %{by_name: %{String.t() => verb()}, defs: [verb()]}
+  @type veto :: %{event: String.t(), asks: String.t(), about: String.t()}
+  @type verb :: %{
+          names: [String.t()],
+          forms: [form()],
+          incomplete: String.t() | nil,
+          vetoes: [veto()]
+        }
+  @type vocabulary :: %{
+          by_name: %{String.t() => verb()},
+          defs: [verb()],
+          vetoes: %{String.t() => [veto()]},
+          directions: [{String.t(), String.t() | nil}],
+          aliases: %{String.t() => String.t()},
+          articles: [String.t()]
+        }
 
-  @aliases %{
-    "d" => "down",
-    "e" => "east",
-    "n" => "north",
-    "ne" => "northeast",
-    "nw" => "northwest",
-    "s" => "south",
-    "se" => "southeast",
-    "sw" => "southwest",
-    "u" => "up",
-    "w" => "west"
-  }
+  @reaches ~w(here carried room)
 
-  @directions ~w(north south east west northeast northwest southeast southwest up down in out)
-
-  @opposites %{
-    "down" => "up",
-    "east" => "west",
-    "in" => "out",
-    "north" => "south",
-    "northeast" => "southwest",
-    "northwest" => "southeast",
-    "out" => "in",
-    "south" => "north",
-    "southeast" => "northwest",
-    "southwest" => "northeast",
-    "up" => "down",
-    "west" => "east"
-  }
-
-  @scopes ~w(here inv room)
-
-  def aliases, do: @aliases
-  def directions, do: @directions
-  def opposite(direction), do: @opposites[direction]
-  def articles, do: ~w(a an the)
+  @doc "The words that repeat the last command. The Host reads these itself."
   def again_words, do: ~w(again g)
 
-  @doc "A direction word, or its short form, as a direction; `nil` otherwise."
-  def to_direction(nil), do: nil
+  @doc "A Direction word, or an Alias of one, as a Direction; `nil` otherwise."
+  def to_direction(_vocabulary, nil), do: nil
 
-  def to_direction(word) do
-    direction = Map.get(@aliases, word, word)
-    if direction in @directions, do: direction
+  def to_direction(vocabulary, word) do
+    direction = Map.get(vocabulary.aliases, word, word)
+    if List.keymember?(vocabulary.directions, direction, 0), do: direction
   end
 
-  defp f(handler, pattern, opts \\ []),
-    do: %{
-      handler: handler,
-      pattern: pattern,
-      scope: opts[:scope],
-      indirect_scope: opts[:indirect_scope]
-    }
+  @doc "The Directions, in the order a World declares them."
+  def directions(vocabulary), do: Enum.map(vocabulary.directions, &elem(&1, 0))
 
-  @verbs [
-    %{
-      names: ~w(look l examine x),
-      incomplete: nil,
-      forms: [
-        {"look", ""},
-        {"look", "around"},
-        {"examine", "at obj"},
-        {"examine", "in obj"},
-        {"examine", "obj"}
-      ]
-    },
-    %{
-      names: ~w(move go walk),
-      incomplete: "Where do you want to go?",
-      forms: [{"move", "dir"}, {"move", "to dir"}]
-    },
-    %{
-      names: ~w(take get pick),
-      incomplete: "What do you want to take?",
-      forms: [{"take", "up obj"}, {"take", "obj"}]
-    },
-    %{
-      names: ~w(drop),
-      incomplete: "What do you want to drop?",
-      forms: [{"drop", "obj", scope: "inv"}]
-    },
-    %{names: ~w(read), incomplete: "What do you want to read?", forms: [{"read", "obj"}]},
-    %{names: ~w(help commands), incomplete: nil, forms: [{"help", ""}]},
-    %{names: ~w(inventory inv i), incomplete: nil, forms: [{"inventory", ""}]},
-    %{names: ~w(open), incomplete: "What do you want to open?", forms: [{"open", "obj"}]},
-    %{names: ~w(close shut), incomplete: "What do you want to close?", forms: [{"close", "obj"}]},
-    %{
-      names: ~w(lock),
-      incomplete: "What do you want to lock?",
-      forms: [{"lock", "obj with obj2", indirect_scope: "inv"}, {"lock", "obj"}]
-    },
-    %{
-      names: ~w(unlock),
-      incomplete: "What do you want to unlock?",
-      forms: [{"unlock", "obj with obj2", indirect_scope: "inv"}, {"unlock", "obj"}]
-    },
-    %{
-      names: ~w(say),
-      incomplete: "What do you want to say?",
-      forms: [{"sayTo", "to obj text", scope: "room"}, {"say", "text"}]
-    }
-  ]
-
-  @doc "The built-in verbs."
-  def built_in do
-    for v <- @verbs do
-      forms =
-        Enum.map(v.forms, fn
-          {h, p} -> f(h, p)
-          {h, p, opts} -> f(h, p, opts)
-        end)
-
-      %{v | forms: forms}
+  @doc "A Direction's opposite, or `nil`."
+  def opposite(vocabulary, direction) do
+    case List.keyfind(vocabulary.directions, direction, 0) do
+      {_, opposite} -> opposite
+      nil -> nil
     end
   end
 
   @doc """
-  The built-in verbs plus a world's own. A world verb that shares a name with
-  another adds its forms, which are tried first: a world can add
-  `look under obj` without replacing `look`.
+  A vocabulary from `verbs` and `words` components, in order. A verb that
+  shares a name with an earlier one adds its forms, which are tried first: a
+  World can add `look under obj` without replacing `look`. A malformed verb
+  is skipped.
   """
-  @spec vocabulary([verb()]) :: vocabulary()
-  def vocabulary(extra \\ []) do
-    defs = built_in() ++ extra
+  @spec from_components([map()]) :: vocabulary()
+  def from_components(components) do
+    defs =
+      for %{"verbs" => %{"defs" => defs}} when is_list(defs) <- components,
+          def <- defs,
+          verb = to_verb(def),
+          do: verb
+
+    words = for %{"words" => %{} = words} <- components, do: words
 
     by_name =
       Enum.reduce(defs, %{}, fn def, acc ->
@@ -166,56 +99,97 @@ defmodule MuaWorld.Commands.Verbs do
         end)
       end)
 
-    %{by_name: by_name, defs: defs}
+    %{
+      by_name: by_name,
+      defs: defs,
+      vetoes: vetoes(defs),
+      directions: directions_of(words),
+      aliases: merge(words, "aliases"),
+      articles: words |> Enum.flat_map(&strings(&1["articles"])) |> Enum.uniq()
+    }
   end
 
   @doc """
-  The vocabulary of a World: the built-ins plus the verbs every entity's
-  `verbs` component declares. A malformed verb is skipped.
+  The vocabulary of a World: every entity's `verbs` and `words` components,
+  in entity order, so the Base Verbs a World includes first come first.
   """
   @spec from_world(OdgnEcs.t()) :: vocabulary()
   def from_world(world) do
-    world
-    |> OdgnEcs.query(with: ["verbs"])
-    |> Enum.flat_map(fn eid ->
-      case OdgnEcs.get(world, eid, "verbs")["defs"] do
-        defs when is_list(defs) -> Enum.flat_map(defs, &List.wrap(to_verb(&1)))
-        _ -> []
-      end
+    (OdgnEcs.query(world, with: ["verbs"]) ++ OdgnEcs.query(world, with: ["words"]))
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.map(fn eid ->
+      %{"verbs" => OdgnEcs.get(world, eid, "verbs"), "words" => OdgnEcs.get(world, eid, "words")}
     end)
-    |> vocabulary()
+    |> from_components()
   end
 
+  # Each handler's Vetoes. A later Verb declaring Vetoes for a handler
+  # replaces the earlier ones.
+  defp vetoes(defs) do
+    for def <- defs, def.vetoes != [], form <- def.forms, reduce: %{} do
+      acc -> Map.put(acc, form.handler, def.vetoes)
+    end
+  end
+
+  # A later Direction of the same name replaces the earlier, in its place
+  defp directions_of(words) do
+    for %{"directions" => list} when is_list(list) <- words,
+        %{"name" => name} = d when is_binary(name) <- list,
+        reduce: [] do
+      acc ->
+        opposite = if is_binary(d["opposite"]), do: String.downcase(d["opposite"])
+        List.keystore(acc, String.downcase(name), 0, {String.downcase(name), opposite})
+    end
+  end
+
+  defp merge(words, key) do
+    for %{^key => %{} = map} <- words,
+        {k, v} <- map,
+        is_binary(k) and is_binary(v),
+        into: %{},
+        do: {String.downcase(k), String.downcase(v)}
+  end
+
+  defp strings(list), do: for(s <- List.wrap(list), is_binary(s), do: String.downcase(s))
+
   defp to_verb(%{} = def) do
-    names = for n <- List.wrap(def["names"]), is_binary(n), do: String.downcase(n)
+    names = strings(def["names"])
     forms = for form <- List.wrap(def["forms"]), f = to_form(form), do: f
+    vetoes = for veto <- List.wrap(def["vetoes"]), v = to_veto(veto), do: v
 
     if names != [] and forms != [] do
       incomplete = if is_binary(def["incomplete"]), do: def["incomplete"]
-      %{names: names, forms: forms, incomplete: incomplete}
+      %{names: names, forms: forms, incomplete: incomplete, vetoes: vetoes}
     end
   end
 
   defp to_verb(_), do: nil
 
   defp to_form(%{"handler" => h, "pattern" => p} = form) when is_binary(h) and is_binary(p) do
-    scope = form["scope"]
-    indirect = form["indirect_scope"]
+    reach = form["reach"]
+    indirect = form["indirect_reach"]
 
-    if scope in [nil | @scopes] and indirect in [nil | @scopes],
-      do: f(h, p, scope: scope, indirect_scope: indirect)
+    if reach in [nil | @reaches] and indirect in [nil | @reaches],
+      do: %{handler: h, pattern: p, reach: reach, indirect_reach: indirect}
   end
 
   defp to_form(_), do: nil
 
+  defp to_veto(%{"event" => e, "asks" => a, "about" => s})
+       when is_binary(e) and is_binary(a) and is_binary(s),
+       do: %{event: e, asks: a, about: s}
+
+  defp to_veto(_), do: nil
+
   @doc """
   Every word that starts a command, for clients to complete: each verb's
-  names, then the directions and their short forms, then `again`.
+  names, then the Directions and their Aliases, then `again`.
   """
-  def list(vocabulary \\ vocabulary()) do
+  def list(vocabulary) do
     Enum.uniq(
       Enum.flat_map(vocabulary.defs, & &1.names) ++
-        @directions ++ Map.keys(@aliases) ++ again_words()
+        directions(vocabulary) ++ Enum.sort(Map.keys(vocabulary.aliases)) ++ again_words()
     )
   end
 end

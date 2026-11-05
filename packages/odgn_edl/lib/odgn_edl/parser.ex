@@ -4,7 +4,7 @@ defmodule OdgnEdl.Parser do
 
   import NimbleParsec
 
-  alias OdgnEdl.{Atom, Column, ComponentDef, Entity, Ref}
+  alias OdgnEdl.{Atom, Column, ComponentDef, Entity, Include, Ref}
 
   # -- Whitespace and comments ------------------------------------------------
 
@@ -158,6 +158,12 @@ defmodule OdgnEdl.Parser do
     |> concat(components)
     |> reduce({__MODULE__, :to_node, [Entity]})
 
+  include_def =
+    ignore(string("include"))
+    |> concat(sp)
+    |> unwrap_and_tag(string_lit, :path)
+    |> reduce({__MODULE__, :to_node, [Include]})
+
   # -- Component definitions --------------------------------------------------
 
   json_column =
@@ -195,7 +201,7 @@ defmodule OdgnEdl.Parser do
   defparsec(
     :edl,
     ws
-    |> repeat(choice([atom_def, entity_def, component_def]) |> concat(ws))
+    |> repeat(choice([include_def, atom_def, entity_def, component_def]) |> concat(ws))
     |> eos()
   )
 

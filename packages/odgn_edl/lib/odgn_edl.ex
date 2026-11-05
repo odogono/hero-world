@@ -54,6 +54,22 @@ defmodule OdgnEdl do
     end
   end
 
+  @doc """
+  Parses EDL source and reads in the files its `include` lines name (ADR
+  0025). Returns the definitions and the source the World's EDL hash is
+  taken from: the EDL's own source, followed by each included file's.
+
+    * `:path` - the `.edl` file's path, which relative includes resolve
+      against.
+    * `:roots` - named roots, `%{"mua-scripts" => dir}`, for includes
+      written as `"mua-scripts:edl/base.edl"`.
+  """
+  @spec read(String.t(), keyword()) :: {:ok, [definition()], String.t()} | {:error, Error.t()}
+  def read(source, opts \\ []) do
+    with {:ok, definitions} <- parse(source),
+         do: OdgnEdl.Includes.expand(definitions, source, opts)
+  end
+
   # -- Build ------------------------------------------------------------------
 
   @doc """
@@ -62,12 +78,13 @@ defmodule OdgnEdl do
   nothing changes. Like every change, it is durable once the caller commits
   (or, outside a transaction, as soon as it returns).
 
-  `:path` is the `.edl` file's path, which `script { src: }` values are
-  resolved against.
+  `:path` is the `.edl` file's path, which `script { src: }` values and
+  relative includes are resolved against; `:roots` names include roots, as
+  for `read/2`.
   """
   @spec build(OdgnEcs.t(), String.t(), keyword()) :: {:ok, OdgnEcs.t()} | {:error, Error.t()}
   def build(%OdgnEcs{} = world, source, opts \\ []) do
-    with {:ok, definitions} <- parse(source) do
+    with {:ok, definitions, source} <- read(source, opts) do
       OdgnEdl.Build.run(world, source, definitions, opts)
     end
   end
@@ -87,7 +104,7 @@ defmodule OdgnEdl do
 
   It runs in one savepoint, so on an error nothing changes. Options:
 
-    * `:path` - the `.edl` file's path, as for `build/3`.
+    * `:path`, `:roots` - as for `build/3`.
     * `:dry_run` - work out the plan, then roll everything back.
     * `:prune` - a function called with each entity whose Definition name is
       gone from the EDL, to take it out of play; its Definition name is then
@@ -100,15 +117,22 @@ defmodule OdgnEdl do
   @spec migrate(OdgnEcs.t(), String.t(), keyword()) ::
           {:ok, OdgnEcs.t(), OdgnEdl.Plan.t()} | {:error, Error.t()}
   def migrate(%OdgnEcs{} = world, source, opts \\ []) do
-    with {:ok, definitions} <- parse(source) do
+    with {:ok, definitions, source} <- read(source, opts) do
       OdgnEdl.Migrate.run(world, source, definitions, Keyword.delete(opts, :build))
     end
   end
 
-  @doc "Whether `source` differs from the EDL the World was built or last migrated from."
-  @spec changed?(OdgnEcs.t(), String.t()) :: boolean()
-  def changed?(%OdgnEcs{} = world, source),
-    do: OdgnEdl.Record.hash(world) != OdgnEdl.Migrate.hash(source)
+  @doc """
+  Whether `source`, with the files it includes, differs from the EDL the
+  World was built or last migrated from. Takes the options of `read/2`.
+  """
+  @spec changed?(OdgnEcs.t(), String.t(), keyword()) :: boolean()
+  def changed?(%OdgnEcs{} = world, source, opts \\ []) do
+    case read(source, opts) do
+      {:ok, _definitions, source} -> OdgnEdl.Record.hash(world) != OdgnEdl.Migrate.hash(source)
+      {:error, _} -> true
+    end
+  end
 
   @doc """
   Builds the World from EDL if it is empty, or resumes it if it was built or
@@ -124,14 +148,16 @@ defmodule OdgnEdl do
         with {:ok, world} <- build(world, source, opts), do: {:ok, world, :built}
 
       hash ->
-        if hash == OdgnEdl.Migrate.hash(source) do
-          {:ok, world, :resumed}
-        else
-          {:error,
-           Error.new(
-             :migration_needed,
-             "The EDL has changed since this World was built; it needs a Migration"
-           )}
+        with {:ok, _definitions, source} <- read(source, opts) do
+          if hash == OdgnEdl.Migrate.hash(source) do
+            {:ok, world, :resumed}
+          else
+            {:error,
+             Error.new(
+               :migration_needed,
+               "The EDL has changed since this World was built; it needs a Migration"
+             )}
+          end
         end
     end
   end

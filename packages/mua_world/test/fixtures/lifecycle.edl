@@ -1,5 +1,7 @@
 # A small world for Limbo, the system actor and lifecycle messages
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

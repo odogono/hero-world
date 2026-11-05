@@ -71,38 +71,49 @@ defmodule MuaWorld.Dispatch do
   # Questions asked before an action changes the World, as Decisions. Any
   # entity asked can veto, by a fixed `responses { veto: { <event>: ... } }`
   # or a handler `on <event> actor, subject, deciding` that runs `veto`.
-  defp veto_events(world, %{verb: "move"} = ctx) do
-    case plan_move(world, ctx) do
-      {:go, exit, from, to} ->
-        [
-          {"beforeTraverse", {:service, "exit"}, exit},
-          {"beforeExit", from, to},
-          {"beforeEnter", to, from}
-        ]
+  # Which Decisions a Verb raises is World data, its `vetoes`; each names
+  # who is asked and what about as a role. When a role is missing, such as
+  # a move with no exit, or the action would refuse anyway, none is asked.
+  defp veto_events(world, ctx) do
+    vetoes = get_in(ctx, [:vocabulary, :vetoes, ctx.verb]) || []
 
-      _ ->
-        []
+    if vetoes == [] or refuses?(world, ctx) do
+      []
+    else
+      roles = roles(world, ctx)
+
+      events =
+        for %{event: event, asks: asks, about: about} <- vetoes,
+            do: {event, role(roles, asks), role(roles, about)}
+
+      if Enum.any?(events, fn {_, to, subject} -> to == nil or subject == nil end),
+        do: [],
+        else: events
     end
   end
 
-  defp veto_events(world, %{verb: "take"} = ctx) do
-    holder = Scope.location(world, ctx[:target_id])
+  defp refuses?(world, %{verb: "take"} = ctx), do: Actions.take_refusal(world, ctx) != nil
+  defp refuses?(_world, _ctx), do: false
 
-    if Actions.take_refusal(world, ctx) || holder == nil,
-      do: [],
-      else: [{"beforeRemove", holder, ctx.target_id}, {"beforeAdd", ctx.actor, ctx.target_id}]
+  defp roles(world, ctx) do
+    target = ctx[:target_id]
+
+    move =
+      case ctx.verb == "move" && plan_move(world, ctx) do
+        {:go, exit, from, to} -> %{"exit" => exit, "from" => from, "to" => to}
+        _ -> %{}
+      end
+
+    Map.merge(move, %{
+      "actor" => ctx.actor,
+      "target" => target,
+      "holder" => target && Scope.location(world, target),
+      "room" => Scope.location(world, ctx.actor)
+    })
   end
 
-  defp veto_events(world, %{verb: "drop"} = ctx) do
-    holder = Scope.location(world, ctx[:target_id])
-    room = Scope.location(world, ctx.actor)
-
-    if holder && room,
-      do: [{"beforeRemove", holder, ctx.target_id}, {"beforeAdd", room, ctx.target_id}],
-      else: []
-  end
-
-  defp veto_events(_world, _ctx), do: []
+  defp role(_roles, "service:" <> name), do: {:service, name}
+  defp role(roles, name), do: roles[name]
 
   # A fixed reply from an entity's `responses`, by role (or `veto`) and key
   defp response(_world, {:service, _}, _, _), do: nil

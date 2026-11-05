@@ -8,6 +8,7 @@ defmodule OdgnEdl.Error do
   @type kind ::
           :syntax
           | :command
+          | :include
           | :already_built
           | :migration_needed
           | :invalid_rename

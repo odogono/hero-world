@@ -1,0 +1,393 @@
+{
+  "edl": "house.edl",
+  "actor": "ada",
+  "cases": [
+    {
+      "name": "look on its own",
+      "input": "look",
+      "expect": {
+        "commands": [
+          {
+            "verb": "look"
+          }
+        ]
+      }
+    },
+    {
+      "name": "look around",
+      "input": "look around",
+      "expect": {
+        "commands": [
+          {
+            "verb": "look"
+          }
+        ]
+      }
+    },
+    {
+      "name": "look at a thing, dropping an article",
+      "input": "look at the lamp",
+      "expect": {
+        "commands": [
+          {
+            "verb": "examine",
+            "target": "lamp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "look in a thing",
+      "input": "look in box",
+      "expect": {
+        "commands": [
+          {
+            "verb": "examine",
+            "target": "box"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an Alias of look with a noun",
+      "input": "x lantern",
+      "expect": {
+        "commands": [
+          {
+            "verb": "examine",
+            "target": "lamp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "go in a Direction",
+      "input": "go north",
+      "expect": {
+        "commands": [
+          {
+            "verb": "move",
+            "direction": "north"
+          }
+        ]
+      }
+    },
+    {
+      "name": "go to a Direction",
+      "input": "walk to north",
+      "expect": {
+        "commands": [
+          {
+            "verb": "move",
+            "direction": "north"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a Direction on its own",
+      "input": "south",
+      "expect": {
+        "commands": [
+          {
+            "verb": "move",
+            "direction": "south"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a Direction's Alias",
+      "input": "ne",
+      "expect": {
+        "commands": [
+          {
+            "verb": "move",
+            "direction": "northeast"
+          }
+        ]
+      }
+    },
+    {
+      "name": "go without a Direction",
+      "input": "go",
+      "expect": {
+        "reply": "Where do you want to go?"
+      }
+    },
+    {
+      "name": "go somewhere that is no Direction",
+      "input": "go banana",
+      "expect": {
+        "reply": "Where do you want to go?"
+      }
+    },
+    {
+      "name": "take a thing",
+      "input": "take the lamp",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pick up a thing",
+      "input": "pick up lamp",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take nothing",
+      "input": "take",
+      "expect": {
+        "reply": "What do you want to take?"
+      }
+    },
+    {
+      "name": "drop a carried thing",
+      "input": "drop coin",
+      "expect": {
+        "commands": [
+          {
+            "verb": "drop",
+            "target": "coin"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drop reaches only what is carried",
+      "input": "drop lamp",
+      "expect": {
+        "reply": "You aren't carrying any lamp."
+      }
+    },
+    {
+      "name": "read a thing",
+      "input": "read note",
+      "expect": {
+        "commands": [
+          {
+            "verb": "read",
+            "target": "note"
+          }
+        ]
+      }
+    },
+    {
+      "name": "help",
+      "input": "help",
+      "expect": {
+        "commands": [
+          {
+            "verb": "help"
+          }
+        ]
+      }
+    },
+    {
+      "name": "inventory by its Alias",
+      "input": "i",
+      "expect": {
+        "commands": [
+          {
+            "verb": "inventory"
+          }
+        ]
+      }
+    },
+    {
+      "name": "open a thing",
+      "input": "open box",
+      "expect": {
+        "commands": [
+          {
+            "verb": "open",
+            "target": "box"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shut is close",
+      "input": "shut box",
+      "expect": {
+        "commands": [
+          {
+            "verb": "close",
+            "target": "box"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lock a door with a carried key",
+      "input": "lock door with iron key",
+      "expect": {
+        "commands": [
+          {
+            "verb": "lock",
+            "target": "door",
+            "indirect": "iron_key"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lock reaches only carried keys",
+      "input": "lock door with brass key",
+      "expect": {
+        "reply": "You aren't carrying any brass key."
+      }
+    },
+    {
+      "name": "lock a door on its own",
+      "input": "lock door",
+      "expect": {
+        "commands": [
+          {
+            "verb": "lock",
+            "target": "door"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unlock a door with a key",
+      "input": "unlock the door with the iron key",
+      "expect": {
+        "commands": [
+          {
+            "verb": "unlock",
+            "target": "door",
+            "indirect": "iron_key"
+          }
+        ]
+      }
+    },
+    {
+      "name": "say keeps the text as typed",
+      "input": "say Hello  there, Bob",
+      "expect": {
+        "commands": [
+          {
+            "verb": "say",
+            "text": "Hello  there, Bob"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a leading quote says the rest",
+      "input": "'Hi all",
+      "expect": {
+        "commands": [
+          {
+            "verb": "say",
+            "text": "Hi all"
+          }
+        ]
+      }
+    },
+    {
+      "name": "say to someone in the room",
+      "input": "say to bob hi",
+      "expect": {
+        "commands": [
+          {
+            "verb": "sayTo",
+            "target": "bob",
+            "text": "hi"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a listener's name says to them",
+      "input": "bob hello",
+      "expect": {
+        "commands": [
+          {
+            "verb": "sayTo",
+            "target": "bob",
+            "text": "hello"
+          }
+        ]
+      }
+    },
+    {
+      "name": "say nothing",
+      "input": "say",
+      "expect": {
+        "reply": "What do you want to say?"
+      }
+    },
+    {
+      "name": "an unknown word",
+      "input": "dance",
+      "expect": {
+        "reply": "Unknown command: \"dance\""
+      }
+    },
+    {
+      "name": "nothing typed",
+      "input": "   ",
+      "expect": {
+        "reply": "Please enter a command."
+      }
+    },
+    {
+      "name": "two things answer to a word",
+      "input": "take key",
+      "expect": {
+        "reply": "Which do you mean: the iron key or the brass key?"
+      }
+    },
+    {
+      "name": "the reply to which do you mean",
+      "input": ["take key", "brass"],
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "brass_key"
+          }
+        ]
+      }
+    },
+    {
+      "name": "again repeats the last input",
+      "input": ["take lamp", "g"],
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "it is the last thing named",
+      "input": ["examine lamp", "take it"],
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          }
+        ]
+      }
+    }
+  ]
+}

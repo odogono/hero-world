@@ -1,6 +1,8 @@
 # timers.edl after an edit, for migrations: a garden north of the hall,
 # the belfry no longer chimes, and the lamp is described afresh
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

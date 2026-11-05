@@ -56,6 +56,7 @@ defmodule MuaWorld.Migration do
     result =
       OdgnEdl.migrate(world, source,
         path: opts[:path],
+        roots: Keyword.get(opts, :roots, MuaWorld.Scripts.roots()),
         dry_run: opts[:dry_run] == true,
         prune: prune,
         finish: finish

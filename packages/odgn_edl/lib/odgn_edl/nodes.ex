@@ -56,3 +56,14 @@ defmodule OdgnEdl.Ref do
 
   @type t :: %__MODULE__{name: String.t(), path: [String.t() | non_neg_integer()]}
 end
+
+defmodule OdgnEdl.Include do
+  @moduledoc """
+  An `include "path"` line: another EDL file whose definitions are read in
+  its place. `root:rest` names a root the caller configures; any other path
+  is relative to the including file.
+  """
+  defstruct path: nil
+
+  @type t :: %__MODULE__{path: String.t()}
+end

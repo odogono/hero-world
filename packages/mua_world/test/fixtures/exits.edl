@@ -1,5 +1,7 @@
 # A small map made with the exits shorthand
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

@@ -1,0 +1,142 @@
+# The Base Verbs: the Verbs, Directions, Aliases and articles every World
+# starts with (ADR 0024). A World's EDL includes this file:
+#
+#   include "mua-scripts:edl/base.edl"
+#
+# A World adds forms to a Verb by declaring a Verb of the same name, whose
+# forms are tried first.
+#
+# Each form names its handler and pattern. A pattern's slots are `dir` (a
+# Direction), `obj` (the thing acted on), `obj2` (a second thing, after a
+# preposition), `text` (the rest of the line) and literal words. `reach` and
+# `indirect_reach` say where `obj` and `obj2` are looked for: `here` (the
+# default), `carried` or `room`.
+#
+# A Verb's `vetoes` are the `before…` Decisions asked before its Action, in
+# order. `asks` is who decides and `about` the entity it concerns, each one
+# of the roles the Host knows: actor, target, holder (what holds the
+# target), room (where the actor is), exit, from, to, or `service:<name>`.
+
+entity base_verbs {
+  verbs {
+    defs: [
+      {
+        names: ["look" "l" "examine" "x"]
+        forms: [
+          { handler: "look" pattern: "" }
+          { handler: "look" pattern: "around" }
+          { handler: "examine" pattern: "at obj" }
+          { handler: "examine" pattern: "in obj" }
+          { handler: "examine" pattern: "obj" }
+        ]
+      }
+      {
+        names: ["move" "go" "walk"]
+        forms: [
+          { handler: "move" pattern: "dir" }
+          { handler: "move" pattern: "to dir" }
+        ]
+        incomplete: "Where do you want to go?"
+        vetoes: [
+          { event: "beforeTraverse" asks: "service:exit" about: "exit" }
+          { event: "beforeExit" asks: "from" about: "to" }
+          { event: "beforeEnter" asks: "to" about: "from" }
+        ]
+      }
+      {
+        names: ["take" "get" "pick"]
+        forms: [
+          { handler: "take" pattern: "up obj" }
+          { handler: "take" pattern: "obj" }
+        ]
+        incomplete: "What do you want to take?"
+        vetoes: [
+          { event: "beforeRemove" asks: "holder" about: "target" }
+          { event: "beforeAdd" asks: "actor" about: "target" }
+        ]
+      }
+      {
+        names: ["drop"]
+        forms: [{ handler: "drop" pattern: "obj" reach: "carried" }]
+        incomplete: "What do you want to drop?"
+        vetoes: [
+          { event: "beforeRemove" asks: "holder" about: "target" }
+          { event: "beforeAdd" asks: "room" about: "target" }
+        ]
+      }
+      {
+        names: ["read"]
+        forms: [{ handler: "read" pattern: "obj" }]
+        incomplete: "What do you want to read?"
+      }
+      {
+        names: ["help" "commands"]
+        forms: [{ handler: "help" pattern: "" }]
+      }
+      {
+        names: ["inventory" "inv" "i"]
+        forms: [{ handler: "inventory" pattern: "" }]
+      }
+      {
+        names: ["open"]
+        forms: [{ handler: "open" pattern: "obj" }]
+        incomplete: "What do you want to open?"
+      }
+      {
+        names: ["close" "shut"]
+        forms: [{ handler: "close" pattern: "obj" }]
+        incomplete: "What do you want to close?"
+      }
+      {
+        names: ["lock"]
+        forms: [
+          { handler: "lock" pattern: "obj with obj2" indirect_reach: "carried" }
+          { handler: "lock" pattern: "obj" }
+        ]
+        incomplete: "What do you want to lock?"
+      }
+      {
+        names: ["unlock"]
+        forms: [
+          { handler: "unlock" pattern: "obj with obj2" indirect_reach: "carried" }
+          { handler: "unlock" pattern: "obj" }
+        ]
+        incomplete: "What do you want to unlock?"
+      }
+      {
+        names: ["say"]
+        forms: [
+          { handler: "sayTo" pattern: "to obj text" reach: "room" }
+          { handler: "say" pattern: "text" }
+        ]
+        incomplete: "What do you want to say?"
+      }
+    ]
+  }
+
+  # Each Direction with its opposite, in the order a room lists its exits,
+  # the Aliases that stand for them, and
+  # the articles a noun phrase may start with.
+  words {
+    directions: [
+      { name: "north" opposite: "south" }
+      { name: "south" opposite: "north" }
+      { name: "east" opposite: "west" }
+      { name: "west" opposite: "east" }
+      { name: "northeast" opposite: "southwest" }
+      { name: "northwest" opposite: "southeast" }
+      { name: "southeast" opposite: "northwest" }
+      { name: "southwest" opposite: "northeast" }
+      { name: "up" opposite: "down" }
+      { name: "down" opposite: "up" }
+      { name: "in" opposite: "out" }
+      { name: "out" opposite: "in" }
+    ]
+    aliases: {
+      n: "north" s: "south" e: "east" w: "west"
+      ne: "northeast" nw: "northwest" se: "southeast" sw: "southwest"
+      u: "up" d: "down"
+    }
+    articles: ["a" "an" "the"]
+  }
+}

@@ -1,5 +1,7 @@
 # A small world that adds verbs of its own, for its Scripts to handle
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
   script { src: "scripts/plain-room.talk" }
@@ -23,7 +25,7 @@ entity world_verbs {
       {
         names: ["pray" "kneel"]
         forms: [
-          { handler: "prayTo" pattern: "to obj" scope: "room" }
+          { handler: "prayTo" pattern: "to obj" reach: "room" }
           { handler: "pray" pattern: "" }
         ]
         incomplete: "Pray to whom?"

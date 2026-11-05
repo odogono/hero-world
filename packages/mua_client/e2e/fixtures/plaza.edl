@@ -1,6 +1,9 @@
 # A small World for the browser checks: a plaza with a coin, and a garden
 # to the north.
 
+include "mua-scripts:edl/base.edl"
+
+
 atom room {}
 
 atom item {

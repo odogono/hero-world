@@ -1,5 +1,7 @@
 # A small world where a Script reads the command it handles
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

@@ -12,6 +12,9 @@ defmodule MuaWorld.Components do
 
   alias OdgnEcs.{Column, Component}
 
+  # The columns of `exits`, one per Direction in the Base Verbs. A World's
+  # own Directions are World data, but an `exits` component can only name
+  # one of these.
   @directions ~w(north northeast east southeast south southwest west northwest up down in out)
 
   @doc "Every component a mua World defines, `odgn_ecs_talk`'s and `odgn_edl`'s included."
@@ -41,6 +44,11 @@ defmodule MuaWorld.Components do
       c("lockable", true, [col("is_locked", :boolean, default: false), col("lock", :string)]),
       c("key", false, [col("opens", :array)]),
       c("verbs", false, [col("defs", :json)]),
+      c("words", false, [
+        col("directions", :json),
+        col("aliases", :json),
+        col("articles", :array)
+      ]),
       c("readable", false, [col("text", :string)]),
       c("home", true, [col("in", :eid)]),
       c("noun", false, [col("words", :array)]),

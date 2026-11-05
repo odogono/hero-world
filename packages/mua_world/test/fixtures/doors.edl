@@ -1,5 +1,7 @@
 # A small world with a lockable door between two rooms
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

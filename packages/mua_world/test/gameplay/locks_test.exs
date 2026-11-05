@@ -1,6 +1,6 @@
 # Adapted from packages/mua/src/server/mua-world/__test__/locks.test.ts: the
 # same behaviour, built in (MuaWorld.Actions) and as a Script
-# (priv/behaviours/lockable.talk), must pass every case.
+# (packages/mua-scripts/scripts/services/lockable.talk), must pass every case.
 for {kind, fixture} <- [{"BuiltIn", "locks.edl"}, {"Scripted", "locks-scripted.edl"}] do
   defmodule Module.concat(MuaWorld.LocksTest, kind) do
     use ExUnit.Case, async: true

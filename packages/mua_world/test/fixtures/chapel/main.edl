@@ -1,6 +1,8 @@
 # A chapel with a statue, a lever, a candle and a sexton. Tests make Ada, a
 # Character, and enter her here.
 
+include "mua-scripts:edl/base.edl"
+
 def pulled {
   yes: boolean
 }
