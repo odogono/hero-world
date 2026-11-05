@@ -1,6 +1,7 @@
 # The World the command cases run in: Ada stands in a hall with a lamp, a
-# box, two keys and a note, and carries a coin. Bob, another Character, is
-# here too. A door leads north.
+# box with a pebble in it, a closed chest, two keys and a note, and carries
+# a coin and the iron key. Bob, another Character, is here too. A door leads
+# north.
 
 include "mua-scripts:edl/base.edl"
 
@@ -70,4 +71,20 @@ entity note : item {
 entity coin : item {
   described { name: "Coin" description: "A gold coin." }
   location { in: $ada }
+}
+
+entity pebble : item {
+  described { name: "Pebble" description: "A smooth pebble." }
+  location { in: $box }
+}
+
+entity chest {
+  described { name: "Chest" description: "A heavy chest." }
+  container { capacity: 10 is_closed: true }
+  location { in: $hall }
+}
+
+entity gem : item {
+  described { name: "Gem" description: "A red gem." }
+  location { in: $chest }
 }

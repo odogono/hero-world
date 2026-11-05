@@ -388,6 +388,186 @@
           }
         ]
       }
+    },
+    {
+      "name": "take all that is around you",
+      "input": "take all",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          },
+          {
+            "verb": "take",
+            "target": "box"
+          },
+          {
+            "verb": "take",
+            "target": "pebble"
+          },
+          {
+            "verb": "take",
+            "target": "brass_key"
+          },
+          {
+            "verb": "take",
+            "target": "note"
+          },
+          {
+            "verb": "take",
+            "target": "chest"
+          },
+          {
+            "verb": "take",
+            "target": "door"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take all except one thing",
+      "input": "take all except lamp",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "box"
+          },
+          {
+            "verb": "take",
+            "target": "pebble"
+          },
+          {
+            "verb": "take",
+            "target": "brass_key"
+          },
+          {
+            "verb": "take",
+            "target": "note"
+          },
+          {
+            "verb": "take",
+            "target": "chest"
+          },
+          {
+            "verb": "take",
+            "target": "door"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drop all that is carried",
+      "input": "drop all",
+      "expect": {
+        "commands": [
+          {
+            "verb": "drop",
+            "target": "iron_key"
+          },
+          {
+            "verb": "drop",
+            "target": "coin"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take two things",
+      "input": "take lamp and note",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "lamp"
+          },
+          {
+            "verb": "take",
+            "target": "note"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take a thing from inside another",
+      "input": "take pebble from box",
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "pebble"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take a thing that is not inside another",
+      "input": "take lamp from box",
+      "expect": {
+        "reply": "There is no lamp in the box."
+      }
+    },
+    {
+      "name": "take from a thing that holds nothing",
+      "input": "take pebble from lamp",
+      "expect": {
+        "reply": "There is nothing in the lamp."
+      }
+    },
+    {
+      "name": "take from a closed thing",
+      "input": "take gem from chest",
+      "expect": {
+        "reply": "The chest is closed."
+      }
+    },
+    {
+      "name": "a thing in a closed thing is out of reach",
+      "input": "take gem",
+      "expect": {
+        "reply": "You can't see any gem here."
+      }
+    },
+    {
+      "name": "take a thing that is not here",
+      "input": "take banana",
+      "expect": {
+        "reply": "You can't see any banana here."
+      }
+    },
+    {
+      "name": "answer which do you mean with a number",
+      "input": ["take key", "2"],
+      "expect": {
+        "commands": [
+          {
+            "verb": "take",
+            "target": "brass_key"
+          }
+        ]
+      }
+    },
+    {
+      "name": "answer which do you mean with a number that is no option",
+      "input": ["take key", "3"],
+      "expect": {
+        "reply": "Unknown command: \"3\""
+      }
+    },
+    {
+      "name": "again with nothing typed before",
+      "input": "again",
+      "expect": {
+        "reply": "There is nothing to repeat."
+      }
+    },
+    {
+      "name": "it with nothing named before",
+      "input": "take it",
+      "expect": {
+        "reply": "I'm not sure what \"it\" refers to."
+      }
     }
   ]
 }

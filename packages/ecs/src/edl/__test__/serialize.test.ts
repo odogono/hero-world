@@ -13,7 +13,7 @@ describe('serializeEntity', () => {
     const entity = {
       container: {
         capacity: 10,
-        isClosed: false
+        is_closed: false
       },
       described: {
         description: 'A test entity',
@@ -28,6 +28,18 @@ describe('serializeEntity', () => {
     expect(result).toBe(`entity entity_1 {
   container { capacity: 10 is_closed: false }
   described { description: "A test entity" name: "Test Entity" }
+}`);
+  });
+
+  it('keeps keys as written', () => {
+    const entity = {
+      id: 3,
+      link: { targetId: 1 },
+      world: {} as World<Components>
+    };
+
+    expect(serializeEntity(entity)).toBe(`entity entity_3 {
+  link { targetId: 1 }
 }`);
   });
 
@@ -110,7 +122,7 @@ describe('serializeComponentDef', () => {
     const def: CDef = {
       columns: [
         { name: 'id', optional: false, type: 'pk' },
-        { default: 'Anonymous', name: 'displayName', type: 'string' },
+        { default: 'Anonymous', name: 'display_name', type: 'string' },
         { isUnique: true, name: 'email', optional: false, type: 'string' },
         {
           default: { mode: 'auto' } as unknown as string,
@@ -119,7 +131,7 @@ describe('serializeComponentDef', () => {
         }
       ],
       hash: 'hash',
-      id: 'UserProfile'
+      id: 'user_profile'
     };
 
     expect(serializeComponentDef(def)).toBe(`def user_profile {
@@ -136,7 +148,7 @@ describe('serializeEDL', () => {
     const def: CDef = {
       columns: [{ name: 'name', type: 'string' }],
       hash: 'hash',
-      id: 'Thing'
+      id: 'thing'
     };
 
     const entity = {

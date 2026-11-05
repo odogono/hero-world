@@ -117,7 +117,7 @@ describe('World EDL', () => {
 
     const edl = `
     entity box {
-      container { capacity: 15 is_closed: true }
+      container { capacity: 15 isClosed: true }
     }
     `;
 
