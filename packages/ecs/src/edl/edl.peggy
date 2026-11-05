@@ -58,7 +58,8 @@ Start
     }
 
 Definition
-  = AtomDef
+  = IncludeDef
+  / AtomDef
   / EntityDef
   / ComponentDef
 
@@ -68,6 +69,12 @@ AtomDef
     }
   / 'atom' __ id2:IdentifierOrString _ '{' _ comps2:Components? _ '}' {
       return { type: 'atom', id: id2, components: comps2 ?? {} } as EDLDefinition;
+    }
+
+// `include "path"`: another EDL file whose definitions are read in here (ADR 0025)
+IncludeDef
+  = 'include' __ path:String {
+      return { type: 'include', path };
     }
 
 EntityDef

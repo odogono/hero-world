@@ -1,6 +1,7 @@
 export { parse as parseEDL } from './parser';
 export { executeEDL, type ExecuteOptions } from './execute';
 export { hashEDL } from './compile';
+export { readEDL, type ReadEDL, type ReadOptions } from './includes';
 export {
   isEDLChanged,
   migrateEDL,
@@ -22,6 +23,7 @@ export {
   EDLMissingComponentError,
   EDLMissingPropertyError,
   EDLErrorCodes,
+  EDLIncludeError,
   EDLUnknownEntityReferenceError,
   EDLCircularReferenceError
 } from './errors';

@@ -4,6 +4,7 @@ export const EDLErrorCodes = {
   EDL_CIRCULAR_REFERENCE: 'EDL_CIRCULAR_REFERENCE',
   EDL_ERROR: 'EDL_ERROR',
   EDL_EXECUTION_ERROR: 'EDL_EXECUTION_ERROR',
+  EDL_INCLUDE_ERROR: 'EDL_INCLUDE_ERROR',
   EDL_INVALID_EXTEND: 'EDL_INVALID_EXTEND',
   EDL_MISSING_COMPONENT: 'EDL_MISSING_COMPONENT',
   EDL_MISSING_PROPERTY: 'EDL_MISSING_PROPERTY',
@@ -28,6 +29,15 @@ export class EDLParseError extends EDLError {
     super(message, context, EDLErrorCodes.EDL_PARSE_ERROR);
     this.name = 'EDLParseError';
     Object.setPrototypeOf(this, EDLParseError.prototype);
+  }
+}
+
+/** An `include` that names no configured root, or a file that can't be read */
+export class EDLIncludeError extends EDLError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, context, EDLErrorCodes.EDL_INCLUDE_ERROR);
+    this.name = 'EDLIncludeError';
+    Object.setPrototypeOf(this, EDLIncludeError.prototype);
   }
 }
 
