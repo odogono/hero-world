@@ -29,6 +29,11 @@ atom crumbling {
   script { src: "scripts/crumbling.talk" }
 }
 
+# Replies a refusal of the wrong shape
+atom mistaken {
+  script { src: "scripts/mistaken.talk" }
+}
+
 entity west_of_house : room guarded {
   meta { props: { id: "west_of_house" } }
   described { name: "Guardroom" description: "A bare guardroom." }
@@ -54,5 +59,10 @@ entity tablet : item crumbling {
 
 entity rock : item {
   described { name: "Rock" description: "A plain rock." }
+  location { in: $west_of_house }
+}
+
+entity scroll : item mistaken {
+  described { name: "Scroll" description: "A rolled scroll." }
   location { in: $west_of_house }
 }

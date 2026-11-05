@@ -958,7 +958,7 @@ defmodule MuaWorld do
       end
 
     Step.await(state, pending, ctx.actor, ctx.raw, fn state, outcome ->
-      k.(state, reply(q.asks, outcome))
+      k.(state, reply(q, outcome))
     end)
   end
 
@@ -966,16 +966,29 @@ defmodule MuaWorld do
 
   # What a question's outcome means to Dispatch: a Decision's veto is its
   # answer, as a reply is a Request's.
-  # A Service Action says no by replying `{refused: text}`.
-  defp reply(:offer, {:replied, %NorthTalk.Map{} = value}) do
+  # A Request says no by replying `{refused: text}`; any other map is a
+  # mistake, so fails rather than counting as having acted.
+  defp reply(%{asks: :offer} = q, {:replied, %NorthTalk.Map{} = value}) do
     case NorthTalk.Map.get(value, "refused") do
-      text when is_binary(text) -> {:refused, text}
-      _ -> {:replied, nil}
+      text when is_binary(text) ->
+        {:refused, text}
+
+      _ ->
+        Logger.error(
+          "#{q.message} to #{inspect(q.to)} replied #{MuaWorld.Admin.show(value)}: " <>
+            "a Request replies text, nothing, or {refused: text}",
+          event: :malformed_reply
+        )
+
+        :failed
     end
   end
 
-  defp reply(:offer, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
-  defp reply(:decide, {:vetoed, reason}), do: {:replied, if(is_binary(reason), do: reason)}
+  defp reply(%{asks: :offer}, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
+
+  defp reply(%{asks: :decide}, {:vetoed, reason}),
+    do: {:replied, if(is_binary(reason), do: reason)}
+
   defp reply(_, :passed), do: :passed
   defp reply(_, _), do: :failed
 
