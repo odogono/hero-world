@@ -11,17 +11,12 @@
 -- it in that role; `veto` vetoes a `before…` Decision. A thing's own Script
 -- is asked first, and may pass to these.
 
-use lookup from map
-
 on any message m
   put the args of m into args
-  if the length of args is 2 and the responses of the target is not nothing then
-    put item 1 of args into role
-    if kindOf(role) is "text" then
-      put lookup(the responses of the target, [role, the name of m]) into reply
-      if kindOf(reply) is "text" then
-        return {refused: reply}
-      end if
+  if the length of args is 2 and kindOf(item 1 of args) is "text" then
+    put the optional (the name of m) of the optional (item 1 of args) of the responses of the target into reply
+    if kindOf(reply) is "text" then
+      return {refused: reply}
     end if
   end if
   pass any message
@@ -29,10 +24,7 @@ end any message
 
 -- a Decision's fixed veto
 function vetoFor event
-  if the responses of the target is nothing then
-    return nothing
-  end if
-  put lookup(the responses of the target, ["veto", event]) into reply
+  put the optional (event) of the optional veto of the responses of the target into reply
   if kindOf(reply) is "text" then
     return reply
   end if

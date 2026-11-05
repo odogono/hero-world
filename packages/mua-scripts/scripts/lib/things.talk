@@ -16,19 +16,15 @@ end actorName
 
 -- does this thing, if it is a key, open the named lock?
 function fits candidate, lockName
-  if the key of candidate is nothing then
-    return false
-  end if
-  return lockName is in the opens of the key of candidate
+  return lockName is in (the optional opens of the key of candidate otherwise [])
 end fits
 
 -- what a place holds that can be named, with what is inside any open
 -- container there: the things, and the people, but no exits
 function contents place
-  ask world to find place, "described"
-  put every item of it whose portal is nothing into here
-  ask world to find place, "player"
-  put [...here, ...it] into here
+  ask world to find place, "described" into described
+  ask world to find place, "player" into players
+  put [...every item of described whose portal is nothing, ...players] into here
   put [] into found
   repeat for each thing in here
     put thing after found

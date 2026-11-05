@@ -30,8 +30,8 @@ on traverse way, actor, origin, destination
   moveTo actor, destination
 
   -- the exit's `messages` can replace what is said as the actor passes
-  ask mua to command
-  put {actor: actor, owner: way, dir: the direction of it} into about
+  ask mua to command into cmd
+  put {actor: actor, owner: way, dir: the direction of cmd} into about
   put messageFor("move", "omsg", about) into line
   if line is not nothing then
     tell mua to announce origin, line, actor

@@ -24,11 +24,7 @@ function report verb, target, actor
     ask world to resolve the in of the location of actor
     tell mua to announce it, others, actor
   end if
-  put messageFor(verb, "msg", {actor: actor, target: target}) into seen
-  if seen is nothing then
-    return ""
-  end if
-  return seen
+  return messageFor(verb, "msg", {actor: actor, target: target}) otherwise ""
 end report
 
 -- whether something is a person
@@ -40,11 +36,12 @@ on examine target, actor
   if target is nothing or (the location of target is nothing and the door of target is nothing) then
     return {refused: "Examine what?"}
   end if
-  put the lockable of target is not nothing and the is_locked of the lockable of target into locked
+  put the optional is_locked of the lockable of target otherwise false into locked
 
   put [] into lines
-  if the described of target is not nothing and the description of the described of target is not nothing then
-    put the description of the described of target after lines
+  put the optional description of the described of target into description
+  if description is not nothing then
+    put description after lines
   else if isPerson(target) then
     put "You see " & theName(target) & "." after lines
   else
@@ -105,7 +102,7 @@ function takeRefusal target, actor
   if the player of target is not nothing then
     return "You can't take people."
   end if
-  if the item of target is nothing or not the is_takeable of the item of target then
+  if not (the optional is_takeable of the item of target otherwise false) then
     return "You can't take that."
   end if
   return nothing
