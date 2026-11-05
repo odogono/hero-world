@@ -10,6 +10,7 @@
 -- thing opens is the open Action's question.
 
 use nameOf, fits from things
+use messageFor from messages
 
 on unlock target, actor
   if the lockable of target is nothing then
@@ -69,12 +70,10 @@ on turnKey target, actor, verb, locking
   end if
 
   change target, "lockable", {is_locked: locking, lock: lockName}
-  ask mua to message verb, "omsg", k
-  put it into others
+  put messageFor(verb, "omsg", {actor: actor, target: target, indirect: k}) into others
   if others is not nothing then
     ask world to resolve the in of the location of actor
     tell mua to announce it, others, actor
   end if
-  ask mua to message verb, "msg", k
-  return chosen & it
+  return chosen & messageFor(verb, "msg", {actor: actor, target: target, indirect: k})
 end turnKey

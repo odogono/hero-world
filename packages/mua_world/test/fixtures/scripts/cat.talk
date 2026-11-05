@@ -4,5 +4,5 @@ on start actor
 end start
 
 on wander
-  tell mua to act the target, "east"
+  tell mua to act the target, {verb: "move", direction: "east"}
 end wander

@@ -1,0 +1,68 @@
+-- responsive: the base Script for a thing's fixed `responses`. A thing
+-- that extends the `responsive` atom of the Base EDL answers from them:
+--
+--   responses {
+--     target: { take: "It's bolted to the floor." }
+--     room: { say: "The silence swallows your words." }
+--     veto: { beforeAdd: "The floor is too hot." }
+--   }
+--
+-- `target`, `indirect` and `room` refuse a Verb when the thing is offered
+-- it in that role; `veto` vetoes a `before…` Decision. A thing's own Script
+-- is asked first, and may pass to these.
+
+use lookup from map
+
+on any message m
+  put the args of m into args
+  if the length of args is 2 and the responses of the target is not nothing then
+    put item 1 of args into role
+    if kindOf(role) is "text" then
+      put lookup(the responses of the target, [role, the name of m]) into reply
+      if kindOf(reply) is "text" then
+        return {refused: reply}
+      end if
+    end if
+  end if
+  pass any message
+end any message
+
+-- a Decision's fixed veto
+function vetoFor event
+  if the responses of the target is nothing then
+    return nothing
+  end if
+  put lookup(the responses of the target, ["veto", event]) into reply
+  if kindOf(reply) is "text" then
+    return reply
+  end if
+  return nothing
+end vetoFor
+
+on beforeRemove actor, subject, deciding
+  if vetoFor("beforeRemove") is not nothing then
+    veto vetoFor("beforeRemove")
+  end if
+  pass beforeRemove
+end beforeRemove
+
+on beforeAdd actor, subject, deciding
+  if vetoFor("beforeAdd") is not nothing then
+    veto vetoFor("beforeAdd")
+  end if
+  pass beforeAdd
+end beforeAdd
+
+on beforeExit actor, subject, deciding
+  if vetoFor("beforeExit") is not nothing then
+    veto vetoFor("beforeExit")
+  end if
+  pass beforeExit
+end beforeExit
+
+on beforeEnter actor, subject, deciding
+  if vetoFor("beforeEnter") is not nothing then
+    veto vetoFor("beforeEnter")
+  end if
+  pass beforeEnter
+end beforeEnter

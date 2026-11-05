@@ -1,4 +1,4 @@
-# A small world where Scripts add to built-in replies
+# A small world where Scripts add to the Actions' replies
 
 include "mua-scripts:edl/base.edl"
 

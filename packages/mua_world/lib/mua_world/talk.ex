@@ -8,23 +8,26 @@ defmodule MuaWorld.Talk do
   - `command`: the command the Script is handling, as a map of `verb`,
     `actor`, `target`, `indirect`, `text` and `direction` (Nothing for any it
     doesn't have), or Nothing outside a command.
-  - `message handler, kind, indirect, owner`: a built-in message for the
-    command being handled (`MuaWorld.Messages`): `kind` is `"msg"` or
-    `"omsg"`, `indirect` stands in for the command's second object, and
-    `owner`, if given, is the entity whose `messages` are used in place of
-    the target's, as the exit is for `move`.
-  - `notice place, message, who`: sends `message who` to the Scripts of the
-    things in a place but `who`, once the Run's Pump ends.
+  - `notice place, message, who, text`: sends `message who` (or
+    `message who, text` when `text` is given) to the Scripts of the things
+    in a place but `who`, once the Run's Pump ends.
+  - `verbs`: the World's Verbs, as a map of `names` (each Verb's first
+    name) and `aliases` (the Direction Aliases), for `help`.
 
   - `act actor, command`: has an NPC carry out a command as a Character
     would, as a Step of its own after the current one commits (ADR 0003).
+    The command is a line to parse, or one already bound: a map of `verb`
+    and any of `target`, `indirect`, `direction` and `text`, which skips
+    the parser (ADR 0024).
+
+  Scripts fill in message templates themselves, with the `messages`
+  Library; the Host formats no text (ADR 0024).
 
   Callbacks run in NorthTalk's Tasks while the World process is blocked in a
   Pump (ADR 0015). They write the outbox inside the World's transaction, and
   share the World process's table for queued notices. The command a Run
   handles is the host term of its Delivery (`OdgnEcsTalk.delivery/2`).
   """
-  alias MuaWorld.Messages
   alias NorthTalk.{Capability, Object}
   alias OdgnEcsTalk.Values
 
@@ -61,9 +64,9 @@ defmodule MuaWorld.Talk do
 
     Capability.from_functions("mua", %{
       "act" =>
-        {[args: [entity, "text"], cost: 1, mode: :fire_and_forget, command: true],
-         fn [actor, text], _ ->
-           MuaWorld.Tables.queue_act(world, Values.from_value(actor), text)
+        {[args: [entity, "any"], cost: 1, mode: :fire_and_forget, command: true],
+         fn [actor, command], _ ->
+           MuaWorld.Tables.queue_act(world, Values.from_value(actor), Values.from_value(command))
            :noreply
          end},
       "announce" =>
@@ -96,37 +99,33 @@ defmodule MuaWorld.Talk do
                 ])}
            end
          end},
-      # `indirect` and `owner` are optional, and a Script may leave them out
-      "message" => {
-        [args: ["text", "text", optional, optional], result: "any", cost: 1],
-        fn [handler, kind | rest], call ->
-          [indirect, owner] = Enum.take(rest ++ [nil, nil], 2)
-          ctx = context(talk, call)
-
-          if ctx && kind in ["msg", "omsg"] do
-            ctx =
-              if indirect,
-                do: Map.put(ctx, :indirect_id, Values.from_value(indirect)),
-                else: ctx
-
-            owner = if owner, do: Values.from_value(owner), else: :target
-            {:ok, Messages.message_for(world, ctx, handler, kind, owner)}
-          else
-            {:ok, nil}
-          end
-        end
-      },
       "notice" =>
-        {[args: [entity, "text", entity], cost: 1, mode: :fire_and_forget, command: true],
-         fn [place, message, who], _ ->
+        {[
+           args: [entity, "text", entity, %{"optional" => "text"}],
+           cost: 1,
+           mode: :fire_and_forget,
+           command: true
+         ],
+         fn [place, message, who | rest], _ ->
            n = :erlang.unique_integer([:monotonic])
-
-           :ets.insert(
-             table,
-             {{:notice, n}, {Values.from_value(place), message, Values.from_value(who)}}
-           )
-
+           args = [{:entity, Values.from_value(who)} | Enum.reject(rest, &is_nil/1)]
+           :ets.insert(table, {{:notice, n}, {Values.from_value(place), message, args}})
            :noreply
+         end},
+      "verbs" =>
+        {[args: [], result: "any", cost: 1],
+         fn [], call ->
+           case context(talk, call) do
+             %{vocabulary: vocabulary} ->
+               {:ok,
+                NorthTalk.Map.new([
+                  {"aliases", vocabulary.aliases |> Map.keys() |> Enum.sort()},
+                  {"names", vocabulary.defs |> Enum.map(&hd(&1.names)) |> Enum.uniq()}
+                ])}
+
+             _ ->
+               {:ok, nil}
+           end
          end}
     })
   end

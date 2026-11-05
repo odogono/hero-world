@@ -8,6 +8,7 @@
 --      moves the actor and returns what they see.
 
 use describe, isClosed from rooms
+use messageFor from messages
 
 on beforeTraverse actor, way, deciding
   if the door of the portal of way is nothing then
@@ -29,13 +30,15 @@ on traverse way, actor, origin, destination
   moveTo actor, destination
 
   -- the exit's `messages` can replace what is said as the actor passes
-  ask mua to message "move", "omsg", nothing, way
-  if it is not nothing then
-    tell mua to announce origin, it, actor
+  ask mua to command
+  put {actor: actor, owner: way, dir: the direction of it} into about
+  put messageFor("move", "omsg", about) into line
+  if line is not nothing then
+    tell mua to announce origin, line, actor
   end if
-  ask mua to message "arrive", "omsg", nothing, way
-  if it is not nothing then
-    tell mua to announce destination, it, actor
+  put messageFor("arrive", "omsg", about) into line
+  if line is not nothing then
+    tell mua to announce destination, line, actor
   end if
 
   -- let the scripted things on each side notice
@@ -43,9 +46,9 @@ on traverse way, actor, origin, destination
   tell mua to notice destination, "arrived", actor
 
   put describe(destination, actor) into seen
-  ask mua to message "move", "msg", nothing, way
-  if it is nothing then
+  put messageFor("move", "msg", about) into line
+  if line is nothing then
     return seen
   end if
-  return it & `\n` & seen
+  return line & `\n` & seen
 end traverse

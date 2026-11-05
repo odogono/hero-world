@@ -39,12 +39,12 @@ entity courtyard : room {
   described { name: "Courtyard" description: "An open courtyard." }
 }
 
-entity hall : room {
+entity hall : room responsive {
   described { name: "Hall" description: "A hall with a hot stone floor." }
   responses { veto: { beforeAdd: "The floor is too hot to put anything down." } }
 }
 
-entity vault : room {
+entity vault : room responsive {
   described { name: "Vault" description: "A sealed vault." }
   responses { veto: { beforeEnter: "The vault door is sealed." } }
 }
