@@ -37,24 +37,19 @@ end lock
 
 -- whether a container or door stands open
 function isOpen thing
-  if the container of thing is not nothing then
-    return not the is_closed of the container of thing
-  end if
-  if the door of thing is not nothing then
-    return not the is_closed of the door of thing
-  end if
-  return false
+  put the container of thing otherwise the door of thing into data
+  return data is not nothing and not the is_closed of data
 end isOpen
 
 -- locks or unlocks the target with the key named, or one the actor carries
 on turnKey target, actor, verb, locking
   put the lock of the lockable of target into lockName
-  ask mua to command
-  put the indirect of it into k
+  ask mua to command into cmd
+  put the indirect of cmd into k
   put "" into chosen
   if k is nothing then
-    ask world to find actor, "key"
-    repeat for each candidate in it
+    ask world to find actor, "key" into keys
+    repeat for each candidate in keys
       if k is nothing and fits(candidate, lockName) then
         put candidate into k
       end if

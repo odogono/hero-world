@@ -11,28 +11,23 @@
 -- it in that role; `veto` vetoes a `before…` Decision. A thing's own Script
 -- is asked first, and may pass to these.
 
-use lookup from map
-
 on any message m
   put the args of m into args
-  if the length of args is 2 and the responses of the target is not nothing then
-    put item 1 of args into role
-    if kindOf(role) is "text" then
-      put lookup(the responses of the target, [role, the name of m]) into reply
-      if kindOf(reply) is "text" then
-        return {refused: reply}
-      end if
+  if the length of args is 2 and kindOf(item 1 of args) is "text" then
+    put the optional (the name of m) of the optional (item 1 of args) of the responses of the target into reply
+    if kindOf(reply) is "text" then
+      return {refused: reply}
     end if
   end if
   pass any message
 end any message
 
--- a Decision's fixed veto
+-- A Decision's fixed veto. Decisions never reach `on any message`, and
+-- `veto` runs only in a `, deciding` Handler, so each Decision the Base
+-- Verbs raise of a thing has its own Handler here. A test checks that none
+-- is missing (responsive_test.exs).
 function vetoFor event
-  if the responses of the target is nothing then
-    return nothing
-  end if
-  put lookup(the responses of the target, ["veto", event]) into reply
+  put the optional (event) of the optional veto of the responses of the target into reply
   if kindOf(reply) is "text" then
     return reply
   end if
@@ -40,29 +35,25 @@ function vetoFor event
 end vetoFor
 
 on beforeRemove actor, subject, deciding
-  if vetoFor("beforeRemove") is not nothing then
-    veto vetoFor("beforeRemove")
-  end if
+  put vetoFor("beforeRemove") into reason
+  if reason is not nothing then veto reason
   pass beforeRemove
 end beforeRemove
 
 on beforeAdd actor, subject, deciding
-  if vetoFor("beforeAdd") is not nothing then
-    veto vetoFor("beforeAdd")
-  end if
+  put vetoFor("beforeAdd") into reason
+  if reason is not nothing then veto reason
   pass beforeAdd
 end beforeAdd
 
 on beforeExit actor, subject, deciding
-  if vetoFor("beforeExit") is not nothing then
-    veto vetoFor("beforeExit")
-  end if
+  put vetoFor("beforeExit") into reason
+  if reason is not nothing then veto reason
   pass beforeExit
 end beforeExit
 
 on beforeEnter actor, subject, deciding
-  if vetoFor("beforeEnter") is not nothing then
-    veto vetoFor("beforeEnter")
-  end if
+  put vetoFor("beforeEnter") into reason
+  if reason is not nothing then veto reason
   pass beforeEnter
 end beforeEnter

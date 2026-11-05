@@ -12,8 +12,7 @@ on say target, actor, words
   if the location of actor is nothing then
     return {refused: "There is nobody here to hear you."}
   end if
-  ask world to resolve the in of the location of actor
-  put it into here
+  ask world to resolve the in of the location of actor into here
   tell mua to announce here, `${called(actor)} says, "${words}"`, actor
   tell mua to notice here, "heard", actor, words
   return `You say, "${words}"`
@@ -31,8 +30,7 @@ on sayTo target, actor, words
   end if
   put called(target) into name
   if the location of actor is not nothing then
-    ask world to resolve the in of the location of actor
-    put it into here
+    ask world to resolve the in of the location of actor into here
     tell mua to announce here, `${called(actor)} says to ${name}, "${words}"`, actor
     tell mua to notice here, "heard", actor, words
   end if

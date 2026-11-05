@@ -10,21 +10,12 @@
 -- `{the indirect}` and `{dir}`. A capital (`{Actor}`, `{The target}`)
 -- capitalises the value, and a name with no value is left as written.
 
-use lookup, withPath from map
-use split from text
-
 -- what to call someone or something: a player's name, else its own
 function called thing
   if thing is nothing then
     return nothing
   end if
-  if the player of thing is not nothing then
-    return the name of the player of thing
-  end if
-  if the described of thing is not nothing then
-    return the name of the described of thing
-  end if
-  return nothing
+  return the optional name of the player of thing otherwise the optional name of the described of thing
 end called
 
 -- a thing as "the lamp", or a player by name
@@ -37,59 +28,42 @@ end theName
 
 -- what a template's names stand for, for these entities
 function valuesOf about
-  put {actor: "Someone", dir: the dir of about} into values
-  if called(the actor of about) is not nothing then
-    put withPath(values, ["actor"], called(the actor of about)) into values
-  end if
+  put {actor: called(the actor of about) otherwise "Someone", dir: the dir of about} into values
   repeat for each role in ["target", "indirect"]
-    put lookup(about, [role]) into thing
+    put the (role) of about into thing
     if called(thing) is not nothing then
-      put withPath(values, [role], lower(called(thing))) into values
-      put withPath(values, ["the " & role], theName(thing)) into values
+      put lower(called(thing)) into the (role) of values
+      put theName(thing) into the ("the " & role) of values
     end if
   end repeat
   return values
 end valuesOf
 
 function capitalised t
-  if t is "" then
-    return t
-  end if
-  return upper(character 1 of t) & characters 2..(the length of t) of t
+  return upper(character 1 of t) & characters 2..-1 of t
 end capitalised
+
+-- one `{slot}` filled in, or left as written when it has no value
+function fill slot, values
+  put the optional (lower(slot)) of values into value
+  if value is nothing then
+    return "{" & slot & "}"
+  end if
+  if upper(character 1 of slot) is character 1 of slot then
+    return capitalised(value)
+  end if
+  return value
+end fill
 
 -- a template with its names filled in from `values`
 function render template, values
-  put nothing into out
-  repeat for each part in split(template, "{")
-    if out is nothing then
-      put part into out
-      next repeat
-    end if
-    put offset("}", part) into ends
-    put nothing into value
-    if ends > 1 then
-      put characters 1..(ends - 1) of part into slot
-      put lookup(values, [lower(slot)]) into value
-      if value is not nothing and upper(character 1 of slot) is character 1 of slot then
-        put capitalised(value) into value
-      end if
-    end if
-    if value is nothing then
-      put out & "{" & part into out
-    else if ends is the length of part then
-      put out & value into out
-    else
-      put out & value & characters (ends + 1)..(the length of part) of part into out
-    end if
-  end repeat
-  return out
+  return replace <"{", slot: one or more of <letter or " ">, "}"> in template with fill(slot, values)
 end render
 
 -- the template for a verb: the owner's, else the default
 function templateFor verb, kind, owner
-  if owner is not nothing and the messages of owner is not nothing then
-    put lookup(the messages of owner, [kind, verb]) into own
+  if owner is not nothing then
+    put the optional (verb) of the optional (kind) of the messages of owner into own
     if own is not nothing then
       return own
     end if
@@ -98,7 +72,7 @@ function templateFor verb, kind, owner
   if it is nothing then
     return nothing
   end if
-  return lookup(the messages of it, [kind, verb])
+  return the optional (verb) of the optional (kind) of the messages of it
 end templateFor
 
 -- the message `kind` ("msg" or "omsg") for a verb, filled in from `about`:
@@ -106,11 +80,7 @@ end templateFor
 -- `messages` replace the defaults (the target, unless given). Nothing when
 -- there is no template.
 function messageFor verb, kind, about
-  put the owner of about into owner
-  if owner is nothing then
-    put the target of about into owner
-  end if
-  put templateFor(verb, kind, owner) into template
+  put templateFor(verb, kind, the owner of about otherwise the target of about) into template
   if template is nothing then
     return nothing
   end if
