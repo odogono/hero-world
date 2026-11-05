@@ -23,7 +23,7 @@ defmodule OdgnEcsTalk.MixProject do
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",
-       ref: "5cf8ce78d855def7bfe1632e6b1f596e70db6cb8"}
+       ref: "3216b61b5540a6bd3de3cfb4c6911b9c106f2a32"}
     ]
   end
 end
