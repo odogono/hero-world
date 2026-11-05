@@ -1,0 +1,80 @@
+-- The lock Service: `lock` and `unlock`, as a Script. For `unlock box` or
+-- `unlock box with key`, mua sends `unlock target, actor` (or `lock …`),
+-- and the key named, if any, is the command's `indirect`.
+--
+-- It returns what the actor sees when it acted, or `{refused: text}` when
+-- it said no, so mua neither keeps its changes nor sends `afterUnlock`.
+--
+-- A thing locks with a `lockable { is_locked: true lock: "chest" }`, and a
+-- key opens the locks its `key { opens: [...] }` lists. Whether a locked
+-- thing opens is the open Action's question.
+
+use nameOf, fits from things
+
+on unlock target, actor
+  if the lockable of target is nothing then
+    return {refused: "You can't unlock that."}
+  end if
+  if not the is_locked of the lockable of target then
+    return {refused: `The ${nameOf(target)} is already unlocked.`}
+  end if
+  return turnKey(target, actor, "unlock", false)
+end unlock
+
+on lock target, actor
+  if the lockable of target is nothing then
+    return {refused: "You can't lock that."}
+  end if
+  if the is_locked of the lockable of target then
+    return {refused: `The ${nameOf(target)} is already locked.`}
+  end if
+  if isOpen(target) then
+    return {refused: `You'll have to close the ${nameOf(target)} first.`}
+  end if
+  return turnKey(target, actor, "lock", true)
+end lock
+
+-- whether a container or door stands open
+function isOpen thing
+  if the container of thing is not nothing then
+    return not the is_closed of the container of thing
+  end if
+  if the door of thing is not nothing then
+    return not the is_closed of the door of thing
+  end if
+  return false
+end isOpen
+
+-- locks or unlocks the target with the key named, or one the actor carries
+on turnKey target, actor, verb, locking
+  put the lock of the lockable of target into lockName
+  ask mua to command
+  put the indirect of it into k
+  put "" into chosen
+  if k is nothing then
+    ask world to find actor, "key"
+    repeat for each candidate in it
+      if k is nothing and fits(candidate, lockName) then
+        put candidate into k
+      end if
+    end repeat
+    if k is nothing then
+      return {refused: `You need a key to ${verb} the ${nameOf(target)}.`}
+    end if
+    put `(with the ${nameOf(k)})\n` into chosen
+  else if the key of k is nothing then
+    return {refused: `You can't ${verb} anything with that.`}
+  else if not fits(k, lockName) then
+    return {refused: `The ${nameOf(k)} doesn't fit.`}
+  end if
+
+  change target, "lockable", {is_locked: locking, lock: lockName}
+  ask mua to message verb, "omsg", k
+  put it into others
+  if others is not nothing then
+    ask world to resolve the in of the location of actor
+    tell mua to announce it, others, actor
+  end if
+  ask mua to message verb, "msg", k
+  return chosen & it
+end turnKey

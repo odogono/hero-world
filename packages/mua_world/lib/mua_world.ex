@@ -333,7 +333,7 @@ defmodule MuaWorld do
   # mua's Libraries, by the name Scripts `use` them from, and its Service
   # Scripts: its core actions, which no Message Path reaches.
   @libraries ~w(rooms things)
-  @services ~w(room exit)
+  @services ~w(room exit lock)
 
   defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
 
@@ -854,6 +854,9 @@ defmodule MuaWorld do
             {{:replied, message}, :veto} ->
               k.(state, Actions.refused(message || Dispatch.cannot()))
 
+            {{:refused, message}, _} ->
+              k.(state, Actions.refused(message))
+
             {:failed, _} ->
               k.(state, Actions.refused("Something went wrong."))
 
@@ -883,6 +886,9 @@ defmodule MuaWorld do
                   Actions.done(message || ""),
                   k
                 )
+
+              {:refused, message} ->
+                k.(state, Actions.refused(message))
 
               :failed ->
                 k.(state, Actions.refused("Something went wrong."))
@@ -987,6 +993,14 @@ defmodule MuaWorld do
 
   # What a question's outcome means to Dispatch: a Decision's veto is its
   # answer, as a reply is a Request's.
+  # A Service Action says no by replying `{refused: text}`.
+  defp reply(:offer, {:replied, %NorthTalk.Map{} = value}) do
+    case NorthTalk.Map.get(value, "refused") do
+      text when is_binary(text) -> {:refused, text}
+      _ -> {:replied, nil}
+    end
+  end
+
   defp reply(:offer, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
   defp reply(:decide, {:vetoed, reason}), do: {:replied, if(is_binary(reason), do: reason)}
   defp reply(_, :passed), do: :passed
