@@ -25,6 +25,7 @@ RUN mix local.hex --force && mix local.rebar --force
 COPY packages/odgn_ecs ./packages/odgn_ecs
 COPY packages/odgn_edl ./packages/odgn_edl
 COPY packages/odgn_ecs_talk ./packages/odgn_ecs_talk
+COPY packages/odgn_ecs_engine ./packages/odgn_ecs_engine
 COPY packages/mua_world ./packages/mua_world
 COPY packages/mua_server ./packages/mua_server
 COPY --from=client /src/packages/mua_server/priv/static ./packages/mua_server/priv/static
