@@ -1,0 +1,148 @@
+-- The thing Service: `examine`, `take`, `drop`, `inventory` and `read`, as
+-- a Script. mua sends each `<verb> target, actor`; `target` is Nothing for
+-- `inventory`.
+--
+-- Each returns what the actor sees when it acted, or `{refused: text}`
+-- when it said no. Before a `take`, mua asks this Service's `beforeTake`
+-- Decision, so a thing that can't be taken is refused before anything else
+-- is asked.
+
+use contents from things
+use messageFor, theName from messages
+use join from text
+use map from list
+
+-- things as "the lamp, the coin"
+function listNames things
+  return join(map(things, given t: theName(t)), ", ")
+end listNames
+
+-- `msg` for the actor, and `omsg` for everyone else in the room
+function report verb, target, actor
+  put messageFor(verb, "omsg", {actor: actor, target: target}) into others
+  if others is not nothing and the location of actor is not nothing then
+    ask world to resolve the in of the location of actor
+    tell mua to announce it, others, actor
+  end if
+  put messageFor(verb, "msg", {actor: actor, target: target}) into seen
+  if seen is nothing then
+    return ""
+  end if
+  return seen
+end report
+
+-- whether something is a person
+function isPerson thing
+  return the player of thing is not nothing or the npc of thing is not nothing
+end isPerson
+
+on examine target, actor
+  if target is nothing or (the location of target is nothing and the door of target is nothing) then
+    return {refused: "Examine what?"}
+  end if
+  put the lockable of target is not nothing and the is_locked of the lockable of target into locked
+
+  put [] into lines
+  if the described of target is not nothing and the description of the described of target is not nothing then
+    put the description of the described of target after lines
+  else if isPerson(target) then
+    put "You see " & theName(target) & "." after lines
+  else
+    put "You see nothing special." after lines
+  end if
+
+  if the door of target is not nothing then
+    if not the is_closed of the door of target then
+      put "It is open." after lines
+    else if locked then
+      put "It is closed and locked." after lines
+    else
+      put "It is closed." after lines
+    end if
+  end if
+
+  if the container of target is not nothing and not isPerson(target) then
+    if the is_closed of the container of target and locked then
+      put "It is closed and locked." after lines
+    else if the is_closed of the container of target then
+      put "It is closed." after lines
+    else
+      put contents(target) into inside
+      if inside is empty then
+        put "It is empty." after lines
+      else
+        put "It contains: " & listNames(inside) & "." after lines
+      end if
+    end if
+  end if
+  return join(lines, `\n`)
+end examine
+
+on inventory target, actor
+  put contents(actor) into carried
+  if carried is empty then
+    return "You are empty-handed."
+  end if
+  return "You are carrying: " & listNames(carried) & "."
+end inventory
+
+-- why the target can't be taken, or Nothing if it can
+function takeRefusal target, actor
+  if target is nothing then
+    return "Take what?"
+  end if
+  if the location of target is nothing then
+    -- a door is named from either room but lives in neither
+    if the door of target is not nothing then
+      return "You can't take that."
+    end if
+    return "Take what?"
+  end if
+  ask world to resolve the in of the location of target
+  if it is actor then
+    return "You already have that."
+  end if
+  if the player of target is not nothing then
+    return "You can't take people."
+  end if
+  if the item of target is nothing or not the is_takeable of the item of target then
+    return "You can't take that."
+  end if
+  return nothing
+end takeRefusal
+
+on beforeTake actor, target, deciding
+  put takeRefusal(target, actor) into refusal
+  if refusal is not nothing then
+    veto refusal
+  end if
+  pass beforeTake
+end beforeTake
+
+on take target, actor
+  put takeRefusal(target, actor) into refusal
+  if refusal is not nothing then
+    return {refused: refusal}
+  end if
+  moveTo target, actor
+  return report("take", target, actor)
+end take
+
+on drop target, actor
+  if target is nothing or the location of target is nothing or the location of actor is nothing then
+    return {refused: "Drop what?"}
+  end if
+  ask world to resolve the in of the location of actor
+  moveTo target, it
+  return report("drop", target, actor)
+end drop
+
+on read target, actor
+  if target is nothing then
+    return {refused: "Read what?"}
+  end if
+  if the readable of target is nothing then
+    return {refused: "There's nothing written on it."}
+  end if
+  return the text of the readable of target
+end read

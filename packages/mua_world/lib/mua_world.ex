@@ -38,7 +38,6 @@ defmodule MuaWorld do
   require Logger
 
   alias MuaWorld.{
-    Actions,
     Components,
     Dispatch,
     Exits,
@@ -332,8 +331,7 @@ defmodule MuaWorld do
 
   # mua's Libraries, by the name Scripts `use` them from, and its Service
   # Scripts: its core actions, which no Message Path reaches.
-  @libraries ~w(rooms things)
-  @services ~w(room exit lock)
+  @libraries ~w(things messages rooms)
 
   defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
 
@@ -357,7 +355,7 @@ defmodule MuaWorld do
               "mua"
             ])
 
-    for name <- @services,
+    for name <- Dispatch.services(),
         do:
           :ok =
             OdgnEcsTalk.load_service_script(
@@ -782,6 +780,16 @@ defmodule MuaWorld do
     end)
   end
 
+  # A bound command skips the parser (ADR 0024)
+  defp npc_input(state, actor, %{} = bound) do
+    active? = (OdgnEcs.get(state.world, actor, "npc") || %{})["active"] == true
+
+    case active? && Input.bound(bound) do
+      {:ok, command} -> run_commands(state, actor, [command], command.verb)
+      _ -> state
+    end
+  end
+
   defp npc_input(state, actor, text) do
     active? = (OdgnEcs.get(state.world, actor, "npc") || %{})["active"] == true
 
@@ -838,95 +846,60 @@ defmodule MuaWorld do
   defp ask_each(state, ctx, [], k), do: run_action(state, ctx, k)
 
   defp ask_each(state, ctx, [q | rest], k) do
-    cond do
-      q.response != nil ->
-        k.(state, Actions.refused(q.response))
+    if not answerable?(state, q.to) do
+      ask_each(state, ctx, rest, k)
+    else
+      ask(state, ctx, q, fn state, reply ->
+        case {reply, q.kind} do
+          {{:replied, message}, :receiver} ->
+            k.(state, done(message || ""))
 
-      not answerable?(state, q.to) ->
-        ask_each(state, ctx, rest, k)
+          {{:replied, message}, :veto} ->
+            k.(state, refused(message || Dispatch.cannot()))
 
-      true ->
+          {{:refused, message}, _} ->
+            k.(state, refused(message))
+
+          {:failed, _} ->
+            k.(state, refused("Something went wrong."))
+
+          {:passed, _} ->
+            ask_each(state, ctx, rest, k)
+        end
+      end)
+    end
+  end
+
+  defp run_action(state, ctx, k) do
+    case Dispatch.plan(state.world, ctx) do
+      {:refused, message} ->
+        k.(state, refused(message))
+
+      {:send, to, message, args} ->
+        q = %{kind: :action, asks: :offer, to: to, message: message, args: args}
+
         ask(state, ctx, q, fn state, reply ->
-          case {reply, q.kind} do
-            {{:replied, message}, :receiver} ->
-              k.(state, Actions.done(message || ""))
+          case reply do
+            {:replied, message} ->
+              after_each(state, ctx, Dispatch.afters(state.world, ctx), done(message || ""), k)
 
-            {{:replied, message}, :veto} ->
-              k.(state, Actions.refused(message || Dispatch.cannot()))
+            {:refused, message} ->
+              k.(state, refused(message))
 
-            {{:refused, message}, _} ->
-              k.(state, Actions.refused(message))
+            :failed ->
+              k.(state, refused("Something went wrong."))
 
-            {:failed, _} ->
-              k.(state, Actions.refused("Something went wrong."))
-
-            {:passed, _} ->
-              ask_each(state, ctx, rest, k)
+            :passed ->
+              k.(state, refused(Dispatch.cannot()))
           end
         end)
     end
   end
 
-  defp run_action(state, ctx, k) do
-    if Dispatch.scripted?(ctx.verb) do
-      case Dispatch.plan(state.world, ctx) do
-        {:refused, message} ->
-          k.(state, Actions.refused(message))
-
-        {:send, to, message, args} ->
-          q = %{kind: :action, asks: :offer, to: to, message: message, args: args, response: nil}
-
-          ask(state, ctx, q, fn state, reply ->
-            case reply do
-              {:replied, message} ->
-                after_each(
-                  state,
-                  ctx,
-                  Dispatch.afters(state.world, ctx),
-                  Actions.done(message || ""),
-                  k
-                )
-
-              {:refused, message} ->
-                k.(state, Actions.refused(message))
-
-              :failed ->
-                k.(state, Actions.refused("Something went wrong."))
-
-              :passed ->
-                k.(state, Actions.refused(Dispatch.cannot()))
-            end
-          end)
-      end
-    else
-      case run_built_in(state.world, ctx) do
-        :pass -> k.(state, Actions.refused(Dispatch.cannot()))
-        outcome -> after_each(state, ctx, Dispatch.afters(state.world, ctx), outcome, k)
-      end
-    end
-  end
-
-  # A built-in runs in a savepoint of its own: one that refuses, or raises,
-  # leaves no partial change behind.
-  defp run_built_in(world, ctx) do
-    :ok = OdgnEcs.savepoint(world, "mua_action")
-
-    outcome =
-      try do
-        Actions.run(world, ctx)
-      rescue
-        e ->
-          OdgnEcs.rollback_to(world, "mua_action")
-          reraise e, __STACKTRACE__
-      end
-
-    case outcome do
-      %{kind: :done} -> :ok = OdgnEcs.release(world, "mua_action")
-      _ -> :ok = OdgnEcs.rollback_to(world, "mua_action")
-    end
-
-    outcome
-  end
+  # What a command came to: `:done` when it acted, `:refused` when it was
+  # answered with a no
+  defp done(message), do: %{kind: :done, message: message}
+  defp refused(message), do: %{kind: :refused, message: message}
 
   # Once an action has succeeded, `after<Verb>` goes to the same receivers,
   # whose replies are added to its message.
@@ -1006,23 +979,12 @@ defmodule MuaWorld do
   defp reply(_, :passed), do: :passed
   defp reply(_, _), do: :failed
 
-  # Tells the actor, the Scripts that notice it, and everyone else who saw it.
-  defp finish(state, ctx, outcome, label) do
-    message = outcome.message
-
-    state =
-      if message not in [nil, ""],
-        do: tell(state, ctx.actor, if(label, do: "#{label}: #{message}", else: message)),
-        else: state
-
-    if outcome.kind == :done do
-      for {place, notice, args} <- outcome.notices, do: Step.notify(state, place, notice, args)
-
-      for {place, line, except} <- outcome.broadcasts,
-          do: Tables.tell(state.world, place, line, except)
-    end
-
-    state
+  # Tells the actor. Everyone else who saw it, and the Scripts that notice
+  # it, were told by the Service Script.
+  defp finish(state, ctx, %{message: message}, label) do
+    if message not in [nil, ""],
+      do: tell(state, ctx.actor, if(label, do: "#{label}: #{message}", else: message)),
+      else: state
   end
 
   # An admin's line runs in a savepoint, released only if its Run

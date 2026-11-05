@@ -1,0 +1,89 @@
+-- The open Service: `open` and `close`, for containers and doors, as a
+-- Script. mua sends `open target, actor` (or `close …`). It returns what the
+-- actor sees, or `{refused: text}` when it said no. A locked thing won't
+-- open: unlocking it is the lock Service's.
+
+use contents from things
+use messageFor, theName from messages
+use join from text
+use map from list
+use merge from map
+
+function capitalised t
+  return upper(character 1 of t) & characters 2..(the length of t) of t
+end capitalised
+
+on open target, actor
+  return setClosed(target, actor, "open", false)
+end open
+
+on close target, actor
+  return setClosed(target, actor, "close", true)
+end close
+
+on setClosed target, actor, verb, closing
+  if target is nothing or the player of target is not nothing then
+    return {refused: `You can't ${verb} that.`}
+  end if
+  put "container" into kind
+  put the container of target into data
+  if data is nothing then
+    put "door" into kind
+    put the door of target into data
+  end if
+  if data is nothing then
+    return {refused: `You can't ${verb} that.`}
+  end if
+
+  put capitalised(theName(target)) into called
+  if not closing and the lockable of target is not nothing and the is_locked of the lockable of target then
+    return {refused: called & " is locked."}
+  end if
+  if the is_closed of data is closing then
+    if closing then
+      return {refused: called & " is already closed."}
+    end if
+    return {refused: called & " is already open."}
+  end if
+
+  change target, kind, merge(data, {is_closed: closing})
+
+  ask world to resolve the in of the location of actor
+  put it into here
+  put messageFor(verb, "omsg", {actor: actor, target: target}) into others
+  if others is not nothing then
+    tell mua to announce here, others, actor
+  end if
+
+  -- the other side of a door sees it move
+  if kind is "door" then
+    put called & " opens." into line
+    if closing then
+      put called & " closes." into line
+    end if
+    ask world to find here, "portal"
+    repeat for each way in it
+      if the door of the portal of way is not nothing and the to of the portal of way is not nothing then
+        ask world to resolve the door of the portal of way
+        if it is target then
+          ask world to resolve the to of the portal of way
+          if it is not here then
+            tell mua to announce it, line, nothing
+          end if
+        end if
+      end if
+    end repeat
+  end if
+
+  if kind is "container" and not closing then
+    put contents(target) into inside
+    if inside is not empty then
+      return "Opening " & theName(target) & " reveals: " & join(map(inside, given t: theName(t)), ", ") & "."
+    end if
+  end if
+  put messageFor(verb, "msg", {actor: actor, target: target}) into seen
+  if seen is nothing then
+    return ""
+  end if
+  return seen
+end setClosed

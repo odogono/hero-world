@@ -1,4 +1,4 @@
--- Too heavy to take: it answers `take` itself, so the built-in never runs.
+-- Too heavy to take: it answers `take` itself, so the Action never runs.
 on take role, actor
   if role is "target" then
     return "It is far too heavy."

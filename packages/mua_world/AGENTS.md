@@ -5,7 +5,7 @@ mua's World in Elixir. `README.md` explains how it works (Steps, Dispatch, Limbo
 ## Where things are
 
 - `lib/mua_world.ex`: the World GenServer. The public API (`command/4`, `sign_in/4`, `enter/3`, `view/3`, `reset/2`, `tick/1` …) sits at the top, around line 100–225, and each call's `handle_call` follows from line 380 on. Look up a call with `rg -n 'def <name>|handle_call\(\{?:<name>' lib/mua_world.ex` rather than reading the file through.
-- A command's path: `input.ex` (parse the input) → `commands/` (`parser`, `verbs`, `scope`, `bind`) → `dispatch.ex` (room, second object, target, vetoes) → `actions.ex` (built-ins) or the Service Scripts in `../mua-scripts/scripts/` → `messages.ex` (what each side sees).
+- A command's path: `input.ex` (parse the input) → `commands/` (`parser`, `verbs`, `scope`, `bind`) → `dispatch.ex` (room, second object, target, vetoes) → the Service Scripts in `../mua-scripts/scripts/services/`, which fill in their messages with the `messages` Library.
 - `talk.ex`: the `mua` Capability that Scripts call. `admin.ex`: the `;` admin prompt.
 - `components.ex`: the component definitions. `tables.ex`: mua's own SQL tables (time, outbox, pending input, NPC queue).
 - `places.ex` (Limbo, Starting room), `exits.ex`, `lifecycle.ex` (homes, resets, timers, `start`), `view.ex`.

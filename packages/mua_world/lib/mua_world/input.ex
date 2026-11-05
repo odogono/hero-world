@@ -57,6 +57,29 @@ defmodule MuaWorld.Input do
     end
   end
 
+  @doc """
+  A command a Script gave already bound (`mua act`): a map of `verb` and any
+  of `target`, `indirect` (entity ids), `direction` and `text`. `:error`
+  without a verb.
+  """
+  def bound(%{"verb" => verb} = command) when is_binary(verb) and verb != "" do
+    {:ok,
+     %{
+       verb: verb,
+       target_id: id(command["target"]),
+       indirect_id: id(command["indirect"]),
+       direction: text(command["direction"]),
+       text: text(command["text"])
+     }}
+  end
+
+  def bound(_), do: :error
+
+  defp id(eid) when is_integer(eid), do: eid
+  defp id(_), do: nil
+  defp text(t) when is_binary(t), do: t
+  defp text(_), do: nil
+
   defp bind_first(world, actor, command, resolved) do
     case Bind.bind(world, actor, command, nil, resolved) do
       {:ambiguous, _message, %{"options" => [%{"id" => id} | _], "slot" => slot}} ->

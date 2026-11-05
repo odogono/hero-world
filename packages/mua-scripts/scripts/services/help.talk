@@ -1,0 +1,16 @@
+-- The help Service: `help`, as a Script. mua sends `help target, actor`,
+-- with Nothing for the target, and `ask mua to verbs` gives the World's
+-- Verbs and Aliases.
+
+use join from text
+
+on help target, actor
+  ask mua to verbs
+  put it into words
+  return join([
+    `Commands: ${join(the names of words, ", ")}.`,
+    `Move by naming a direction: north, south, east, west, up, down and so on (or ${join(the aliases of words, ", ")}).`,
+    "Say something with say, or start with a quote: 'hello.",
+    "Repeat the last command with again (g)."
+  ], `\n`)
+end help

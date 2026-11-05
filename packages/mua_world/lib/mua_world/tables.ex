@@ -109,16 +109,30 @@ defmodule MuaWorld.Tables do
     notices
   end
 
-  @doc "Queues a command an NPC's Script asked it to carry out (`mua act`)."
-  def queue_act(%OdgnEcs{conn: conn}, actor, text),
-    do: SQL.run!(conn, "INSERT INTO mua_npc_queue (actor, text) VALUES (?1, ?2)", [actor, text])
+  @doc """
+  Queues a command an NPC's Script asked it to carry out (`mua act`): a
+  line of text, or a bound command as a map, kept as JSON.
+  """
+  def queue_act(%OdgnEcs{conn: conn}, actor, command) do
+    text = if is_map(command), do: Jason.encode!(%{"bound" => command}), else: command
+    SQL.run!(conn, "INSERT INTO mua_npc_queue (actor, text) VALUES (?1, ?2)", [actor, text])
+  end
 
-  @doc "The queued NPC commands, oldest first, as `{id, actor, text}`."
+  @doc "The queued NPC commands, oldest first, as `{id, actor, command}`."
   def queued_acts(%OdgnEcs{conn: conn}) do
     for [id, actor, text] <-
           SQL.all!(conn, "SELECT id, actor, text FROM mua_npc_queue ORDER BY id"),
-        do: {id, actor, text}
+        do: {id, actor, decode_act(text)}
   end
+
+  defp decode_act("{" <> _ = text) do
+    case Jason.decode(text) do
+      {:ok, %{"bound" => %{} = command}} -> command
+      _ -> text
+    end
+  end
+
+  defp decode_act(text), do: text
 
   def delete_act(%OdgnEcs{conn: conn}, id),
     do: SQL.run!(conn, "DELETE FROM mua_npc_queue WHERE id = ?1", [id])

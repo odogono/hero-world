@@ -17,12 +17,12 @@ defmodule MuaWorld.ScriptsTest do
     assert send_bob(c, "examine statue") == "The statue winks at you."
   end
 
-  test "falls through to the built-in action when the Script passes", c do
+  test "falls through to the Service Action when the Script passes", c do
     assert send_bob(c, "take statue") == "Taken."
     assert send_bob(c, "i") == "You are carrying: the statue."
   end
 
-  test "uses the built-in action for things without a Script", c do
+  test "uses the Service Action for things without a Script", c do
     assert send_bob(c, "examine rock") == "A plain rock."
   end
 

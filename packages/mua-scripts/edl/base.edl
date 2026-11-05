@@ -51,6 +51,7 @@ entity base_verbs {
         ]
         incomplete: "What do you want to take?"
         vetoes: [
+          { event: "beforeTake" asks: "service:thing" about: "target" }
           { event: "beforeRemove" asks: "holder" about: "target" }
           { event: "beforeAdd" asks: "actor" about: "target" }
         ]
@@ -139,4 +140,42 @@ entity base_verbs {
     }
     articles: ["a" "an" "the"]
   }
+}
+
+# The messages the Actions tell, by who sees them (`msg` the actor, `omsg`
+# everyone else in the room) and Verb. A thing's own `messages`, set on it
+# or inherited, replace these, as in
+# `messages { omsg: { take: "{actor} heaves {the target} onto a shoulder." } }`.
+# The `messages` Library fills them in (`mua-scripts/scripts/lib/messages.talk`).
+entity base_messages {
+  messages {
+    msg: {
+      close: "Closed."
+      drop: "Dropped."
+      lock: "You lock {the target} with {the indirect}."
+      open: "Opened."
+      take: "Taken."
+      unlock: "You unlock {the target} with {the indirect}."
+    }
+    omsg: {
+      arrive: "{actor} arrives."
+      close: "{actor} closes {the target}."
+      drop: "{actor} drops {the target}."
+      lock: "{actor} locks {the target}."
+      move: "{actor} goes {dir}."
+      open: "{actor} opens {the target}."
+      take: "{actor} takes {the target}."
+      unlock: "{actor} unlocks {the target}."
+    }
+  }
+}
+
+# A thing with fixed `responses` extends this atom, whose Script answers
+# from them (`mua-scripts/scripts/base/responsive.talk`):
+#
+#   atom bolted : responsive {
+#     responses { target: { take: "It's bolted to the floor." } }
+#   }
+atom responsive {
+  script { src: "../scripts/base/responsive.talk" }
 }

@@ -95,8 +95,8 @@ defmodule MuaWorld.Step do
     between = fn ->
       notices = Talk.take_notices(state.table)
 
-      for {place, message, who} <- notices,
-          do: notify(state, place, message, [{:entity, who}])
+      for {place, message, args} <- notices,
+          do: notify(state, place, message, args)
 
       notices != []
     end

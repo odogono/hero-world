@@ -61,7 +61,7 @@ entity anvil {
 atom exit {
 }
 
-atom bolted {
+atom bolted : responsive {
   responses { target: { take: "It's bolted to the floor." } }
 }
 
@@ -70,13 +70,13 @@ entity statue : item bolted {
   location { in: $west_of_house }
 }
 
-entity plinth {
+entity plinth : responsive {
   described { name: "Plinth" description: "A stone plinth." }
   responses { indirect: { open: "The plinth is not a key." } }
   location { in: $west_of_house }
 }
 
-entity vault : room {
+entity vault : room responsive {
   described { name: "Vault" description: "A silent stone vault." }
   responses { room: { drop: "The floor is too sacred to drop things on.", say: "The silence swallows your words." } }
 }
@@ -85,7 +85,7 @@ entity workshop_east : exit {
   location { in: $west_of_house } portal { dir: "east" to: $vault }
 }
 
-# Messages that replace the built-in defaults, set directly or inherited
+# Messages that replace the default messages, set directly or inherited
 atom fragile {
   messages { omsg: { drop: "{actor} sets {the target} down very gently." } }
 }
@@ -94,6 +94,12 @@ entity vase : item fragile {
   described { name: "Vase" description: "A thin porcelain vase." }
   messages { msg: { take: "You lift {the target} with both hands." } }
   location { in: $west_of_house }
+}
+
+entity orb : item {
+  described { name: "Orb" description: "A glass orb." }
+  messages { msg: { take: "{The target} glows. {Actor} eyes {the indirect}." } }
+  location { in: $vault }
 }
 
 entity trapdoor : exit {

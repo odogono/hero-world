@@ -13,7 +13,7 @@ defmodule MuaWorld.AfterTest do
 
   defp send_bob(%{world: world, bob: bob}, text), do: send_command(world, bob, text)
 
-  test "adds the target's reply to the built-in's", c do
+  test "adds the target's reply to the Action's", c do
     assert send_bob(c, "examine orb") == "A glass orb.\nIt hums faintly."
   end
 
@@ -25,12 +25,12 @@ defmodule MuaWorld.AfterTest do
     assert send_bob(c, "take orb") == "Taken.\nDust swirls where it lay."
   end
 
-  test "asks nothing when the built-in refuses", c do
+  test "asks nothing when the Action refuses", c do
     send_bob(c, "take orb")
     assert send_bob(c, "take orb") == "You already have that."
   end
 
-  test "runs the built-in once", c do
+  test "runs the Action once", c do
     send_bob(c, "take rock")
     assert send_bob(c, "i") == "You are carrying: the rock."
   end

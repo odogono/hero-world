@@ -5,8 +5,6 @@ defmodule MuaWorld.OutputTest do
 
   import MuaWorld.Case
 
-  alias MuaWorld.Messages
-
   @moduletag :tmp_dir
 
   describe "telling" do
@@ -36,27 +34,28 @@ defmodule MuaWorld.OutputTest do
     end
   end
 
+  # The `messages` Library fills in templates (mua-scripts/scripts/lib)
   describe "rendering a message" do
-    @values %{
-      "actor" => "bob",
-      "dir" => "north",
-      "target" => "lamp",
-      the: %{"target" => "the lamp"}
-    }
-
-    test ~s(fills in names, with or without "the") do
-      assert Messages.render("{actor} takes {the target}.", @values) == "bob takes the lamp."
-      assert Messages.render("{actor} goes {dir}.", @values) == "bob goes north."
+    setup %{tmp_dir: dir} do
+      world = start("objects.edl", dir)
+      bob = join(world, "bob")
+      alice = join(world, "alice")
+      for c <- [bob, alice], do: received(c)
+      {:ok, world: world, bob: bob, alice: alice}
     end
 
-    test "capitalises a placeholder written with a capital" do
-      assert Messages.render("{The target} glows. {Actor} grins.", @values) ==
-               "The lamp glows. Bob grins."
+    test ~s(fills in names, with or without "the"), c do
+      send_command(c.world, c.bob, "take lamp")
+      assert received(c.alice) == ["bob takes the lamp."]
+      send_command(c.world, c.bob, "east")
+      assert received(c.alice) == ["bob goes east."]
     end
 
-    test "leaves unknown placeholders alone" do
-      assert Messages.render("{actor} eyes {the indirect}.", @values) ==
-               "bob eyes {the indirect}."
+    test "capitalises a placeholder written with a capital, and leaves unknown ones alone", c do
+      send_command(c.world, c.bob, "east")
+
+      assert send_command(c.world, c.bob, "take orb") ==
+               "The orb glows. Bob eyes {the indirect}."
     end
   end
 end

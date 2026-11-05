@@ -14,7 +14,7 @@ defmodule MuaWorld.DispatchTest do
   defp send_bob(%{world: world, bob: bob}, text), do: send_command(world, bob, text)
 
   describe "target responses" do
-    test "refuse instead of the built-in action, inherited from an atom", c do
+    test "refuse instead of the Service Action, inherited from an atom", c do
       assert send_bob(c, "take statue") == "It's bolted to the floor."
       assert send_bob(c, "i") == "You are empty-handed."
     end
@@ -83,11 +83,13 @@ defmodule MuaWorld.DispatchTest do
 
       assert [room, indirect, target] = MuaWorld.Dispatch.questions(ecs, ctx)
       assert {room.to, indirect.to, target.to} == {location(c.world, c.bob), plinth, crate}
-      assert indirect.response =~ "The plinth is not a key."
-      assert target.response == nil
+
+      assert {room.args, indirect.args, target.args} ==
+               {["room", {:entity, c.bob}], ["indirect", {:entity, c.bob}],
+                ["target", {:entity, c.bob}]}
     end
 
-    test "falls through to the built-in action when nobody responds", c do
+    test "falls through to the Service Action when nobody responds", c do
       assert send_bob(c, "open crate") == "Opening the crate reveals: the coin."
     end
   end

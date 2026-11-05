@@ -1,27 +1,27 @@
 defmodule MuaWorld.Dispatch do
   @moduledoc """
-  What dispatch asks about a command, in turn, ported from
-  `actions/index.ts`, `scripted.ts` and `vetoes.ts`:
+  What dispatch asks about a command, in turn (ADR 0024):
 
   1. the receivers: the room it happens in, the second object, then the
      thing acted on. Each is offered the command (`on <verb> role, actor`),
      and a reply handles it;
   2. the veto Decisions of the action, any of which may refuse it;
-  3. the action: a built-in (`MuaWorld.Actions`), or for `look`, `move`,
-     `lock` and `unlock` a request to one of mua's Service Scripts;
+  3. the Action: a request to one of mua's Service Scripts
+     (`packages/mua-scripts/scripts/services`);
   4. once it has succeeded, `after<Verb>` (`afterTake`) to the same
      receivers, whose replies are added to the action's.
 
-  Each question is answered by a fixed reply from the entity's `responses`
-  first, else by its Scripts. The World process asks them
-  (`MuaWorld.run_dispatch/3`), so a Script may answer in a later Step.
+  Every question goes to a Message Path or a Service Script: a thing's
+  fixed `responses` are answered by the `responsive` base Script it
+  extends. The World process asks them (`MuaWorld.run_dispatch/3`), so a
+  Script may answer in a later Step.
 
   A question is a map: `asks` (`:offer` or `:decide`), `to` (an entity id
-  or `{:service, name}`), `message`, `args` (text, or `{:entity, eid}`),
-  `response` (a fixed reply or `nil`) and `kind` (`:receiver` or `:veto`).
+  or `{:service, name}`), `message`, `args` (text, Nothing, or
+  `{:entity, eid}`) and `kind` (`:receiver` or `:veto`).
   """
 
-  alias MuaWorld.{Actions, Exits}
+  alias MuaWorld.Exits
   alias MuaWorld.Commands.Scope
 
   @cannot "You can't do that."
@@ -33,7 +33,7 @@ defmodule MuaWorld.Dispatch do
   @doc "The `after<Verb>` questions, asked of the receivers once the action has succeeded."
   def afters(world, ctx) do
     message = "after" <> String.upcase(String.first(ctx.verb)) <> String.slice(ctx.verb, 1..-1//1)
-    for q <- receivers(world, ctx), do: %{q | message: message, response: nil}
+    for q <- receivers(world, ctx), do: %{q | message: message}
   end
 
   defp receivers(world, ctx) do
@@ -49,8 +49,7 @@ defmodule MuaWorld.Dispatch do
         asks: :offer,
         to: id,
         message: ctx.verb,
-        args: [role, {:entity, ctx.actor}],
-        response: response(world, id, role, ctx.verb)
+        args: [role, {:entity, ctx.actor}]
       }
     end)
   end
@@ -62,22 +61,20 @@ defmodule MuaWorld.Dispatch do
         asks: :decide,
         to: to,
         message: event,
-        args: [{:entity, ctx.actor}, {:entity, subject}],
-        response: response(world, to, "veto", event)
+        args: [{:entity, ctx.actor}, {:entity, subject}]
       }
     end
   end
 
   # Questions asked before an action changes the World, as Decisions. Any
-  # entity asked can veto, by a fixed `responses { veto: { <event>: ... } }`
-  # or a handler `on <event> actor, subject, deciding` that runs `veto`.
-  # Which Decisions a Verb raises is World data, its `vetoes`; each names
-  # who is asked and what about as a role. When a role is missing, such as
-  # a move with no exit, or the action would refuse anyway, none is asked.
+  # entity asked can veto, with a handler `on <event> actor, subject,
+  # deciding` that runs `veto`. Which Decisions a Verb raises is World data,
+  # its `vetoes`; each names who is asked and what about as a role. When a
+  # role is missing, such as a move with no exit, none is asked.
   defp veto_events(world, ctx) do
     vetoes = get_in(ctx, [:vocabulary, :vetoes, ctx.verb]) || []
 
-    if vetoes == [] or refuses?(world, ctx) do
+    if vetoes == [] do
       []
     else
       roles = roles(world, ctx)
@@ -91,9 +88,6 @@ defmodule MuaWorld.Dispatch do
         else: events
     end
   end
-
-  defp refuses?(world, %{verb: "take"} = ctx), do: Actions.take_refusal(world, ctx) != nil
-  defp refuses?(_world, _ctx), do: false
 
   defp roles(world, ctx) do
     target = ctx[:target_id]
@@ -115,25 +109,30 @@ defmodule MuaWorld.Dispatch do
   defp role(_roles, "service:" <> name), do: {:service, name}
   defp role(roles, name), do: roles[name]
 
-  # A fixed reply from an entity's `responses`, by role (or `veto`) and key
-  defp response(_world, {:service, _}, _, _), do: nil
-
-  defp response(world, id, role, key) do
-    case OdgnEcs.get(world, id, "responses") do
-      %{^role => %{^key => reply}} when is_binary(reply) -> reply
-      _ -> nil
-    end
-  end
-
   # -- Scripted actions --------------------------------------------------------
 
-  @doc "Whether a verb's action is one of mua's Service Scripts."
-  def scripted?(verb), do: verb in ["look", "move", "lock", "unlock"]
+  # The Service Script that carries out each Verb's Action, sent
+  # `<verb> target, actor` (`target` may be Nothing)
+  @services %{
+    "close" => "open",
+    "drop" => "thing",
+    "examine" => "thing",
+    "help" => "help",
+    "inventory" => "thing",
+    "lock" => "lock",
+    "open" => "open",
+    "read" => "thing",
+    "take" => "thing",
+    "unlock" => "lock"
+  }
+
+  @doc "The Service Scripts mua loads, by name."
+  def services, do: ~w(room exit lock thing open speech help)
 
   @doc """
-  What to send for a scripted action: `{:send, {:service, name}, message,
-  args}`, or `{:refused, message}` when it can't happen. The Service replies
-  text when it acted, or `{refused: text}` when it said no. Ask before the
+  What to send for an action: `{:send, {:service, name}, message, args}`,
+  or `{:refused, message}` when it can't happen. The Service replies text
+  when it acted, or `{refused: text}` when it said no. Ask before the
   action runs: once it has, the World has changed.
   """
   def plan(world, %{verb: "look"} = ctx) do
@@ -143,8 +142,8 @@ defmodule MuaWorld.Dispatch do
     end
   end
 
-  def plan(_world, %{verb: verb} = ctx) when verb in ["lock", "unlock"],
-    do: {:send, {:service, "lock"}, verb, [{:entity, ctx.target_id}, {:entity, ctx.actor}]}
+  def plan(_world, %{verb: verb} = ctx) when verb in ["say", "sayTo"],
+    do: {:send, {:service, "speech"}, verb, [target(ctx), {:entity, ctx.actor}, ctx[:text]]}
 
   def plan(world, %{verb: "move"} = ctx) do
     case plan_move(world, ctx) do
@@ -156,6 +155,15 @@ defmodule MuaWorld.Dispatch do
         refused
     end
   end
+
+  def plan(_world, %{verb: verb} = ctx) do
+    case @services[verb] do
+      nil -> {:refused, @cannot}
+      service -> {:send, {:service, service}, verb, [target(ctx), {:entity, ctx.actor}]}
+    end
+  end
+
+  defp target(ctx), do: if(id = ctx[:target_id], do: {:entity, id})
 
   @doc """
   Where a move goes: `{:go, exit, from, to}`, or why it can't happen.
