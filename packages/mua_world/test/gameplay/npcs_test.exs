@@ -54,4 +54,11 @@ defmodule MuaWorld.NpcsTest do
     send_command(world, bob, "say pieces of eight")
     refute ~s(Parrot says, "pieces of eight") in received(bob)
   end
+
+  test "a Step keeps its change set", %{world: world} do
+    polly = MuaWorld.named(world, "polly")
+    MuaWorld.set_component(world, polly, "npc", %{"active" => false})
+
+    assert [{^polly, "npc", :changed, %{"active" => false}}] = :sys.get_state(world).changes
+  end
 end

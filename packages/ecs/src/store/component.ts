@@ -176,6 +176,43 @@ export const cascadeSql = (c: Component) => {
     .join(' ');
 };
 
+const changeTrigger = (c: Component, op: string) =>
+  ident(`ecs_changes_${tableName(c)}_${op}`);
+
+/**
+ * Temporary triggers, on this connection only, that note in
+ * `temp.ecs_changes` each entity whose component is added, changed or
+ * removed, and whether it had the component before (see `takeChanges`).
+ * Nothing is written to the World file.
+ */
+export const changeSql = (c: Component) => {
+  const table = ident(tableName(c));
+  const name = `'${c.name.replaceAll("'", "''")}'`;
+  // Not INSERT OR IGNORE: an outer statement's conflict policy overrides it
+  const note = (eid: string, existed: number) =>
+    `INSERT INTO ecs_changes (name, eid, existed) SELECT ${name}, ${eid}, ${existed} ` +
+    `WHERE NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = ${name} AND eid = ${eid}); END;`;
+  const differs = c.columns
+    .map(col => `OLD.${ident(col.name)} IS NOT NEW.${ident(col.name)}`)
+    .join(' OR ');
+  return (
+    `CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'i')} AFTER INSERT ON main.${table} ` +
+    `BEGIN ${note('NEW.eid', 0)} ` +
+    `CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'd')} AFTER DELETE ON main.${table} ` +
+    `BEGIN ${note('OLD.eid', 1)}` +
+    (differs === ''
+      ? ''
+      : ` CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'u')} AFTER UPDATE ON main.${table} ` +
+        `WHEN ${differs} BEGIN ${note('OLD.eid', 1)}`)
+  );
+};
+
+/** Drops the triggers of `changeSql`, so the table can change */
+export const dropChangeSql = (c: Component) =>
+  ['i', 'u', 'd']
+    .map(op => `DROP TRIGGER IF EXISTS temp.${changeTrigger(c, op)};`)
+    .join(' ');
+
 const indexed = (col: Column) =>
   col.unique ? false : col.type === 'eid' ? true : col.index;
 

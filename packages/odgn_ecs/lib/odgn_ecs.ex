@@ -24,6 +24,9 @@ defmodule OdgnEcs do
   @schema """
   CREATE TABLE IF NOT EXISTS entities (eid INTEGER PRIMARY KEY);
   CREATE TABLE IF NOT EXISTS ecs_components (name TEXT PRIMARY KEY, columns TEXT NOT NULL);
+  CREATE TEMP TABLE IF NOT EXISTS ecs_changes (
+    name TEXT NOT NULL, eid INTEGER NOT NULL, existed INTEGER NOT NULL,
+    PRIMARY KEY (name, eid));
   """
 
   # -- Opening ----------------------------------------------------------------
@@ -54,6 +57,7 @@ defmodule OdgnEcs do
             into: %{},
             do: {name, Component.from_json(name, json)}
 
+      for {_, c} <- components, do: SQL.exec!(conn, Component.change_sql(c))
       {:ok, %__MODULE__{conn: conn, components: components}}
     end
   end
@@ -80,13 +84,23 @@ defmodule OdgnEcs do
   @spec define(t(), Component.t()) :: {:ok, t()} | {:error, Error.t()}
   def define(%__MODULE__{} = world, %Component{} = component) do
     with :ok <- Component.validate(component),
+         :ok <- SQL.exec(world.conn, Component.drop_change_sql(component)),
          {:ok, world} <- define_table(world, component),
          :ok <- ensure_keys(world, component) do
       # Every time, so a World made before a column was indexed or
       # cascaded gets its index or trigger
       SQL.exec!(world.conn, Component.index_sql(component))
       SQL.exec!(world.conn, Component.cascade_sql(component))
+      # After any rebuild, which drops the table's triggers
+      SQL.exec!(world.conn, Component.change_sql(world.components[component.name]))
       {:ok, world}
+    else
+      error ->
+        # The table is as it was, so it gets its change triggers back
+        with %Component{} = c <- component(world, component.name),
+             do: SQL.exec(world.conn, Component.change_sql(c))
+
+        error
     end
   end
 
@@ -585,6 +599,46 @@ defmodule OdgnEcs do
 
     {eid, data}
   end
+
+  # -- Change sets ------------------------------------------------------------
+
+  @typedoc """
+  A component that changed: `:added` and `:changed` carry its data now,
+  `:removed` carries `nil`.
+  """
+  @type change :: {eid(), String.t(), :added | :changed | :removed, data() | nil}
+
+  @doc """
+  The components added, changed or removed since the change set was last
+  taken, in entity then component order, and starts a new one. Taking it
+  after a transaction commits gives that transaction's change set.
+
+  Only the net change shows: a component added then removed is not there,
+  and one put again with the same values is not changed. Changes rolled
+  back, by `rollback/1` or `rollback_to/2`, are not there either. Removes
+  made by deleting an entity, or by a `:cascade` Reference, are. The change
+  set lives on the connection, not in the World file, so it starts empty
+  when the World opens.
+  """
+  @spec take_changes(t()) :: [change()]
+  def take_changes(%__MODULE__{} = world) do
+    rows =
+      SQL.all!(world.conn, "SELECT eid, name, existed FROM temp.ecs_changes ORDER BY eid, name")
+
+    SQL.exec!(world.conn, "DELETE FROM temp.ecs_changes")
+
+    for [eid, name, existed] <- rows,
+        change = change(get(world, eid, name), existed),
+        change != nil do
+      {op, data} = change
+      {eid, name, op, data}
+    end
+  end
+
+  defp change(nil, 0), do: nil
+  defp change(nil, 1), do: {:removed, nil}
+  defp change(data, 0), do: {:added, data}
+  defp change(data, 1), do: {:changed, data}
 
   # -- Transactions -----------------------------------------------------------
 

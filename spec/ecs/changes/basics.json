@@ -1,0 +1,112 @@
+{
+  "components": [
+    {
+      "name": "stats",
+      "columns": [
+        { "name": "hp", "type": "int" },
+        { "name": "name", "type": "string" }
+      ]
+    },
+    { "name": "tag", "columns": [] },
+    {
+      "name": "held",
+      "columns": [{ "name": "by", "type": "eid", "on_delete": "cascade" }]
+    },
+    {
+      "name": "target",
+      "columns": [{ "name": "of", "type": "eid", "on_delete": "nullify" }]
+    }
+  ],
+  "entities": [
+    { "id": "a", "components": { "stats": { "hp": 5, "name": "Ann" } } },
+    { "id": "b", "components": { "tag": {} } },
+    { "id": "c", "components": { "held": { "by": { "$ref": "a" } } } },
+    { "id": "d", "components": { "target": { "of": { "$ref": "a" } } } }
+  ],
+  "cases": [
+    {
+      "name": "nothing changed",
+      "ops": [],
+      "expect": []
+    },
+    {
+      "name": "added",
+      "ops": [["put", "b", "stats", { "hp": 1 }]],
+      "expect": [["b", "stats", "added", { "hp": 1, "name": null }]]
+    },
+    {
+      "name": "changed, with its values now",
+      "ops": [
+        ["put", "a", "stats", { "hp": 4, "name": "Ann" }],
+        ["put", "a", "stats", { "hp": 3, "name": "Ann" }]
+      ],
+      "expect": [["a", "stats", "changed", { "hp": 3, "name": "Ann" }]]
+    },
+    {
+      "name": "put again with the same values is no change",
+      "ops": [
+        ["put", "a", "stats", { "hp": 5, "name": "Ann" }],
+        ["put", "b", "tag", {}]
+      ],
+      "expect": []
+    },
+    {
+      "name": "removed",
+      "ops": [["remove", "b", "tag"]],
+      "expect": [["b", "tag", "removed", null]]
+    },
+    {
+      "name": "added then removed is no change",
+      "ops": [
+        ["put", "b", "stats", { "hp": 1 }],
+        ["remove", "b", "stats"]
+      ],
+      "expect": []
+    },
+    {
+      "name": "removed then added again is changed",
+      "ops": [
+        ["remove", "b", "tag"],
+        ["put", "b", "tag", {}]
+      ],
+      "expect": [["b", "tag", "changed", {}]]
+    },
+    {
+      "name": "deleting an entity removes its components, cascades and nullifies",
+      "ops": [["delete", "a"]],
+      "expect": [
+        ["a", "stats", "removed", null],
+        ["c", "held", "removed", null],
+        ["d", "target", "changed", { "of": null }]
+      ]
+    },
+    {
+      "name": "a new entity's components",
+      "ops": [
+        ["create", "e"],
+        ["put", "e", "tag", {}]
+      ],
+      "expect": [["e", "tag", "added", {}]]
+    },
+    {
+      "name": "changes rolled back to a savepoint are not there",
+      "ops": [
+        ["put", "a", "stats", { "hp": 9, "name": "Ann" }],
+        ["savepoint", "s"],
+        ["remove", "b", "tag"],
+        ["rollback_to", "s"]
+      ],
+      "expect": [["a", "stats", "changed", { "hp": 9, "name": "Ann" }]]
+    },
+    {
+      "name": "a rolled back transaction has no changes",
+      "ops": [["begin"], ["remove", "b", "tag"], ["rollback"]],
+      "expect": []
+    },
+    {
+      "name": "a committed transaction has its changes",
+      "ops": [["begin"], ["remove", "b", "tag"], ["commit"]],
+      "expect": [["b", "tag", "removed", null]]
+    }
+  ]
+}

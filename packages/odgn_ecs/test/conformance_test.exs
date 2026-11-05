@@ -19,6 +19,58 @@ defmodule OdgnEcs.ConformanceTest do
     end
   end
 
+  for file <- Path.wildcard(Path.join(@spec_dir, "changes/*.json")) do
+    @external_resource file
+    spec = file |> File.read!() |> JSON.decode!()
+
+    describe Path.relative_to(file, @spec_dir) do
+      for c <- spec["cases"] do
+        test c["name"] do
+          run_changes(unquote(Macro.escape(spec)), unquote(Macro.escape(c)))
+        end
+      end
+    end
+  end
+
+  # Builds the World, takes its change set, runs the case's ops, and takes
+  # the change set again
+  defp run_changes(spec, c) do
+    {world, ids} = build(spec)
+    OdgnEcs.take_changes(world)
+    ids = Enum.reduce(c["ops"], ids, &op(world, &1, &2))
+
+    actual =
+      for {eid, name, kind, data} <- OdgnEcs.take_changes(world),
+          do: [eid, name, Atom.to_string(kind), data]
+
+    expected =
+      for [label, name, kind, data] <- c["expect"],
+          do: [Map.fetch!(ids, label), name, kind, resolve(data, ids)]
+
+    assert actual == expected
+  end
+
+  defp op(world, ["create", label], ids) do
+    {:ok, eid} = OdgnEcs.create(world)
+    Map.put(ids, label, eid)
+  end
+
+  defp op(world, op, ids) do
+    :ok =
+      case op do
+        ["put", l, name, data] -> OdgnEcs.put(world, ids[l], name, resolve(data, ids))
+        ["remove", l, name] -> OdgnEcs.remove(world, ids[l], name)
+        ["delete", l] -> OdgnEcs.delete(world, ids[l])
+        ["begin"] -> OdgnEcs.begin(world)
+        ["commit"] -> OdgnEcs.commit(world)
+        ["rollback"] -> OdgnEcs.rollback(world)
+        ["savepoint", n] -> OdgnEcs.savepoint(world, n)
+        ["rollback_to", n] -> OdgnEcs.rollback_to(world, n)
+      end
+
+    ids
+  end
+
   defp run_case(spec, c) do
     {world, ids} = build(spec)
     query = c["query"] |> resolve(ids) |> options(ids)

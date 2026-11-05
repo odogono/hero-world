@@ -16,6 +16,10 @@ defmodule MuaWorld.Step do
   In tests only, the World's `fault` stops the process, as a crash would, at
   `:before_commit` or `:after_commit`, before publishing.
 
+  The components the Step added, changed or removed, its change set
+  (`OdgnEcs.take_changes/1`), are kept in the state's `changes` after the
+  `COMMIT`. Writes made outside a Step aren't in it.
+
   It works on the World's state, `%MuaWorld{}`, and returns it.
   """
   require Logger
@@ -34,6 +38,8 @@ defmodule MuaWorld.Step do
     world = state.world
     started = System.monotonic_time()
     :ok = OdgnEcs.begin(world)
+    # Changes made since the last Step, outside one, are not this Step's
+    OdgnEcs.take_changes(world)
     Tables.put_world_time(world, state.world_ms)
     state = input.(state)
     state = pump(state)
@@ -42,11 +48,12 @@ defmodule MuaWorld.Step do
     lines = Tables.take_outbox(world)
     fault(state, :before_commit)
     commit!(world)
+    state = %{state | changes: OdgnEcs.take_changes(world)}
 
     :telemetry.execute(
       [:mua_world, :step, :stop],
       %{duration: System.monotonic_time() - started},
-      %{lines: length(lines)}
+      %{lines: length(lines), changes: length(state.changes)}
     )
 
     fault(state, :after_commit)

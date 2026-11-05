@@ -10,14 +10,19 @@ import {
   component,
   createEntity,
   define,
+  deleteEntity,
+  ident,
   openStore,
   put,
   query,
+  remove,
   select,
+  takeChanges,
   type ColumnInput,
   type Condition,
   type Order,
-  type QueryOptions
+  type QueryOptions,
+  type Store
 } from '../index';
 
 const SPEC_DIR = join(import.meta.dir, '../../../../../spec/ecs');
@@ -68,7 +73,7 @@ const columnOf = (c: Record<string, unknown>): ColumnInput => ({
   unique: c.unique as boolean | undefined
 });
 
-const build = async (spec: Spec) => {
+const build = async (spec: Omit<Spec, 'cases'>) => {
   const db = await createDatabase({ type: DatabaseType.BUN });
   const store = openStore(db);
   for (const c of spec.components) {
@@ -132,6 +137,83 @@ for (const file of files) {
             (c.expect as string[]).map(label => ids.get(label)!)
           );
         }
+        store.db.close();
+      });
+    }
+  });
+}
+
+type ChangeSpec = Omit<Spec, 'cases'> & {
+  cases: {
+    expect: [string, string, string, unknown][];
+    name: string;
+    ops: unknown[][];
+  }[];
+};
+
+const runOp = (store: Store, ids: Ids, op: unknown[]) => {
+  const [kind, a, b, c] = op as [string, string, string, unknown];
+  const eid = () => ids.get(a)!;
+  switch (kind) {
+    case 'create':
+      ids.set(a, createEntity(store));
+      break;
+    case 'put':
+      put(store, eid(), b, resolve(c, ids) as Record<string, unknown>);
+      break;
+    case 'remove':
+      remove(store, eid(), b);
+      break;
+    case 'delete':
+      deleteEntity(store, eid());
+      break;
+    case 'begin':
+      store.db.exec('BEGIN IMMEDIATE');
+      break;
+    case 'commit':
+      store.db.exec('COMMIT');
+      break;
+    case 'rollback':
+      store.db.exec('ROLLBACK');
+      break;
+    case 'savepoint':
+      store.db.exec(`SAVEPOINT ${ident(a)}`);
+      break;
+    case 'rollback_to':
+      store.db.exec(`ROLLBACK TO ${ident(a)}`);
+      store.db.exec(`RELEASE ${ident(a)}`);
+      break;
+    default:
+      throw new Error(`Unknown op ${kind}`);
+  }
+};
+
+const changeFiles = readdirSync(join(SPEC_DIR, 'changes')).filter(f =>
+  f.endsWith('.json')
+);
+
+for (const file of changeFiles) {
+  const spec = JSON.parse(
+    readFileSync(join(SPEC_DIR, 'changes', file), 'utf8')
+  ) as ChangeSpec;
+
+  describe(`changes/${file}`, () => {
+    for (const c of spec.cases) {
+      // Builds the World, takes its change set, runs the case's ops, and
+      // takes the change set again
+      test(c.name, async () => {
+        const { ids, store } = await build(spec);
+        takeChanges(store);
+        for (const op of c.ops) {
+          runOp(store, ids, op);
+        }
+        const expected = c.expect.map(([label, name, kind, data]) => [
+          ids.get(label),
+          name,
+          kind,
+          resolve(data, ids)
+        ]);
+        expect(takeChanges(store)).toEqual(expected as never);
         store.db.close();
       });
     }
