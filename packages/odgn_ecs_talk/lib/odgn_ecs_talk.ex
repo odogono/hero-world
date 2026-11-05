@@ -266,16 +266,19 @@ defmodule OdgnEcsTalk do
     if :ets.member(talk.table, {:service, service}) do
       {:error, "Service #{service} already has a Script"}
     else
-      obj = NorthTalk.object!(talk.group, talk.atom_kind, "service:" <> service, service)
+      # A Script that fails to load keeps its Object for the next try: an
+      # Object's id can't be reused, even once it is disposed
+      id = "service:" <> service
 
-      case load_owned(talk, "service:" <> service, obj, source, opts) do
-        :ok ->
-          :ets.insert(talk.table, {{:service, service}, obj})
-          :ok
+      obj =
+        case NorthTalk.object_by_id(talk.group, talk.atom_kind.name, id) do
+          {:ok, obj} -> obj
+          :error -> NorthTalk.object!(talk.group, talk.atom_kind, id, service)
+        end
 
-        error ->
-          NorthTalk.dispose(talk.group, obj)
-          error
+      with :ok <- load_owned(talk, id, obj, source, opts) do
+        :ets.insert(talk.table, {{:service, service}, obj})
+        :ok
       end
     end
   end

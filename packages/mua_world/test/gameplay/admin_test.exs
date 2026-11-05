@@ -50,6 +50,13 @@ defmodule MuaWorld.AdminTest do
     assert line(world, ada, "return (") =~ ~r/^!! line 1: /
   end
 
+  test "a line that fails leaves the prompt usable", %{world: world, ada: ada} do
+    assert line(world, ada, ~s|return lookup({a: 1}, ["a"])|) =~ ~r/^!! line 1: /
+    assert line(world, ada, "return (") =~ ~r/^!! line 1: /
+    assert line(world, ada, "return 1 / 0") =~ ~r/^!! /
+    assert line(world, ada, "return 1") == "=> 1"
+  end
+
   test "a line that fails leaves no change, its output and timers included",
        %{world: world, ada: ada} do
     lamp = MuaWorld.named(world, "lamp")
