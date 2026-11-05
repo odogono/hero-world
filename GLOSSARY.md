@@ -34,6 +34,10 @@ _Avoid_: operator, superuser, wizard
 The complete, persistent state of one game: its entities and their components. It has one writer at a time.
 _Avoid_: store, database (for the concept), scene
 
+**Local World**:
+A World played solo in the browser, with its own local Account. It never syncs with a server's World, and its file is its save.
+_Avoid_: offline world, save game
+
 **Entity**:
 A thing that exists in a World and carries components. It is nothing but its id.
 _Avoid_: object, instance
