@@ -20,10 +20,13 @@ export type EDLResolutionError =
   | EDLCircularReferenceError
   | EDLInvalidExtendError;
 
-type EDLNode = {
+/** A definition as parsed: an atom, entity, component def or include */
+export type EDLNode = {
   components?: ComponentData;
   extends?: string[];
   id?: string;
+  /** The file an `include` names */
+  path?: string;
   type: string;
   was?: string;
 };
@@ -98,7 +101,11 @@ export const stripComments = (line: string) => {
 };
 
 /** Parses an EDL source into its atoms and entities */
-export const compileEDL = (edl: string): CompiledEDL => {
+export const compileEDL = (edl: string): CompiledEDL =>
+  compileNodes(parseNodes(edl));
+
+/** Parses an EDL source into its definitions, includes left unread */
+export const parseNodes = (edl: string): EDLNode[] => {
   const origLines = edl.split(/\r?\n/);
   const includeMap: Array<{ originalIndex: number; text: string }> = [];
   const parseLines: string[] = [];
@@ -166,7 +173,11 @@ export const compileEDL = (edl: string): CompiledEDL => {
     // Fallback if no location is available
     throw new EDLParseError(String(error?.message ?? 'EDL parse error'));
   }
+  return defs;
+};
 
+/** The atoms and entities of parsed definitions; includes are ignored */
+export const compileNodes = (defs: readonly EDLNode[]): CompiledEDL => {
   const atoms = new Map<string, Definition>();
   const entities: EntityDefinition[] = [];
   for (const def of defs) {

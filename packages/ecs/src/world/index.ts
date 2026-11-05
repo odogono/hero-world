@@ -21,7 +21,7 @@ import {
   saveToJSON as sharedSaveToJSON
 } from '../db/json-functions';
 import { executeEDL, type ExecuteOptions } from '../edl';
-import { compileEDL } from '../edl/compile';
+import { parseNodes } from '../edl/compile';
 import { parseDefsFromEDL } from '../edl/helpers';
 import { edlRecord, type ScriptOwner } from '../edl/record';
 import {
@@ -143,6 +143,8 @@ const proxyEntity = <T extends Components>(
 type CreateWorldOptions = Partial<CreateDatabaseOptions> & {
   allowRedefineDefinitions?: boolean;
   dbType?: DatabaseType;
+  /** How an EDL given to createWorld reads its includes and scripts */
+  edl?: ExecuteOptions;
 };
 
 const registerComponentDef = <TComponents extends Components>(
@@ -640,9 +642,9 @@ export async function createWorld(
     await initialiseWorldDb(world, defs, options);
     // Build its atoms and entities, if it has any; one with only `def`s
     // leaves the world unbuilt, for a later executeEDL
-    const { atoms, entities } = compileEDL(componentDefs);
-    if (atoms.size > 0 || entities.length > 0) {
-      executeEDL(world, componentDefs);
+    const nodes = parseNodes(componentDefs);
+    if (nodes.some(node => node.type !== 'component')) {
+      executeEDL(world, componentDefs, options?.edl);
     }
     return world;
   }

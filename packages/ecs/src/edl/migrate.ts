@@ -2,7 +2,7 @@ import { addComponents } from '../component';
 import { removeComponent } from '../component/remove';
 import type { Components, GenericEntity } from '../types';
 import type { World } from '../world';
-import { compileEDL, hashEDL, resolveEDL, scriptPath } from './compile';
+import { compileNodes, hashEDL, resolveEDL, scriptPath } from './compile';
 import {
   edlValues,
   isPlayState,
@@ -10,13 +10,12 @@ import {
   readComponents
 } from './edl-values';
 import { EDLExecutionError } from './errors';
+import { readEDL, type ReadOptions } from './includes';
 import { edlRecord } from './record';
 
-export type MigrateOptions = {
+export type MigrateOptions = ReadOptions & {
   /** Report what would change without changing anything */
   dryRun?: boolean;
-  /** Path of the .edl file; `script.src` values resolve relative to it */
-  path?: string;
   /**
    * Takes an entity gone from the EDL out of play, e.g. by moving it to
    * Limbo. Without it, such entities are only reported.
@@ -67,11 +66,15 @@ export type MigrationPlan = {
   updated: EntityMigration[];
 };
 
-/** Whether the EDL differs from the one the world was built or migrated from */
+/**
+ * Whether the EDL, with the files it includes, differs from the one the
+ * world was built or migrated from
+ */
 export const isEDLChanged = <T extends Components>(
   world: World<T>,
-  edl: string
-) => edlRecord(world).getEDLHash() !== hashEDL(edl);
+  edl: string,
+  options: ReadOptions = {}
+) => edlRecord(world).getEDLHash() !== hashEDL(readEDL(edl, options).source);
 
 const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -101,7 +104,8 @@ export const migrate = <T extends Components>(
 ): MigrationPlan => {
   const { build = false, dryRun = false, path, prune } = options;
   const record = edlRecord(world);
-  const compiled = compileEDL(edl);
+  const { nodes, source } = readEDL(edl, options);
+  const compiled = compileNodes(nodes);
   const named = compiled.entities.filter(entity => entity.name);
   const stored = record.getDefinitionNames();
 
@@ -320,7 +324,7 @@ export const migrate = <T extends Components>(
     plan.pruned = plan.gone.length > 0;
   }
 
-  record.setEDLHash(hashEDL(edl));
+  record.setEDLHash(hashEDL(source));
   world.flush();
   return plan;
 };

@@ -1,13 +1,11 @@
 import type { Components } from '../types';
 import type { World } from '../world';
 import { EDLError } from './errors';
+import type { ReadOptions } from './includes';
 import { migrate } from './migrate';
 import { edlRecord } from './record';
 
-export type ExecuteOptions = {
-  /** Path of the .edl file; `script.src` values resolve relative to it */
-  path?: string;
-};
+export type ExecuteOptions = ReadOptions;
 
 /**
  * Builds a world from EDL: the Migration of an empty world (ADR 0007). It
@@ -24,5 +22,5 @@ export const executeEDL = <T extends Components>(
       'This world has already been built from an EDL; use migrateEDL to bring it up to date'
     );
   }
-  migrate(world, edl, { build: true, path: options.path });
+  migrate(world, edl, { ...options, build: true });
 };
