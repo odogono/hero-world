@@ -58,6 +58,38 @@ defmodule MuaWorld.Talk do
   defp handle(nil), do: nil
   defp handle(eid), do: %Object{kind: "entity", id: Integer.to_string(eid), group: @group}
 
+  @doc """
+  Sends a notice to the Scripts of the things in a place, but not the one
+  it is about (its first argument), such as the actor who arrived.
+  """
+  def notify(talk, world, place, message, args) do
+    about = with [{:entity, eid} | _] <- args, do: eid
+    values = Enum.map(args, &value(talk, &1))
+
+    for watcher <- MuaWorld.Commands.Scope.entities_in(world, place),
+        watcher != about,
+        OdgnEcsTalk.scripted?(talk, watcher),
+        do: {:ok, _} = OdgnEcsTalk.deliver(talk, watcher, message, values)
+
+    :ok
+  end
+
+  @doc "An argument for a Script: an entity's Handle, or text as it is."
+  def value(talk, {:entity, eid}), do: OdgnEcsTalk.handle(talk, eid)
+  def value(_talk, text), do: text
+
+  @doc """
+  The engine's `:between` hook: sends the notices Scripts asked for since
+  the last Pump, and says whether there were any.
+  """
+  def between(talk, world, table) do
+    fn ->
+      notices = take_notices(table)
+      for {place, message, args} <- notices, do: notify(talk, world, place, message, args)
+      notices != []
+    end
+  end
+
   @doc "The `mua` Capability, for `OdgnEcsTalk.start/2`'s `:capabilities`."
   def mua(world, table, talk) do
     entity = %{"object" => "entity"}

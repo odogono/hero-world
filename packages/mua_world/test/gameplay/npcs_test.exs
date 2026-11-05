@@ -59,6 +59,7 @@ defmodule MuaWorld.NpcsTest do
     polly = MuaWorld.named(world, "polly")
     MuaWorld.set_component(world, polly, "npc", %{"active" => false})
 
-    assert [{^polly, "npc", :changed, %{"active" => false}}] = :sys.get_state(world).changes
+    assert [{^polly, "npc", :changed, %{"active" => false}}] =
+             :sys.get_state(world).engine.changes
   end
 end
