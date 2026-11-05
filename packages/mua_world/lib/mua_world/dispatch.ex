@@ -7,8 +7,8 @@ defmodule MuaWorld.Dispatch do
      thing acted on. Each is offered the command (`on <verb> role, actor`),
      and a reply handles it;
   2. the veto Decisions of the action, any of which may refuse it;
-  3. the action: a built-in (`MuaWorld.Actions`), or for `look` and `move` a
-     request to one of mua's Service Scripts;
+  3. the action: a built-in (`MuaWorld.Actions`), or for `look`, `move`,
+     `lock` and `unlock` a request to one of mua's Service Scripts;
   4. once it has succeeded, `after<Verb>` (`afterTake`) to the same
      receivers, whose replies are added to the action's.
 
@@ -128,11 +128,12 @@ defmodule MuaWorld.Dispatch do
   # -- Scripted actions --------------------------------------------------------
 
   @doc "Whether a verb's action is one of mua's Service Scripts."
-  def scripted?(verb), do: verb in ["look", "move"]
+  def scripted?(verb), do: verb in ["look", "move", "lock", "unlock"]
 
   @doc """
   What to send for a scripted action: `{:send, {:service, name}, message,
-  args}`, or `{:refused, message}` when it can't happen. Ask before the
+  args}`, or `{:refused, message}` when it can't happen. The Service replies
+  text when it acted, or `{refused: text}` when it said no. Ask before the
   action runs: once it has, the World has changed.
   """
   def plan(world, %{verb: "look"} = ctx) do
@@ -141,6 +142,9 @@ defmodule MuaWorld.Dispatch do
       room -> {:send, {:service, "room"}, "look", [{:entity, room}, {:entity, ctx.actor}]}
     end
   end
+
+  def plan(_world, %{verb: verb} = ctx) when verb in ["lock", "unlock"],
+    do: {:send, {:service, "lock"}, verb, [{:entity, ctx.target_id}, {:entity, ctx.actor}]}
 
   def plan(world, %{verb: "move"} = ctx) do
     case plan_move(world, ctx) do
