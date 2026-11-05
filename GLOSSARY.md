@@ -151,3 +151,33 @@ _Avoid_: inheritance chain, delegation
 **Delivery**:
 One message handed to an entity's Message Path from outside Scripts, such as a command's question, a due timer or a lifecycle message, together with the Script work it causes. A Step holds one or more Deliveries.
 _Avoid_: dispatch, event
+
+**Host**:
+A program that runs a World and its Scripts: the server in Elixir, or a Local World's Worker in TypeScript. Every Host plays a World the same way.
+_Avoid_: runtime, backend
+
+**Script**:
+NorthTalk code attached to an atom or entity that decides how it behaves.
+_Avoid_: behaviour (for the code), handler
+
+**Service Script**:
+A Script that belongs to no entity and carries out an Action for every World.
+_Avoid_: built-in, system script
+
+## Commands
+
+**Command**:
+One thing a Character or NPC asks to do, a Verb with its bound entities and text, as read from what they typed.
+_Avoid_: action, input, order
+
+**Verb**:
+A named kind of Command, with the forms it can be typed in and the Reach of each noun. Verbs are World data, never Host code.
+_Avoid_: command (for the kind)
+
+**Action**:
+The change a Command makes to the World once nothing has Vetoed it, carried out by a Service Script.
+_Avoid_: built-in, effect
+
+**Reach**:
+The part of a Character's Perception that a Verb's noun can name: here, carried, or the room. It never extends past Perception.
+_Avoid_: scope, range
