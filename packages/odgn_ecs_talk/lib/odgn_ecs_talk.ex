@@ -2,8 +2,9 @@ defmodule OdgnEcsTalk do
   @moduledoc """
   A NorthTalk Host Adapter for an `odgn_ecs` World: one Script Group per
   World, entities as Host Objects of the `entity` Object Kind, atoms with
-  Scripts on their Message Path, and the `world`, `clock` and `timer`
-  Capabilities.
+  Scripts on their Message Path, and the `world` and `clock` Capabilities.
+  Timers are the engine's (`OdgnEcsEngine.Timers`), which a Host adds
+  through `:capabilities`.
 
   The caller drives it: `pump/2` with a Clock reading, inside its own
   transaction, as Mua's World process does (ADR 0015). Callbacks run in
@@ -29,10 +30,6 @@ defmodule OdgnEcsTalk do
     `resolve`, `named` and `show` are not; `show` calls the `:on_show`
     option. `named` finds an entity by its Definition name.
   - **`clock`:** `now`, the Pump's Clock reading.
-  - **`timer`:** `schedule name, at, message, args` and `cancel name` keep
-    durable timers in the World, owned by the entity the Run was delivered
-    to, scoped to it and the Script (an atom's name, for a copy).
-    `due_timers/2` and `fire_timer/2` deliver them.
   - **Deliveries:** `deliver`, `request` and `decide` (and their Service
     forms) take a `:host` option, a term of the Host's own that a Capability
     reads back with `delivery/2` while the Delivery's Runs go on. The adapter
@@ -59,31 +56,15 @@ defmodule OdgnEcsTalk do
 
   @entity "entity"
   @atom "atom"
-  @timer "talk_timer"
 
   @type t :: %__MODULE__{}
 
   @doc """
-  The components the adapter needs the World to define: `location` (unless
-  the `:location` option names another) and `talk_timer`.
+  The components the adapter needs the World to define: `location`, unless
+  the `:location` option names another.
   """
   def components do
-    [
-      %Component{name: "location", play_state: true, columns: [%Column{name: "in", type: :eid}]},
-      %Component{
-        name: @timer,
-        play_state: true,
-        columns: [
-          # a timer goes with the entity it belongs to
-          %Column{name: "owner", type: :eid, optional: false, on_delete: :cascade},
-          %Column{name: "script", type: :string, optional: false},
-          %Column{name: "name", type: :string, optional: false},
-          %Column{name: "at", type: :int, optional: false, index: true},
-          %Column{name: "message", type: :string, optional: false},
-          %Column{name: "args", type: :string, optional: false}
-        ]
-      }
-    ]
+    [%Component{name: "location", play_state: true, columns: [%Column{name: "in", type: :eid}]}]
   end
 
   @doc """
@@ -139,7 +120,6 @@ defmodule OdgnEcsTalk do
       )
 
     :ok = NorthTalk.define_capability!(owner, clock_capability())
-    :ok = NorthTalk.define_capability!(owner, timer_capability(talk))
 
     hosts =
       for build <- Keyword.get(opts, :capabilities, []), into: %{} do
@@ -151,8 +131,7 @@ defmodule OdgnEcsTalk do
     grants =
       %{
         "world" => NorthTalk.grant!(owner, "world"),
-        "clock" => NorthTalk.grant!(owner, "clock"),
-        "timer" => NorthTalk.grant!(owner, "timer")
+        "clock" => NorthTalk.grant!(owner, "clock")
       }
       |> Map.merge(hosts)
       |> Map.merge(Keyword.get(opts, :grants, %{}))
@@ -308,15 +287,15 @@ defmodule OdgnEcsTalk do
 
   @doc """
   Compiles a Library and adds it to the Group, for Scripts loaded after it.
-  Its functions may call `world`, `clock` and `timer` with their caller's
-  Grants, and the defined Capabilities named in `capabilities`, which
-  Scripts must be granted under those names.
+  Its functions may call every Capability Scripts are granted, with their
+  caller's Grants, and the defined Capabilities named in `capabilities`,
+  which Scripts must be granted under those names.
   """
   def add_library(%__MODULE__{} = talk, name, source, imports \\ [], capabilities \\ []) do
     with {:ok, library} <-
            NorthTalk.compile_library(talk.owner, name, "1", source,
              imports: imports,
-             capabilities: ["world", "clock", "timer" | capabilities]
+             capabilities: Enum.uniq(Map.keys(talk.grants) ++ capabilities)
            ),
          :ok <- NorthTalk.add_library(talk.group, library) do
       {:ok, library}
@@ -584,136 +563,16 @@ defmodule OdgnEcsTalk do
     :ok
   end
 
-  # -- Timers -----------------------------------------------------------------
-
-  @doc "The timers due at or before `now_us` (microseconds), earliest first."
-  def due_timers(%__MODULE__{world: world}, now_us) do
-    world
-    |> OdgnEcs.select([@timer], where: [{@timer, "at", :<=, now_us}], order_by: {@timer, "at"})
-    |> Enum.map(&timer/1)
-  end
-
-  defp timer({eid, %{@timer => timer}}), do: Map.put(timer, "eid", eid)
-
-  @doc "When the earliest timer falls due, in microseconds, or `nil` if there is none."
-  def next_timer_at(%__MODULE__{world: world}) do
-    case OdgnEcs.select(world, [@timer], with: [@timer], order_by: {@timer, "at"}, limit: 1) do
-      [{_, %{@timer => %{"at" => at}}}] -> at
-      [] -> nil
-    end
-  end
-
   @doc """
-  Stores a timer of the Host's own, as a Script's `schedule` does, replacing
-  one of the same owner, `script` and name. `script` is a name of the Host's
-  choosing, such as `"mua:timers"`, so the Host can tell its timers apart in
-  `due_timers/2` and handle them itself instead of `fire_timer/2`. `at` is in
-  microseconds.
+  The name a Script's timers and the like are scoped by: the Script's own,
+  or, for a copy of an atom's Script (`atom@path`), the atom's.
   """
-  def schedule(
-        %__MODULE__{world: world},
-        %{owner: owner, script: script, name: name, at: at, message: message} = timer
-      ) do
-    for eid <- find_timer(world, owner, script, name), do: OdgnEcs.delete(world, eid)
-    {:ok, eid} = OdgnEcs.create(world)
-
-    OdgnEcs.put(world, eid, @timer, %{
-      "owner" => owner,
-      "script" => script,
-      "name" => name,
-      "at" => at,
-      "message" => message,
-      "args" => Values.encode(Map.get(timer, :args, []))
-    })
-  end
-
-  @doc "Every timer stored under `script`, as `due_timers/2` gives them."
-  def timers(%__MODULE__{world: world}, script) do
-    world
-    |> OdgnEcs.select([@timer], where: [{@timer, "script", script}])
-    |> Enum.map(&timer/1)
-  end
-
-  @doc "Removes a timer, as `due_timers/2` gave it, without delivering it."
-  def remove_timer(%__MODULE__{world: world}, %{"eid" => eid}), do: OdgnEcs.delete(world, eid)
-
-  @doc "Removes a due timer and delivers its message to its entity, if that still exists."
-  def fire_timer(%__MODULE__{world: world} = talk, %{"eid" => eid, "owner" => owner} = timer) do
-    :ok = OdgnEcs.delete(world, eid)
-
-    if OdgnEcs.exists?(world, owner),
-      do: deliver(talk, owner, timer["message"], Values.decode(timer["args"])),
-      else: :ok
-  end
-
-  defp find_timer(world, owner, script, name) do
-    OdgnEcs.query(world,
-      where: [{@timer, "owner", owner}, {@timer, "script", script}, {@timer, "name", name}]
-    )
-  end
-
-  # A timer a Run sets belongs to the entity its Delivery went to
-  defp timer_owner(talk, call) do
-    case delivery(talk, call) do
-      %{receiver: eid} when eid != nil -> {:ok, eid}
-      _ -> no_timer_owner()
-    end
-  end
-
-  defp no_timer_owner,
-    do: {:error, %{code: "invalid value", message: "A timer needs a Run delivered to an entity"}}
-
-  defp timer_script(talk, script) do
+  def script_name(%__MODULE__{} = talk, script) do
     case :ets.lookup(talk.table, {:copy, script}) do
       [{_, atom}] -> atom
       [] -> script
     end
   end
-
-  defp timer_capability(talk) do
-    world = talk.world
-
-    Capability.from_functions("timer", %{
-      "schedule" =>
-        {[args: ["text", "any", "text", "any"], cost: 1, mode: :fire_and_forget],
-         fn [name, at, message, args], call ->
-           with {:ok, owner} <- timer_owner(talk, call),
-                {:ok, at_us} <- instant_us(at) do
-             script = timer_script(talk, call.script)
-             for eid <- find_timer(world, owner, script, name), do: OdgnEcs.delete(world, eid)
-             {:ok, eid} = OdgnEcs.create(world)
-
-             :ok =
-               OdgnEcs.put(world, eid, @timer, %{
-                 "owner" => owner,
-                 "script" => script,
-                 "name" => name,
-                 "at" => at_us,
-                 "message" => message,
-                 "args" => Values.encode(args || [])
-               })
-
-             :noreply
-           end
-         end},
-      "cancel" =>
-        {[args: ["text"], cost: 1, mode: :fire_and_forget],
-         fn [name], call ->
-           with {:ok, owner} <- timer_owner(talk, call) do
-             for eid <- find_timer(world, owner, timer_script(talk, call.script), name),
-                 do: OdgnEcs.delete(world, eid)
-
-             {:ok, nil}
-           end
-         end}
-    })
-  end
-
-  defp instant_us(%NorthTalk.Instant{unix_us: us}), do: {:ok, us}
-  defp instant_us(%DateTime{} = dt), do: {:ok, DateTime.to_unix(dt, :microsecond)}
-
-  defp instant_us(other),
-    do: {:error, %{code: "invalid value", message: "#{inspect(other)} is not an Instant"}}
 
   # -- Capabilities -----------------------------------------------------------
 

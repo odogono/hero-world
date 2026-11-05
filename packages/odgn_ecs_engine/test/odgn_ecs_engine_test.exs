@@ -2,7 +2,7 @@ defmodule OdgnEcsEngineTest do
   use ExUnit.Case, async: true
 
   alias OdgnEcs.{Column, Component, SQL}
-  alias OdgnEcsEngine.{Delivery, Tables}
+  alias OdgnEcsEngine.{Delivery, Tables, Timers}
 
   @edl """
   atom loud {}
@@ -59,7 +59,8 @@ defmodule OdgnEcsEngineTest do
         on_show: fn _, text ->
           SQL.run!(world.conn, "INSERT INTO shown (text) VALUES (?1)", [text])
         end,
-        limits: [fuel_per_run: 5_000]
+        limits: [fuel_per_run: 5_000],
+        capabilities: [&Timers.capability/1]
       )
 
     :ok = OdgnEcsTalk.load_atom_script(talk, "loud", @loud)
@@ -237,7 +238,7 @@ defmodule OdgnEcsEngineTest do
           systems: [system],
           timers: %{
             "host:test" => fn step, timer ->
-              OdgnEcsTalk.remove_timer(step.talk, timer)
+              Timers.remove(step.world, timer)
               send(test, {:ran, timer["name"], step.now})
             end
           }
@@ -249,7 +250,7 @@ defmodule OdgnEcsEngineTest do
       for {name, ms} <- [{"late", 900}, {"early", 800}],
           do:
             :ok =
-              OdgnEcsTalk.schedule(engine.talk, %{
+              Timers.schedule(engine.world, %{
                 owner: bell,
                 script: "host:test",
                 name: name,

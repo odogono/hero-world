@@ -22,4 +22,4 @@ The engine has no process and keeps no clock: the Host owns both, and gives it W
 
 ## Tables
 
-The engine keeps World time in `ecs_engine_meta` and Waiting inputs in `ecs_engine_waiting` ([ADR 0022](../../docs/adr/0022-the-engine-owns-its-tables.md)). Timers are still `talk_timer` entities, kept by `odgn_ecs_talk`.
+The engine keeps World time in `ecs_engine_meta`, timers in `ecs_engine_timers` and Waiting inputs in `ecs_engine_waiting` ([ADR 0022](../../docs/adr/0022-the-engine-owns-its-tables.md)). `OdgnEcsEngine.Timers` stores them and gives Scripts the `timer` Capability: a Host starts its `odgn_ecs_talk` adapter with `capabilities: [&OdgnEcsEngine.Timers.capability/1]`. A timer goes with the entity that owns it. A World whose timers were `talk_timer` entities has them moved into the table when the engine's tables are made.
