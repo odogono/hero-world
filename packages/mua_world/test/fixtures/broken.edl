@@ -1,0 +1,16 @@
+# A world with a Script that doesn't compile
+include "mua-scripts:edl/base.edl"
+
+atom room {
+  container { capacity: 100 is_closed: false }
+  described { name: "Room" description: "A room." }
+}
+
+atom broken {
+  script { src: "scripts/broken.talk" }
+}
+
+entity west_of_house : room broken {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Hall" description: "A long hall." }
+}

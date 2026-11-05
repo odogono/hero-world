@@ -285,7 +285,8 @@ defmodule OdgnEcsTalk do
 
   @doc """
   Loads the Script of every atom and entity whose EDL declares one, reading
-  each source with `read`, a function of its path.
+  each source with `read`, a function of its path. Stops at the first that
+  fails, as `{:error, {path, reason}}`.
   """
   def load_scripts(%__MODULE__{} = talk, read, opts \\ []) do
     Enum.reduce_while(OdgnEdl.script_owners(talk.world), :ok, fn owner, :ok ->
@@ -295,7 +296,10 @@ defmodule OdgnEcsTalk do
           %{kind: :entity, eid: eid, src: src} -> load_entity_script(talk, eid, read.(src), opts)
         end
 
-      if result == :ok, do: {:cont, :ok}, else: {:halt, result}
+      case result do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, {owner.src, reason}}}
+      end
     end)
   end
 

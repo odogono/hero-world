@@ -429,6 +429,32 @@ defmodule OdgnEcsTalkTest do
     assert value(ask(talk, id(world, "rock"), "who")) == "rock"
   end
 
+  @tag :tmp_dir
+  test "names the Script that fails to load", %{tmp_dir: dir} do
+    File.write!(Path.join(dir, "rock.talk"), "on who\n  return (\nend who")
+    {:ok, world} = OdgnEcs.open(":memory:")
+
+    world =
+      Enum.reduce(OdgnEcsTalk.components(), world, fn c, w -> elem(OdgnEcs.define(w, c), 1) end)
+
+    {:ok, world, _} =
+      OdgnEdl.load(
+        world,
+        """
+        def script {
+          src: string
+        }
+        entity rock { script { src: "rock.talk" } }
+        """,
+        path: Path.join(dir, "main.edl")
+      )
+
+    assert {:error, {path, %NorthTalk.LoadError{}}} =
+             OdgnEcsTalk.load_scripts(talk(world), &File.read!/1)
+
+    assert Path.basename(path) == "rock.talk"
+  end
+
   describe "the timer Capability" do
     @bells """
     entity tower {}
