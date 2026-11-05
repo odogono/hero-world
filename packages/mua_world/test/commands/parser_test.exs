@@ -4,7 +4,9 @@ defmodule MuaWorld.Commands.ParserTest do
 
   alias MuaWorld.Commands.{Parser, Verbs}
 
-  defp parse(text), do: Parser.parse(text)
+  @vocabulary MuaWorld.Case.base_vocabulary()
+
+  defp parse(text), do: Parser.parse(text, @vocabulary)
 
   describe "look" do
     test "parses look and its aliases" do
@@ -15,7 +17,7 @@ defmodule MuaWorld.Commands.ParserTest do
     end
 
     test "parses look with a noun as examine" do
-      assert {:ok, %{verb: "examine", target: "mailbox", target_scope: "here"}} =
+      assert {:ok, %{verb: "examine", target: "mailbox", target_reach: "here"}} =
                parse("look mailbox")
     end
   end
@@ -62,12 +64,17 @@ defmodule MuaWorld.Commands.ParserTest do
 
     test "splits a noun phrase at a preposition" do
       assert {:ok,
-              %{verb: "unlock", target: "red box", indirect: "brass key", indirect_scope: "inv"}} =
+              %{
+                verb: "unlock",
+                target: "red box",
+                indirect: "brass key",
+                indirect_reach: "carried"
+              }} =
                parse("unlock red box with brass key")
     end
 
-    test "uses the form's scope" do
-      assert {:ok, %{verb: "drop", target: "lamp", target_scope: "inv"}} = parse("drop lamp")
+    test "uses the form's Reach" do
+      assert {:ok, %{verb: "drop", target: "lamp", target_reach: "carried"}} = parse("drop lamp")
     end
   end
 
@@ -82,7 +89,7 @@ defmodule MuaWorld.Commands.ParserTest do
     end
 
     test "says to someone" do
-      assert {:ok, %{verb: "sayTo", target: "bob", text: "hi", target_scope: "room"}} =
+      assert {:ok, %{verb: "sayTo", target: "bob", text: "hi", target_reach: "room"}} =
                parse("say to bob hi")
     end
 
@@ -98,22 +105,27 @@ defmodule MuaWorld.Commands.ParserTest do
   describe "a world's verbs" do
     @extra [
       %{
-        names: ["pray", "kneel"],
-        incomplete: "Pray to whom?",
-        forms: [
-          %{handler: "prayTo", pattern: "to obj", scope: "room", indirect_scope: nil},
-          %{handler: "pray", pattern: "", scope: nil, indirect_scope: nil}
-        ]
-      },
-      %{
-        names: ["look"],
-        incomplete: nil,
-        forms: [%{handler: "lookUnder", pattern: "under obj", scope: nil, indirect_scope: nil}]
+        "verbs" => %{
+          "defs" => [
+            %{
+              "names" => ["pray", "kneel"],
+              "incomplete" => "Pray to whom?",
+              "forms" => [
+                %{"handler" => "prayTo", "pattern" => "to obj", "reach" => "room"},
+                %{"handler" => "pray", "pattern" => ""}
+              ]
+            },
+            %{
+              "names" => ["look"],
+              "forms" => [%{"handler" => "lookUnder", "pattern" => "under obj"}]
+            }
+          ]
+        }
       }
     ]
 
-    test "add new verbs, and forms to a built-in tried first" do
-      vocabulary = Verbs.vocabulary(@extra)
+    test "add new verbs, and forms to a Base Verb tried first" do
+      vocabulary = MuaWorld.Case.base_vocabulary(@extra)
 
       assert {:ok, %{verb: "pray"}} = Parser.parse("kneel", vocabulary)
       assert {:ok, %{verb: "prayTo", target: "altar"}} = Parser.parse("pray to altar", vocabulary)
@@ -127,7 +139,7 @@ defmodule MuaWorld.Commands.ParserTest do
   end
 
   test "lists every word that starts a command, once" do
-    verbs = Verbs.list()
+    verbs = Verbs.list(@vocabulary)
 
     for word <- ~w(look x take north n again), do: assert(word in verbs)
     assert length(Enum.uniq(verbs)) == length(verbs)

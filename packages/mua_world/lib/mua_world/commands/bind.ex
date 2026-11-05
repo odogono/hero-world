@@ -35,12 +35,12 @@ defmodule MuaWorld.Commands.Bind do
           {:cont, {:ok, acc}}
 
         phrase ->
-          scope = Map.get(command, scope_key(slot)) || "here"
-          pool = Scope.in_scope(world, actor, scope)
+          reach = Map.get(command, reach_key(slot)) || "here"
+          pool = Scope.in_reach(world, actor, reach)
 
           case resolved[Atom.to_string(slot)] do
             nil ->
-              ctx = %{world: world, actor: actor, pool: pool, scope: scope}
+              ctx = %{world: world, actor: actor, pool: pool, reach: reach}
 
               case bind_phrase(ctx, String.split(phrase), last_target) do
                 {:error, message} ->
@@ -90,8 +90,8 @@ defmodule MuaWorld.Commands.Bind do
     end
   end
 
-  defp scope_key(:target), do: :target_scope
-  defp scope_key(:indirect), do: :indirect_scope
+  defp reach_key(:target), do: :target_reach
+  defp reach_key(:indirect), do: :indirect_reach
 
   @doc "Whether a candidate answers to these words: every word must be one of its."
   def matches?(candidate, words), do: words != [] and Enum.all?(words, &(&1 in candidate.words))
@@ -99,7 +99,10 @@ defmodule MuaWorld.Commands.Bind do
   defp bind_phrase(ctx, [first | _] = words, last_target) when first in @all do
     # `take all` means what's around you; `drop all` what you carry
     candidates =
-      Enum.filter(ctx.pool, &(!&1.player? and (ctx.scope == "inv" or &1.location != ctx.actor)))
+      Enum.filter(
+        ctx.pool,
+        &(!&1.player? and (ctx.reach == "carried" or &1.location != ctx.actor))
+      )
 
     candidates =
       case split_on(words, @except) do
@@ -206,7 +209,7 @@ defmodule MuaWorld.Commands.Bind do
     end
   end
 
-  defp not_found(%{scope: "inv"}, phrase), do: "You aren't carrying any #{phrase}."
+  defp not_found(%{reach: "carried"}, phrase), do: "You aren't carrying any #{phrase}."
   defp not_found(_, phrase), do: "You can't see any #{phrase} here."
 
   defp describe_list(candidates) do
@@ -257,11 +260,20 @@ defmodule MuaWorld.Commands.Bind do
   @doc "The parsed command a pending map holds."
   def pending_command(%{"command" => command}), do: decode(command)
 
-  @keys ~w(verb raw target indirect target_scope indirect_scope direction text)a
+  @keys ~w(verb raw target indirect target_reach indirect_reach direction text)a
 
   defp encode(command),
     do: for({k, v} <- Map.take(command, @keys), v != nil, into: %{}, do: {Atom.to_string(k), v})
 
   defp decode(command),
-    do: for(k <- @keys, v = command[Atom.to_string(k)], into: %{}, do: {k, v})
+    do:
+      for(k <- @keys, v = command[Atom.to_string(k)] || legacy(command, k), into: %{}, do: {k, v})
+
+  # A question asked before Reach was named (#181) kept its old keys
+  defp legacy(command, :target_reach), do: legacy_reach(command["target_scope"])
+  defp legacy(command, :indirect_reach), do: legacy_reach(command["indirect_scope"])
+  defp legacy(_command, _key), do: nil
+
+  defp legacy_reach("inv"), do: "carried"
+  defp legacy_reach(reach), do: reach
 end

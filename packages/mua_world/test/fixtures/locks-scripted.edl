@@ -1,4 +1,6 @@
-# locks.edl, with locks handled by behaviours/lockable.talk
+# locks.edl, with locks handled by mua-scripts/scripts/services/lockable.talk
+
+include "mua-scripts:edl/base.edl"
 
 atom room {
   container { capacity: 100 is_closed: false }
@@ -10,7 +12,7 @@ atom item {
 
 # A lockable chest; each chest names its own lock
 atom chest {
-  script { src: "../../priv/behaviours/lockable.talk" }
+  script { src: "../../../mua-scripts/scripts/services/lockable.talk" }
   container { capacity: 5 is_closed: true }
   lockable { is_locked: true lock: "chest" }
 }

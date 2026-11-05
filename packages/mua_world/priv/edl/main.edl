@@ -1,5 +1,4 @@
-
-
+include "mua-scripts:edl/base.edl"
 
 
 # ======
@@ -129,7 +128,7 @@ entity garden_verbs {
       }
       {
         names: ["water"]
-        forms: [{ handler: "water" pattern: "obj with obj2" indirect_scope: "inv" }]
+        forms: [{ handler: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
         incomplete: "Water what, with what?"
       }
     ]

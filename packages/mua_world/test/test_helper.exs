@@ -7,6 +7,17 @@ defmodule MuaWorld.Case do
   def fixture(name), do: Path.join(@fixtures, name)
 
   @doc """
+  The vocabulary of the Base Verbs, without a World, with `extra` `verbs`
+  and `words` components after them.
+  """
+  def base_vocabulary(extra \\ []) do
+    path = MuaWorld.Scripts.path("edl/base.edl")
+    {:ok, definitions, _} = OdgnEdl.read(File.read!(path), path: path)
+    components = for %OdgnEdl.Entity{components: c} <- definitions, do: c
+    MuaWorld.Commands.Verbs.from_components(components ++ extra)
+  end
+
+  @doc """
   A World built from `fixtures/<name>`, in `dir`, ticking by hand. Its
   Starting room is `west_of_house` unless `starting_room:` says otherwise.
   """

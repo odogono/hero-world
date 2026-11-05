@@ -1,5 +1,7 @@
 # A small world where Scripts add to built-in replies
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

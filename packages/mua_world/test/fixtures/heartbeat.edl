@@ -1,5 +1,7 @@
 # NPCs that act on the heartbeat mua's npc_heartbeat System gives them
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

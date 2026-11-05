@@ -1,5 +1,7 @@
 # A small world for testing how players refer to objects
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
   described { name: "Room" description: "A room." }

@@ -1,0 +1,73 @@
+# The World the command cases run in: Ada stands in a hall with a lamp, a
+# box, two keys and a note, and carries a coin. Bob, another Character, is
+# here too. A door leads north.
+
+include "mua-scripts:edl/base.edl"
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+entity hall {
+  container { capacity: 100 is_closed: false }
+  described { name: "Hall" description: "A long hall." }
+  exits { north: { to: $study door: $door } }
+}
+
+entity study {
+  container { capacity: 100 is_closed: false }
+  described { name: "Study" description: "A quiet study." }
+}
+
+entity door {
+  described { name: "Door" description: "An oak door." }
+  door { is_closed: true }
+  lockable { is_locked: false lock: "oak" }
+}
+
+entity ada {
+  player { name: "Ada" }
+  described { name: "Ada" description: "Ada." }
+  location { in: $hall }
+}
+
+entity bob {
+  player { name: "Bob" }
+  described { name: "Bob" description: "Bob." }
+  location { in: $hall }
+}
+
+entity lamp : item {
+  described { name: "Lamp" description: "A brass oil lamp." }
+  noun { words: ["lantern"] }
+  location { in: $hall }
+}
+
+entity box {
+  described { name: "Box" description: "A wooden box." }
+  container { capacity: 5 is_closed: false }
+  location { in: $hall }
+}
+
+entity brass_key : item {
+  described { name: "Brass key" description: "A small brass key." }
+  noun { words: ["key"] }
+  location { in: $hall }
+}
+
+entity iron_key : item {
+  described { name: "Iron key" description: "A heavy iron key." }
+  noun { words: ["key"] }
+  location { in: $ada }
+}
+
+entity note : item {
+  described { name: "Note" description: "A folded note." }
+  readable { text: "Meet me at noon." }
+  location { in: $hall }
+}
+
+entity coin : item {
+  described { name: "Coin" description: "A gold coin." }
+  location { in: $ada }
+}

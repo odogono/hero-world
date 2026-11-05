@@ -38,10 +38,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && sed -i '/en_US.UTF-8/s/^# //' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
-  DATABASE_PATH=/data/world.db PORT=4000
+  DATABASE_PATH=/data/world.db PORT=4000 MUA_SCRIPTS_DIR=/app/mua-scripts
 RUN useradd --system --create-home --uid 1000 mua && mkdir /data && chown mua /data
 WORKDIR /app
 COPY --from=release --chown=mua /src/packages/mua_server/_build/prod/rel/mua_server ./
+# The Base Verbs and Service Scripts every World shares (ADR 0024)
+COPY --chown=mua packages/mua-scripts ./mua-scripts
 USER mua
 VOLUME /data
 EXPOSE 4000

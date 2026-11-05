@@ -17,7 +17,7 @@ defmodule MuaWorld.Actions do
   """
 
   alias MuaWorld.Messages
-  alias MuaWorld.Commands.{Scope, Verbs}
+  alias MuaWorld.Commands.Scope
 
   @built_in ~w(close drop examine help inventory lock open read say sayTo take unlock)
 
@@ -347,9 +347,9 @@ defmodule MuaWorld.Actions do
 
   defp help(_world, ctx) do
     names =
-      (ctx[:vocabulary] || Verbs.vocabulary()).defs |> Enum.map(&hd(&1.names)) |> Enum.uniq()
+      ctx.vocabulary.defs |> Enum.map(&hd(&1.names)) |> Enum.uniq()
 
-    short = Verbs.aliases() |> Map.keys() |> Enum.sort() |> Enum.join(", ")
+    short = ctx.vocabulary.aliases |> Map.keys() |> Enum.sort() |> Enum.join(", ")
 
     done(
       Enum.join(

@@ -21,9 +21,9 @@ NorthTalk's Elixir Host isn't on Hex yet, so `mix.exs` pins it to a commit of od
   - The `rooms` and `things` Libraries.
 - **Components:** `MuaWorld.Components` defines mua's components, ported from `coms.ts` in snake_case, before the Build.
 - **Commands:** a Character's input is parsed against the World's verbs, the built-ins plus any a `verbs` component adds (`MuaWorld.Commands`). It is bound to the things in scope, with `all`, `X and Y`, `X in Y`, `it` and `again`. "Which do you mean?" waits in `player.pending`, so it survives a restart.
-- **Dispatch:** each command is offered in turn to the room, the second object and the thing acted on; a reply from a Script, or a fixed one from `responses`, handles it. Then come the veto Decisions, such as `beforeTraverse`, `beforeExit` and `beforeEnter` for a move. Last comes the action: a built-in (`MuaWorld.Actions`), or for `look` and `move` mua's Service Scripts in [`priv/behaviours`](priv/behaviours). Each question is awaited inside the command's Step, and only a Script that suspends carries the rest over to a later Step (`MuaWorld.Dispatch`). Once the action has succeeded, `after<Verb>` (such as `afterTake`) goes to the same receivers, and their replies are added below its message.
+- **Dispatch:** each command is offered in turn to the room, the second object and the thing acted on; a reply from a Script, or a fixed one from `responses`, handles it. Then come the veto Decisions each Verb declares in its data, such as `beforeTraverse`, `beforeExit` and `beforeEnter` for a move. Last comes the action: a built-in (`MuaWorld.Actions`), or for `look` and `move` mua's Service Scripts in [`packages/mua-scripts/scripts`](../mua-scripts/scripts). Each question is awaited inside the command's Step, and only a Script that suspends carries the rest over to a later Step (`MuaWorld.Dispatch`). Once the action has succeeded, `after<Verb>` (such as `afterTake`) goes to the same receivers, and their replies are added below its message.
 - **Rolling back:** a vetoed command never reaches its action. A built-in runs in a savepoint of its own, so one that refuses or raises leaves no partial change. A Script that fails rolls back its own Segment.
-- **Locks:** `lock` and `unlock` are built in, and [`priv/behaviours/lockable.talk`](priv/behaviours/lockable.talk) does the same as a Script. Both pass the same tests.
+- **Locks:** `lock` and `unlock` are built in, and [`mua-scripts/scripts/services/lockable.talk`](../mua-scripts/scripts/services/lockable.talk) does the same as a Script. Both pass the same tests.
 - **`show actor, text`:** a Character sees it; any other actor passes it to the Characters inside it, so a room can speak.
 - **Accounts and Characters** ([ADR 0016](../../docs/adr/0016-accounts-are-entities-in-the-world.md)): an Account is an Entity with an `account` component, and owns its Characters through `player.account`. `create_account`, `create_character`, `enter`, `leave` and `command` are each one Step, and every one that acts for a Character names its Account, which must own it. Character names are unique, ignoring case.
 - **Limbo and the Starting room** (`MuaWorld.Places`): Limbo and the system actor are found by `meta.props.id`, or made on start. A new Character waits in Limbo until it enters, and one that leaves goes back there, remembering the room it left in `player.return_to`. Entering returns it to that room if the room still exists, isn't Limbo and isn't inside anything; otherwise it goes to the Starting room. The `starting_room:` option names the Starting room by Definition name, and a World refuses to start unless it is a top-level place. Phoenix's disconnect grace and takeover come with #97.
@@ -62,7 +62,7 @@ NorthTalk's Elixir Host isn't on Hex yet, so `mix.exs` pins it to a commit of od
 | Path | Contents |
 | --- | --- |
 | [`lib/mua_world.ex`](lib/mua_world.ex) | The World process: Steps, commands, timers and restarts. |
-| [`lib/mua_world/commands/`](lib/mua_world/commands) | Verbs, the parser, scope and binding. |
+| [`lib/mua_world/commands/`](lib/mua_world/commands) | The vocabulary read from World data, the parser, Reach and binding. |
 | [`lib/mua_world/input.ex`](lib/mua_world/input.ex) | Reading input into commands: pending questions, `again`, `say to`. |
 | [`lib/mua_world/dispatch.ex`](lib/mua_world/dispatch.ex) | What dispatch asks, and the plans for `look` and `move`. |
 | [`lib/mua_world/actions.ex`](lib/mua_world/actions.ex), [`messages.ex`](lib/mua_world/messages.ex) | The built-in actions and their messages. |
@@ -73,5 +73,5 @@ NorthTalk's Elixir Host isn't on Hex yet, so `mix.exs` pins it to a commit of od
 | [`lib/mua_world/tables.ex`](lib/mua_world/tables.ex) | mua's own tables: World time, the outbox, waiting inputs, notices and queued NPC commands. |
 | [`lib/mua_world/lifecycle.ex`](lib/mua_world/lifecycle.ex) | Homes, resets and mua's `timers`. |
 | [`lib/mua_world/places.ex`](lib/mua_world/places.ex) | Limbo, the system actor and the Starting room. |
-| [`priv/behaviours/`](priv/behaviours) | mua's Service Scripts and Libraries, from `packages/mua`, in snake_case. |
+| [`../mua-scripts/`](../mua-scripts) | The Base Verbs (`edl/base.edl`), and mua's Service Scripts and Libraries, which every World shares. `MuaWorld.Scripts` finds it. |
 | [`test/`](test/) | Tests against a small chapel World ([`test/fixtures/chapel`](test/fixtures/chapel)), including crashes around the commit, and gameplay tests against fixtures adapted from `packages/mua`. |

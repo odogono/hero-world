@@ -1,5 +1,7 @@
 # A small world for the world clock and timers
 
+include "mua-scripts:edl/base.edl"
+
 atom room {
   container { capacity: 100 is_closed: false }
 }

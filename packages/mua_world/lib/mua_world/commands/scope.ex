@@ -43,11 +43,11 @@ defmodule MuaWorld.Commands.Scope do
     end)
   end
 
-  @doc "The candidates in `scope` for an actor."
-  def in_scope(world, actor, scope) do
-    carried = if scope == "room", do: [], else: elements(world, actor)
+  @doc "The candidates within a Reach (`here`, `carried` or `room`) for an actor."
+  def in_reach(world, actor, reach) do
+    carried = if reach == "room", do: [], else: elements(world, actor)
 
-    if scope == "inv" do
+    if reach == "carried" do
       carried
     else
       case location(world, actor) do
