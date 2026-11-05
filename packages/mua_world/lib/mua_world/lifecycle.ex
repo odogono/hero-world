@@ -5,9 +5,8 @@ defmodule MuaWorld.Lifecycle do
 
   - **Homes:** where each thing starts, so a reset can put it back. Things
     already given a home keep it; Characters and exits have none.
-  - **Reset:** puts back every thing whose home is the place and that has
-    wandered, unless a Character is carrying it, then tells the place's
-    Scripts.
+  - **Reset:** decided by the `lifecycle` Service Script
+    (`packages/mua-scripts`, ADR 0024). This module only schedules it.
   - **`timers { every: { message: seconds } }`:** kept as `talk_timer`s
     under the script name `mua:timers`, one interval apart. `reset` resets
     the place; any other message goes to the entity's Scripts from the
@@ -29,33 +28,6 @@ defmodule MuaWorld.Lifecycle do
             OdgnEcs.put(world, eid, "home", %{"in" => OdgnEcs.get(world, eid, "location")["in"]})
 
     :ok
-  end
-
-  @doc "Puts back what has strayed from `place`. Returns how many things moved."
-  def put_back(world, place) do
-    strays =
-      for eid <- OdgnEcs.query(world, where: [{"home", "in", place}]),
-          (OdgnEcs.get(world, eid, "location") || %{})["in"] != place,
-          not carried?(world, eid),
-          do: eid
-
-    for eid <- strays, do: :ok = OdgnEcs.put(world, eid, "location", %{"in" => place})
-    length(strays)
-  end
-
-  # Is a Character holding this, directly or inside something they carry?
-  defp carried?(world, eid, seen \\ MapSet.new()) do
-    case (OdgnEcs.get(world, eid, "location") || %{})["in"] do
-      nil ->
-        false
-
-      holder ->
-        cond do
-          MapSet.member?(seen, holder) -> false
-          OdgnEcs.get(world, holder, "player") != nil -> true
-          true -> carried?(world, holder, MapSet.put(seen, eid))
-        end
-    end
   end
 
   @doc "The seconds between an entity's `message` timers, if it has them."

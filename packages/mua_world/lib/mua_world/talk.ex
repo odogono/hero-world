@@ -8,6 +8,7 @@ defmodule MuaWorld.Talk do
   - `command`: the command the Script is handling, as a map of `verb`,
     `actor`, `target`, `indirect`, `text` and `direction` (Nothing for any it
     doesn't have), or Nothing outside a command.
+  - `homed place`: the things whose `home` is `place`, for a reset.
   - `notice place, message, who, text`: sends `message who` (or
     `message who, text` when `text` is given) to the Scripts of the things
     in a place but `who`, once the Run's Pump ends.
@@ -98,6 +99,12 @@ defmodule MuaWorld.Talk do
                   {"verb", ctx.verb}
                 ])}
            end
+         end},
+      "homed" =>
+        {[args: [entity], result: %{"list" => entity}, cost: 1],
+         fn [place], _ ->
+           place = Values.from_value(place)
+           {:ok, Enum.map(OdgnEcs.query(world, where: [{"home", "in", place}]), &handle/1)}
          end},
       "notice" =>
         {[

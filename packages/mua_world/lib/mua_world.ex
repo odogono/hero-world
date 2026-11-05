@@ -786,8 +786,27 @@ defmodule MuaWorld do
     end
   end
 
+  # What a reset does is the lifecycle Service's to decide (ADR 0024); the
+  # place's own Scripts hear of it after
   defp reset_place(state, place) do
-    moved = Lifecycle.put_back(state.world, place)
+    talk = state.talk
+    handle = OdgnEcsTalk.handle(talk, place)
+
+    {:ok, pending} =
+      OdgnEcsTalk.request_service(talk, "lifecycle", "reset", [handle], instant(state.world_ms))
+
+    state = Step.pump(state)
+
+    moved =
+      case OdgnEcsTalk.outcome(pending) do
+        {:replied, n} when is_number(n) ->
+          trunc(n)
+
+        other ->
+          if other == :waiting, do: OdgnEcsTalk.abandon(pending)
+          Logger.error("reset of #{place} failed: #{inspect(other)}", event: :reset_failed)
+          0
+      end
 
     if OdgnEcsTalk.scripted?(state.talk, place) do
       system = OdgnEcsTalk.handle(state.talk, state.places.system)
