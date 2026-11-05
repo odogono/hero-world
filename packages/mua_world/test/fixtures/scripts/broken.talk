@@ -1,0 +1,3 @@
+on examine role, actor
+  return (
+end examine

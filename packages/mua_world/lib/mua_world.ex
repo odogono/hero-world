@@ -287,12 +287,27 @@ defmodule MuaWorld do
         Lifecycle.record_homes(world)
         :ok = OdgnEcs.commit(world)
         state = %{state | vocabulary: Verbs.from_world(world), places: places}
-        state = start_talk(state, Keyword.get(opts, :limits, []))
-        # a test's `fault` is for the Steps that follow start-up
-        state = %{start_world(%{state | fault: nil}) | fault: opts[:fault]}
-        if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
-        started(path, how, state.world_ms, abandoned)
-        {:ok, state}
+
+        case start_talk(state, Keyword.get(opts, :limits, [])) do
+          {:ok, state} ->
+            # a test's `fault` is for the Steps that follow start-up
+            state = %{start_world(%{state | fault: nil}) | fault: opts[:fault]}
+            if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
+            started(path, how, state.world_ms, abandoned)
+            {:ok, state}
+
+          {:error, {script, reason}} ->
+            diagnostics = diagnostics(reason)
+
+            for d <- diagnostics do
+              at = Enum.join(Enum.reject([script, d["line"], d["col"]], &is_nil/1), ":")
+              Logger.error("#{at} #{d["message"]}", event: :script_load_failed)
+            end
+
+            OdgnEcs.close(world)
+            Lock.release(path)
+            {:stop, {:script_load_failed, script, diagnostics}}
+        end
 
       {:error, reason} ->
         :ok = OdgnEcs.rollback(world)
@@ -348,25 +363,41 @@ defmodule MuaWorld do
         on_show: &Tables.tell(world, &1, &2)
       )
 
-    for name <- @libraries,
-        do:
-          {:ok, _} =
-            OdgnEcsTalk.add_library(talk, name, File.read!(behaviour("lib/#{name}.talk")), [], [
-              "mua"
-            ])
+    libraries =
+      for name <- @libraries do
+        path = behaviour("lib/#{name}.talk")
+        {path, fn -> OdgnEcsTalk.add_library(talk, name, File.read!(path), [], ["mua"]) end}
+      end
 
-    for name <- Dispatch.services(),
-        do:
-          :ok =
-            OdgnEcsTalk.load_service_script(
-              talk,
-              name,
-              File.read!(behaviour("services/#{name}.talk"))
-            )
+    services =
+      for name <- Dispatch.services() do
+        path = behaviour("services/#{name}.talk")
+        {path, fn -> OdgnEcsTalk.load_service_script(talk, name, File.read!(path)) end}
+      end
 
-    :ok = OdgnEcsTalk.load_scripts(talk, &File.read!/1)
-    %{state | talk: talk, table: table}
+    # Each Script loads in turn, and the first that fails stops the World,
+    # naming its file
+    loaded =
+      Enum.reduce_while(libraries ++ services, :ok, fn {path, load}, :ok ->
+        case load.() do
+          {:error, reason} -> {:halt, {:error, {path, reason}}}
+          _ -> {:cont, :ok}
+        end
+      end)
+
+    with :ok <- loaded,
+         :ok <- OdgnEcsTalk.load_scripts(talk, &File.read!/1) do
+      {:ok, %{state | talk: talk, table: table}}
+    end
   end
+
+  # What went wrong loading a Script, as NorthTalk diagnostics
+  defp diagnostics(%NorthTalk.LoadError{diagnostics: diagnostics}), do: diagnostics
+
+  defp diagnostics(reason) when is_exception(reason),
+    do: [%{"message" => Exception.message(reason)}]
+
+  defp diagnostics(reason), do: [%{"message" => inspect(reason)}]
 
   # Arms mua's timers, then tells every scripted thing the World has
   # started, as one Step. Scripts load fresh on every start (ADR 0014), so
