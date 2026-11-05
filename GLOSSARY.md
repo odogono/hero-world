@@ -90,6 +90,10 @@ _Avoid_: game time, wall-clock time
 One input to the World, such as a command, a due timer or a run of a System, and the Script work it causes, ending in one commit. Output that confirms it is published only after that commit.
 _Avoid_: tick, transaction, turn
 
+**Waiting input**:
+An input the World has accepted but not yet run as a Step. It is kept in the World, so it survives a restart.
+_Avoid_: pending command, queue entry
+
 **Limbo**:
 The place that holds what is out of play: stored things, and Characters not in play, whether their Players have left or they have yet to enter for the first time.
 _Avoid_: void, storage room
