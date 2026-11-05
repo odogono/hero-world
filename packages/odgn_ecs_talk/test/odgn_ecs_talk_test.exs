@@ -589,6 +589,19 @@ defmodule OdgnEcsTalkTest do
     assert value(settle(talk, pending)) == 2
   end
 
+  test "a Service Script that fails to load can be loaded again" do
+    {world, talk} = setup_world()
+    hero = OdgnEcsTalk.handle(talk, id(world, "hero"))
+
+    assert {:error, %NorthTalk.LoadError{}} =
+             OdgnEcsTalk.put_service_script(talk, "probe", "on run\n  return (\nend run")
+
+    :ok = OdgnEcsTalk.put_service_script(talk, "probe", "on run who\n  return 1\nend run")
+
+    {:ok, pending} = OdgnEcsTalk.request_service(talk, "probe", "run", [hero], now())
+    assert value(settle(talk, pending)) == 1
+  end
+
   describe "a Delivery's host term" do
     # `probe` answers the host term of the Run's Delivery, and its receiver
     @probe """
