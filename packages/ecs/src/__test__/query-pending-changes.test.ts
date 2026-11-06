@@ -84,3 +84,68 @@ describe('replacing a whole component', () => {
     expect(read()).toEqual({ health: 1, mana: 2 });
   });
 });
+
+/** n entities, health 0 … n-1, flushed */
+const many = async (n: number) => {
+  const world = await createWorld([statsComponent]);
+  const ids = Array.from(
+    { length: n },
+    (_, i) => world.create({ statsPendingTest: { health: i, mana: 0 } }).id
+  );
+  world.flush();
+  const healths = (opts: { limit?: number; offset?: number } = {}) =>
+    world
+      .queryAll({ ...opts, with: ['statsPendingTest'] })
+      .map(e => e.statsPendingTest.health);
+  return { healths, ids, world };
+};
+
+describe('querying after a delete that is not yet flushed (#231)', () => {
+  test('the deleted entity is gone from queryAll, query and queryIterator', async () => {
+    const { healths, ids, world } = await many(3);
+    world.delete({ id: ids[0]! });
+    expect(healths()).toEqual([1, 2]);
+    expect(
+      world.query({
+        entity: { id: ids[0]!, world },
+        with: ['statsPendingTest']
+      })
+    ).toBeNull();
+    using it = world.queryIterator({ with: ['statsPendingTest'] });
+    expect([...it].map(e => e.statsPendingTest.health)).toEqual([1, 2]);
+  });
+
+  test('limit and offset count only entities still in the World', async () => {
+    const { healths, ids, world } = await many(5);
+    world.delete({ id: ids[0]! });
+    world.delete({ id: ids[2]! });
+    expect(healths({ limit: 2 })).toEqual([1, 3]);
+    expect(healths({ limit: 2, offset: 1 })).toEqual([3, 4]);
+    expect(
+      world.query({ with: ['statsPendingTest'] })!.statsPendingTest.health
+    ).toBe(1);
+  });
+
+  test('get returns null for it', async () => {
+    const { ids, world } = await many(1);
+    world.delete({ id: ids[0]! });
+    expect(world.get(ids[0]!)).toBeNull();
+  });
+
+  test('it stays gone after the flush', async () => {
+    const { healths, ids, world } = await many(2);
+    world.delete({ id: ids[0]! });
+    world.flush();
+    expect(healths()).toEqual([1]);
+  });
+
+  test('a discarded Change Scope brings it back', async () => {
+    const { healths, ids, world } = await many(2);
+    const scope = world.openChanges();
+    scope.run(() => world.delete({ id: ids[0]! }));
+    expect(healths()).toEqual([1]);
+    scope.discard();
+    expect(healths()).toEqual([0, 1]);
+    expect(world.get(ids[0]!)).not.toBeNull();
+  });
+});

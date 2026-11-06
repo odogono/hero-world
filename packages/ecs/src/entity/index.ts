@@ -223,10 +223,23 @@ const run = <T extends Components>(
   options: QueryOptions<T> | undefined
 ) => {
   const { names, opts } = buildQuery(world, options);
+  // An entity deleted since the last flush is gone from the World's view,
+  // though its rows stay until the flush. With some pending, `limit` and
+  // `offset` are applied after leaving them out.
+  const pending = world.entitiesToDelete;
   try {
-    return select(world.store, names, opts).map(row =>
-      mapRowToEntity(world, row)
+    if (pending.size === 0) {
+      return select(world.store, names, opts).map(row =>
+        mapRowToEntity(world, row)
+      );
+    }
+    const { limit, offset = 0, ...rest } = opts;
+    const rows = select(world.store, names, rest).filter(
+      ([eid]) => !pending.has(eid)
     );
+    return rows
+      .slice(offset, limit === undefined ? undefined : offset + limit)
+      .map(row => mapRowToEntity(world, row));
   } catch (error) {
     if (typeof options?.where === 'string') {
       throw SQLiteError.executionError(options.where, error as Error, {

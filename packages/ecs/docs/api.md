@@ -27,7 +27,7 @@ const stats = defineComponent({
 
 - `await createWorld([defs], options?)`, or `await createWorld(edlSource)`, which reads the component defs from the EDL and loads its entities. The database type defaults to Bun SQLite; `DatabaseType` is `bun | wasm` (`src/db/index.ts`).
 - `world.create(components?)` returns a proxied entity.
-- `world.get(id)` returns `{ id, world }` with no components loaded, or `null`.
+- `world.get(id)` returns `{ id, world }` with no components loaded, or `null`, also for an entity deleted but not yet flushed.
 - `world.delete(entity)` marks the entity for deletion when the world is next flushed.
 - `world.query(opts)` returns one entity or `null`; `world.queryAll(opts)` returns an array; `world.queryIterator(opts)` returns a `using`-disposable iterator.
 - `world.flush()` writes the pending changes and deletions in one transaction.
@@ -60,6 +60,7 @@ All of these were checked against the code:
 - **Assigning a component adds it; assigning `null` removes it.** `world.create` and query results are proxies that turn `e.tag = {…}` into `addComponent`. With `asProxy: false` a query returns plain objects, and such an assignment is lost.
 - **Adding a component the entity has replaces it whole.** `addComponent`, `addComponents` and assignment all do this: fields left out go back to their defaults and are not merged with the old value. `eid` is each component table's primary key, so an entity has at most one row per component.
 - **Queries see unflushed changes.** Entities are cached in `world.entityCache`, so a later query returns the pending value until the next flush.
+- **Queries leave out entities deleted but not yet flushed.** After `world.delete(e)`, `query`, `queryAll` and `queryIterator` skip `e`, with `limit` and `offset` counting only the rest, and `world.get` returns `null`. Discarding the Change Scope that deleted it brings it back.
 - The tracking lives in `component/helpers/make-tracked.ts`, and the dirty set is `world.dirtyEntities`.
 
 ## Change Scopes: `src/world/changes.ts`
@@ -84,7 +85,7 @@ A System is a `name`, an interval (`every`), a store `query`, an optional `selec
 ## Events: `src/events/index.ts`
 
 - `scheduleEvent(world, type, payload, at?)` stores an `event` component entity.
-- `runEvents(world, 'move:*', fn, { flush? })` runs `fn` on each due event whose type matches, deletes it unless `fn` returns false, and flushes unless `flush` is false. An event it ran is skipped by a later `runEvents` before the flush. The caller runs it when it chooses; events are TypeScript-only (ADR 0020), so it isn't a System. The world must register the `event` component.
+- `runEvents(world, 'move:*', fn, { flush? })` runs `fn` on each due event whose type matches, deletes it unless `fn` returns false, and flushes unless `flush` is false. The caller runs it when it chooses; events are TypeScript-only (ADR 0020), so it isn't a System. The world must register the `event` component.
 
 ## Frame loop: `src/loop/`
 

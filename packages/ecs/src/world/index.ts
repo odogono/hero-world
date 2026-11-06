@@ -408,13 +408,14 @@ export class World<TComponents extends Components> {
    * Returns an entity instance by its id. This does not include any components.
    *
    * @param id - The id of the entity to return
-   * @returns The entity instance or null if the entity does not exist
+   * @returns The entity instance, or null if the entity does not exist or
+   * is deleted and waiting for the next flush
    */
   get(id: number): GenericEntity<TComponents> | null {
     if (!this.store) {
       throw createWorldNotInitializedError();
     }
-    return existsInStore(this.store, id)
+    return !this.entitiesToDelete.has(id) && existsInStore(this.store, id)
       ? ({ id, world: this } as GenericEntity<TComponents>)
       : null;
   }
