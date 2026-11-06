@@ -103,3 +103,50 @@ test('plays a Local World in a Worker, and a reload plays on', async () => {
   expect(state.state.room.name).toBe('North of house');
   await context.close();
 }, 120_000);
+
+test('saves a World as a file, and another browser loads it and plays on', async () => {
+  const first = await browser.newContext();
+  const page = await first.newPage();
+  await page.goto(server.url.href);
+  await post(page, { name: 'Ada', type: 'join' });
+  await until(page, m => m.some(x => x.event === 'state'));
+  await post(page, { ref: 1, text: 'north', type: 'command' });
+  await until(page, m => m.some(x => x.event === 'reply'));
+  await post(page, { type: 'save' });
+  await until(page, m => m.some(x => x.event === 'saved'));
+  const save = await page.evaluate(() => {
+    const heard = (
+      globalThis as unknown as {
+        heard: { bytes?: Uint8Array; event: string }[];
+      }
+    ).heard;
+    return [...heard.find(m => m.event === 'saved')!.bytes!];
+  });
+  await first.close();
+
+  // a fresh browser has its own OPFS, and so its own World
+  const second = await browser.newContext();
+  const other = await second.newPage();
+  await other.goto(server.url.href);
+  await post(other, { name: 'Bob', type: 'join' });
+  await until(other, m => m.some(x => x.event === 'state'));
+  await other.evaluate(
+    bytes =>
+      (globalThis as unknown as { post: (m: unknown) => void }).post({
+        bytes: new Uint8Array(bytes),
+        type: 'load'
+      }),
+    save
+  );
+  await until(other, m => m.some(x => x.event === 'loaded'));
+  await other.evaluate(() => {
+    (globalThis as unknown as { heard: unknown[] }).heard.length = 0;
+  });
+  await post(other, { name: 'Bob', type: 'join' });
+  const messages = await until(other, m => m.some(x => x.event === 'state'));
+  const state = messages.find(m => m.event === 'state') as unknown as {
+    state: { room: { name: string } };
+  };
+  expect(state.state.room.name).toBe('North of house');
+  await second.close();
+}, 120_000);

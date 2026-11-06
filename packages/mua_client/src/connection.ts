@@ -20,6 +20,8 @@ let socket: Socket | undefined;
 let channel: Channel | undefined;
 /** A Local World's Worker, while playing offline (ADR 0023) */
 let worker: Worker | undefined;
+/** The local Character's name, to join again after loading a save */
+let localName = '';
 
 const add = (line: Parameters<typeof append>[1]) => {
   lines.value = append(lines.value, line);
@@ -87,6 +89,7 @@ export const connect = (token: string, character: number) => {
  */
 export const connectLocal = (name: string) => {
   worker?.terminate();
+  localName = name;
   worker = new Worker('/local/worker.js', { type: 'module' });
   worker.addEventListener('message', ({ data }: MessageEvent<FromWorld>) => {
     switch (data.event) {
@@ -119,6 +122,20 @@ export const connectLocal = (name: string) => {
           add({ kind: 'error', text: `Not sent: ${data.reason}` });
         }
         break;
+      case 'saved':
+        download(data.bytes);
+        add({ kind: 'status', text: 'Saved your world as mua-world.db.' });
+        break;
+      case 'loaded':
+        // the saved World plays from here on, with its own Character
+        lines.value = [];
+        add({ kind: 'status', text: 'Loaded a saved world.' });
+        status.value = 'connecting';
+        worker?.postMessage({ name: localName, type: 'join' });
+        break;
+      case 'loadFailed':
+        add({ kind: 'error', text: `Not loaded: ${data.message}` });
+        break;
       case 'error':
         add({ kind: 'error', text: `The world stopped: ${data.message}` });
         status.value = 'offline';
@@ -132,6 +149,27 @@ export const connectLocal = (name: string) => {
     status.value = 'offline';
   });
   worker.postMessage({ name, type: 'join' });
+};
+
+// Offers a save to the browser to keep, as a file
+const download = (bytes: Uint8Array) => {
+  const url = URL.createObjectURL(
+    new Blob([bytes as BlobPart], { type: 'application/vnd.sqlite3' })
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'mua-world.db';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
+/** Saves the Local World as a file the browser downloads */
+export const saveLocal = () => worker?.postMessage({ type: 'save' });
+
+/** Loads a saved World from a file, in place of the Local World */
+export const loadLocal = async (file: Blob) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  worker?.postMessage({ bytes, type: 'load' }, [bytes.buffer]);
 };
 
 /**

@@ -26,6 +26,10 @@ export class WasmDatabaseWrapper implements Database {
     this.db.close();
   }
 
+  export(): Uint8Array {
+    return this.sqlite3.capi.sqlite3_js_db_export(this.db);
+  }
+
   addEntity(): number {
     this.db.exec('INSERT INTO entities DEFAULT VALUES');
     return this.lastInsertRowId();
@@ -159,20 +163,24 @@ export class WasmDatabaseWrapper implements Database {
 }
 
 // Factory function for SQLite WASM
-export const createWasmDatabaseInstance = async (
-  options: CreateDatabaseOptions
-): Promise<Database> => {
-  const { enableTracing = false, opfs = false, path = ':memory:' } = options;
+const loadSqlite3 = async () => {
   const sqliteWasm = await import('@sqlite.org/sqlite-wasm');
   // the package declares init() with no arguments, but its runtime takes
   // Emscripten module options such as print and printErr
   const init = sqliteWasm.default as unknown as (
     options: Record<string, unknown>
   ) => ReturnType<typeof sqliteWasm.default>;
-  const sqlite3 = await init({
+  return init({
     print: () => {},
     printErr: () => {}
   });
+};
+
+export const createWasmDatabaseInstance = async (
+  options: CreateDatabaseOptions
+): Promise<Database> => {
+  const { enableTracing = false, opfs = false, path = ':memory:' } = options;
+  const sqlite3 = await loadSqlite3();
 
   let flags = 'c';
   if (enableTracing) {
@@ -211,4 +219,20 @@ export const createWasmDatabaseInstance = async (
   // `);
 
   return new WasmDatabaseWrapper(db, sqlite3);
+};
+
+/**
+ * Puts an SQLite file's bytes in place of the database at `path` in OPFS,
+ * as loading a save does. Close the database there first. Only a Worker has
+ * OPFS.
+ */
+export const importWasmDatabase = async (path: string, bytes: Uint8Array) => {
+  const sqlite3 = await loadSqlite3();
+  const { OpfsDb } = sqlite3.oo1 as {
+    OpfsDb?: { importDb: (path: string, bytes: Uint8Array) => unknown };
+  };
+  if (!OpfsDb) {
+    throw new Error('OPFS is not available here: open it from a Worker');
+  }
+  OpfsDb.importDb(path, bytes);
 };

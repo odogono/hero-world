@@ -12,7 +12,9 @@ import { append, connectionLost, rejoined, sent } from '../transcript';
 
 const commands: string[] = [];
 void mock.module('../connection', () => ({
+  loadLocal: () => Promise.resolve(),
   logout: () => Promise.resolve(),
+  saveLocal: () => {},
   sendCommand: (text: string) => {
     commands.push(text);
     return true;

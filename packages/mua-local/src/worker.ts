@@ -7,33 +7,19 @@
  */
 // a macro: the World's files are read and inlined when the Worker is bundled
 import { worldFiles } from '../scripts/files' with { type: 'macro' };
-import { openLocalWorld, type LocalWorld } from './local';
+import { createLocalHost } from './local';
 import type { FromWorld, ToWorld } from './protocol';
 
 const TICK_MS = 100;
 const DATABASE = 'mua-local-world.db';
 
 const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
-const send = (message: FromWorld) => scope.postMessage(message);
 
-let opened: Promise<LocalWorld> | undefined;
-
-// Messages are handled one at a time, in the order they came
-let queue: Promise<unknown> = Promise.resolve();
-
-const open = () => {
-  opened ??= openLocalWorld({
-    database: { opfs: true, path: `/${DATABASE}`, type: 'wasm' },
-    files: worldFiles(),
-    send
-  }).then(world => {
-    setInterval(() => {
-      queue = queue.then(() => world.tick()).catch(report);
-    }, TICK_MS);
-    return world;
-  });
-  return opened;
-};
+const send = (message: FromWorld) =>
+  // a save's bytes are moved, not copied
+  message.event === 'saved'
+    ? scope.postMessage(message, [message.bytes.buffer])
+    : scope.postMessage(message);
 
 const report = (error: unknown) =>
   send({
@@ -41,8 +27,20 @@ const report = (error: unknown) =>
     message: error instanceof Error ? error.message : String(error)
   });
 
-scope.addEventListener('message', (event: MessageEvent<ToWorld>) => {
-  queue = queue
-    .then(async () => (await open()).receive(event.data))
-    .catch(report);
+const host = createLocalHost({
+  database: { opfs: true, path: `/${DATABASE}`, type: 'wasm' },
+  files: worldFiles(),
+  send
 });
+
+// Messages and ticks are handled one at a time, in the order they came
+let queue: Promise<unknown> = Promise.resolve();
+const enqueue = (fn: () => unknown) => {
+  queue = queue.then(fn).catch(report);
+};
+
+setInterval(() => enqueue(() => host.tick()), TICK_MS);
+
+scope.addEventListener('message', (event: MessageEvent<ToWorld>) =>
+  enqueue(() => host.receive(event.data))
+);

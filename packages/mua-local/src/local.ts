@@ -4,7 +4,11 @@ import {
   startMuaWorld,
   type MuaWorld
 } from 'mua-world';
-import type { CreateDatabaseOptions } from 'odgn-ecs/db';
+import {
+  isSqliteFile,
+  replaceDatabase,
+  type CreateDatabaseOptions
+} from 'odgn-ecs/db';
 import { isEDLBuilt, isEDLChanged, migrateEDL } from 'odgn-ecs/edl';
 import { get, type Eid } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
@@ -22,6 +26,11 @@ export type LocalWorldOptions = {
   database: CreateDatabaseOptions;
   /** The World's files, from `scripts/files.ts` */
   files: WorldFiles;
+  /**
+   * Refuse a database that isn't a built World, as when loading a save,
+   * rather than build one into it
+   */
+  requireBuilt?: boolean;
   /** Called with each message for the UI */
   send: (message: FromWorld) => void;
   /** The room Characters enter first; `west_of_house` by default */
@@ -50,6 +59,10 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   };
 
   const world = await createWorld(components, options.database);
+  if (options.requireBuilt && !isEDLBuilt(world)) {
+    world.store.db.close();
+    throw new Error('That file is not a saved World');
+  }
   if (!isEDLBuilt(world)) {
     world.executeEDL(edl, read);
   } else if (isEDLChanged(world, edl, read)) {
@@ -170,6 +183,13 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
           return logout();
       }
     },
+    /** Closes the World's database */
+    close: () => {
+      unsubscribe?.();
+      store.db.close();
+    },
+    /** The World as an SQLite file's bytes, between Steps */
+    save: () => store.db.export(),
     /** Runs what is due at World time; the Worker calls it on a timer */
     tick: () => mua.tick(),
     world: mua
@@ -177,3 +197,65 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
 };
 
 export type LocalWorld = Awaited<ReturnType<typeof openLocalWorld>>;
+
+/**
+ * A Local World's host, as its Worker runs it: it opens the World on the
+ * first message, and handles saving it and loading a save in its place
+ * (#219). A save is the World's database file (ADR 0023). A loaded file
+ * that isn't a World this can play is refused, and the World is put back as
+ * it was. Messages must come one at a time.
+ */
+export const createLocalHost = (options: LocalWorldOptions) => {
+  const { send } = options;
+  let world: LocalWorld | undefined;
+
+  const open = async (requireBuilt = false) => {
+    world ??= await openLocalWorld({ ...options, requireBuilt });
+    return world;
+  };
+
+  const load = async (bytes: Uint8Array) => {
+    if (!isSqliteFile(bytes)) {
+      send({ event: 'loadFailed', message: 'That file is not a saved World' });
+      return;
+    }
+    const backup = (await open()).save();
+    world!.close();
+    world = undefined;
+    try {
+      await replaceDatabase(options.database, bytes);
+      await open(true);
+      send({ event: 'loaded' });
+    } catch (error) {
+      // a file that opened but failed after holds the database: let it go
+      (world as LocalWorld | undefined)?.close();
+      world = undefined;
+      await replaceDatabase(options.database, backup);
+      await open();
+      send({
+        event: 'loadFailed',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
+
+  return {
+    receive: async (message: ToWorld) => {
+      switch (message.type) {
+        case 'save':
+          send({ bytes: (await open()).save(), event: 'saved' });
+          return;
+        case 'load':
+          return load(message.bytes);
+        default:
+          return (await open()).receive(message);
+      }
+    },
+    /** Runs what is due, once the World is open */
+    tick: () => world?.tick(),
+    /** The open World, if it is open */
+    world: () => world
+  };
+};
+
+export type LocalHost = ReturnType<typeof createLocalHost>;

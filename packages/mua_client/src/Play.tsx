@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { Profile } from './Profile';
-import { logout, sendCommand } from './connection';
+import { loadLocal, logout, saveLocal, sendCommand } from './connection';
 import { actions, commands, lines, status, type Status } from './store';
 import type { Line } from './transcript';
 
@@ -264,11 +264,14 @@ export const Play = ({
   admin = false,
   email = null,
   name,
+  offline = false,
   onLeft
 }: {
   admin?: boolean;
   email?: string | null;
   name: string;
+  /** Playing a Local World: the World can be saved and loaded */
+  offline?: boolean;
   onLeft: () => void;
 }) => {
   const end = useRef<HTMLLIElement>(null);
@@ -352,6 +355,8 @@ export const Play = ({
           admin={admin}
           email={email}
           name={name}
+          onLoad={offline ? file => void loadLocal(file) : undefined}
+          onSave={offline ? saveLocal : undefined}
           onSignOut={leave}
           status={status.value}
           statusText={STATUS_TEXT[status.value]}

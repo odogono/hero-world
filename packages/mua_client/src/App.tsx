@@ -71,6 +71,7 @@ export const App = () => {
         admin={false}
         email={null}
         name={local}
+        offline
         onLeft={() => {
           offline.value = undefined;
         }}

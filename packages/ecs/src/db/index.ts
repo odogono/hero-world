@@ -38,6 +38,8 @@ export type Database = {
   close: () => void;
   dump: () => string;
   exec: (sql: string, args?: StatementArgs, ...rest: StatementArgs[]) => void;
+  /** The whole database as an SQLite file's bytes, for a save */
+  export: () => Uint8Array;
   prepare: (sql: string) => Statement;
   query: (
     sql: string,
@@ -88,6 +90,43 @@ export const createDatabase = async (
     default:
       throw new Error(`Unsupported database type: ${type}`);
   }
+};
+
+/** An SQLite file starts with these 16 bytes */
+const SQLITE_HEADER = 'SQLite format 3\u0000';
+
+/** Whether bytes are an SQLite database file, by its header */
+export const isSqliteFile = (bytes: Uint8Array) =>
+  bytes.length >= 100 &&
+  new TextDecoder().decode(bytes.subarray(0, 16)) === SQLITE_HEADER;
+
+/**
+ * Puts an SQLite file's bytes in place of the database `options` names, as
+ * loading a save does: a file on disk for `bun`, or a file in OPFS for
+ * `wasm` with `opfs`. Close the database there first.
+ */
+export const replaceDatabase = async (
+  options: CreateDatabaseOptions,
+  bytes: Uint8Array
+) => {
+  if (!isSqliteFile(bytes)) {
+    throw new Error('That is not an SQLite database file');
+  }
+  const { path } = options;
+  if (!path || path === ':memory:') {
+    throw new Error('Only a database kept in a file can be replaced');
+  }
+  if (options.type === DatabaseType.WASM && options.opfs) {
+    const { importWasmDatabase } = await import('./sqlite-wasm');
+    await importWasmDatabase(path, bytes);
+    return;
+  }
+  if (options.type === DatabaseType.BUN) {
+    const { replaceBunDatabase } = await import('./bun');
+    replaceBunDatabase(path, bytes);
+    return;
+  }
+  throw new Error('This database can not be replaced');
 };
 
 // Convenience functions for common use cases
