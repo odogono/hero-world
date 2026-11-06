@@ -43,6 +43,8 @@ export type CDefColumnType =
   | 'eid';
 
 export type CDefColumnInfo = {
+  /** Compares and is unique ignoring case, as `odgn_ecs`'s `case_insensitive` */
+  caseInsensitive?: boolean;
   default?:
     string | number | boolean | Date | unknown[] | Record<string, unknown>;
   enum?: string[];

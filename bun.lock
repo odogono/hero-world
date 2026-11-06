@@ -81,6 +81,9 @@
     "packages/mua-world": {
       "name": "mua-world",
       "dependencies": {
+        "@northtalk/ts": "0.7.0",
+        "ecs-engine": "workspace:*",
+        "ecs-talk": "workspace:*",
         "odgn-ecs": "workspace:*",
       },
       "peerDependencies": {

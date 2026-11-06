@@ -12,6 +12,8 @@ export type ColumnBuilder<
   readonly __type?: TType;
   readonly __value?: TValue;
   build: (props: { name: string }) => CDefColumnInfo;
+  /** Compare, and be unique, ignoring case */
+  caseInsensitive: () => ColumnBuilder<TType, TOptional, TValue, TDefault>;
   default: (value?: unknown) => ColumnBuilder<TType, TOptional, TValue, true>;
   foreignKey: (
     foreignKey: string

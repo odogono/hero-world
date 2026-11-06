@@ -168,7 +168,8 @@ const player = defineComponent({
     last_input: s.string().optional(),
     // what the player last referred to, gone when that is
     last_target_id: s.entityId().onDelete('nullify'),
-    name: s.string().unique(),
+    // unique among Characters, ignoring case
+    name: s.string().unique().caseInsensitive(),
     pending: s.json().optional(),
     return_to: s.entityId().onDelete('nullify')
   }
