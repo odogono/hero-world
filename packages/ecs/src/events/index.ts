@@ -45,15 +45,24 @@ const dueEvents = (world: EventWorld, type: string | string[]) => {
  * first. An event is deleted after it runs unless `exec` returns false.
  * Events are TypeScript-only (ADR 0020), so this is a plain function the
  * caller runs when it chooses, not a System.
+ *
+ * It flushes when done, unless `flush` is false, as in a Frame loop that
+ * commits once per Frame. An event it has run then stays in the database
+ * until that flush, so a later `runEvents` before it skips the event.
  */
 export const runEvents = <
   TComponents extends Components & { event: EventComponent }
 >(
   world: World<TComponents>,
   type: string | string[],
-  exec: (props: EventExecProps<TComponents>) => boolean | void
+  exec: (props: EventExecProps<TComponents>) => boolean | void,
+  { flush = true }: { flush?: boolean } = {}
 ) => {
   for (const entity of dueEvents(world as unknown as EventWorld, type)) {
+    // Run, and deleted, since the last flush
+    if (world.entitiesToDelete.has(entity.id)) {
+      continue;
+    }
     const shouldDelete =
       exec({
         event: entity as unknown as EntityWithComponents<TComponents, 'event'>,
@@ -65,7 +74,9 @@ export const runEvents = <
       world.delete(entity);
     }
   }
-  world.flush();
+  if (flush) {
+    world.flush();
+  }
 };
 
 /** Schedule an event for World time `at`, by default now */

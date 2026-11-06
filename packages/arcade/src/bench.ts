@@ -10,7 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import type { FrameTiming } from './frame-loop';
+import type { FrameTiming } from 'odgn-ecs/loop';
+
 import { createSim, type InputState } from './sim/sim';
 
 const BUDGET_MS = 8;

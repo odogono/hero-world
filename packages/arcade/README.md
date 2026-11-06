@@ -2,7 +2,7 @@
 
 An asteroids-style game run on the ECS at 60 Frames a second. It measures how the store holds up under fast-paced load, and you can play it.
 
-The simulation (`src/sim/`) is 2D, seeded and deterministic. A Frame (`src/frame-loop.ts`) advances World time, runs every due System through the World, and commits once. Events on World time start waves and end the ship's invulnerability.
+The simulation (`src/sim/`) is 2D, seeded and deterministic. A Frame (`odgn-ecs/loop`) advances World time, runs every due System through the World, and commits once. Events on World time start waves and end the ship's invulnerability.
 
 ```sh
 bun run bench     # headless: Frame times on Bun's SQLite for K = 100 … 5000 asteroids

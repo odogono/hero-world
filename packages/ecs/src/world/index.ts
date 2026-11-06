@@ -191,8 +191,8 @@ export class World<TComponents extends Components> {
   /** The shared World layout this World is stored in */
   store!: Store;
   /**
-   * World time: advanced by the game loop (by its `deltaTime`) or by
-   * `advanceTime`, never by the wall clock. Events are due by it.
+   * World time: advanced by the Frame loop (`loop/`, by its `frameMs`) or
+   * by `advanceTime`, never by the wall clock. Events are due by it.
    */
   time = 0;
   /** The Change Scope that writes join, while one is running */

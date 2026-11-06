@@ -1,8 +1,8 @@
 import type { DatabaseType } from 'odgn-ecs/db';
 import { runEvents, scheduleEvent } from 'odgn-ecs/events';
+import { createFrameLoop, type FrameSystem } from 'odgn-ecs/loop';
 import { createWorld } from 'odgn-ecs/world';
 
-import { createFrameLoop, type FrameSystem } from '../frame-loop';
 import { arcadeComponents } from './components';
 import { createRng } from './rng';
 
@@ -292,26 +292,30 @@ export const createSim = async (options: SimOptions = {}) => {
   const events: FrameSystem<W> = {
     name: 'events',
     run: w =>
-      runEvents(w, ['wave:start', 'ship:vulnerable'], ({ type }) => {
-        const s = getShip();
-        if (!s) {
-          return;
-        }
-        if (type === 'ship:vulnerable') {
-          s.ship.invulnerable = false;
-        } else {
-          s.ship.wave += 1;
-          for (let i = 0; i < 3 + s.ship.wave; i++) {
-            spawnAsteroid(3);
+      runEvents(
+        w,
+        ['wave:start', 'ship:vulnerable'],
+        ({ type }) => {
+          const s = getShip();
+          if (!s) {
+            return;
           }
-        }
-      })
+          if (type === 'ship:vulnerable') {
+            s.ship.invulnerable = false;
+          } else {
+            s.ship.wave += 1;
+            for (let i = 0; i < 3 + s.ship.wave; i++) {
+              spawnAsteroid(3);
+            }
+          }
+        },
+        // The Frame commits once, at its end
+        { flush: false }
+      )
   };
 
   const loop = createFrameLoop(
     world,
-    // events runs first: runEvents flushes, so it must not commit this
-    // Frame's writes before the end-of-Frame flush can time them.
     [events, control, movement, bullets, collision, waves],
     { frameMs: FRAME_MS }
   );
