@@ -29,11 +29,15 @@ export type SimOptions = {
   dbType?: DatabaseType;
   /** Benchmark only: the ship never loses a life */
   godMode?: boolean;
-  /** Benchmark only: keep at least this many asteroids, topping up each Frame */
-  minAsteroids?: number;
   /** A database file; in memory without one */
   path?: string;
   seed?: number;
+  /**
+   * Benchmark only: hold the asteroid count at this, so a long run measures
+   * the same load throughout. Each Frame tops it up, and a hit splits an
+   * asteroid only into the room left under it.
+   */
+  steadyAsteroids?: number;
 };
 
 export type EntityKind = 'asteroid' | 'bullet' | 'ship';
@@ -61,7 +65,13 @@ const wrap = (v: number, max: number) =>
 const cellKey = (gx: number, gy: number) => gy * 1024 + gx;
 
 export const createSim = async (options: SimOptions = {}) => {
-  const { dbType, godMode = false, minAsteroids = 0, path, seed = 1 } = options;
+  const {
+    dbType,
+    godMode = false,
+    path,
+    seed = 1,
+    steadyAsteroids = 0
+  } = options;
   const rng = createRng(seed);
 
   const world = await createWorld(arcadeComponents, {
@@ -202,6 +212,7 @@ export const createSim = async (options: SimOptions = {}) => {
       }
 
       const dead = new Set<number>();
+      let live = asteroids.length;
       const hit = (x: number, y: number, radius: number) => {
         const cell = grid.get(
           cellKey(Math.floor(x / CELL), Math.floor(y / CELL))
@@ -225,10 +236,17 @@ export const createSim = async (options: SimOptions = {}) => {
         const { size } = a.asteroid;
         const { x, y } = a.transform;
         w.delete(a);
-        if (size > 1) {
-          spawnAsteroid(size - 1, x, y);
+        live -= 1;
+        const pieces =
+          size === 1
+            ? 0
+            : steadyAsteroids > 0
+              ? Math.max(0, Math.min(2, steadyAsteroids - live))
+              : 2;
+        for (let i = 0; i < pieces; i++) {
           spawnAsteroid(size - 1, x, y);
         }
+        live += pieces;
         return ASTEROID_SCORE[size]!;
       };
 
@@ -269,8 +287,8 @@ export const createSim = async (options: SimOptions = {}) => {
     name: 'waves',
     run: w => {
       const count = w.queryAll({ with: ['asteroid'] }).length;
-      if (minAsteroids > 0) {
-        for (let i = count; i < minAsteroids; i++) {
+      if (steadyAsteroids > 0) {
+        for (let i = count; i < steadyAsteroids; i++) {
           spawnAsteroid(3);
         }
         return;
