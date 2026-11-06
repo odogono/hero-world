@@ -1,0 +1,169 @@
+{
+  "components": [
+    { "name": "meta", "columns": [{ "name": "props", "type": "json" }] },
+    { "name": "mark", "columns": [{ "name": "n", "type": "int" }] }
+  ],
+  "edl": "atom loud {}\nentity hall { meta { props: { id: \"hall\" } } }\nentity bell: loud { meta { props: { id: \"bell\" } } }\n",
+  "scripts": [
+    {
+      "atom": "loud",
+      "source": "on ring\n  show the target, \"Ding!\"\nend ring\n\non mark n\n  change the target, \"mark\", {n: n}\nend mark\n\non crack\n  change the target, \"mark\", {n: 1}\n  show the target, \"Crack!\"\n  repeat forever\n  end repeat\nend crack\n\non slow\n  wait 2 s\n  show the target, \"Slow.\"\n  return \"done\"\nend slow\n\non greet who\n  return \"hello \" & who\nend greet\n\non judge, deciding\n  veto \"no\"\nend judge\n\non allow, deciding\nend allow\n"
+    }
+  ],
+  "cases": [
+    {
+      "name": "sends Deliveries in order, in one Step at its World time",
+      "steps": [
+        {
+          "step": {
+            "deliver": [
+              { "to": "bell", "message": "ring" },
+              { "to": "bell", "message": "mark", "args": [3] },
+              { "to": "bell", "message": "ring" }
+            ]
+          },
+          "at": 500,
+          "expect": {
+            "output": [
+              ["bell", "Ding!"],
+              ["bell", "Ding!"]
+            ],
+            "changes": [["bell", "mark", "added", { "n": 3 }]],
+            "world_time": 500,
+            "world": { "bell": { "mark": { "n": 3 } } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a Script whose Segment fails loses only that Segment",
+      "steps": [
+        {
+          "step": {
+            "deliver": [
+              { "to": "bell", "message": "mark", "args": [2] },
+              { "to": "bell", "message": "crack" }
+            ]
+          },
+          "expect": {
+            "output": [],
+            "changes": [["bell", "mark", "added", { "n": 2 }]],
+            "world": { "bell": { "mark": { "n": 2 } } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an input that fails rolls the whole Step back",
+      "steps": [
+        {
+          "step": {
+            "fail": [
+              { "to": "bell", "message": "mark", "args": [4] },
+              { "to": "bell", "message": "ring" }
+            ]
+          },
+          "expect": {
+            "error": true,
+            "world": { "bell": { "mark": null } }
+          }
+        },
+        {
+          "step": { "deliver": [{ "to": "bell", "message": "ring" }] },
+          "expect": { "output": [["bell", "Ding!"]], "changes": [] }
+        }
+      ]
+    },
+    {
+      "name": "stops at the first Veto, and gives its reason",
+      "steps": [
+        {
+          "step": {
+            "decide_until_veto": [
+              { "to": "bell", "message": "allow" },
+              { "to": "bell", "message": "judge" },
+              { "to": "bell", "message": "allow" }
+            ]
+          },
+          "expect": { "result": { "vetoed": "no" }, "output": [] }
+        },
+        {
+          "step": {
+            "decide_until_veto": [{ "to": "bell", "message": "allow" }]
+          },
+          "expect": { "result": "passed" }
+        }
+      ]
+    },
+    {
+      "name": "a Request answered in its Step gives its reply",
+      "steps": [
+        {
+          "step": {
+            "ask": {
+              "to": "bell",
+              "message": "greet",
+              "args": ["you"],
+              "asks": "request"
+            }
+          },
+          "expect": { "result": { "replied": "hello you" } }
+        },
+        {
+          "step": {
+            "ask": { "to": "bell", "message": "dance", "asks": "request" }
+          },
+          "expect": { "result": "passed" }
+        }
+      ]
+    },
+    {
+      "name": "a waiting Request continues in the Step that sees its Run end",
+      "steps": [
+        {
+          "step": {
+            "ask": { "to": "bell", "message": "slow", "asks": "request" }
+          },
+          "expect": { "result": "waiting", "output": [], "next_deadline": 2000 }
+        },
+        {
+          "advance": 1000,
+          "expect": [],
+          "next_deadline": 2000
+        },
+        {
+          "advance": 2000,
+          "expect": [
+            {
+              "answered": { "replied": "done" },
+              "output": [["bell", "Slow."]],
+              "world_time": 2000
+            }
+          ],
+          "next_deadline": null
+        }
+      ]
+    },
+    {
+      "name": "a waiting Request carries on past a Step that fails",
+      "steps": [
+        {
+          "step": {
+            "ask": { "to": "bell", "message": "slow", "asks": "request" }
+          },
+          "expect": { "result": "waiting" }
+        },
+        {
+          "step": { "fail": [{ "to": "bell", "message": "ring" }] },
+          "expect": { "error": true }
+        },
+        {
+          "advance": 2000,
+          "expect": [
+            { "answered": { "replied": "done" }, "output": [["bell", "Slow."]] }
+          ]
+        }
+      ]
+    }
+  ]
+}

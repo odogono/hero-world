@@ -48,3 +48,36 @@ Each file builds the World from `components` and `entities`, as the query cases 
 - **`["next_due", names, expect]`**: when the first armed one is next due, or `null`.
 - **`["run", name, now, expect]`**: runs it at `now`. `expect` lists labels, or `[label, data]` with `select`.
 - **`["savepoint", name]`** and **`["rollback_to", name]`**, as in the change-set cases.
+
+## Step cases (`steps/*.json`)
+
+Cases for the engine (ADR 0021): `packages/odgn_ecs_engine` runs them in `test/steps_test.exs`, and the TypeScript engine will run the same files. Each file builds one World, fresh for each case:
+
+- **`components`**: Component Definitions, as above. The adapter's `location` is always defined.
+- **`edl`**: EDL source, built into the World. Entities are named by their Definition name, which is their label in the case.
+- **`scripts`**: each is `{"atom": name, "source": ...}`, `{"entity": label, ...}` or `{"service": name, ...}`. Scripts get the `world`, `clock` and `timer` Capabilities, with 5000 fuel per Run.
+- **`systems`** (optional): each has a `name`, an interval `every`, a `query` (`with` only), and `deliver`, the message it delivers to each entity it selects (ADR 0020). Every System is armed at World time 0.
+
+World time starts at 0, in milliseconds. A case's `steps` run in order. Each entry is one of two kinds.
+
+**`{"step": input, "at"?: ms, "expect": {...}}`** runs one Step. `at` moves World time first. `input` is one of these fixture shapes:
+
+- **`deliver`**: a list of Deliveries, sent in order.
+- **`decide_until_veto`**: asks each Delivery as a Decision, in order, and stops at the first Veto. The Step's `result` is `{"vetoed": reason}`, or `"passed"` if none vetoed.
+- **`ask`**: one Request or Decision. The `result` is its outcome now, or `"waiting"`. A waiting one is answered in the Step that sees its Run end, as `answered`.
+- **`fail`**: sends the Deliveries, Pumps, then fails, so the whole Step rolls back.
+
+A Delivery is `{"to": label, "message": ..., "args"?: [...], "asks"?: "deliver" | "request" | "decide"}`. In `args`, `{"$ref": label}` is that entity's Handle.
+
+**`{"advance": ms, "expect": [...], "next_deadline"?: ms | null}`** moves World time to `ms`. `expect` lists, in order, what each Step that `advance` ran should give. At one World time those are the due timers, earliest first, then NorthTalk's deadline, then the due Systems.
+
+A Step's expectation checks only the keys it has:
+
+- **`error: true`**: the Step rolled back. Otherwise it must have committed.
+- **`result`**: the input's result. An outcome is `{"replied": value}`, `"passed"`, `{"vetoed": reason}`, `"failed"` or `"waiting"`.
+- **`answered`**: the outcome a waiting input was given in this Step.
+- **`output`**: `[label, text]` for each `show`, in order. Output is kept in the World's transaction, as a Host's outbox is, so a Segment or Step that rolls back sends none.
+- **`changes`**: the Step's change set, as in the change-set cases.
+- **`world_time`**: the Step's World time.
+- **`world`**: `{label: {component: data | null}}`, read after the Step.
+- **`next_deadline`**: when the engine next has work, after the Step, or `null`.
