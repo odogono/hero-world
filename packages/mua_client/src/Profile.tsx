@@ -12,6 +12,8 @@ export const Profile = ({
   admin,
   email,
   name,
+  onLoad,
+  onSave,
   onSignOut,
   status,
   statusText
@@ -19,6 +21,10 @@ export const Profile = ({
   admin: boolean;
   email: string | null;
   name: string;
+  /** Playing offline: loads a saved World from a file */
+  onLoad?: (file: File) => void;
+  /** Playing offline: saves the World as a file */
+  onSave?: () => void;
   onSignOut: () => void;
   status: Status;
   statusText: string;
@@ -26,6 +32,7 @@ export const Profile = ({
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const badge = useRef<HTMLButtonElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
 
   // close on a click elsewhere, or Escape, which hands focus back
   useEffect(() => {
@@ -74,6 +81,52 @@ export const Profile = ({
             </svg>
             Settings <span class="soon">soon</span>
           </button>
+          {onSave && (
+            <button
+              class="profile-item"
+              onClick={() => {
+                setOpen(false);
+                onSave();
+              }}
+              role="menuitem"
+              type="button"
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" />
+              </svg>
+              Save world
+            </button>
+          )}
+          {onLoad && (
+            <button
+              class="profile-item"
+              onClick={() => picker.current?.click()}
+              role="menuitem"
+              type="button"
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M8 13.5v-8M4.5 9 8 5.5 11.5 9M3 2.5h10" />
+              </svg>
+              Load world…
+            </button>
+          )}
+          {onLoad && (
+            <input
+              accept=".db,application/vnd.sqlite3"
+              aria-label="Saved world file"
+              hidden
+              onChange={event => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (file) {
+                  setOpen(false);
+                  onLoad(file);
+                }
+              }}
+              ref={picker}
+              type="file"
+            />
+          )}
           <button
             class="profile-item"
             onClick={onSignOut}

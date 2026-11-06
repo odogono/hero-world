@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 
 import type {
   Database as BunDatabase,
@@ -22,6 +22,10 @@ export class BunDatabaseWrapper implements Database {
 
   constructor(db: BunDatabase) {
     this.db = db;
+  }
+
+  export(): Uint8Array {
+    return new Uint8Array(this.db.serialize());
   }
 
   close(): void {
@@ -238,3 +242,11 @@ const convertChangesToStatementRunResult = (
   changes: Number(changes.changes),
   lastInsertRowId: Number(changes.lastInsertRowid)
 });
+
+/** Writes a database file's bytes at `path`, dropping its old journal */
+export const replaceBunDatabase = (path: string, bytes: Uint8Array) => {
+  for (const suffix of ['-wal', '-shm', '-journal']) {
+    rmSync(`${path}${suffix}`, { force: true });
+  }
+  writeFileSync(path, bytes);
+};

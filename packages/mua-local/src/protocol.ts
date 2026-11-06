@@ -10,7 +10,11 @@ export type ToWorld =
   /** Starts the World and plays its Character, made with `name` the first time */
   | { name: string; type: 'join' }
   | { ref: number | string; text: string; type: 'command' }
-  | { type: 'logout' };
+  | { type: 'logout' }
+  /** Saves the World: replied to with `saved` */
+  | { type: 'save' }
+  /** Loads a saved World in place of this one: replied to with `loaded` or `loadFailed` */
+  | { bytes: Uint8Array; type: 'load' };
 
 /** From the World */
 export type FromWorld =
@@ -23,5 +27,11 @@ export type FromWorld =
   /** The reply to a `command`, once its Step has committed */
   | { event: 'reply'; ok: true; ref: number | string }
   | { event: 'reply'; ok: false; reason: string; ref?: number | string }
+  /** The World as an SQLite file, to download */
+  | { bytes: Uint8Array; event: 'saved' }
+  /** A loaded World plays from now on: `join` again to play it */
+  | { event: 'loaded' }
+  /** The file wasn't a World this can play, and the World is as it was */
+  | { event: 'loadFailed'; message: string }
   /** The World couldn't start or carry on */
   | { event: 'error'; message: string };
