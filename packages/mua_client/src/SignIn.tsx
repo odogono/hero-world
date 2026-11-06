@@ -2,7 +2,13 @@ import { useState } from 'preact/hooks';
 
 import { devSignIn } from './api';
 
-export const SignIn = ({ onSignedIn }: { onSignedIn: () => void }) => {
+export const SignIn = ({
+  onOffline,
+  onSignedIn
+}: {
+  onOffline: () => void;
+  onSignedIn: () => void;
+}) => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string>();
 
@@ -22,6 +28,13 @@ export const SignIn = ({ onSignedIn }: { onSignedIn: () => void }) => {
       <a class="button" href="/auth/google">
         Sign in with Google
       </a>
+      <p>
+        Or play on your own, in this browser, without signing in. Your world is
+        kept here, and nobody else can visit it.
+      </p>
+      <button onClick={onOffline} type="button">
+        Play offline
+      </button>
       {MUA_DEV && (
         <form aria-label="Development sign-in" onSubmit={submit}>
           <label>

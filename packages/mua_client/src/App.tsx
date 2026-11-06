@@ -6,7 +6,7 @@ import { NameForm } from './NameForm';
 import { Play } from './Play';
 import { SignIn } from './SignIn';
 import { getSession, signOut } from './api';
-import { connect } from './connection';
+import { connect, connectLocal } from './connection';
 import {
   clearHistory,
   keepOnly,
@@ -15,6 +15,7 @@ import {
   saveCommands,
   saveHistory
 } from './history';
+import { chooseName, offline, playOffline } from './offline';
 import { commands, lines, session, status } from './store';
 import { restored } from './transcript';
 
@@ -51,11 +52,36 @@ export const App = () => {
     }
   }, [token, characterId]);
 
+  const local = offline.value;
+  useEffect(() => {
+    if (local) {
+      lines.value = [];
+      commands.value = [];
+      status.value = 'connecting';
+      connectLocal(local);
+    }
+  }, [local]);
+
+  if (local === null) {
+    return <NameForm choose={chooseName} onCreated={() => {}} />;
+  }
+  if (local) {
+    return (
+      <Play
+        admin={false}
+        email={null}
+        name={local}
+        onLeft={() => {
+          offline.value = undefined;
+        }}
+      />
+    );
+  }
   if (current === undefined) {
     return <main class="card">Loading…</main>;
   }
   if (current === null) {
-    return <SignIn onSignedIn={refresh} />;
+    return <SignIn onOffline={playOffline} onSignedIn={refresh} />;
   }
   if (!character) {
     return <NameForm onCreated={refresh} />;

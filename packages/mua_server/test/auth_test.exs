@@ -38,6 +38,15 @@ defmodule MuaServer.AuthTest do
     assert conn.status in [200, 404]
   end
 
+  # so a Local World's Worker can use sqlite-wasm in OPFS (ADR 0023)
+  test "isolates every page from other origins" do
+    for path <- ["/", "/api/session", "/health"] do
+      conn = get(build_conn(), path)
+      assert get_resp_header(conn, "cross-origin-opener-policy") == ["same-origin"]
+      assert get_resp_header(conn, "cross-origin-embedder-policy") == ["require-corp"]
+    end
+  end
+
   test "an identity not on the allowlist, or unverified, is refused" do
     for code <- ["eve@example.com", "ada@example.com:unverified"] do
       assert html_response(google(code), 403) =~ "isn't invited"

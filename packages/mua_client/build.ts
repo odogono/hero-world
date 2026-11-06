@@ -1,11 +1,13 @@
 // Bundles the client into packages/mua_server/priv/static, which Phoenix
-// serves. `--watch` rebuilds on change; `--dev` keeps the development
+// serves, with a Local World's Worker in priv/static/local. `--watch` rebuilds on change; `--dev` keeps the development
 // sign-in form (the server only offers its route in development and tests).
 //
 //   bun run build.ts [--watch] [--dev]
 import { watch } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+
+import { bundleWorker } from 'mua-local/bundle';
 
 const OUT = resolve(import.meta.dir, '../mua_server/priv/static');
 
@@ -43,6 +45,8 @@ const build = async () => {
       process.exit(1);
     }
   }
+  // a Local World's Worker, for playing offline (ADR 0023)
+  await bundleWorker(join(OUT, 'local'), dev);
   console.log(`built ${result.outputs.length} files into ${OUT}`);
 };
 
