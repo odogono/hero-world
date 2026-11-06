@@ -7,22 +7,27 @@ import { describe, expect, test } from 'bun:test';
 
 import { DatabaseType, createDatabase } from '../../db';
 import {
+  armSystems,
   component,
   createEntity,
   define,
   deleteEntity,
+  dueSystems,
   ident,
+  nextDue,
   openStore,
   put,
   query,
   remove,
+  runSystem,
   select,
   takeChanges,
   type ColumnInput,
   type Condition,
   type Order,
   type QueryOptions,
-  type Store
+  type Store,
+  type System
 } from '../index';
 
 const SPEC_DIR = join(import.meta.dir, '../../../../../spec/ecs');
@@ -214,6 +219,85 @@ for (const file of changeFiles) {
           resolve(data, ids)
         ]);
         expect(takeChanges(store)).toEqual(expected as never);
+        store.db.close();
+      });
+    }
+  });
+}
+
+type SystemSpec = Omit<Spec, 'cases'> & {
+  cases: { name: string; ops: unknown[][] }[];
+  systems: {
+    every: number;
+    name: string;
+    query: Record<string, unknown>;
+    select?: string[];
+  }[];
+};
+
+const systemFiles = readdirSync(join(SPEC_DIR, 'systems')).filter(f =>
+  f.endsWith('.json')
+);
+
+for (const file of systemFiles) {
+  const spec = JSON.parse(
+    readFileSync(join(SPEC_DIR, 'systems', file), 'utf8')
+  ) as SystemSpec;
+
+  describe(`systems/${file}`, () => {
+    for (const c of spec.cases) {
+      test(c.name, async () => {
+        const { ids, store } = await build(spec);
+        const systems = new Map<string, System<undefined, unknown>>(
+          spec.systems.map(s => [
+            s.name,
+            {
+              every: s.every,
+              name: s.name,
+              query: options(resolve(s.query, ids) as never, ids),
+              run: entities => entities,
+              ...(s.select ? { select: s.select } : {})
+            }
+          ])
+        );
+        const named = (names: string[]) => names.map(n => systems.get(n)!);
+        const labels = new Map([...ids].map(([label, eid]) => [eid, label]));
+        for (const op of c.ops) {
+          const [kind, a, b, d] = op as [string, unknown, unknown, unknown];
+          switch (kind) {
+            case 'arm':
+              armSystems(store, named(a as string[]), b as number);
+              break;
+            case 'due':
+              expect(
+                dueSystems(store, named(a as string[]), b as number).map(
+                  s => s.name
+                )
+              ).toEqual(d as string[]);
+              break;
+            case 'next_due':
+              expect(nextDue(store, named(a as string[])) ?? null).toEqual(
+                b as number | null
+              );
+              break;
+            case 'run': {
+              const ran = runSystem(
+                store,
+                systems.get(a as string)!,
+                b as number,
+                undefined
+              ) as (number | [number, unknown])[];
+              expect(
+                ran.map(e =>
+                  Array.isArray(e) ? [labels.get(e[0]), e[1]] : labels.get(e)
+                )
+              ).toEqual(resolve(d, ids) as never);
+              break;
+            }
+            default:
+              runOp(store, ids, op);
+          }
+        }
         store.db.close();
       });
     }

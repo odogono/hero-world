@@ -1,0 +1,106 @@
+{
+  "components": [
+    {
+      "name": "npc",
+      "columns": [{ "name": "active", "type": "boolean", "default": true }]
+    }
+  ],
+  "entities": [
+    { "id": "a", "components": { "npc": { "active": true } } },
+    { "id": "b", "components": { "npc": { "active": false } } }
+  ],
+  "systems": [
+    {
+      "name": "heartbeat",
+      "every": 45,
+      "query": { "where": [["npc", "active", true]] }
+    },
+    {
+      "name": "census",
+      "every": 45,
+      "query": { "with": ["npc"] },
+      "select": ["npc"]
+    },
+    { "name": "fast", "every": 10, "query": { "with": ["npc"] } },
+    { "name": "slow", "every": 100, "query": { "with": ["npc"] } }
+  ],
+  "cases": [
+    {
+      "name": "first runs one interval after it is first seen",
+      "ops": [
+        ["due", ["heartbeat"], 100, []],
+        ["due", ["heartbeat"], 144, []],
+        ["due", ["heartbeat"], 145, ["heartbeat"]]
+      ]
+    },
+    {
+      "name": "arming records when a System was first seen",
+      "ops": [
+        ["arm", ["heartbeat"], 10],
+        ["arm", ["heartbeat"], 30],
+        ["due", ["heartbeat"], 54, []],
+        ["due", ["heartbeat"], 55, ["heartbeat"]]
+      ]
+    },
+    {
+      "name": "runs over its entities, and waits another interval",
+      "ops": [
+        ["due", ["heartbeat"], 0, []],
+        ["run", "heartbeat", 50, ["a"]],
+        ["due", ["heartbeat"], 94, []],
+        ["due", ["heartbeat"], 95, ["heartbeat"]]
+      ]
+    },
+    {
+      "name": "reads components with its entities",
+      "ops": [
+        [
+          "run",
+          "census",
+          0,
+          [
+            ["a", { "npc": { "active": true } }],
+            ["b", { "npc": { "active": false } }]
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "runs once after missing several intervals",
+      "ops": [
+        ["due", ["heartbeat"], 0, []],
+        ["due", ["heartbeat"], 1000, ["heartbeat"]],
+        ["run", "heartbeat", 1000, ["a"]],
+        ["due", ["heartbeat"], 1001, []]
+      ]
+    },
+    {
+      "name": "keeps its last run in the World, and rolls back with it",
+      "ops": [
+        ["due", ["heartbeat"], 0, []],
+        ["savepoint", "step"],
+        ["run", "heartbeat", 45, ["a"]],
+        ["rollback_to", "step"],
+        ["due", ["heartbeat"], 45, ["heartbeat"]]
+      ]
+    },
+    {
+      "name": "keeps each System's interval apart, in the order given",
+      "ops": [
+        ["due", ["slow", "fast"], 0, []],
+        ["due", ["slow", "fast"], 50, ["fast"]],
+        ["due", ["slow", "fast"], 100, ["slow", "fast"]]
+      ]
+    },
+    {
+      "name": "is next due at the earliest armed System",
+      "ops": [
+        ["next_due", ["fast", "slow"], null],
+        ["arm", ["slow"], 0],
+        ["next_due", ["fast", "slow"], 100],
+        ["arm", ["fast"], 5],
+        ["next_due", ["fast", "slow"], 15]
+      ]
+    }
+  ]
+}

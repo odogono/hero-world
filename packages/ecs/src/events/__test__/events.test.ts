@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
-  createEventSystem,
   eventComponent,
   getAllEvents,
   getEvents,
   getPendingEvents,
+  runEvents,
   scheduleEvent
 } from '..';
 import { DatabaseType } from '../../db';
@@ -17,13 +17,6 @@ const createTestWorld = async () =>
   await createWorld([eventComponent], { dbType });
 
 describe('EventSystem', () => {
-  test('should create event system', async () => {
-    const world = await createTestWorld();
-    const eventSystem = createEventSystem('*', () => {});
-
-    expect(eventSystem).toBeDefined();
-  });
-
   test('should schedule events', async () => {
     const world = await createTestWorld();
 
@@ -103,40 +96,43 @@ describe('EventSystem', () => {
     expect(collectedEvents[0]?.payload.value).toBe(1);
   });
 
-  test('event system processing events', async () => {
+  test('runs the due events of a type', async () => {
     const world = await createTestWorld();
 
     let readReceivedCount = 0;
-    const readSystem = createEventSystem('*', () => {
-      readReceivedCount++;
-      return false;
-    });
+    const read = () =>
+      runEvents(world, '*', () => {
+        readReceivedCount++;
+        return false;
+      });
 
     let receivedCount = 0;
-    const eventSystem = createEventSystem('type-a', ({ type }) => {
-      receivedCount++;
-    });
+    const typeA = () =>
+      runEvents(world, 'type-a', () => {
+        receivedCount++;
+      });
 
     let allReceivedCount = 0;
-    const allSystem = createEventSystem(['type-a', 'type-b'], () => {
-      allReceivedCount++;
-    });
+    const both = () =>
+      runEvents(world, ['type-a', 'type-b'], () => {
+        allReceivedCount++;
+      });
 
     scheduleEvent(world, 'type-a', { value: 1 });
     scheduleEvent(world, 'type-b', { value: 2 });
     scheduleEvent(world, 'type-a', { value: 3 });
     world.flush();
 
-    readSystem.exec({ deltaTime: 16, world });
-    eventSystem.exec({ deltaTime: 16, world });
-    allSystem.exec({ deltaTime: 16, world });
+    read();
+    typeA();
+    both();
 
     expect(readReceivedCount).toBe(3);
     expect(receivedCount).toBe(2);
     expect(allReceivedCount).toBe(1);
 
     // should not process events again
-    eventSystem.exec({ deltaTime: 16, world });
+    typeA();
     expect(receivedCount).toBe(2);
   });
 });

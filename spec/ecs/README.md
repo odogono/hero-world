@@ -38,3 +38,13 @@ Each case builds the World from `components` and `entities`, as the query cases 
 
 - **`ops`**: `["create", label]`, `["put", label, component, data]`, `["remove", label, component]`, `["delete", label]`, `["begin"]`, `["commit"]`, `["rollback"]`, `["savepoint", name]` and `["rollback_to", name]`.
 - **`expect`**: `[label, component, kind, data]` in entity then component order. `kind` is `added`, `changed` or `removed`. `data` is the component's data now, or `null` when removed.
+
+## System cases (`systems/*.json`)
+
+Each file builds the World from `components` and `entities`, as the query cases do, and defines `systems`: each a `name`, an interval `every`, a `query` (the query options above) and an optional `select`. Every System's `run` returns its entities. Each case runs `ops` in order on a fresh World:
+
+- **`["arm", names, now]`**: arms those Systems at `now`.
+- **`["due", names, now, expect]`**: the names of the Systems due at `now`, in the order given.
+- **`["next_due", names, expect]`**: when the first armed one is next due, or `null`.
+- **`["run", name, now, expect]`**: runs it at `now`. `expect` lists labels, or `[label, data]` with `select`.
+- **`["savepoint", name]`** and **`["rollback_to", name]`**, as in the change-set cases.
