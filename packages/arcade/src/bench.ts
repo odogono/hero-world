@@ -60,8 +60,8 @@ const run = async (variant: Variant, k: number) => {
     variant === 'file' ? mkdtempSync(join(tmpdir(), 'arcade-')) : undefined;
   const sim = await createSim({
     godMode: true,
-    minAsteroids: k,
     seed: 42,
+    steadyAsteroids: k,
     ...(dir ? { path: join(dir, 'world.db') } : {})
   });
 
@@ -115,7 +115,7 @@ console.log(
 for (const variant of variants) {
   console.log(`## ${variant}`);
   console.log(
-    '      K  entities   median     p99    flush  | per system (median ms)'
+    '      K  entities   median     p99    flush  µs/entity | per system (median ms)'
   );
   for (const k of ks) {
     const r = await run(variant, k);
@@ -124,7 +124,7 @@ for (const variant of variants) {
       .join(', ');
     const mark = r.p99 <= BUDGET_MS ? ' ' : r.median <= BUDGET_MS ? '~' : '✗';
     console.log(
-      `${String(k).padStart(7)} ${String(r.entities).padStart(9)} ${fmt(r.median)} ${fmt(r.p99)} ${fmt(r.flush)} ${mark}| ${systems}`
+      `${String(k).padStart(7)} ${String(r.entities).padStart(9)} ${fmt(r.median)} ${fmt(r.p99)} ${fmt(r.flush)} ${((r.median * 1000) / r.entities).toFixed(2).padStart(9)} ${mark}| ${systems}`
     );
     if (r.median > GIVE_UP_MS) {
       console.log('        (stopping: far over budget)');
