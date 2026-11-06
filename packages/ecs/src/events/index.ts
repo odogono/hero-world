@@ -1,6 +1,4 @@
 import { defineComponent, s, type InferComponentType } from '../component';
-import { createSystem } from '../system';
-import type { ExecProps } from '../system/types';
 import type { Components, EntityWithComponents } from '../types';
 import type { World } from '../world';
 
@@ -43,32 +41,32 @@ const dueEvents = (world: EventWorld, type: string | string[]) => {
 };
 
 /**
- * A System that runs `exec` on each event of `type` that is due. An event is
- * deleted after it runs unless `exec` returns false.
+ * Runs `exec` on each event of `type` that is due by World time, earliest
+ * first. An event is deleted after it runs unless `exec` returns false.
+ * Events are TypeScript-only (ADR 0020), so this is a plain function the
+ * caller runs when it chooses, not a System.
  */
-export const createEventSystem = <
+export const runEvents = <
   TComponents extends Components & { event: EventComponent }
 >(
+  world: World<TComponents>,
   type: string | string[],
   exec: (props: EventExecProps<TComponents>) => boolean | void
-) =>
-  createSystem<TComponents, ExecProps<TComponents>>(({ world }) => {
-    for (const entity of dueEvents(world as unknown as EventWorld, type)) {
-      const shouldDelete =
-        exec({
-          event: entity as unknown as EntityWithComponents<
-            TComponents,
-            'event'
-          >,
-          payload: entity.event.payload,
-          type: entity.event.type,
-          world
-        }) ?? true;
-      if (shouldDelete) {
-        world.delete(entity);
-      }
+) => {
+  for (const entity of dueEvents(world as unknown as EventWorld, type)) {
+    const shouldDelete =
+      exec({
+        event: entity as unknown as EntityWithComponents<TComponents, 'event'>,
+        payload: entity.event.payload,
+        type: entity.event.type,
+        world
+      }) ?? true;
+    if (shouldDelete) {
+      world.delete(entity);
     }
-  });
+  }
+  world.flush();
+};
 
 /** Schedule an event for World time `at`, by default now */
 export const scheduleEvent = <

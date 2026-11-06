@@ -2,7 +2,7 @@
 defmodule OdgnEcs.ConformanceTest do
   use ExUnit.Case, async: true
 
-  alias OdgnEcs.{Column, Component}
+  alias OdgnEcs.{Column, Component, System}
 
   @spec_dir Path.expand("../../../spec/ecs", __DIR__)
 
@@ -30,6 +30,65 @@ defmodule OdgnEcs.ConformanceTest do
         end
       end
     end
+  end
+
+  for file <- Path.wildcard(Path.join(@spec_dir, "systems/*.json")) do
+    @external_resource file
+    spec = file |> File.read!() |> JSON.decode!()
+
+    describe Path.relative_to(file, @spec_dir) do
+      for c <- spec["cases"] do
+        test c["name"] do
+          run_systems(unquote(Macro.escape(spec)), unquote(Macro.escape(c)))
+        end
+      end
+    end
+  end
+
+  # Runs the case's ops against the spec's Systems, each of whose `run`
+  # returns its entities
+  defp run_systems(spec, c) do
+    {world, ids} = build(spec)
+
+    systems =
+      Map.new(spec["systems"], fn s ->
+        {s["name"],
+         %System{
+           name: s["name"],
+           every: s["every"],
+           query: s["query"] |> resolve(ids) |> options(ids),
+           select: s["select"],
+           run: fn entities, _ -> entities end
+         }}
+      end)
+
+    named = fn names -> Enum.map(names, &Map.fetch!(systems, &1)) end
+    labels = Map.new(ids, fn {label, eid} -> {eid, label} end)
+
+    Enum.each(c["ops"], fn
+      ["arm", names, now] ->
+        :ok = System.arm(world, named.(names), now)
+
+      ["due", names, now, expected] ->
+        assert Enum.map(System.due(world, named.(names), now), & &1.name) == expected
+
+      ["next_due", names, expected] ->
+        assert System.next_due(world, named.(names)) == expected
+
+      ["run", name, now, expected] ->
+        ran =
+          for e <- System.run(world, Map.fetch!(systems, name), now, nil) do
+            case e do
+              {eid, data} -> [labels[eid], data]
+              eid -> labels[eid]
+            end
+          end
+
+        assert ran == expected
+
+      op ->
+        op(world, op, ids)
+    end)
   end
 
   # Builds the World, takes its change set, runs the case's ops, and takes

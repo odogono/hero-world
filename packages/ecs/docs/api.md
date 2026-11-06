@@ -35,7 +35,7 @@ const stats = defineComponent({
 - Lineage and Scripts: `getEntityLineage(eid)`, `getAtomLineage(name)` and `getScriptOwners()`.
 - `saveWorld` / `loadWorld` and `world.saveToJSON` / `loadFromJSON` persist a world.
 - Redefining a component the World file already has changes its table in place when the change is compatible (adding an optional column or one with a default, dropping one, making one optional, changing a default or index). Anything else, such as changing a column's type or adding a required column with no default, throws a `StoreError` with code `incompatible_change`.
-- World time: `world.time`, moved on by `world.advanceTime(delta)` and by the game loop, which adds each frame's `deltaTime`. It is kept with the World. Events fall due by it, never by the wall clock.
+- World time: `world.time`, moved on by `world.advanceTime(delta)`. It is kept with the World. Events fall due by it, never by the wall clock.
 
 ## Storage: `src/store/`
 
@@ -71,13 +71,17 @@ A Change Scope groups pending changes so they can be kept or undone together. `e
 - An open scope holds the entities it touched. `flush()` leaves their changes pending, and a write to one from another scope or from outside any scope throws `ChangeConflictError`.
 - `world.clone` and `world.copy` write SQL directly, so a scope can't undo them.
 
-## Systems and the game loop: `src/system/`
+## Systems: `src/store/system.ts`
 
-- `createSystem(fn, opts)` (`system/index.ts`): with query options, `fn` runs once per matching entity as `{ entity, world, deltaTime }`; without them, once per update.
-- `createGameLoop(world)` (`system/game-loop.ts`): `addSystem(id, system, { priority, frequency, enabled })`. A system made without a world type (`createSystem(() => …)`) can be added to any world's loop. Systems run in descending `priority` (default 50), and ties run in the order they were added. `frequency: n` runs a system every n-th frame. `update(deltaTime)` runs the systems, then flushes once. Pass `createGameLoop(world, { throwErrors: true })` in tests.
-- **By default, a system that throws is logged and skipped**, so a test can pass or fail for the wrong reason. `throwErrors: true` rethrows instead; mua turns it on under `bun test`.
+A System is a `name`, an interval (`every`), a store `query`, an optional `select` and a `run(entities, context)` function, as `OdgnEcs.System` (ADR 0018, ADR 0020). The store keeps no clock and runs nothing itself: the caller supplies the time.
+
+- `dueSystems(store, systems, now)`: the Systems due at `now`, in the order given. A System it hasn't seen is armed at `now`, so it first runs one interval later. One that missed several intervals runs once.
+- `runSystem(store, system, now, context)`: runs it over its entities inside the caller's transaction, records `now` as its last run in `ecs_systems`, and returns what `run` returns.
+- `armSystems(store, systems, now)` arms Systems when a World starts. `nextDue(store, systems)` gives when the first armed one is next due.
+
+`spec/ecs/systems/` holds the cases both languages run.
 
 ## Events: `src/events/index.ts`
 
 - `scheduleEvent(world, type, payload, at?)` stores an `event` component entity.
-- `createEventSystem('move:*', fn)` handles due events whose type matches. The world must register the `event` component.
+- `runEvents(world, 'move:*', fn)` runs `fn` on each due event whose type matches, deletes it unless `fn` returns false, and flushes. The caller runs it when it chooses; events are TypeScript-only (ADR 0020), so it isn't a System. The world must register the `event` component.
