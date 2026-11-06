@@ -1,0 +1,68 @@
+# A small world for asking Dispatch directly, without a World process
+
+include "mua-scripts:edl/base.edl"
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom box {
+  container { capacity: 5 is_closed: false }
+}
+
+# Remarks on anything taken from it
+atom dusty_room {
+  script { src: "scripts/dusty-room.talk" }
+}
+
+# Won't give up what it holds
+atom jealous {
+  script { src: "scripts/jealous.talk" }
+}
+
+# Says no with the wrong shape of refusal
+atom mistaken {
+  script { src: "scripts/mistaken.talk" }
+}
+
+entity west_of_house : room dusty_room {
+  meta { props: { id: "west_of_house" } }
+  described { name: "Attic" description: "A dusty attic." }
+}
+
+entity crate : box responsive {
+  described { name: "Crate" description: "A wooden crate." }
+  container { is_closed: true }
+  responses { target: { open: "The crate is stuck." } }
+  location { in: $west_of_house }
+}
+
+entity plinth : responsive {
+  described { name: "Plinth" description: "A stone plinth." }
+  responses { indirect: { open: "The plinth is not a key." } }
+  location { in: $west_of_house }
+}
+
+entity chest : box jealous {
+  described { name: "Chest" description: "An iron-bound chest." }
+  location { in: $west_of_house }
+}
+
+entity gem : item {
+  described { name: "Gem" description: "A glittering gem." }
+  location { in: $chest }
+}
+
+entity rock : item {
+  described { name: "Rock" description: "A plain rock." }
+  location { in: $west_of_house }
+}
+
+entity puzzle_box : item mistaken {
+  described { name: "Puzzle box" description: "A puzzle box." }
+  location { in: $west_of_house }
+}
