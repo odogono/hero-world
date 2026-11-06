@@ -29,6 +29,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check
+      # ecs-talk and the Mix packages use one odgn-talk commit (ADR 0021)
+      - run: bun run check:northtalk
 
   # The Elixir World (packages/mua_world) builds and tests with Mix alone,
   # without Bun (#102).

@@ -9,6 +9,7 @@ Game libraries and the games built on them: Elixir (Mix) packages, and a Bun wor
 - `packages/mua_client`: the Preact browser client, and the `bun run load` load test.
 - `packages/odgn_ecs`, `packages/odgn_edl`, `packages/odgn_ecs_talk`: the Elixir ECS, EDL loader and NorthTalk Host Adapter that `mua_world` is built on.
 - `packages/ecs` (`odgn-ecs`): the TypeScript ECS, kept at parity with the Elixir libraries for the browser (ADR 0019). See `packages/ecs/AGENTS.md`.
+- `packages/ecs-talk`: the TypeScript twin of `odgn_ecs_talk`, on `@northtalk/ts` published from the commit every `mix.exs` pins (`bun run check:northtalk`, ADR 0021).
 - `packages/helpers` (`odgn-helpers`): logging, strings, `trycatch`.
 - `tools/`: commit, changelog and typecheck scripts.
 - `GLOSSARY.md` and `docs/adr/`: domain terms and decisions (`docs/agents/domain.md`).

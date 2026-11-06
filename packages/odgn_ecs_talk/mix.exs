@@ -14,8 +14,9 @@ defmodule OdgnEcsTalk.MixProject do
   def application, do: [extra_applications: [:logger]]
 
   # NorthTalk's Elixir Host isn't on Hex yet (odogono/odgn-talk#1983), so it
-  # is pinned to a commit of odgn-talk, one with Host Commands and Library
-  # declarations (odogono/odgn-talk#1993) and `send_request/4` (#2052).
+  # is pinned to the commit @northtalk/ts 0.7.0 was released from, which
+  # ecs-talk uses too (ADR 0021). It has reactor-v0.24.0, Host Commands and
+  # Library declarations (odogono/odgn-talk#1993) and `send_request/4` (#2052).
   defp deps do
     [
       {:odgn_ecs, path: "../odgn_ecs"},
@@ -23,7 +24,7 @@ defmodule OdgnEcsTalk.MixProject do
       {:north_talk,
        github: "odogono/odgn-talk",
        sparse: "impl/elixir",
-       ref: "3216b61b5540a6bd3de3cfb4c6911b9c106f2a32"}
+       ref: "5bae9a9938925d7609476726b4cc8b5acd33277e"}
     ]
   end
 end
