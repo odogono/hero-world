@@ -1,0 +1,64 @@
+{
+  "components": [
+    { "name": "stats", "columns": [{ "name": "hp", "type": "int" }] },
+    { "name": "tag", "columns": [] },
+    {
+      "name": "handle",
+      "columns": [{ "name": "name", "type": "string", "unique": true }]
+    }
+  ],
+  "entities": [
+    {
+      "id": "a",
+      "components": { "stats": { "hp": 5 }, "handle": { "name": "x" } }
+    },
+    { "id": "b", "components": { "tag": {} } },
+    { "id": "c", "components": {} }
+  ],
+  "cases": [
+    {
+      "name": "put_many adds and changes in one call",
+      "ops": [["put_many", "stats", [["a", { "hp": 4 }], ["b", { "hp": 1 }]]]],
+      "expect": [
+        ["a", "stats", "changed", { "hp": 4 }],
+        ["b", "stats", "added", { "hp": 1 }]
+      ]
+    },
+    {
+      "name": "put_many with no rows changes nothing",
+      "ops": [["put_many", "stats", []]],
+      "expect": []
+    },
+    {
+      "name": "put to a deleted entity is unknown_entity",
+      "ops": [
+        ["delete", "b"],
+        ["fails", "unknown_entity", ["put", "b", "stats", { "hp": 1 }]]
+      ],
+      "expect": [["b", "tag", "removed", null]]
+    },
+    {
+      "name": "put_many with one deleted entity writes none of its rows",
+      "ops": [
+        ["delete", "b"],
+        [
+          "fails",
+          "unknown_entity",
+          ["put_many", "stats", [["a", { "hp": 9 }], ["b", { "hp": 1 }]]]
+        ]
+      ],
+      "expect": [["b", "tag", "removed", null]]
+    },
+    {
+      "name": "a unique clash in put_many is a constraint, and writes nothing",
+      "ops": [
+        [
+          "fails",
+          "constraint",
+          ["put_many", "handle", [["b", { "name": "y" }], ["c", { "name": "x" }]]]
+        ]
+      ],
+      "expect": []
+    }
+  ]
+}
