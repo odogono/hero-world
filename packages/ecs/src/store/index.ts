@@ -626,11 +626,21 @@ const plan = (
   const names = [...required, ...optional];
   const aliasOf = new Map(names.map(n => [n, ident(n)]));
 
+  // A query with a required component starts from that component's table:
+  // its rows exist only for entities that exist, so joining `entities` too
+  // would cost a lookup per row and change nothing. Raw SQL may name
+  // `e.eid`, so a query with it keeps `entities e`.
+  const driver = opts.sql ? undefined : required[0];
+  const eid = driver ? `${aliasOf.get(driver)}.eid` : 'e.eid';
+  const from = driver
+    ? `${ident(tableName(driver))} ${aliasOf.get(driver)}`
+    : 'entities e';
   const joins = names
+    .filter(name => name !== driver)
     .map(name => {
       const kind = required.includes(name) ? 'JOIN' : 'LEFT JOIN';
       const a = aliasOf.get(name)!;
-      return ` ${kind} ${ident(tableName(name))} ${a} ON ${a}.eid = e.eid`;
+      return ` ${kind} ${ident(tableName(name))} ${a} ON ${a}.eid = ${eid}`;
     })
     .join('');
 
@@ -652,7 +662,7 @@ const plan = (
   for (const [i, name] of (opts.without ?? []).entries()) {
     if (store.components.has(name)) {
       const a = `w${i}`;
-      without += ` LEFT JOIN ${ident(tableName(name))} ${a} ON ${a}.eid = e.eid`;
+      without += ` LEFT JOIN ${ident(tableName(name))} ${a} ON ${a}.eid = ${eid}`;
       conds.push(`${a}.eid IS NULL`);
     }
   }
@@ -663,7 +673,7 @@ const plan = (
   }
 
   if (opts.eids) {
-    conds.push('e.eid IN (SELECT value FROM json_each(?))');
+    conds.push(`${eid} IN (SELECT value FROM json_each(?))`);
     args.push(JSON.stringify(opts.eids));
   }
 
@@ -673,7 +683,7 @@ const plan = (
       fetchColumn(store, name, prop);
       return `${aliasOf.get(name)}.${ident(prop)} ${dir === 'desc' ? 'DESC' : 'ASC'}`;
     }),
-    'e.eid'
+    eid
   ].join(', ');
 
   let limitSql = '';
@@ -699,7 +709,7 @@ const plan = (
   });
 
   const sql =
-    `SELECT ${['e.eid AS eid', ...cols].join(', ')} FROM entities e${joins}${without}` +
+    `SELECT ${[`${eid} AS eid`, ...cols].join(', ')} FROM ${from}${joins}${without}` +
     `${whereSql} ORDER BY ${orderSql}${limitSql}`;
 
   // The row keys are worked out once per query, not once per row
