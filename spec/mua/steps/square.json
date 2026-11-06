@@ -1,0 +1,100 @@
+{
+  "edl": "square.edl",
+  "starting_room": "square",
+  "cases": [
+    {
+      "name": "a Veto stops a Command, and leaves the World as it was",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "north",
+          "told": ["The sentry steps in front of you."]
+        },
+        {
+          "where": {
+            "ada": "square"
+          }
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Market\nStalls line the street.\n\nAlso here: Trader\nExits: west"
+          ],
+          "heard": {
+            "ada": ["Trader says, \"Welcome to the market!\""]
+          }
+        },
+        {
+          "where": {
+            "ada": "market"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an NPC acts on what it hears and sees",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "say pieces of eight",
+          "told": ["You say, \"pieces of eight\""],
+          "heard": {
+            "ada": ["Parrot says, \"pieces of eight\""],
+            "bob": [
+              "ada says, \"pieces of eight\"",
+              "Parrot says, \"pieces of eight\""
+            ]
+          }
+        },
+        {
+          "as": "bob",
+          "type": "east",
+          "told": [
+            "Market\nStalls line the street.\n\nAlso here: Trader\nExits: west"
+          ],
+          "heard": {
+            "ada": ["bob goes east."],
+            "bob": ["Trader says, \"Welcome to the market!\""]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a Script tells the room, and its timer fires later",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "take feather",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the feather."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "unlock box",
+          "told": ["There is no keyhole you can see."]
+        },
+        {
+          "as": "ada",
+          "type": "unlock box with feather",
+          "told": ["You press the Feather into a gap between the panels."],
+          "heard": {
+            "bob": ["ada fiddles with the puzzle box."]
+          }
+        },
+        {
+          "advance": 2,
+          "heard": {
+            "ada": ["The panels settle."],
+            "bob": ["The panels settle."]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+# The World the house cases run in: a hall with a lamp, a box with a
+# pebble in it, a closed chest with a gem, a brass key and a note; a door
+# north to a study, locked with the brass key's lock.
+
+include "mua-scripts:edl/base.edl"
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+entity hall {
+  meta { props: { id: "hall" } }
+  container { capacity: 100 is_closed: false }
+  described { name: "Hall" description: "A long hall." }
+  exits { north: { to: $study door: $door } }
+}
+
+entity study {
+  container { capacity: 100 is_closed: false }
+  described { name: "Study" description: "A quiet study." }
+  exits { south: { to: $hall door: $door } }
+}
+
+entity door {
+  described { name: "Door" description: "An oak door." }
+  door { is_closed: true }
+  lockable { is_locked: true lock: "oak" }
+}
+
+entity lamp : item {
+  described { name: "Lamp" description: "A brass oil lamp." }
+  noun { words: ["lantern"] }
+  location { in: $hall }
+}
+
+entity box {
+  described { name: "Box" description: "A wooden box." }
+  container { capacity: 5 is_closed: false }
+  location { in: $hall }
+}
+
+entity brass_key : item {
+  described { name: "Brass key" description: "A small brass key." }
+  noun { words: ["key"] }
+  key { opens: ["oak"] }
+  location { in: $hall }
+}
+
+entity note : item {
+  described { name: "Note" description: "A folded note." }
+  readable { text: "Meet me at noon." }
+  location { in: $hall }
+}
+
+entity pebble : item {
+  described { name: "Pebble" description: "A smooth pebble." }
+  location { in: $box }
+}
+
+entity chest {
+  described { name: "Chest" description: "A heavy chest." }
+  container { capacity: 10 is_closed: true }
+  location { in: $hall }
+}
+
+entity gem : item {
+  described { name: "Gem" description: "A red gem." }
+  location { in: $chest }
+}

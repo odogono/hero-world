@@ -1,0 +1,3 @@
+on arrived who
+  tell mua to act the target, {verb: "say", text: "Welcome to the market!"}
+end arrived
