@@ -1,0 +1,54 @@
+# The browser journeys in Chromium: the client against the real server (#104),
+# a Local World's Worker (ADR 0023) and the arcade.
+when:
+  - event: pull_request
+    path: &paths
+      include:
+        - 'packages/**'
+        - 'package.json'
+        - 'bun.lock'
+        - 'tools/ci/Dockerfile'
+        - '.woodpecker/e2e.yaml'
+      on_empty: true
+  - event: push
+    branch: main
+    path: *paths
+  - event: manual
+
+labels:
+  backend: docker
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git:2.10.1
+
+steps:
+  - name: install
+    image: hero-world-ci:2026-11-06
+    commands:
+      - bun install --frozen-lockfile
+
+  - name: mua-client
+    image: hero-world-ci:2026-11-06
+    depends_on: [install]
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      - cd packages/mua_server
+      - (mix deps.get || mix deps.get) && mix compile
+      - cd ../mua_client
+      - bun run e2e
+
+  - name: mua-local
+    image: hero-world-ci:2026-11-06
+    depends_on: [install]
+    directory: packages/mua-local
+    commands:
+      - bun run e2e
+
+  - name: arcade
+    image: hero-world-ci:2026-11-06
+    depends_on: [install]
+    directory: packages/arcade
+    commands:
+      - bun run e2e

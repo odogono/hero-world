@@ -1,0 +1,25 @@
+# The PR title (the squash commit's subject) and its changelog fragment.
+# Reruns when the PR's title, body or base branch is edited.
+when:
+  - event: pull_request
+  - event: pull_request_metadata
+    evaluate: 'CI_PIPELINE_EVENT_REASON == "edited"'
+
+labels:
+  platform: linux/amd64
+  backend: docker
+  role: conventions
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git:2.10.1
+    settings:
+      partial: false
+      depth: 0
+
+steps:
+  - name: conventions
+    image: hero-world-ci:2026-11-06
+    commands:
+      - git config --global --add safe.directory "$PWD"
+      - bun tools/commits/woodpecker.ts

@@ -5,6 +5,10 @@ import { play, transcript } from './helpers';
 // Playing offline (ADR 0023): the main World runs in a Web Worker in this
 // browser, with no sign-in, and a reload plays on where it left off.
 
+// A Local World can take ~20s to start (sqlite-wasm and NorthTalk) on a
+// slower CI machine, such as the Woodpecker agent on taito
+const starting = { timeout: 30_000 };
+
 test('plays a Local World offline, and a reload plays on', async ({
   browser
 }) => {
@@ -18,8 +22,8 @@ test('plays a Local World offline, and a reload plays on', async ({
   await page.getByRole('button', { name: 'Play offline' }).click();
   await page.getByLabel('Name').fill('Ada');
   await page.getByRole('button', { name: 'Enter the world' }).click();
-  await expect(transcript(page)).toContainText('Welcome, Ada!');
-  await expect(page.getByRole('status')).toHaveText('Connected');
+  await expect(transcript(page)).toContainText('Welcome, Ada!', starting);
+  await expect(page.getByRole('status')).toHaveText('Connected', starting);
 
   await play(page, 'north');
   await expect(transcript(page)).toContainText('North of house');
@@ -27,7 +31,7 @@ test('plays a Local World offline, and a reload plays on', async ({
   // the same browser keeps the World and its Character
   await page.reload();
   await page.getByRole('button', { name: 'Play offline' }).click();
-  await expect(page.getByRole('status')).toHaveText('Connected');
+  await expect(page.getByRole('status')).toHaveText('Connected', starting);
   await play(page, 'look');
   await expect(transcript(page)).toContainText('North of house');
 
@@ -43,7 +47,7 @@ test('saves a Local World as a file, and another browser loads it', async ({
   await page.getByRole('button', { name: 'Play offline' }).click();
   await page.getByLabel('Name').fill('Ada');
   await page.getByRole('button', { name: 'Enter the world' }).click();
-  await expect(page.getByRole('status')).toHaveText('Connected');
+  await expect(page.getByRole('status')).toHaveText('Connected', starting);
   await play(page, 'north');
   await expect(transcript(page)).toContainText('North of house');
 
@@ -65,12 +69,15 @@ test('saves a Local World as a file, and another browser loads it', async ({
   await other.getByRole('button', { name: 'Play offline' }).click();
   await other.getByLabel('Name').fill('Bob');
   await other.getByRole('button', { name: 'Enter the world' }).click();
-  await expect(other.getByRole('status')).toHaveText('Connected');
+  await expect(other.getByRole('status')).toHaveText('Connected', starting);
 
   await other.getByRole('button', { name: /profile menu/ }).click();
   await other.getByLabel('Saved world file').setInputFiles(save);
-  await expect(transcript(other)).toContainText('Loaded a saved world.');
-  await expect(other.getByRole('status')).toHaveText('Connected');
+  await expect(transcript(other)).toContainText(
+    'Loaded a saved world.',
+    starting
+  );
+  await expect(other.getByRole('status')).toHaveText('Connected', starting);
   await play(other, 'look');
   await expect(transcript(other)).toContainText('North of house');
   await second.close();
