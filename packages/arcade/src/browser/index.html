@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arcade</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #05070f;
+        color: #cfe8ff;
+        font:
+          14px/1.4 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      #game {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #hud {
+        position: fixed;
+        top: 12px;
+        left: 16px;
+        white-space: pre;
+      }
+      #help {
+        position: fixed;
+        bottom: 12px;
+        left: 16px;
+        opacity: 0.6;
+      }
+      #banner {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud"></div>
+    <div id="banner"></div>
+    <div id="help">
+      ←/→ or A/D turn · ↑ or W thrust · space fire · R restart
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

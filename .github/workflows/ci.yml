@@ -217,6 +217,19 @@ jobs:
       - run: bunx playwright install --with-deps chromium
       - run: bun run e2e
 
+  arcade-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/arcade
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run e2e
+
   # The alpha's release image builds from a clean checkout (#130). Nothing is
   # pushed.
   release-image:
