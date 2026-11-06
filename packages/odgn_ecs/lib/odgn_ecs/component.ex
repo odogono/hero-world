@@ -191,10 +191,15 @@ defmodule OdgnEcs.Component do
     table = OdgnEcs.SQL.ident(table(c))
     name = "'" <> String.replace(c.name, "'", "''") <> "'"
     trigger = &OdgnEcs.SQL.ident("ecs_changes_#{table(c)}_#{&1}")
-    # Not INSERT OR IGNORE: an outer statement's conflict policy overrides it
+    # The check for an entity already noted is the trigger's WHEN, not a WHERE
+    # in its body: a trigger whose WHEN fails costs far less than one whose
+    # body runs and inserts nothing, and most writes are to an entity already
+    # noted. Not INSERT OR IGNORE: an outer statement's conflict policy
+    # overrides it.
+    fresh = &"NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = #{name} AND eid = #{&1})"
+
     note =
-      &("INSERT INTO ecs_changes (name, eid, existed) SELECT #{name}, #{&1}, #{&2} " <>
-          "WHERE NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = #{name} AND eid = #{&1}); END;")
+      &"BEGIN INSERT INTO ecs_changes (name, eid, existed) VALUES (#{name}, #{&1}, #{&2}); END;"
 
     differs =
       Enum.map_join(c.columns, " OR ", fn col ->
@@ -203,14 +208,14 @@ defmodule OdgnEcs.Component do
       end)
 
     "CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("i")} AFTER INSERT ON main.#{table} " <>
-      "BEGIN #{note.("NEW.eid", 0)} " <>
+      "WHEN #{fresh.("NEW.eid")} #{note.("NEW.eid", 0)} " <>
       "CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("d")} AFTER DELETE ON main.#{table} " <>
-      "BEGIN #{note.("OLD.eid", 1)}" <>
+      "WHEN #{fresh.("OLD.eid")} #{note.("OLD.eid", 1)}" <>
       if(differs == "",
         do: "",
         else:
           " CREATE TEMP TRIGGER IF NOT EXISTS #{trigger.("u")} AFTER UPDATE ON main.#{table} " <>
-            "WHEN #{differs} BEGIN #{note.("OLD.eid", 1)}"
+            "WHEN (#{differs}) AND #{fresh.("OLD.eid")} #{note.("OLD.eid", 1)}"
       )
   end
 
