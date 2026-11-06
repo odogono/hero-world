@@ -51,7 +51,7 @@ Each file builds the World from `components` and `entities`, as the query cases 
 
 ## Step cases (`steps/*.json`)
 
-Cases for the engine (ADR 0021): `packages/odgn_ecs_engine` runs them in `test/steps_test.exs`, and the TypeScript engine will run the same files. Each file builds one World, fresh for each case:
+Cases for the engine (ADR 0021): `packages/odgn_ecs_engine` runs them in `test/steps_test.exs`, and `packages/ecs-engine` runs the same files in `src/__test__/steps.test.ts`. Each file builds one World, fresh for each case:
 
 - **`components`**: Component Definitions, as above. The adapter's `location` is always defined.
 - **`edl`**: EDL source, built into the World. Entities are named by their Definition name, which is their label in the case.
