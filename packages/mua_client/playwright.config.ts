@@ -13,7 +13,7 @@ const worlds = [
     name: 'plaza',
     port: 4100,
     start: 'plaza',
-    test: /journey/
+    test: /\/(journey|offline)\.spec\.ts$/
   },
   { edl: 'manor.edl', name: 'manor', port: 4101, start: 'hall', test: /manor/ }
 ];

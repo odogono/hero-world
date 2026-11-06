@@ -8,13 +8,25 @@ const ERRORS: Record<string, string> = {
   name_taken: 'Someone already goes by that name.'
 };
 
-export const NameForm = ({ onCreated }: { onCreated: () => void }) => {
+/**
+ * Chooses a Character's name. `choose` makes it; by default it asks the
+ * server for one, and a Local World passes its own.
+ */
+export const NameForm = ({
+  choose = createCharacter,
+  onCreated
+}: {
+  choose?: (
+    name: string
+  ) => Promise<{ error: string; ok: false } | { ok: true }>;
+  onCreated: () => void;
+}) => {
   const [name, setName] = useState('');
   const [error, setError] = useState<string>();
 
   const submit = async (event: Event) => {
     event.preventDefault();
-    const result = await createCharacter(name.trim());
+    const result = await choose(name.trim());
     if (result.ok) {
       onCreated();
     } else {

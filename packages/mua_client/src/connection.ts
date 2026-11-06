@@ -1,3 +1,4 @@
+import type { FromWorld } from 'mua-local';
 import { Socket, type Channel } from 'phoenix';
 
 import { actions, lines, status } from './store';
@@ -17,6 +18,8 @@ type Status = { status: 'connected' | 'limbo' | 'replaced' };
 
 let socket: Socket | undefined;
 let channel: Channel | undefined;
+/** A Local World's Worker, while playing offline (ADR 0023) */
+let worker: Worker | undefined;
 
 const add = (line: Parameters<typeof append>[1]) => {
   lines.value = append(lines.value, line);
@@ -78,10 +81,73 @@ export const connect = (token: string, character: number) => {
 };
 
 /**
+ * Plays a Local World offline: the main World in a Web Worker, which speaks
+ * the Channel's messages (packages/mua-local). Its Character is made with
+ * `name` the first time, and played again after a reload.
+ */
+export const connectLocal = (name: string) => {
+  worker?.terminate();
+  worker = new Worker('/local/worker.js', { type: 'module' });
+  worker.addEventListener('message', ({ data }: MessageEvent<FromWorld>) => {
+    switch (data.event) {
+      case 'output':
+        for (const text of data.lines) {
+          add({ kind: 'output', text });
+        }
+        break;
+      case 'state':
+        actions.value = data.state.actions;
+        break;
+      case 'prompt':
+        add({ kind: 'prompt', options: data.options, text: data.text });
+        break;
+      case 'status':
+        if (data.status === 'connected') {
+          status.value = 'joined';
+        } else {
+          status.value = 'limbo';
+          add({ kind: 'status', text: 'You have left the world.' });
+        }
+        break;
+      case 'reply':
+        if (data.ref !== undefined) {
+          lines.value = data.ok
+            ? confirmed(lines.value, Number(data.ref))
+            : unconfirmed(lines.value, Number(data.ref));
+        }
+        if (!data.ok) {
+          add({ kind: 'error', text: `Not sent: ${data.reason}` });
+        }
+        break;
+      case 'error':
+        add({ kind: 'error', text: `The world stopped: ${data.message}` });
+        status.value = 'offline';
+        break;
+      default:
+        break;
+    }
+  });
+  worker.addEventListener('error', event => {
+    add({ kind: 'error', text: `The world stopped: ${event.message}` });
+    status.value = 'offline';
+  });
+  worker.postMessage({ name, type: 'join' });
+};
+
+/**
  * Sends a command, only while joined: Phoenix would otherwise buffer it and
  * send it on rejoining, turning an offline command into a later action.
  */
 export const sendCommand = (text: string) => {
+  if (worker) {
+    if (status.value !== 'joined') {
+      return false;
+    }
+    const [next, ref] = sent(lines.value, text);
+    lines.value = next;
+    worker.postMessage({ ref, text, type: 'command' });
+    return true;
+  }
   if (!channel || status.value !== 'joined' || !socket?.isConnected()) {
     return false;
   }
@@ -103,7 +169,25 @@ export const sendCommand = (text: string) => {
 };
 
 /** Leaves the World: the Character goes to Limbo at once */
-export const logout = () =>
+export const logout = () => (worker ? logoutLocal() : logoutRemote());
+
+// The Local World puts its Character in Limbo, then the Worker stops, and
+// World time with it
+const logoutLocal = () =>
+  new Promise<void>(resolve => {
+    const local = worker!;
+    local.addEventListener('message', ({ data }: MessageEvent<FromWorld>) => {
+      if (data.event === 'status' && data.status === 'limbo') {
+        resolve();
+      }
+    });
+    local.postMessage({ type: 'logout' });
+  }).then(() => {
+    worker?.terminate();
+    worker = undefined;
+  });
+
+const logoutRemote = () =>
   new Promise<void>(resolve => {
     if (!channel || status.value !== 'joined') {
       resolve();
