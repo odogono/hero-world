@@ -188,22 +188,27 @@ const changeTrigger = (c: Component, op: string) =>
 export const changeSql = (c: Component) => {
   const table = ident(tableName(c));
   const name = `'${c.name.replaceAll("'", "''")}'`;
-  // Not INSERT OR IGNORE: an outer statement's conflict policy overrides it
+  // The check for an entity already noted is the trigger's WHEN, not a WHERE
+  // in its body: a trigger whose WHEN fails costs far less than one whose
+  // body runs and inserts nothing, and most writes are to an entity already
+  // noted. Not INSERT OR IGNORE: an outer statement's conflict policy
+  // overrides it.
+  const fresh = (eid: string) =>
+    `NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = ${name} AND eid = ${eid})`;
   const note = (eid: string, existed: number) =>
-    `INSERT INTO ecs_changes (name, eid, existed) SELECT ${name}, ${eid}, ${existed} ` +
-    `WHERE NOT EXISTS (SELECT 1 FROM ecs_changes WHERE name = ${name} AND eid = ${eid}); END;`;
+    `BEGIN INSERT INTO ecs_changes (name, eid, existed) VALUES (${name}, ${eid}, ${existed}); END;`;
   const differs = c.columns
     .map(col => `OLD.${ident(col.name)} IS NOT NEW.${ident(col.name)}`)
     .join(' OR ');
   return (
     `CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'i')} AFTER INSERT ON main.${table} ` +
-    `BEGIN ${note('NEW.eid', 0)} ` +
+    `WHEN ${fresh('NEW.eid')} ${note('NEW.eid', 0)} ` +
     `CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'd')} AFTER DELETE ON main.${table} ` +
-    `BEGIN ${note('OLD.eid', 1)}` +
+    `WHEN ${fresh('OLD.eid')} ${note('OLD.eid', 1)}` +
     (differs === ''
       ? ''
       : ` CREATE TEMP TRIGGER IF NOT EXISTS ${changeTrigger(c, 'u')} AFTER UPDATE ON main.${table} ` +
-        `WHEN ${differs} BEGIN ${note('OLD.eid', 1)}`)
+        `WHEN (${differs}) AND ${fresh('OLD.eid')} ${note('OLD.eid', 1)}`)
   );
 };
 
