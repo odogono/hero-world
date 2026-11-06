@@ -110,7 +110,7 @@ export const createSim = async (options: SimOptions = {}) => {
     name: 'control',
     run: (w, dtMs) => {
       const e = getShip();
-      if (!e) {
+      if (!e || e.ship.lives <= 0) {
         return;
       }
       const dt = dtMs / 1000;
@@ -368,7 +368,7 @@ export const createSim = async (options: SimOptions = {}) => {
       push('bullet', e);
     }
     const s = getShip();
-    if (s) {
+    if (s && s.ship.lives > 0) {
       push('ship', { ...s, collider: { radius: SHIP_RADIUS } });
     }
     return {
