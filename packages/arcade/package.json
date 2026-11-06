@@ -1,0 +1,19 @@
+{
+  "name": "arcade",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "bench": "bun run src/bench.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --cache .",
+    "lint:fix": "eslint --fix .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "odgn-ecs": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}

@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dir, '../..');
 
 const PROJECTS = [
+  'packages/arcade',
   'packages/ecs',
   'packages/ecs-talk',
   'packages/ecs-engine',
