@@ -582,11 +582,24 @@ defmodule OdgnEcs do
       names = required ++ optional
       alias_of = names |> Enum.with_index() |> Map.new(fn {n, i} -> {n, "t#{i}"} end)
 
+      # A query with a required component starts from that component's
+      # table: its rows exist only for entities that exist, so joining
+      # `entities` too would cost a lookup per row and change nothing
+      {from, eid, joined} =
+        case required do
+          [first | _] ->
+            a = alias_of[first]
+            {"#{SQL.ident(Component.table(first))} #{a}", "#{a}.eid", tl(names)}
+
+          [] ->
+            {"entities e", "e.eid", names}
+        end
+
       joins =
-        Enum.map_join(names, "", fn name ->
+        Enum.map_join(joined, "", fn name ->
           kind = if name in required, do: "JOIN", else: "LEFT JOIN"
           a = alias_of[name]
-          " #{kind} #{SQL.ident(Component.table(name))} #{a} ON #{a}.eid = e.eid"
+          " #{kind} #{SQL.ident(Component.table(name))} #{a} ON #{a}.eid = #{eid}"
         end)
 
       {conds, args} =
@@ -600,7 +613,7 @@ defmodule OdgnEcs do
       {conds, args} =
         case Keyword.fetch(opts, :eids) do
           {:ok, eids} ->
-            {conds ++ ["e.eid IN (SELECT value FROM json_each(?))"],
+            {conds ++ ["#{eid} IN (SELECT value FROM json_each(?))"],
              args ++ [[JSON.encode!(eids)]]}
 
           :error ->
@@ -617,7 +630,7 @@ defmodule OdgnEcs do
           fetch_column!(world, name, prop)
           "#{alias_of[name]}.#{SQL.ident(prop)} #{if dir == :desc, do: "DESC", else: "ASC"}"
         end)
-        |> Kernel.++(["e.eid"])
+        |> Kernel.++([eid])
         |> Enum.join(", ")
 
       {limit_sql, args} =
@@ -636,7 +649,7 @@ defmodule OdgnEcs do
         end)
 
       sql =
-        "SELECT #{Enum.join(["e.eid" | cols], ", ")} FROM entities e#{joins}" <>
+        "SELECT #{Enum.join([eid | cols], ", ")} FROM #{from}#{joins}" <>
           "#{where_sql} ORDER BY #{order_sql}#{limit_sql}"
 
       {sql, args, &read_row(defs, &1)}
