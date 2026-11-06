@@ -14,7 +14,10 @@ FROM oven/bun:1.4.4 AS client
 WORKDIR /src
 COPY package.json bun.lock ./
 COPY packages ./packages
-RUN bun install --frozen-lockfile --filter mua-client
+# The whole workspace: the client bundles mua-local's Worker, which pulls in
+# other packages' dependencies, and this stage's node_modules are not shipped.
+# --ignore-scripts skips the root's git hook setup, which needs git.
+RUN bun install --frozen-lockfile --ignore-scripts
 RUN cd packages/mua_client && bun run build
 
 # -- The release --------------------------------------------------------------
