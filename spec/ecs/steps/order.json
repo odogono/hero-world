@@ -1,0 +1,85 @@
+{
+  "components": [
+    { "name": "meta", "columns": [{ "name": "props", "type": "json" }] }
+  ],
+  "edl": "atom loud {}\nentity bell: loud { meta { props: { id: \"bell\" } } }\nentity gong: loud { meta { props: { id: \"gong\" } } }\n",
+  "scripts": [
+    {
+      "atom": "loud",
+      "source": "on arm\n  ask clock to now\n  put it into t\n  tell timer to schedule \"late\", t + 900 ms, \"chime\", [\"late\"]\n  tell timer to schedule \"early\", t + 800 ms, \"chime\", [\"early\"]\nend arm\n\non chime which\n  show the target, which\nend chime\n\non linger\n  wait 1 s\n  show the target, \"Slow.\"\nend linger\n\non beat\n  show the target, \"Beat.\"\nend beat\n"
+    }
+  ],
+  "systems": [
+    {
+      "name": "heartbeat",
+      "every": 1000,
+      "query": { "with": ["meta"] },
+      "deliver": "beat"
+    }
+  ],
+  "cases": [
+    {
+      "name": "at one World time: timers earliest first, then NorthTalk's deadline, then Systems",
+      "steps": [
+        {
+          "step": { "deliver": [{ "to": "bell", "message": "arm" }] },
+          "expect": { "output": [], "next_deadline": 800 }
+        },
+        {
+          "advance": 1000,
+          "expect": [
+            { "output": [["bell", "early"]] },
+            { "output": [["bell", "late"]] },
+            {
+              "output": [
+                ["bell", "Beat."],
+                ["gong", "Beat."]
+              ]
+            }
+          ],
+          "next_deadline": 2000
+        }
+      ]
+    },
+    {
+      "name": "NorthTalk's deadline gets a Step of its own before the Systems",
+      "steps": [
+        {
+          "step": { "deliver": [{ "to": "gong", "message": "linger" }] },
+          "expect": { "output": [], "next_deadline": 1000 }
+        },
+        {
+          "advance": 1000,
+          "expect": [
+            { "output": [["gong", "Slow."]] },
+            {
+              "output": [
+                ["bell", "Beat."],
+                ["gong", "Beat."]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a System first runs one interval after the World starts",
+      "steps": [
+        { "advance": 999, "expect": [], "next_deadline": 1000 },
+        {
+          "advance": 1500,
+          "expect": [
+            {
+              "output": [
+                ["bell", "Beat."],
+                ["gong", "Beat."]
+              ],
+              "world_time": 1500
+            }
+          ],
+          "next_deadline": 2500
+        }
+      ]
+    }
+  ]
+}
