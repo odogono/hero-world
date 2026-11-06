@@ -27,6 +27,15 @@
         "typescript": "^6",
       },
     },
+    "packages/arcade": {
+      "name": "arcade",
+      "dependencies": {
+        "odgn-ecs": "workspace:*",
+      },
+      "peerDependencies": {
+        "typescript": "^6",
+      },
+    },
     "packages/ecs": {
       "name": "odgn-ecs",
       "dependencies": {
@@ -461,6 +470,8 @@
     "ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 
     "ansi-styles": ["ansi-styles@5.2.0", "", {}, "sha512-Cxwpt2SfTzTtXcfOlzGEee8O+c+MmUgGrNiBcXnuWxuFJHe6a5Hz7qwhwe5OgaSYI0IJvkLqWX1ASG+cJOkEiA=="],
+
+    "arcade": ["arcade@workspace:packages/arcade"],
 
     "aria-query": ["aria-query@5.3.0", "", { "dependencies": { "dequal": "^2.0.3" } }, "sha512-b0P0sZPKtyu8HkeRAfCq0IfURZK+SuwMjY1UXGBU27wpAiTwQAIlq56IbIO+ytk/JjS1fMR14ee5WBBfKi5J6A=="],
 
