@@ -1,0 +1,201 @@
+{
+  "edl": "house.edl",
+  "starting_room": "hall",
+  "cases": [
+    {
+      "name": "looks, examines and reads",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "look",
+          "told": [
+            "Hall\nA long hall.\n\nYou see: the lamp, the brass key, the note\nThere is: the box, the chest\nExits: north (closed)"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "examine lantern",
+          "told": ["A brass oil lamp."]
+        },
+        {
+          "as": "ada",
+          "type": "read note",
+          "told": ["Meet me at noon."]
+        }
+      ]
+    },
+    {
+      "name": "takes and drops, and others see it",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "take lamp",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the lamp."]
+          }
+        },
+        {
+          "where": {
+            "lamp": "ada"
+          }
+        },
+        {
+          "as": "ada",
+          "type": "inventory",
+          "told": ["You are carrying: the lamp."]
+        },
+        {
+          "as": "ada",
+          "type": "drop lamp",
+          "told": ["Dropped."],
+          "heard": {
+            "bob": ["ada drops the lamp."]
+          }
+        },
+        {
+          "where": {
+            "lamp": "hall"
+          }
+        }
+      ]
+    },
+    {
+      "name": "takes from a closed container once it is open",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "take pebble",
+          "told": ["Taken."]
+        },
+        {
+          "as": "ada",
+          "type": "take gem",
+          "told": ["You can't see any gem here."]
+        },
+        {
+          "as": "ada",
+          "type": "open chest",
+          "told": ["Opening the chest reveals: the gem."]
+        },
+        {
+          "as": "ada",
+          "type": "take gem",
+          "told": ["Taken."]
+        },
+        {
+          "where": {
+            "gem": "ada",
+            "pebble": "ada"
+          }
+        }
+      ]
+    },
+    {
+      "name": "unlocks a door, opens it and goes through",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "north",
+          "told": ["The door is closed."]
+        },
+        {
+          "as": "ada",
+          "type": "open door",
+          "told": ["The door is locked."]
+        },
+        {
+          "as": "ada",
+          "type": "unlock door",
+          "told": ["You need a key to unlock the door."]
+        },
+        {
+          "as": "ada",
+          "type": "take key",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the brass key."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "unlock door with key",
+          "told": ["You unlock the door with the brass key."],
+          "heard": {
+            "bob": ["ada unlocks the door."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "open door",
+          "told": ["Opened."],
+          "heard": {
+            "bob": ["ada opens the door."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": ["Study\nA quiet study.\n\nExits: south"],
+          "heard": {
+            "bob": ["ada goes north."]
+          }
+        },
+        {
+          "where": {
+            "ada": "study"
+          }
+        },
+        {
+          "as": "ada",
+          "type": "look",
+          "told": ["Study\nA quiet study.\n\nExits: south"]
+        }
+      ]
+    },
+    {
+      "name": "speaks to the room",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "say hello there",
+          "told": ["You say, \"hello there\""],
+          "heard": {
+            "bob": ["ada says, \"hello there\""]
+          }
+        }
+      ]
+    },
+    {
+      "name": "answers what it can't read",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "dance",
+          "told": ["Unknown command: \"dance\""]
+        },
+        {
+          "as": "ada",
+          "type": "take",
+          "told": ["What do you want to take?"]
+        },
+        {
+          "as": "ada",
+          "type": "take unicorn",
+          "told": ["You can't see any unicorn here."]
+        },
+        {
+          "as": "ada",
+          "type": "again",
+          "told": ["You can't see any unicorn here."]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+# The World the scripted cases run in: a square with a sentry who won't let
+# anyone north, a parrot that repeats what it hears, and a puzzle box; a
+# market east, where a trader welcomes whoever arrives.
+
+include "mua-scripts:edl/base.edl"
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom npc {
+  npc { active: true }
+}
+
+atom sentried {
+  script { src: "scripts/sentry.talk" }
+}
+
+atom parrot {
+  script { src: "scripts/parrot.talk" }
+}
+
+atom greeter {
+  script { src: "scripts/greeter.talk" }
+}
+
+atom puzzle {
+  script { src: "scripts/puzzle.talk" }
+}
+
+entity square : room sentried {
+  meta { props: { id: "square" } }
+  described { name: "Square" description: "A busy town square." }
+  exits {
+    north: $courtyard
+    east: $market
+  }
+}
+
+entity courtyard : room {
+  described { name: "Courtyard" description: "An open courtyard." }
+}
+
+entity market : room {
+  described { name: "Market" description: "Stalls line the street." }
+  exits { west: $square }
+}
+
+entity polly : npc parrot {
+  described { name: "Parrot" description: "A green parrot." }
+  noun { words: ["parrot", "polly"] }
+  location { in: $square }
+}
+
+entity trader : npc greeter {
+  described { name: "Trader" description: "A cheerful trader." }
+  location { in: $market }
+}
+
+entity puzzle_box : puzzle {
+  described { name: "Puzzle box" description: "A box of sliding panels." }
+  noun { words: ["box"] }
+  location { in: $square }
+}
+
+entity feather : item {
+  described { name: "Feather" description: "A long feather." }
+  location { in: $square }
+}

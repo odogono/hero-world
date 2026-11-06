@@ -1,6 +1,6 @@
 # Command conformance cases
 
-Language-neutral cases for the front of a Command: reading what a Character typed, parsing it against the World's Verbs and binding its nouns within their Reach (ADR 0024). Every Host's parser and binder must pass them. Actions are not tested here; Step cases test them.
+Language-neutral cases for the front of a Command: reading what a Character typed, parsing it against the World's Verbs and binding its nouns within their Reach (ADR 0024). Every Host's parser and binder must pass them. Actions are not tested here; the Step cases in [`../steps/`](../steps/README.md) test them.
 
 Each `*.json` file names the EDL World its cases run in. The World includes the Base Verbs with `include "mua-scripts:edl/base.edl"`, and the runner points the `mua-scripts` root at `packages/mua-scripts`.
 

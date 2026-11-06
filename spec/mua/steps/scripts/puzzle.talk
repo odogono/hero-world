@@ -1,0 +1,27 @@
+on unlock role, actor
+  if role is not "target" then
+    pass unlock
+  end if
+  ask mua to command
+  put it into cmd
+  if the indirect of cmd is nothing then
+    return "There is no keyhole you can see."
+  end if
+  put the name of the described of the indirect of cmd into thing
+  tell mua to announce the in of the location of actor, the name of the player of actor & " fiddles with the puzzle box.", actor
+  ask clock to now
+  tell timer to schedule "settle", it + 1 s, "settle", []
+  return "You press the " & thing & " into a gap between the panels."
+end unlock
+
+-- A due timer's Run handles no command, so it has none to see (ADR 0002)
+on settle
+  ask mua to command
+  put it into cmd
+  put the in of the location of the target into here
+  if cmd is nothing then
+    tell mua to announce here, "The panels settle.", nothing
+  else
+    tell mua to announce here, "The panels remember " & the verb of cmd & ".", nothing
+  end if
+end settle
