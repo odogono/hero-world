@@ -84,4 +84,13 @@ A System is a `name`, an interval (`every`), a store `query`, an optional `selec
 ## Events: `src/events/index.ts`
 
 - `scheduleEvent(world, type, payload, at?)` stores an `event` component entity.
-- `runEvents(world, 'move:*', fn)` runs `fn` on each due event whose type matches, deletes it unless `fn` returns false, and flushes. The caller runs it when it chooses; events are TypeScript-only (ADR 0020), so it isn't a System. The world must register the `event` component.
+- `runEvents(world, 'move:*', fn, { flush? })` runs `fn` on each due event whose type matches, deletes it unless `fn` returns false, and flushes unless `flush` is false. An event it ran is skipped by a later `runEvents` before the flush. The caller runs it when it chooses; events are TypeScript-only (ADR 0020), so it isn't a System. The world must register the `event` component.
+
+## Frame loop: `src/loop/`
+
+A free-running game loop, TypeScript-only like Events (ADR 0019). `createFrameLoop(world, systems, { frameMs, changes, discardEvery })` returns `frame()`, which advances World time by `frameMs` (1000 / 60 by default), runs each due FrameSystem in order, and flushes once, so a Frame is one commit. It returns how long each part took. The caller decides when to call it.
+
+- A FrameSystem is `{ name, every?, run(world, frameMs) }`. It works through the World's proxies, so it sees what earlier FrameSystems in the Frame changed. This is unlike a store System, which reads committed rows and records each run in `ecs_systems`. One with `every` first runs one interval later, then once per interval. When each one last ran is kept in memory, not in the World.
+- Run Events inside a Frame with `runEvents(…, { flush: false })`, so they commit with it.
+- A loop takes no change sets, so by default it clears the recorded changes every `discardEvery` Frames (60), or they would pile up. With `changes: 'keep'` it leaves them for a caller that calls `takeChanges` itself.
+- `packages/arcade` runs a game on it, and `bun run bench` there measures Frame times.

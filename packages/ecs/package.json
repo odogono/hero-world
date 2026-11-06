@@ -9,6 +9,7 @@
     "./edl": "./src/edl/index.ts",
     "./entity": "./src/entity/index.ts",
     "./events": "./src/events/index.ts",
+    "./loop": "./src/loop/index.ts",
     "./store": "./src/store/index.ts",
     "./system": "./src/system/index.ts",
     "./world": "./src/world/index.ts",
