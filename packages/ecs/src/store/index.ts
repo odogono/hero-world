@@ -17,7 +17,7 @@ import {
   changeSql,
   changes,
   createSql,
-  decode,
+  decodeValue,
   dropChangeSql,
   encode,
   foreignKeys,
@@ -702,15 +702,28 @@ const plan = (
     `SELECT ${['e.eid AS eid', ...cols].join(', ')} FROM entities e${joins}${without}` +
     `${whereSql} ORDER BY ${orderSql}${limitSql}`;
 
+  // The row keys are worked out once per query, not once per row
+  const readers = defs.map((c, i) => ({
+    columns: c.columns.map((col, j) => ({
+      key: `v${i}_${j}`,
+      name: col.name,
+      type: col.type
+    })),
+    name: c.name,
+    present: `p${i}`
+  }));
   const read = (row: Record<string, unknown>): [Eid, Record<string, Data>] => {
     const data: Record<string, Data> = {};
-    for (const [i, c] of defs.entries()) {
-      if (row[`p${i}`] !== null && row[`p${i}`] !== undefined) {
-        data[c.name] = decode(
-          c,
-          c.columns.map((_, j) => row[`v${i}_${j}`])
-        );
+    for (const reader of readers) {
+      const present = row[reader.present];
+      if (present === null || present === undefined) {
+        continue;
       }
+      const component: Data = {};
+      for (const col of reader.columns) {
+        component[col.name] = decodeValue(col.type, row[col.key]);
+      }
+      data[reader.name] = component;
     }
     return [Number(row.eid), data];
   };

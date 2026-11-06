@@ -410,7 +410,7 @@ export const queryValue = (col: Column, v: unknown) =>
       ? JSON.stringify(v)
       : (v ?? null);
 
-const decodeValue = (type: ColumnType, v: unknown) =>
+export const decodeValue = (type: ColumnType, v: unknown) =>
   v === null || v === undefined
     ? null
     : type === 'boolean'
