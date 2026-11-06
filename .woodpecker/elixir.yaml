@@ -1,0 +1,100 @@
+# Each Mix package builds and tests with Mix alone, without Bun (#96, #97,
+# #102, #112, ADR 0021). The steps run in parallel; Hex's download cache is
+# kept on the agent's cache volume.
+when:
+  - event: pull_request
+    path: &paths
+      include:
+        - 'packages/odgn_ecs/**'
+        - 'packages/odgn_edl/**'
+        - 'packages/odgn_ecs_talk/**'
+        - 'packages/odgn_ecs_engine/**'
+        - 'packages/mua_world/**'
+        - 'packages/mua_server/**'
+        - 'tools/ci/Dockerfile'
+        - '.woodpecker/elixir.yaml'
+      on_empty: true
+  - event: push
+    branch: main
+    path: *paths
+  - event: manual
+
+labels:
+  backend: docker
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git:2.10.1
+
+steps:
+  - name: odgn-ecs
+    image: hero-world-ci:2026-11-06
+    directory: packages/odgn_ecs
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test
+
+  - name: odgn-edl
+    image: hero-world-ci:2026-11-06
+    directory: packages/odgn_edl
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test
+
+  - name: odgn-ecs-talk
+    image: hero-world-ci:2026-11-06
+    directory: packages/odgn_ecs_talk
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test
+
+  - name: odgn-ecs-engine
+    image: hero-world-ci:2026-11-06
+    directory: packages/odgn_ecs_engine
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test
+
+  - name: mua-world
+    image: hero-world-ci:2026-11-06
+    directory: packages/mua_world
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test
+
+  - name: mua-server
+    image: hero-world-ci:2026-11-06
+    directory: packages/mua_server
+    environment:
+      HEX_HOME: /woodpecker-go-cache/${CI_REPO}/hex
+    commands:
+      # The odgn-talk git dependency's first fetch can fail; a second works.
+      - mix deps.get || mix deps.get
+      - mix format --check-formatted
+      - mix compile --warnings-as-errors
+      - mix test

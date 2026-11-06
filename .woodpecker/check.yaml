@@ -1,0 +1,25 @@
+# Lint, format, typecheck and the Bun tests (docs/agents/checks.md), then the
+# NorthTalk pins. The Mix packages run in elixir.yaml.
+when:
+  - event: pull_request
+  - event: push
+    branch: main
+  - event: manual
+
+labels:
+  backend: docker
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git:2.10.1
+
+steps:
+  - name: check
+    image: hero-world-ci:2026-11-06
+    environment:
+      CHECK_ELIXIR_SKIP: '1'
+    commands:
+      - bun install --frozen-lockfile
+      - bun run check
+      # ecs-talk and the Mix packages use one odgn-talk commit (ADR 0021)
+      - bun run check:northtalk
