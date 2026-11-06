@@ -21,7 +21,9 @@ have no Docker daemon.
 ## The image
 
 Every step runs in `hero-world-ci:<date>`, built from [`Dockerfile`](Dockerfile)
-on taito, since the agents only use local images:
+on taito, since the agents only use local images. The pipelines ask for
+`platform: linux/amd64`, which keeps them off almere's arm64 agent, where the
+image is not built:
 
 ```sh
 scp tools/ci/Dockerfile taito:/tmp/hero-world-ci/
