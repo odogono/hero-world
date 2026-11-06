@@ -11,6 +11,12 @@ export type CreateDatabaseOptions = {
   cacheSize?: number;
   clearExisting?: boolean;
   enableTracing?: boolean;
+  /**
+   * For `wasm`: keep the database in the Origin Private File System at
+   * `path`, as a Local World's Worker does (ADR 0023). OPFS is only open to
+   * a Worker; elsewhere opening fails.
+   */
+  opfs?: boolean;
   pageSize?: number;
   path?: string | ':memory:';
   readonly?: boolean;

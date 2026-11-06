@@ -202,6 +202,21 @@ jobs:
         working-directory: packages/mua_server
       - run: bun run e2e
 
+  # A Local World's Worker in Chromium: sqlite-wasm in OPFS, NorthTalk and
+  # the mua Host (ADR 0023).
+  mua-local-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mua-local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run e2e
+
   # The alpha's release image builds from a clean checkout (#130). Nothing is
   # pushed.
   release-image:

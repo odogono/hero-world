@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
-
 import { parseNodes, type EDLNode } from './compile';
 import { EDLIncludeError, EDLParseError } from './errors';
+import { dirname, isAbsolute, resolve } from './paths';
 
 export type ReadOptions = {
   /** Path of the .edl file; relative includes and `script.src` resolve against it */
@@ -19,7 +17,20 @@ export type ReadOptions = {
 /** An EDL's definitions with its includes read in, and the source its hash is taken from */
 export type ReadEDL = { nodes: EDLNode[]; source: string };
 
-const readFromDisk = (file: string) => readFileSync(file, 'utf8');
+// Reads from disk where there is one, without importing `node:fs`, so the
+// reader also loads in a Web Worker, which passes its own `readFile`
+const readFromDisk = (file: string): string => {
+  const fs = (
+    globalThis as {
+      process?: { getBuiltinModule?: (id: string) => unknown };
+    }
+  ).process?.getBuiltinModule?.('node:fs') as
+    { readFileSync: (file: string, encoding: string) => string } | undefined;
+  if (!fs) {
+    throw new Error(`no readFile was given to read ${file}`);
+  }
+  return fs.readFileSync(file, 'utf8');
+};
 
 /**
  * Parses EDL source and reads in the files its `include` lines name (ADR

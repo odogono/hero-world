@@ -1,0 +1,29 @@
+{
+  "name": "mua-local",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "scripts": {
+    "files": "bun scripts/files.ts",
+    "bundle": "bun scripts/bundle.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --cache .",
+    "test": "bun test src",
+    "e2e": "bun test e2e"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "mua-world": "workspace:*",
+    "odgn-ecs": "workspace:*"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}

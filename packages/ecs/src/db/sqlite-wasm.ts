@@ -162,7 +162,7 @@ export class WasmDatabaseWrapper implements Database {
 export const createWasmDatabaseInstance = async (
   options: CreateDatabaseOptions
 ): Promise<Database> => {
-  const { enableTracing = false, path = ':memory:' } = options;
+  const { enableTracing = false, opfs = false, path = ':memory:' } = options;
   const sqliteWasm = await import('@sqlite.org/sqlite-wasm');
   // the package declares init() with no arguments, but its runtime takes
   // Emscripten module options such as print and printErr
@@ -179,7 +179,19 @@ export const createWasmDatabaseInstance = async (
     flags += 't';
   }
 
-  const db = new sqlite3.oo1.DB(path, flags);
+  let db: Sqlite3Database;
+  if (opfs) {
+    // only a Worker with the Origin Private File System has OpfsDb
+    const { OpfsDb } = sqlite3.oo1 as {
+      OpfsDb?: new (path: string, flags: string) => Sqlite3Database;
+    };
+    if (!OpfsDb) {
+      throw new Error('OPFS is not available here: open it from a Worker');
+    }
+    db = new OpfsDb(path, flags);
+  } else {
+    db = new sqlite3.oo1.DB(path, flags);
+  }
 
   if (!enableTracing) {
     // @ts-expect-error - sqlite3_trace_v2 claims 3 args, but it's actually 4

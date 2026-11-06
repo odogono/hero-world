@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Local World</title>
+<script type="module">
+  // Talks to the Worker as mua_client will, and keeps what it hears for the
+  // test to read
+  window.heard = [];
+  const worker = new Worker('/worker.js', { type: 'module' });
+  worker.addEventListener('message', event => window.heard.push(event.data));
+  worker.addEventListener('error', event =>
+    window.heard.push({ event: 'error', message: event.message })
+  );
+  window.post = message => worker.postMessage(message);
+</script>
