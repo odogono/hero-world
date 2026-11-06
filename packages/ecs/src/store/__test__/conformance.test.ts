@@ -17,6 +17,7 @@ import {
   nextDue,
   openStore,
   put,
+  putMany,
   query,
   remove,
   runSystem,
@@ -166,6 +167,30 @@ const runOp = (store: Store, ids: Ids, op: unknown[]) => {
     case 'put':
       put(store, eid(), b, resolve(c, ids) as Record<string, unknown>);
       break;
+    case 'put_many':
+      putMany(
+        store,
+        a,
+        (b as unknown as [string, unknown][]).map(
+          ([label, data]) =>
+            [
+              ids.get(label)!,
+              resolve(data, ids) as Record<string, unknown>
+            ] as const
+        )
+      );
+      break;
+    case 'fails': {
+      // `["fails", kind, op]`: the op throws a StoreError of that kind
+      let thrown: unknown;
+      try {
+        runOp(store, ids, b as unknown as unknown[]);
+      } catch (error) {
+        thrown = error;
+      }
+      expect((thrown as { code?: string } | undefined)?.code).toBe(a);
+      break;
+    }
     case 'remove':
       remove(store, eid(), b);
       break;

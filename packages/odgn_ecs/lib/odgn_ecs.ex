@@ -334,6 +334,11 @@ defmodule OdgnEcs do
     SQL.one!(conn, "SELECT 1 FROM entities WHERE eid = ?1", [eid]) != nil
   end
 
+  # Rows per statement in `put_many/3`, before the parameter limit
+  @put_batch 256
+  # SQLite's limit on a statement's bound parameters
+  @max_params 32_766
+
   @doc """
   Gives an entity a component, replacing it whole if it has it already.
   Properties missing from `data` take their defaults.
@@ -341,42 +346,126 @@ defmodule OdgnEcs do
   @spec put(t(), eid(), String.t(), data()) :: :ok | {:error, Error.t()}
   def put(%__MODULE__{} = world, eid, name, data) do
     with {:ok, c} <- fetch_component(world, name),
-         :ok <- check_exists(world, eid),
          {:ok, values} <- Component.encode(c, data) do
-      cols = Enum.map(["eid" | Enum.map(c.columns, & &1.name)], &SQL.ident/1)
-      params = Enum.map_join(1..length(cols), ", ", &"?#{&1}")
+      write(world, c, [[eid | values]])
+    end
+  end
 
-      # An upsert, not INSERT OR REPLACE, which would delete another
-      # entity's row to satisfy a unique column
-      updates =
-        case tl(cols) do
-          [] -> "NOTHING"
-          rest -> "UPDATE SET " <> Enum.map_join(rest, ", ", &"#{&1} = excluded.#{&1}")
+  @doc """
+  Gives each `{eid, data}` in `rows` the component `name`, as `put/4` does,
+  with many rows to a statement. All or nothing: if one row fails, none is
+  written, and the error names that row as `put/4`'s would.
+  """
+  @spec put_many(t(), String.t(), [{eid(), data()}]) :: :ok | {:error, Error.t()}
+  def put_many(%__MODULE__{} = world, name, rows) do
+    with {:ok, c} <- fetch_component(world, name),
+         {:ok, encoded} <- encode_rows(c, rows) do
+      per_statement = max(1, min(@put_batch, div(@max_params, length(c.columns) + 1)))
+
+      case encoded do
+        [] ->
+          :ok
+
+        _ ->
+          :ok = savepoint(world, "ecs_put_many")
+
+          result =
+            encoded
+            |> Enum.chunk_every(per_statement)
+            |> Enum.reduce_while(:ok, fn batch, :ok ->
+              case write(world, c, batch) do
+                :ok -> {:cont, :ok}
+                error -> {:halt, error}
+              end
+            end)
+
+          case result do
+            :ok -> release(world, "ecs_put_many")
+            error -> with(:ok <- rollback_to(world, "ecs_put_many"), do: error)
+          end
+      end
+    end
+  end
+
+  defp encode_rows(c, rows) do
+    Enum.reduce_while(rows, {:ok, []}, fn {eid, data}, {:ok, acc} ->
+      case Component.encode(c, data) do
+        {:ok, values} -> {:cont, {:ok, [[eid | values] | acc]}}
+        error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      error -> error
+    end
+  end
+
+  # Upserts `rows` (each `[eid | values]`) in one statement. The write isn't
+  # checked first: a component's `eid` references `entities`, so the
+  # database refuses one to an entity that doesn't exist. When a statement
+  # of several rows fails, which wrote nothing, they are written one by one
+  # so the error names the row, as `put/4`'s does.
+  defp write(world, c, [_, _ | _] = rows) do
+    case upsert(world, c, rows) do
+      :ok ->
+        :ok
+
+      {:error, _} ->
+        Enum.reduce_while(rows, :ok, fn row, :ok ->
+          case write(world, c, [row]) do
+            :ok -> {:cont, :ok}
+            error -> {:halt, error}
+          end
+        end)
+    end
+  end
+
+  defp write(world, c, [[eid | _]] = rows) do
+    case upsert(world, c, rows) do
+      :ok ->
+        :ok
+
+      {:error, {:sqlite, reason}} ->
+        {:error, Error.new(:sqlite, reason)}
+
+      {:error, reason} ->
+        if exists?(world, eid),
+          do: {:error, Error.new(:constraint, "Component '#{c.name}': #{reason}")},
+          else: {:error, Error.new(:unknown_entity, "No entity #{eid}.")}
+    end
+  end
+
+  # An upsert, not INSERT OR REPLACE, which would delete another entity's
+  # row to satisfy a unique column
+  defp upsert(world, c, rows) do
+    cols = Enum.map(["eid" | Enum.map(c.columns, & &1.name)], &SQL.ident/1)
+    row = "(" <> Enum.map_join(cols, ", ", fn _ -> "?" end) <> ")"
+
+    updates =
+      case tl(cols) do
+        [] -> "NOTHING"
+        rest -> "UPDATE SET " <> Enum.map_join(rest, ", ", &"#{&1} = excluded.#{&1}")
+      end
+
+    sql =
+      "INSERT INTO #{SQL.ident(Component.table(c))} (#{Enum.join(cols, ", ")}) " <>
+        "VALUES #{Enum.map_join(rows, ", ", fn _ -> row end)} ON CONFLICT(eid) DO #{updates}"
+
+    case Sqlite3.prepare(world.conn, sql) do
+      {:ok, stmt} ->
+        try do
+          :ok = Sqlite3.bind(stmt, List.flatten(rows))
+
+          case Sqlite3.step(world.conn, stmt) do
+            :done -> :ok
+            {:error, reason} -> {:error, reason}
+          end
+        after
+          Sqlite3.release(world.conn, stmt)
         end
 
-      sql =
-        "INSERT INTO #{SQL.ident(Component.table(c))} (#{Enum.join(cols, ", ")}) VALUES (#{params}) " <>
-          "ON CONFLICT(eid) DO #{updates}"
-
-      case Sqlite3.prepare(world.conn, sql) do
-        {:ok, stmt} ->
-          try do
-            :ok = Sqlite3.bind(stmt, [eid | values])
-
-            case Sqlite3.step(world.conn, stmt) do
-              :done ->
-                :ok
-
-              {:error, reason} ->
-                {:error, Error.new(:constraint, "Component '#{name}': #{reason}")}
-            end
-          after
-            Sqlite3.release(world.conn, stmt)
-          end
-
-        {:error, reason} ->
-          {:error, Error.new(:sqlite, inspect(reason))}
-      end
+      {:error, reason} ->
+        {:error, {:sqlite, inspect(reason)}}
     end
   end
 
@@ -700,11 +789,5 @@ defmodule OdgnEcs do
       nil -> {:error, Error.new(:unknown_component, "No component '#{name}' is defined.")}
       c -> {:ok, c}
     end
-  end
-
-  defp check_exists(world, eid) do
-    if exists?(world, eid),
-      do: :ok,
-      else: {:error, Error.new(:unknown_entity, "No entity #{eid}.")}
   end
 end

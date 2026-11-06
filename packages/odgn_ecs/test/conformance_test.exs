@@ -114,20 +114,47 @@ defmodule OdgnEcs.ConformanceTest do
     Map.put(ids, label, eid)
   end
 
-  defp op(world, op, ids) do
-    :ok =
-      case op do
-        ["put", l, name, data] -> OdgnEcs.put(world, ids[l], name, resolve(data, ids))
-        ["remove", l, name] -> OdgnEcs.remove(world, ids[l], name)
-        ["delete", l] -> OdgnEcs.delete(world, ids[l])
-        ["begin"] -> OdgnEcs.begin(world)
-        ["commit"] -> OdgnEcs.commit(world)
-        ["rollback"] -> OdgnEcs.rollback(world)
-        ["savepoint", n] -> OdgnEcs.savepoint(world, n)
-        ["rollback_to", n] -> OdgnEcs.rollback_to(world, n)
-      end
-
+  # `["fails", kind, op]`: the op returns an error of that kind
+  defp op(world, ["fails", kind, inner], ids) do
+    assert {:error, %OdgnEcs.Error{kind: actual}} = apply_op(world, inner, ids)
+    assert Atom.to_string(actual) == kind
     ids
+  end
+
+  defp op(world, op, ids) do
+    :ok = apply_op(world, op, ids)
+    ids
+  end
+
+  defp apply_op(world, op, ids) do
+    case op do
+      ["put", l, name, data] ->
+        OdgnEcs.put(world, ids[l], name, resolve(data, ids))
+
+      ["put_many", name, rows] ->
+        OdgnEcs.put_many(world, name, for([l, data] <- rows, do: {ids[l], resolve(data, ids)}))
+
+      ["remove", l, name] ->
+        OdgnEcs.remove(world, ids[l], name)
+
+      ["delete", l] ->
+        OdgnEcs.delete(world, ids[l])
+
+      ["begin"] ->
+        OdgnEcs.begin(world)
+
+      ["commit"] ->
+        OdgnEcs.commit(world)
+
+      ["rollback"] ->
+        OdgnEcs.rollback(world)
+
+      ["savepoint", n] ->
+        OdgnEcs.savepoint(world, n)
+
+      ["rollback_to", n] ->
+        OdgnEcs.rollback_to(world, n)
+    end
   end
 
   defp run_case(spec, c) do

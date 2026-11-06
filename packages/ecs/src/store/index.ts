@@ -358,36 +358,93 @@ const referrers = (store: Store, eid: Eid) => {
   return out.join('; ');
 };
 
+/** Rows per statement in `putMany`, before the parameter limit */
+const PUT_BATCH = 256;
+/** SQLite's limit on a statement's bound parameters */
+const MAX_PARAMS = 32_766;
+
+/**
+ * An upsert of `rows` rows of `c`. An upsert, not INSERT OR REPLACE, which
+ * would delete another entity's row to satisfy a unique column.
+ */
+const upsertSql = (c: Component, rows: number) => {
+  const cols = ['eid', ...c.columns.map(col => col.name)].map(ident);
+  const row = `(${cols.map(() => '?').join(', ')})`;
+  const rest = cols.slice(1);
+  const updates =
+    rest.length === 0
+      ? 'NOTHING'
+      : `UPDATE SET ${rest.map(col => `${col} = excluded.${col}`).join(', ')}`;
+  return (
+    `INSERT INTO ${ident(tableName(c))} (${cols.join(', ')}) ` +
+    `VALUES ${Array.from({ length: rows }, () => row).join(', ')} ` +
+    `ON CONFLICT(eid) DO ${updates}`
+  );
+};
+
+/**
+ * Why a write of `name` to `eid` failed. The write isn't checked first: a
+ * component's `eid` references `entities`, so the database refuses one to
+ * an entity that doesn't exist, and only then is it worth asking.
+ */
+const writeError = (store: Store, eid: Eid, name: string, error: unknown) =>
+  exists(store, eid)
+    ? new StoreError(
+        'constraint',
+        `Component '${name}': ${(error as Error).message}`
+      )
+    : new StoreError('unknown_entity', `No entity ${eid}.`);
+
 /**
  * Gives an entity a component, replacing it whole if it has it already.
  * Properties missing from `data` take their defaults.
  */
 export const put = (store: Store, eid: Eid, name: string, data: Data) => {
   const c = fetchComponent(store, name);
-  if (!exists(store, eid)) {
-    throw new StoreError('unknown_entity', `No entity ${eid}.`);
-  }
   const values = encode(c, data);
-  const cols = ['eid', ...c.columns.map(col => col.name)].map(ident);
-  const params = cols.map((_, i) => `?${i + 1}`).join(', ');
-  // An upsert, not INSERT OR REPLACE, which would delete another entity's
-  // row to satisfy a unique column
-  const rest = cols.slice(1);
-  const updates =
-    rest.length === 0
-      ? 'NOTHING'
-      : `UPDATE SET ${rest.map(col => `${col} = excluded.${col}`).join(', ')}`;
   try {
-    store.db.exec(
-      `INSERT INTO ${ident(tableName(c))} (${cols.join(', ')}) VALUES (${params}) ON CONFLICT(eid) DO ${updates}`,
-      [eid, ...values]
-    );
+    store.db.exec(upsertSql(c, 1), [eid, ...values]);
   } catch (error) {
-    throw new StoreError(
-      'constraint',
-      `Component '${name}': ${(error as Error).message}`
-    );
+    throw writeError(store, eid, name, error);
   }
+};
+
+/**
+ * Gives each entity in `rows` the component `name`, as `put` does, with
+ * many rows to a statement. All or nothing: if one row fails, none is
+ * written, and the error names that row as `put`'s would.
+ */
+export const putMany = (
+  store: Store,
+  name: string,
+  rows: readonly (readonly [Eid, Data])[]
+) => {
+  const c = fetchComponent(store, name);
+  if (rows.length === 0) {
+    return;
+  }
+  const encoded = rows.map(([eid, data]) => [eid, ...encode(c, data)]);
+  const perStatement = Math.max(
+    1,
+    Math.min(PUT_BATCH, Math.floor(MAX_PARAMS / (c.columns.length + 1)))
+  );
+  inSavepoint(store, 'ecs_put_many', () => {
+    for (let i = 0; i < encoded.length; i += perStatement) {
+      const batch = encoded.slice(i, i + perStatement);
+      try {
+        store.db.exec(upsertSql(c, batch.length), batch.flat());
+      } catch {
+        // A failed statement writes nothing; row by row finds the culprit
+        for (const [eid, ...values] of batch) {
+          try {
+            store.db.exec(upsertSql(c, 1), [eid, ...values]);
+          } catch (error) {
+            throw writeError(store, eid as Eid, name, error);
+          }
+        }
+      }
+    }
+  });
 };
 
 /** Takes a component from an entity */

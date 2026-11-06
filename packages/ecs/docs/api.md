@@ -39,7 +39,7 @@ const stats = defineComponent({
 
 ## Storage: `src/store/`
 
-The World is stored in the layout `odgn_ecs` uses, so a World file opens in either implementation (ADR 0019): `entities`, `ecs_components` (each definition as JSON) and a table `c_<name>` per component, one row per entity. `src/store/` is the port of `OdgnEcs`: `define`, `createEntity`, `put`, `remove`, `deleteEntity`, `get`, `query`, `select` and `takeChanges`. It writes straight to the database. The World's pending changes and proxies are layered over it, and `flush()` writes through it. The EDL record lives in the `edl_*` tables, and a Definition name is the `edl_definition` component, which the World keeps out of `world.defs`.
+The World is stored in the layout `odgn_ecs` uses, so a World file opens in either implementation (ADR 0019): `entities`, `ecs_components` (each definition as JSON) and a table `c_<name>` per component, one row per entity. `src/store/` is the port of `OdgnEcs`: `define`, `createEntity`, `put`, `putMany`, `remove`, `deleteEntity`, `get`, `query`, `select` and `takeChanges`. It writes straight to the database. The World's pending changes and proxies are layered over it, and `flush()` writes through it, with one `putMany` per component it changed. The EDL record lives in the `edl_*` tables, and a Definition name is the `edl_definition` component, which the World keeps out of `world.defs`.
 
 `takeChanges(store)` returns the change set since it was last called and starts a new one. Each entry is `[eid, component, 'added' | 'changed' | 'removed', data]`. Changes are recorded by temporary triggers on the connection, as in `OdgnEcs.take_changes/1`, so the set includes cascades and leaves out rolled-back changes. It covers only flushed writes.
 

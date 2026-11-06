@@ -43,7 +43,7 @@ import {
   exists as existsInStore,
   ident,
   openStore,
-  put as putInStore,
+  putMany as putManyInStore,
   remove as removeFromStore,
   tableName,
   type Store
@@ -507,6 +507,10 @@ export class World<TComponents extends Components> {
         this.dirtyEntities.delete(eid);
       }
 
+      // Writes are grouped by component, so each component's are a few
+      // multi-row statements rather than one per entity
+      const writes = new Map<string, [number, Record<string, unknown>][]>();
+      const written: { exists?: boolean }[] = [];
       for (const [eid, components] of dirtyEntities) {
         const cache = entityCache.get(eid);
         if (!cache) {
@@ -526,14 +530,20 @@ export class World<TComponents extends Components> {
             delete cache[name];
             continue;
           }
-          putInStore(
-            this.store,
+          const rows = writes.get(name) ?? [];
+          rows.push([
             eid,
-            name,
             toStored(defs.get(name)!, entry.data as Record<string, unknown>)
-          );
-          entry.exists = true;
+          ]);
+          writes.set(name, rows);
+          written.push(entry);
         }
+      }
+      for (const [name, rows] of writes) {
+        putManyInStore(this.store, name, rows);
+      }
+      for (const entry of written) {
+        entry.exists = true;
       }
     });
 
