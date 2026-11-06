@@ -32,7 +32,7 @@ export const cdefToComponent = (
   playState = cdef.playState
 ): Component => ({
   columns: cdef.columns.map((col): Column => ({
-    caseInsensitive: false,
+    caseInsensitive: col.caseInsensitive === true,
     default: storedDefault(col.default),
     index: col.isIndexed === true,
     name: col.name,

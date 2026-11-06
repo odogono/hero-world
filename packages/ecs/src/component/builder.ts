@@ -19,6 +19,10 @@ const columnBuilder = <
       column.name = props.name;
       return column;
     },
+    caseInsensitive: () => {
+      column.caseInsensitive = true;
+      return builder;
+    },
     default: (value?: unknown) => {
       column.default =
         value === undefined
