@@ -41,10 +41,15 @@ export const makeTrackedComponent = <
     tracked = cached.data as Record<PropertyKey, unknown>;
     const keepPending = mode === 'read' && isDirty;
     if (!keepPending && tracked !== data) {
+      // Overwrite in place, deleting only keys `data` lacks: deleting every
+      // key would make the engine give up the object's fast layout
+      const fresh = data as Record<PropertyKey, unknown>;
       for (const key of Object.keys(tracked)) {
-        delete tracked[key];
+        if (!(key in fresh)) {
+          delete tracked[key];
+        }
       }
-      Object.assign(tracked, data);
+      Object.assign(tracked, fresh);
     }
     // a read can only confirm the row exists; a write knows best
     cached.exists = mode === 'read' ? cached.exists || exists : exists;
