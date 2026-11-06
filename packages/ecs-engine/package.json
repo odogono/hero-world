@@ -1,0 +1,23 @@
+{
+  "name": "ecs-engine",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --cache .",
+    "lint:fix": "eslint --fix .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@northtalk/ts": "0.7.0",
+    "ecs-talk": "workspace:*",
+    "odgn-ecs": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}
