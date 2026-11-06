@@ -1,0 +1,179 @@
+import {
+  MuaWorldError,
+  components,
+  startMuaWorld,
+  type MuaWorld
+} from 'mua-world';
+import type { CreateDatabaseOptions } from 'odgn-ecs/db';
+import { isEDLBuilt, isEDLChanged, migrateEDL } from 'odgn-ecs/edl';
+import { get, type Eid } from 'odgn-ecs/store';
+import { createWorld } from 'odgn-ecs/world';
+
+import { EDL_PATH, SCRIPTS_DIR, reader, type WorldFiles } from './files';
+import type { FromWorld, ToWorld } from './protocol';
+
+/** Commands are at most this long, as on the server */
+const MAX_COMMAND = 500;
+
+export type LocalWorldOptions = {
+  /** Milliseconds of wall time; `performance.now` by default */
+  clock?: () => number;
+  /** Where the World's database is, such as OPFS in a Worker */
+  database: CreateDatabaseOptions;
+  /** The World's files, from `scripts/files.ts` */
+  files: WorldFiles;
+  /** Called with each message for the UI */
+  send: (message: FromWorld) => void;
+  /** The room Characters enter first; `west_of_house` by default */
+  startingRoom?: string;
+};
+
+// The one Account a Local World has, and its Character, kept in the World
+// so a reload plays the same Character
+const LOCAL_SCHEMA =
+  'CREATE TABLE IF NOT EXISTS mua_local (key TEXT PRIMARY KEY, value INTEGER NOT NULL)';
+
+/**
+ * A Local World (ADR 0023): one mua World and the single Character played
+ * in it, speaking the Channel's messages. It has a local Account, with no
+ * sign-in or Allowlist, and never syncs with a server. Its database is its
+ * save. A World built from an older EDL is migrated before it plays.
+ */
+export const openLocalWorld = async (options: LocalWorldOptions) => {
+  const { files, send } = options;
+  const readFile = reader(files);
+  const edl = readFile(EDL_PATH);
+  const read = {
+    path: EDL_PATH,
+    readFile,
+    roots: { 'mua-scripts': SCRIPTS_DIR }
+  };
+
+  const world = await createWorld(components, options.database);
+  if (!isEDLBuilt(world)) {
+    world.executeEDL(edl, read);
+  } else if (isEDLChanged(world, edl, read)) {
+    migrateEDL(world, edl, read);
+  }
+  world.flush();
+
+  const mua: MuaWorld = await startMuaWorld(world, {
+    clock: options.clock,
+    readFile,
+    scriptsDir: SCRIPTS_DIR,
+    startingRoom: options.startingRoom ?? 'west_of_house'
+  });
+  const { store } = mua;
+  store.db.exec(LOCAL_SCHEMA);
+  const stored = (key: string) =>
+    (
+      store.db.query('SELECT value FROM mua_local WHERE key = ?1', [key]) as {
+        value: number;
+      }[]
+    )[0]?.value;
+  const keep = (key: string, value: number) =>
+    store.db.exec(
+      'INSERT OR REPLACE INTO mua_local (key, value) VALUES (?1, ?2)',
+      [key, value]
+    );
+
+  let account: Eid | undefined = stored('account');
+  let character: Eid | undefined = stored('character');
+  let unsubscribe: (() => void) | undefined;
+
+  // What the Character sees, and any "Which do you mean?", after each command
+  const refresh = async () => {
+    if (account === undefined || character === undefined) {
+      return;
+    }
+    try {
+      const state = await mua.view(account, character);
+      if (state) {
+        send({ event: 'state', state });
+      }
+    } catch (error) {
+      if (!(error instanceof MuaWorldError)) {
+        throw error;
+      }
+    }
+    const pending = get(store, character, 'player')?.pending as
+      { options?: { name: string }[] } | null | undefined;
+    if (pending?.options && pending.options.length > 0) {
+      send({
+        event: 'prompt',
+        options: pending.options.map(o => o.name),
+        text: 'Which do you mean?'
+      });
+    }
+  };
+
+  const join = async (name: string) => {
+    if (account === undefined) {
+      account = await mua.createAccount();
+      keep('account', account);
+    }
+    if (character === undefined) {
+      character = await mua.createCharacter(account, name);
+      keep('character', character);
+    }
+    const lines = await mua.enter(account, character);
+    send({ character, event: 'joined' });
+    send({ event: 'status', status: 'connected' });
+    if (lines.length > 0) {
+      send({ event: 'output', lines });
+    }
+    // subscribed after the entry's own lines, so none arrives twice
+    unsubscribe?.();
+    unsubscribe = await mua.subscribe(character, line =>
+      send({ event: 'output', lines: [line] })
+    );
+    await refresh();
+  };
+
+  const command = async (ref: number | string, text: string) => {
+    if (account === undefined || character === undefined) {
+      send({ event: 'reply', ok: false, reason: 'not_joined', ref });
+      return;
+    }
+    if (text.length > MAX_COMMAND) {
+      send({ event: 'reply', ok: false, reason: 'too_long', ref });
+      return;
+    }
+    try {
+      await mua.command(account, character, text);
+      send({ event: 'reply', ok: true, ref });
+    } catch (error) {
+      const reason = error instanceof MuaWorldError ? error.code : 'failed';
+      send({ event: 'reply', ok: false, reason, ref });
+    }
+    await refresh();
+  };
+
+  const logout = async () => {
+    if (account !== undefined && character !== undefined) {
+      unsubscribe?.();
+      unsubscribe = undefined;
+      await mua.leave(account, character);
+    }
+    send({ event: 'status', status: 'limbo' });
+  };
+
+  return {
+    /** Handles one message from the UI */
+    receive: (message: ToWorld) => {
+      switch (message.type) {
+        case 'join':
+          return join(message.name);
+        case 'command':
+          return command(message.ref, message.text);
+        case 'logout':
+          return logout();
+      }
+    },
+    /** Runs what is due at World time; the Worker calls it on a timer */
+    tick: () => mua.tick(),
+    world: mua
+  };
+};
+
+export type LocalWorld = Awaited<ReturnType<typeof openLocalWorld>>;

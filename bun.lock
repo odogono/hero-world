@@ -78,6 +78,20 @@
         "typescript": "^6",
       },
     },
+    "packages/mua-local": {
+      "name": "mua-local",
+      "dependencies": {
+        "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+        "mua-world": "workspace:*",
+        "odgn-ecs": "workspace:*",
+      },
+      "devDependencies": {
+        "playwright": "^1.64.1",
+      },
+      "peerDependencies": {
+        "typescript": "^6",
+      },
+    },
     "packages/mua-world": {
       "name": "mua-world",
       "dependencies": {
@@ -837,6 +851,8 @@
     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 
     "mua-client": ["mua-client@workspace:packages/mua_client"],
+
+    "mua-local": ["mua-local@workspace:packages/mua-local"],
 
     "mua-world": ["mua-world@workspace:packages/mua-world"],
 

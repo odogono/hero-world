@@ -276,7 +276,8 @@ export class World<TComponents extends Components> {
     this.db = await createDatabase({
       ...this.options,
       path: this.options.path || ':memory:',
-      type: this.options.dbType || DatabaseType.BUN
+      // `dbType` is the older spelling of `type`
+      type: this.options.dbType ?? this.options.type ?? DatabaseType.BUN
     });
 
     // todo check whether the db contains existing data

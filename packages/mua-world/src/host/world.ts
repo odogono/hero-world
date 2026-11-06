@@ -51,6 +51,7 @@ import {
   type Act
 } from './tables';
 import { argValue, between, muaCapability, type Notices } from './talk';
+import { viewFor } from './view';
 
 /** mua's Libraries, by the name Scripts `use` them from */
 const LIBRARIES = ['things', 'messages', 'rooms'];
@@ -674,6 +675,19 @@ export const startMuaWorld = async (
         advanceClock();
         await engine.advance(Math.floor(worldMs));
         await runNpcs();
+      }),
+
+    /**
+     * What a Character can see: its room, what it carries and the commands
+     * it could type next, or null when it has no room
+     */
+    view: (account: Eid, character: Eid) =>
+      serial(() => {
+        owns(account, character);
+        if (location(store, character) === limbo) {
+          throw new MuaWorldError('not_in_play');
+        }
+        return viewFor(store, character, location(store, character));
       }),
 
     /** World time, in milliseconds */

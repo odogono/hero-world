@@ -1,5 +1,5 @@
 export { parse as parseEDL } from './parser';
-export { executeEDL, type ExecuteOptions } from './execute';
+export { executeEDL, isEDLBuilt, type ExecuteOptions } from './execute';
 export { hashEDL } from './compile';
 export { readEDL, type ReadEDL, type ReadOptions } from './includes';
 export {

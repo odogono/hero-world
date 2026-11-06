@@ -11,3 +11,4 @@ export {
   type MuaWorld,
   type MuaWorldOptions
 } from './host/world';
+export type { View } from './host/view';

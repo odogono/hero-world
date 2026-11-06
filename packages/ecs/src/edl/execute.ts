@@ -24,3 +24,7 @@ export const executeEDL = <T extends Components>(
   }
   migrate(world, edl, { ...options, build: true });
 };
+
+/** Whether a world has been built from an EDL, so it resumes rather than builds */
+export const isEDLBuilt = <T extends Components>(world: World<T>): boolean =>
+  edlRecord(world).isBuilt();

@@ -1,6 +1,3 @@
-import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
-
 import { parseEDL } from '.';
 import {
   EDLCircularReferenceError,
@@ -10,6 +7,8 @@ import {
   EDLParseError,
   EDLUnknownEntityReferenceError
 } from './errors';
+import { dirname, resolve } from './paths';
+import { sha256 } from './sha256';
 
 export type ComponentData = Record<string, Record<string, unknown>>;
 
@@ -53,8 +52,7 @@ export type CompiledEDL = {
 };
 
 /** The hash a world keeps of the EDL it was last built or migrated from */
-export const hashEDL = (edl: string): string =>
-  createHash('sha256').update(edl).digest('hex');
+export const hashEDL = (edl: string): string => sha256(edl);
 
 export const mergeComponents = (
   base: ComponentData,
