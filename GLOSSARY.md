@@ -38,6 +38,10 @@ _Avoid_: store, database (for the concept), scene
 A World played solo in the browser, with its own local Account. It never syncs with a server's World, and its file is its save.
 _Avoid_: offline world, save game
 
+**Preview World**:
+A private, disposable World for trying something out, which is never saved and never reaches another World.
+_Avoid_: sandbox, test world, scratch world
+
 **Entity**:
 A thing that exists in a World and carries components. It is nothing but its id.
 _Avoid_: object, instance
@@ -56,7 +60,11 @@ _Avoid_: link, pointer, foreign key (for the concept)
 
 **Atom**:
 A named template of components that entities and other atoms extend. It is never itself an entity, and only atoms can be extended.
-_Avoid_: prototype, class, archetype
+_Avoid_: prototype, class, archetype, recipe
+
+**Recipe**:
+A saved set of components and their values that a player creates new entities from. An entity made from one keeps no tie to it, so changing a Recipe changes only what is made after.
+_Avoid_: atom (for this), template, blueprint
 
 **Lineage**:
 The ordered list of atoms an entity or atom was built from, kept after loading.
