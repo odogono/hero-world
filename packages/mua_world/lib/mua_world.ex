@@ -347,51 +347,11 @@ defmodule MuaWorld do
 
   defp ok!({:ok, value}), do: value
 
-  # mua's Libraries, by the name Scripts `use` them from, and its Service
-  # Scripts: its core actions, which no Message Path reaches.
-  @libraries ~w(things messages rooms)
-
-  defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
-
   defp start_talk(state, limits) do
-    world = state.world
     table = Talk.table()
-    {:ok, owner} = NorthTalk.start_link(drive: :manual)
 
-    {:ok, talk} =
-      OdgnEcsTalk.start(world,
-        owner: owner,
-        capabilities: [&OdgnEcsEngine.Timers.capability/1, &Talk.mua(world, table, &1)],
-        limits: limits,
-        on_show: &Tables.tell(world, &1, &2)
-      )
-
-    libraries =
-      for name <- @libraries do
-        path = behaviour("lib/#{name}.talk")
-        {path, fn -> OdgnEcsTalk.add_library(talk, name, File.read!(path), [], ["mua"]) end}
-      end
-
-    services =
-      for name <- Dispatch.services() do
-        path = behaviour("services/#{name}.talk")
-        {path, fn -> OdgnEcsTalk.load_service_script(talk, name, File.read!(path)) end}
-      end
-
-    # Each Script loads in turn, and the first that fails stops the World,
-    # naming its file
-    loaded =
-      Enum.reduce_while(libraries ++ services, :ok, fn {path, load}, :ok ->
-        case load.() do
-          {:error, reason} -> {:halt, {:error, {path, reason}}}
-          _ -> {:cont, :ok}
-        end
-      end)
-
-    with :ok <- loaded,
-         :ok <- OdgnEcsTalk.load_scripts(talk, &File.read!/1) do
-      {:ok, %{state | talk: talk, table: table}}
-    end
+    with {:ok, talk} <- Talk.start(state.world, table, limits),
+         do: {:ok, %{state | talk: talk, table: table}}
   end
 
   # What went wrong loading a Script, as NorthTalk diagnostics
@@ -893,174 +853,11 @@ defmodule MuaWorld do
     end
   end
 
-  defp run_commands(state, _actor, [], _raw), do: state
-
-  defp run_commands(state, actor, [command | rest], raw) do
-    ctx =
-      command
-      |> Map.take([:verb, :target, :indirect, :target_id, :indirect_id, :direction, :text])
-      |> Map.merge(%{actor: actor, raw: raw, vocabulary: state.vocabulary})
-
-    run_dispatch(state, ctx, fn state, outcome ->
-      state
-      |> finish(ctx, outcome, command[:label])
-      |> run_commands(actor, rest, raw)
-    end)
-  end
-
-  @doc false
-  # Asks the questions of `MuaWorld.Dispatch` in turn, then runs the action,
-  # and calls `k` with the outcome. A Script that hasn't answered once its
-  # Pumps are idle carries the rest over to a later Step.
-  def run_dispatch(state, ctx, k),
-    do: ask_each(state, ctx, Dispatch.questions(state.world, ctx), k)
-
-  defp ask_each(state, ctx, [], k), do: run_action(state, ctx, k)
-
-  defp ask_each(state, ctx, [q | rest], k) do
-    if not answerable?(state, q.to) do
-      ask_each(state, ctx, rest, k)
-    else
-      ask(state, ctx, q, fn state, reply ->
-        case {reply, q.kind} do
-          {{:replied, message}, :receiver} ->
-            k.(state, done(message || ""))
-
-          {{:replied, message}, :veto} ->
-            k.(state, refused(message || Dispatch.cannot()))
-
-          {{:refused, message}, _} ->
-            k.(state, refused(message))
-
-          {:failed, _} ->
-            k.(state, refused("Something went wrong."))
-
-          {:passed, _} ->
-            ask_each(state, ctx, rest, k)
-        end
-      end)
-    end
-  end
-
-  defp run_action(state, ctx, k) do
-    case Dispatch.plan(state.world, ctx) do
-      {:refused, message} ->
-        k.(state, refused(message))
-
-      {:send, to, message, args} ->
-        q = %{kind: :action, asks: :offer, to: to, message: message, args: args}
-
-        ask(state, ctx, q, fn state, reply ->
-          case reply do
-            {:replied, message} ->
-              after_each(state, ctx, Dispatch.afters(state.world, ctx), done(message || ""), k)
-
-            {:refused, message} ->
-              k.(state, refused(message))
-
-            :failed ->
-              k.(state, refused("Something went wrong."))
-
-            :passed ->
-              k.(state, refused(Dispatch.cannot()))
-          end
-        end)
-    end
-  end
-
-  # What a command came to: `:done` when it acted, `:refused` when it was
-  # answered with a no
-  defp done(message), do: %{kind: :done, message: message}
-  defp refused(message), do: %{kind: :refused, message: message}
-
-  # Once an action has succeeded, `after<Verb>` goes to the same receivers,
-  # whose replies are added to its message.
-  defp after_each(state, _ctx, _afters, %{kind: kind} = outcome, k) when kind != :done,
-    do: k.(state, outcome)
-
-  defp after_each(state, _ctx, [], outcome, k), do: k.(state, outcome)
-
-  defp after_each(state, ctx, [q | rest], outcome, k) do
-    if answerable?(state, q.to) do
-      ask(state, ctx, q, fn state, reply ->
-        outcome =
-          case reply do
-            {:replied, line} when line not in [nil, ""] ->
-              %{
-                outcome
-                | message:
-                    Enum.join(Enum.reject([outcome.message, line], &(&1 in [nil, ""])), "\n")
-              }
-
-            _ ->
-              outcome
-          end
-
-        after_each(state, ctx, rest, outcome, k)
-      end)
-    else
-      after_each(state, ctx, rest, outcome, k)
-    end
-  end
-
-  defp answerable?(_state, {:service, _}), do: true
-  defp answerable?(state, eid), do: OdgnEcsTalk.scripted?(state.talk, eid)
-
-  # Sends one question, Pumps until idle, and answers `k` now or, if its Run
-  # is still waiting, in the Step that sees it end: a Waiting input.
-  defp ask(state, ctx, q, k) do
-    delivery = %Delivery{
-      to: q.to,
-      message: q.message,
-      args: Enum.map(q.args, &Talk.value(state.talk, &1)),
-      asks: if(q.asks == :offer, do: :request, else: :decide),
-      host: ctx
-    }
-
-    waiting = %{actor: ctx.actor, input: ctx.raw}
-
-    case OdgnEcsEngine.ask(state.step, delivery, waiting, fn step, outcome ->
-           k.(in_step(state, step), reply(q, outcome))
-         end) do
-      :waiting -> state
-      state -> state
-    end
-  end
-
-  # What a question's outcome means to Dispatch: a Decision's veto is its
-  # answer, as a reply is a Request's.
-  # A Request says no by replying `{refused: text}`; any other map is a
-  # mistake, so fails rather than counting as having acted.
-  defp reply(%{asks: :offer} = q, {:replied, %NorthTalk.Map{} = value}) do
-    case NorthTalk.Map.get(value, "refused") do
-      text when is_binary(text) ->
-        {:refused, text}
-
-      _ ->
-        Logger.error(
-          "#{q.message} to #{inspect(q.to)} replied #{MuaWorld.Admin.show(value)}: " <>
-            "a Request replies text, nothing, or {refused: text}",
-          event: :malformed_reply
-        )
-
-        :failed
-    end
-  end
-
-  defp reply(%{asks: :offer}, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
-
-  defp reply(%{asks: :decide}, {:vetoed, reason}),
-    do: {:replied, if(is_binary(reason), do: reason)}
-
-  defp reply(_, :passed), do: :passed
-  defp reply(_, _), do: :failed
-
-  # Tells the actor. Everyone else who saw it, and the Scripts that notice
-  # it, were told by the Service Script.
-  defp finish(state, ctx, %{message: message}, label) do
-    if message not in [nil, ""],
-      do: tell(state, ctx.actor, if(label, do: "#{label}: #{message}", else: message)),
-      else: state
+  # Each command is dispatched in turn within this Step; one whose Scripts
+  # are still waiting carries the rest over to a later Step.
+  defp run_commands(state, actor, commands, raw) do
+    :ok = Dispatch.run(state.step, state.vocabulary, actor, commands, raw)
+    state
   end
 
   # An admin's line runs in a savepoint, released only if its Run

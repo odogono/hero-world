@@ -168,4 +168,54 @@ defmodule MuaWorld.Talk do
          end}
     })
   end
+
+  # mua's Libraries, by the name Scripts `use` them from, and its Service
+  # Scripts: its core actions, which no Message Path reaches.
+  @libraries ~w(things messages rooms)
+
+  defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
+
+  @doc """
+  Starts NorthTalk for `world` with mua's Capability, sharing `table` for
+  notices, and loads mua's Libraries, Service Scripts and the World's
+  Scripts. Returns `{:ok, talk}`, or `{:error, {path, reason}}` naming the
+  first Script that failed to load.
+  """
+  def start(world, table, limits \\ []) do
+    {:ok, owner} = NorthTalk.start_link(drive: :manual)
+
+    {:ok, talk} =
+      OdgnEcsTalk.start(world,
+        owner: owner,
+        capabilities: [&OdgnEcsEngine.Timers.capability/1, &mua(world, table, &1)],
+        limits: limits,
+        on_show: &MuaWorld.Tables.tell(world, &1, &2)
+      )
+
+    libraries =
+      for name <- @libraries do
+        path = behaviour("lib/#{name}.talk")
+        {path, fn -> OdgnEcsTalk.add_library(talk, name, File.read!(path), [], ["mua"]) end}
+      end
+
+    services =
+      for name <- MuaWorld.Dispatch.services() do
+        path = behaviour("services/#{name}.talk")
+        {path, fn -> OdgnEcsTalk.load_service_script(talk, name, File.read!(path)) end}
+      end
+
+    # Each Script loads in turn, and the first that fails stops, naming its file
+    loaded =
+      Enum.reduce_while(libraries ++ services, :ok, fn {path, load}, :ok ->
+        case load.() do
+          {:error, reason} -> {:halt, {:error, {path, reason}}}
+          _ -> {:cont, :ok}
+        end
+      end)
+
+    with :ok <- loaded,
+         :ok <- OdgnEcsTalk.load_scripts(talk, &File.read!/1) do
+      {:ok, talk}
+    end
+  end
 end
