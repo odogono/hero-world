@@ -39,6 +39,15 @@ Apple M5 host with Docker Desktop (10 CPUs, 8 GB for the VM). Client and server 
 | 200     | 0.5 s   | 66.6     | 2.2 s     | 3.2 s     | 7.6 s     | 10 s       | 71 timeouts    | 200/200   | 47.8 s, rate 1.027        |
 | 400     | 2 s     | 0.7      | 8.7 s     | 9.9 s     | 14.8 s    | 14.8 s     | 3,542 timeouts | 400/400   | not seen                  |
 
+With load shedding (#139), re-measured on 2026-11-09 on the same host. `Refused` counts `busy` replies, which aren't failures:
+
+| Players | Think | Cmds/s | p50    | p95   | p99    | Max    | Refused | Failed | Persisted | Timers             |
+| ------- | ----- | ------ | ------ | ----- | ------ | ------ | ------- | ------ | --------- | ------------------ |
+| 50      | 2 s   | 24.1   | 15 ms  | 44 ms | 218 ms | 681 ms | 2       | 0      | 50/50     | 45.0 s, rate 1.000 |
+| 400     | 2 s   | 13.5   | 954 ms | 2.2 s | 2.9 s  | 4.7 s  | 19,502  | 0      | 400/400   | 45.8 s, rate 1.009 |
+
+At 400 players, the server now answers every command within the reply timeout, either with an acknowledgement or with `busy`, and joins and timers keep working. It acknowledges fewer commands per second than at 150 players. In crowded rooms each Step reaches many Characters, so most of the World's time goes on the joins, `state` refreshes and mirror updates around the commands.
+
 Recovery after the kill took 1.0 to 1.5 s in every run. No acknowledged change was ever lost, including on the overloaded runs.
 
 The 50-player alpha workload (the bold row) passes with plenty of room to spare.
@@ -58,8 +67,9 @@ Set alerts on these, from the logs (`docs/operations.md`) and `/health`:
 
 ## Known capacity limits
 
-- **One World process runs every Step.** It handled about 60–80 commands/s on this host. Below that, latency stays in tens of milliseconds. Above it, latency grows with the queue. So 100 players typing every 2 s is the comfortable ceiling, and 150 still works but is sluggish (p95 ≈ 1 s).
-- **No load shedding.** If commands arrive faster than the World can run them, they queue in its mailbox. The Channel gives up after 10 s, but the World still runs the abandoned calls, so the backlog never drains. At 400 players, joining alone took longer than the client timeouts, and almost nothing was acknowledged for the whole run. Nothing persisted was lost, but the server effectively stopped responding until the load went away. Before the alpha grows past about 100 players, it needs admission control or a queue bound (refuse with `busy` instead of queueing).
+- **One World process runs every Step.** It handled about 60–80 commands/s on this host. Below that, latency stays in tens of milliseconds. Above it, latency grows with the queue until commands are refused as `busy`. So 100 players typing every 2 s is the comfortable ceiling, and 150 still works but is sluggish (p95 ≈ 1 s).
+- **Load shedding (#139).** When commands arrive faster than the World can run them, it refuses the excess instead of queueing it. A command is refused at once with `error {reason: "busy"}` while more than 30 messages wait for the World, and a command that would start more than 3 s after it was sent is dropped unrun with the same reply, because its caller has given up by then. A refused command changes nothing, and the client shows it as `Not sent: busy`. Joins, logouts, `state` refreshes and timers are never refused. With commands bounded, they keep their pace. `bun run load` counts `busy` replies as `refused`, not as failures. A timeout is still a failure.
 - **Shared rooms cost more.** Every command pushes a fresh `state` to its player, and `say` and movement reach everyone in the room. The workload crowds players into 10 rooms, which makes this worse than real play would be.
-- **Timers share the queue.** Hollis's timer stayed within a second of its schedule up to 150 players. At 200 players it ran almost 3 s late, and World time ran 2.7% fast (it catches up in jumps once ticks get through). At 400 players his moves never reached a watcher at all.
+- **Timers share the queue.** Before #139, Hollis's timer stayed within a second of its schedule up to 150 players, ran almost 3 s late at 200, and never reached a watcher at 400. Now that the queue is bounded, it stays within a second at 400 players too.
+- **A Step's cost grows with the crowd in its room.** After a Step, only the Characters whose Perception it could have changed are re-read, and everything around a place is read once for all the Characters there (#139). A Step in a room of 40 still reaches 40 mirrors.
 - **Not measured:** a separate client host, TLS through `tailscale serve`, a host smaller than the M5, or sessions longer than 4 minutes, where the database grows. Re-run `bun run load` on `almere` (#134) before inviting players.

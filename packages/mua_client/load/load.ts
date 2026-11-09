@@ -135,6 +135,8 @@ class Player {
   channel!: Channel;
   view?: View;
   acked = 0;
+  // refused as `busy`: the World was behind, and the command did nothing
+  refused = 0;
   errors: string[] = [];
   heard: { at: number; text: string }[] = [];
 
@@ -181,7 +183,11 @@ class Player {
           resolve(performance.now() - sent);
         })
         .receive('error', ({ reason }: { reason: string }) => {
-          this.errors.push(`${text}: ${reason}`);
+          if (reason === 'busy') {
+            this.refused++;
+          } else {
+            this.errors.push(`${text}: ${reason}`);
+          }
           resolve(undefined);
         })
         .receive('timeout', () => {
@@ -366,6 +372,7 @@ const run = async () => {
   const verbs = Object.groupBy(samples, s => s.verb);
   const errors = bots.flatMap(b => b.errors);
   const acked = bots.reduce((n, b) => n + b.acked, 0);
+  const refused = bots.reduce((n, b) => n + b.refused, 0);
 
   // the watcher needs a couple of the gardener's moves to time
   const timersChecked = elapsed >= 2 * POTTER_S + 10;
@@ -401,6 +408,7 @@ const run = async () => {
     },
     players: bots.length,
     recovery_s,
+    refused,
     seconds: elapsed,
     think_ms: think,
     timers: {

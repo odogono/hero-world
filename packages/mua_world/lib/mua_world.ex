@@ -100,13 +100,42 @@ defmodule MuaWorld do
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, Keyword.take(opts, [:name]))
   def start(opts), do: GenServer.start(__MODULE__, opts, Keyword.take(opts, [:name]))
 
+  # A command is refused at once while more than this many messages wait
+  # for the World, and dropped unrun if it waits longer than `@within`: its
+  # caller has given up by then (#139).
+  @max_queue 30
+  @within 3_000
+
   @doc """
   Runs one command for a Character as one Step. Returns the Character's
   output once committed, `{:error, :not_owner}` if the Account doesn't own
   the Character, or `{:error, :not_in_play}` if it is in Limbo.
+
+  When the World is behind, the command is refused with `{:error, :busy}`
+  and changes nothing (#139): at once while more than `max_queue` messages
+  (30) wait for the World, or when it would start more than `within` ms
+  (3 s) after it was sent, since its caller has given up by then. Joins,
+  timers and the other calls are never refused, and once commands stop
+  piling up behind them they keep their pace.
   """
-  def command(world, account, character, text),
-    do: GenServer.call(world, {:command, account, character, text}, 30_000)
+  def command(world, account, character, text, opts \\ []) do
+    if backlog(world) > Keyword.get(opts, :max_queue, @max_queue) do
+      {:error, :busy}
+    else
+      deadline = System.monotonic_time(:millisecond) + Keyword.get(opts, :within, @within)
+      GenServer.call(world, {:command, account, character, text, deadline}, 30_000)
+    end
+  end
+
+  # How many messages wait for the World
+  defp backlog(world) do
+    with pid when is_pid(pid) <- GenServer.whereis(world),
+         {:message_queue_len, n} <- Process.info(pid, :message_queue_len) do
+      n
+    else
+      _ -> 0
+    end
+  end
 
   @doc """
   The Account a sign-in identity maps to, made with its mapping in one Step
@@ -404,30 +433,74 @@ defmodule MuaWorld do
   defp on_step(state, {:error, _}), do: Talk.take_notices(state.table)
 
   # Each mirrored Character with subscribers is sent what changed in its
-  # Perception, which is then kept for the next Step
+  # Perception, which is then kept for the next Step. A Character the Step
+  # can't have touched is skipped without reading its Perception, so a
+  # Step's cost doesn't grow with everyone in play (#139).
   defp publish_changes(state, changes) do
+    touched = touched(changes)
+
     for {{:perceived, character}, {before, held}} <-
           :ets.match_object(state.table, {{:perceived, :_}, :_}),
+        not MapSet.disjoint?(touched, before.entities),
         pids = subscribers(state.table, character),
-        pids != [] do
-      now = perception(state, character)
-      {change_set, held} = MuaWorld.Mirror.change_set(state.world, before, held, now, changes)
-      :ets.insert(state.table, {{:perceived, character}, {now, held}})
-
-      case change_set do
-        nil -> :ok
-        change_set -> for pid <- pids, do: send(pid, {:mua_changes, character, change_set})
-      end
+        pids != [],
+        reduce: %{} do
+      arounds ->
+        {now, arounds} = perception(state, character, arounds)
+        publish_change_set(state, character, pids, before, held, now, changes)
+        arounds
     end
 
     :ok
   end
 
+  defp publish_change_set(state, character, pids, before, held, now, changes) do
+    {change_set, held} = MuaWorld.Mirror.change_set(state.world, before, held, now, changes)
+    :ets.insert(state.table, {{:perceived, character}, {now, held}})
+
+    if change_set,
+      do: for(pid <- pids, do: send(pid, {:mua_changes, character, change_set}))
+  end
+
+  # Every entity a change set could alter a Perception through: each entity
+  # that changed, and each holder something was put in. A Perception reads
+  # only its entities' components and what their `location`s hold, so one
+  # that includes none of these is the same after the Step.
+  defp touched(changes) do
+    for {eid, name, _op, data} <- changes, reduce: MapSet.new() do
+      acc ->
+        acc = MapSet.put(acc, eid)
+
+        case {name, data} do
+          {"location", %{"in" => holder}} when is_integer(holder) -> MapSet.put(acc, holder)
+          _ -> acc
+        end
+    end
+  end
+
   # A Character in Limbo perceives only itself and what it carries
   defp perception(state, character) do
+    {perception, _} = perception(state, character, %{})
+    perception
+  end
+
+  # As `perception/2`, reusing what is seen around each place, kept in
+  # `arounds` by place, for many Characters at once
+  defp perception(state, character, arounds) do
     place = location(state, character)
     place = if place == state.places.limbo, do: nil, else: place
-    MuaWorld.Perception.of(state.world, character, place)
+
+    {around, arounds} =
+      case arounds do
+        %{^place => around} ->
+          {around, arounds}
+
+        _ ->
+          around = MuaWorld.Perception.around(state.world, place)
+          {around, Map.put(arounds, place, around)}
+      end
+
+    {MuaWorld.Perception.of(state.world, character, place, around), arounds}
   end
 
   defp publish(table, lines) do
@@ -500,6 +573,16 @@ defmodule MuaWorld do
   # ---------------------------------------------------------------------
 
   @impl true
+  # Past its deadline its caller has given up: running it would only delay
+  # what comes after it
+  def handle_call({:command, account, character, text, deadline}, from, state) do
+    if System.monotonic_time(:millisecond) > deadline do
+      {:reply, {:error, :busy}, state}
+    else
+      handle_call({:command, account, character, text}, from, state)
+    end
+  end
+
   def handle_call({:command, account, character, ";" <> line}, from, state),
     do: handle_call({:admin_line, account, character, line}, from, state)
 

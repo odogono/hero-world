@@ -118,6 +118,28 @@ defmodule MuaServer.CharacterChannelTest do
       ref = push(a, "command", %{"nope" => 1})
       assert_reply(ref, :error, %{reason: "a command needs text"})
     end
+
+    test "a command is refused as busy while the World is behind (#139)", %{ada: ada} do
+      a = join_as(ada)
+      flush_pushes()
+      world = Process.whereis(@world)
+
+      :ok = :sys.suspend(world)
+
+      try do
+        for _ <- 1..101, do: send(world, :ignored)
+        ref = push(a, "command", %{"text" => "say hello", "ref" => "c1"})
+        assert_reply(ref, :error, %{ref: "c1", reason: "busy"})
+      after
+        :sys.resume(world)
+      end
+
+      refute_push("output", _)
+      refute_push("state", _)
+      ref = push(a, "command", %{"text" => "say hello", "ref" => "c2"})
+      assert_reply(ref, :ok, %{ref: "c2"})
+      assert_push("output", %{lines: ["You say, \"hello\""]})
+    end
   end
 
   describe "the admin prompt" do

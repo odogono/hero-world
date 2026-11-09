@@ -32,6 +32,8 @@ Joining brings the Character into play, or resumes control of it, and takes over
 
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
+A `command` reply of `error {reason: "busy"}` means the World is too far behind to take it (#139). The command did nothing, and the client shows it as not sent; it may be sent again.
+
 A `command` whose text starts with `;` is a line of NorthTalk for an admin, one whose email is on `MUA_ADMINS` (#91). It runs as one Step and changes nothing unless it completes. Its result comes back as `output` to that admin only, `=> value` or `!! ` and why. Anyone else is told "You can't do that."
 
 ### From the server

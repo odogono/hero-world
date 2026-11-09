@@ -42,6 +42,11 @@ defmodule MuaServer.CharacterChannel do
           {:error, :replaced} ->
             {:reply, {:error, %{ref: ref, reason: "replaced"}}, socket}
 
+          # the World is behind (#139): nothing changed, so there's nothing
+          # to refresh, and asking would only add to its queue
+          {:error, :busy} ->
+            {:reply, {:error, %{ref: ref, reason: "busy"}}, socket}
+
           result ->
             # after the output the command produced, which is already queued
             send(self(), :refresh)
@@ -110,7 +115,16 @@ defmodule MuaServer.CharacterChannel do
 
   def handle_info(_, socket), do: {:noreply, socket}
 
+  # A World too far behind to answer in time skips this `state`; the next
+  # one brings the client up to date. Waiting longer, or crashing the
+  # Channel into a rejoin, would only add to its queue (#139).
   defp refresh(socket) do
+    push_view(socket)
+  catch
+    :exit, {:timeout, _} -> :ok
+  end
+
+  defp push_view(socket) do
     %{account: account, character: character} = socket.assigns
 
     case MuaWorld.view(@world, account, character) do
