@@ -13,9 +13,12 @@ export type {
 } from './mirror';
 export {
   openPreviewWorld,
+  type FromPreview,
   type PreviewDefinition,
+  type PreviewEntity,
   type PreviewOptions,
   type PreviewResult,
   type PreviewSource,
-  type PreviewWorld
+  type PreviewWorld,
+  type ToPreview
 } from './preview';

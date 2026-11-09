@@ -35,6 +35,36 @@ export type PreviewOptions = {
   startingRoom?: string;
 };
 
+/** From the UI to a Preview World's Worker (`preview-worker.ts`) */
+export type ToPreview =
+  /** Loads a Preview World, from the main World's EDL if no source is given */
+  | { source?: PreviewSource; type: 'open' }
+  | { ref: number; text: string; type: 'command' }
+  | { type: 'reset' }
+  | { eid: Eid; type: 'entity' };
+
+/** An entity, with a name to show it by */
+export type PreviewEntity = { eid: Eid; label: string };
+
+/** From a Preview World's Worker */
+export type FromPreview =
+  /** The reply to `open` and `reset` */
+  | {
+      definitions: PreviewDefinition[];
+      entities: PreviewEntity[];
+      event: 'opened';
+      runs: boolean;
+    }
+  /** The reply to a `command`, with the entities after it */
+  | ({
+      entities: PreviewEntity[];
+      event: 'result';
+      ref: number;
+    } & PreviewResult)
+  /** The reply to `entity`: every component it has, by name */
+  | { components: Record<string, Data>; eid: Eid; event: 'entity' }
+  | { event: 'error'; message: string };
+
 /** What one command did */
 export type PreviewResult = {
   /** Each Step's change set, in the order they committed */
@@ -166,7 +196,7 @@ export const openPreviewWorld = async (options: PreviewOptions) => {
         .sort((a, b) => a.name.localeCompare(b.name)),
 
     /** Every entity, with a name to show it by */
-    entities: () =>
+    entities: (): PreviewEntity[] =>
       query(current.store, {}).map(eid => ({ eid, label: label(eid) })),
 
     /** Every component an entity has, by name */
