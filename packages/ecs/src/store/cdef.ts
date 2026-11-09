@@ -29,8 +29,10 @@ const storedDefault = (value: unknown) =>
  */
 export const cdefToComponent = (
   cdef: CDef,
-  playState = cdef.playState
+  playState = cdef.playState,
+  buildable = cdef.buildable
 ): Component => ({
+  buildable: buildable === true,
   columns: cdef.columns.map((col): Column => ({
     caseInsensitive: col.caseInsensitive === true,
     default: storedDefault(col.default),

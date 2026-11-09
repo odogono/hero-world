@@ -3,7 +3,9 @@ defmodule MuaWorld.Components do
   mua's components, ported from `packages/mua/src/server/mua-world/coms.ts`
   with snake_case names. The World defines them before its Build, so EDL
   authors never write `def` blocks for them. `play_state` marks those that
-  play changes, which a Migration treats differently (#100).
+  play changes, which a Migration treats differently (#100), and
+  `buildable` those a builder may compose a new entity from (#259). Both
+  Hosts agree on them: `spec/mua/components.json`.
 
   Left out on purpose: the connection and login components, which Phoenix
   owns (#97), and the event components, since a Step needs no event
@@ -22,11 +24,11 @@ defmodule MuaWorld.Components do
 
   defp mua do
     [
-      c("container", true, [
+      b("container", true, [
         col("capacity", :float, default: 10),
         col("is_closed", :boolean, default: false)
       ]),
-      c("item", false, [
+      b("item", false, [
         col("is_takeable", :boolean, default: true),
         col("weight", :float, default: 1)
       ]),
@@ -49,9 +51,9 @@ defmodule MuaWorld.Components do
         col("aliases", :json),
         col("articles", :array)
       ]),
-      c("readable", false, [col("text", :string)]),
+      b("readable", false, [col("text", :string)]),
       c("home", true, [col("in", :eid)]),
-      c("noun", false, [col("words", :array)]),
+      b("noun", false, [col("words", :array)]),
       c("responses", false, [
         col("indirect", :json),
         col("room", :json),
@@ -60,7 +62,7 @@ defmodule MuaWorld.Components do
       ]),
       c("messages", false, [col("msg", :json), col("omsg", :json)]),
       c("script", false, [col("src", :string)]),
-      c("described", false, [col("description", :string), col("name", :string)]),
+      b("described", false, [col("description", :string), col("name", :string)]),
       # A person's game identity (ADR 0016). Phoenix maps a Google identity
       # to its id; nothing in the World points at a person directly.
       # `admin` lets the Account run NorthTalk at the prompt (#91); sign-in
@@ -92,6 +94,9 @@ defmodule MuaWorld.Components do
 
   defp c(name, play_state, columns),
     do: %Component{name: name, play_state: play_state, columns: columns}
+
+  # One a builder may compose a new entity from (#259)
+  defp b(name, play_state, columns), do: %{c(name, play_state, columns) | buildable: true}
 
   defp col(name, type, opts \\ []), do: struct(%Column{name: name, type: type}, opts)
 end
