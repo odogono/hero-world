@@ -8,6 +8,14 @@ The UI talks to the Worker with the Phoenix Channel's messages ([`protocol.ts`](
 - **Its database is its save:** `save` replies `saved` with the World's SQLite file. `load {bytes}` puts a saved file in place of the World and replies `loaded`; `join` again to play it. A World built from an older EDL is migrated before it plays. A file that isn't a saved World gets `loadFailed`, and the World is put back as it was. `createLocalHost` does this, and the Worker only passes it messages.
 - **Its files are bundled:** `mua_world`'s EDL and Scripts, and `mua-scripts`, are inlined into the Worker by a Bun macro (`scripts/files.ts`), at virtual paths under `/world` and `/mua-scripts`.
 
+## Preview Worlds
+
+A Preview World ([`preview.ts`](src/preview.ts), its Worker [`preview-worker.ts`](src/preview-worker.ts)) is private, in memory and never saved. It is opened from one of three sources:
+
+- **`{edl}`:** built as an empty World is, so it runs commands as the game does, and can be migrated to edited EDL (#243, #165).
+- **`{subset}`:** a portable subset of a World, such as a mirror (#164), only to inspect: it has no Scripts underneath.
+- **`{tryIt: {mirror, composition}}`:** a builder's composition tried out where their Character stands (#259). It is built from the base EDL (the Base Verbs and mua-scripts' Service Scripts and Libraries), then the mirror and the composition are added with fresh ids and their References remapped. The player's room becomes its starting room, and their Character a stand-in carrying copies of what they carry. A composition may hold only buildable components. `origins` maps each entity back to the composition, the mirror entity it copies, or the stand-in, so a command's changes map back too. What the mirror doesn't hold, such as where an exit leads, is a placeholder, and a command's `outside` lists any it changed or put something in. Reset rebuilds it from the same inputs. Nothing else reaches it: no server World, and no file outside the bundle.
+
 ```sh
 bun scripts/bundle.ts <outdir>   # worker.js, sqlite3.wasm and sqlite3-opfs-async-proxy.js
 bun test src                     # the Local World over Bun's sqlite

@@ -27,6 +27,7 @@ const opened = (p: PreviewWorld) =>
     edl: p.edl,
     entities: p.entities(),
     event: 'opened',
+    origins: p.origins(),
     runs: p.runs()
   });
 
