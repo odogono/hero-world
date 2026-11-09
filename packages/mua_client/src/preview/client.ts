@@ -1,4 +1,4 @@
-import type { FromPreview, ToPreview } from 'mua-local';
+import type { FromPreview, PreviewSource, ToPreview } from 'mua-local';
 
 type Reply<E extends FromPreview['event']> = Extract<FromPreview, { event: E }>;
 
@@ -44,7 +44,10 @@ export const openPreviewClient = (url = '/local/preview.js') => {
     command: (text: string) =>
       request({ ref: ++ref, text, type: 'command' }, 'result'),
     entity: (eid: number) => request({ eid, type: 'entity' }, 'entity'),
-    open: () => request({ type: 'open' }, 'opened'),
+    migrate: (edl: string) => request({ edl, type: 'migrate' }, 'migrated'),
+    /** Builds a fresh Preview World, from the main World's EDL by default */
+    open: (source?: PreviewSource) =>
+      request({ source, type: 'open' }, 'opened'),
     reset: () => request({ type: 'reset' }, 'opened')
   };
 };

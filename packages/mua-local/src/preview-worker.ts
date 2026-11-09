@@ -40,13 +40,15 @@ const loaded = () => {
 const receive = async (message: ToPreview) => {
   switch (message.type) {
     case 'open': {
-      preview?.close();
-      preview = undefined;
-      preview = await openPreviewWorld({
+      // built before the old one goes, so EDL that won't build leaves the
+      // preview as it was
+      const next = await openPreviewWorld({
         database: { path: ':memory:', type: 'wasm' },
         files,
         source: message.source ?? { edl: files[EDL_PATH]! }
       });
+      preview?.close();
+      preview = next;
       opened(preview);
       break;
     }

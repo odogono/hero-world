@@ -702,3 +702,71 @@ button:disabled {
     grid-template-rows: auto;
   }
 }
+
+/* The World editor (#165): the EDL beside the Preview World. */
+.preview.editor {
+  grid-template-areas: 'head head head' 'edl run entities' 'edl run inspector';
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
+  max-width: 96rem;
+}
+
+.preview-edl {
+  grid-area: edl;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-rows: auto 1fr;
+  min-height: 70vh;
+}
+
+.preview-edl .preview-actions {
+  align-items: center;
+}
+
+.preview-edl textarea {
+  width: 100%;
+  min-height: 24rem;
+  padding: 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  tab-size: 2;
+  resize: vertical;
+}
+
+.preview .plan {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.35rem 0 0;
+}
+
+.preview .plan > div {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.preview .plan dt {
+  color: var(--muted);
+}
+
+.preview .plan dd {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .preview.editor {
+    grid-template-areas: 'head head' 'edl edl' 'run entities' 'run inspector';
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .preview.editor {
+    grid-template-areas: 'head' 'edl' 'run' 'entities' 'inspector';
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
