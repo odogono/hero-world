@@ -1,4 +1,5 @@
 import type {
+  FromMirror,
   FromWorld,
   MirrorChangeSet,
   MirrorSnapshot,
@@ -6,7 +7,7 @@ import type {
 } from 'mua-local';
 import { Socket, type Channel } from 'phoenix';
 
-import { actions, lines, status } from './store';
+import { actions, builder, lines, status, type Builder } from './store';
 import {
   append,
   confirmed,
@@ -30,10 +31,32 @@ let mirror: Worker | undefined;
 /** The local Character's name, to join again after loading a save */
 let localName = '';
 
+/** Replies to `snapshot`, in the order they were asked for */
+const snapshots: ((snapshot: MirrorSnapshot | undefined) => void)[] = [];
+
 const toMirror = (message: ToMirror) => {
-  mirror ??= new Worker('/local/mirror.js', { type: 'module' });
+  if (!mirror) {
+    mirror = new Worker('/local/mirror.js', { type: 'module' });
+    mirror.addEventListener('message', ({ data }: MessageEvent<FromMirror>) =>
+      snapshots.shift()?.(data.snapshot)
+    );
+  }
   mirror.postMessage(message);
 };
+
+/**
+ * The mirror of what the Character perceives, as it is now, for Try it
+ * (#259), or undefined while there is none
+ */
+export const mirrorSnapshot = () =>
+  new Promise<MirrorSnapshot | undefined>(resolve => {
+    if (!mirror) {
+      resolve(undefined);
+      return;
+    }
+    snapshots.push(resolve);
+    toMirror({ type: 'snapshot' });
+  });
 
 const add = (line: Parameters<typeof append>[1]) => {
   lines.value = append(lines.value, line);
@@ -90,7 +113,8 @@ export const connect = (token: string, character: number) => {
   channel.onError(dropped);
   channel
     .join()
-    .receive('ok', () => {
+    .receive('ok', (reply?: { builder?: Builder | null }) => {
+      builder.value = reply?.builder ?? null;
       if (joinedBefore) {
         lines.value = rejoined(lines.value);
       }
@@ -109,6 +133,8 @@ export const connect = (token: string, character: number) => {
  */
 export const connectLocal = (name: string) => {
   worker?.terminate();
+  // building in a Local World is for later (#265)
+  builder.value = null;
   localName = name;
   worker = new Worker('/local/worker.js', { type: 'module' });
   worker.addEventListener('message', ({ data }: MessageEvent<FromWorld>) => {
@@ -225,6 +251,40 @@ export const sendCommand = (text: string) => {
     });
   return true;
 };
+
+/** What a place came to: the thing's id, or the World's reason for refusing */
+export type Placed = { eid: number; ok: true } | { ok: false; reason: string };
+
+/**
+ * Places a thing a Builder composed in the Character's room (#258): a map
+ * of component names to their data. The World checks it all.
+ */
+export const place = (composition: Record<string, unknown>) =>
+  new Promise<Placed>(resolve => {
+    if (!channel || status.value !== 'joined' || !socket?.isConnected()) {
+      resolve({ ok: false, reason: "You aren't connected." });
+      return;
+    }
+    channel
+      .push('place', { composition })
+      .receive('ok', (reply: { eid: number } & Builder) => {
+        if (builder.value) {
+          builder.value = {
+            ...builder.value,
+            max_placed: reply.max_placed,
+            placed: reply.placed
+          };
+        }
+        resolve({ eid: reply.eid, ok: true });
+      })
+      .receive('error', ({ reason }: { reason: string }) =>
+        resolve({ ok: false, reason })
+      )
+      // it may have been placed: the World says, in the transcript
+      .receive('timeout', () =>
+        resolve({ ok: false, reason: 'No answer from the World yet.' })
+      );
+  });
 
 /** Leaves the World: the Character goes to Limbo at once */
 export const logout = () => (worker ? logoutLocal() : logoutRemote());

@@ -770,3 +770,373 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The composer (#260): beside the transcript while a Builder builds, and
+   in its place on a narrow screen, where "Back to play" returns to it. */
+.play.building {
+  display: grid;
+  grid-template-areas: 'head head' 'transcript builder' 'actions builder' 'dock builder';
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  max-width: 84rem;
+}
+
+.play.building > header {
+  grid-area: head;
+}
+
+.play.building > .transcript {
+  grid-area: transcript;
+}
+
+.play.building > .actions {
+  grid-area: actions;
+}
+
+.play.building > .dock {
+  grid-area: dock;
+}
+
+/* a wide screen keeps the badge in the window's corner, outside the play
+   column; with the composer open the column fills the window, so the badge
+   goes back beside the command box */
+.play.building .profile {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  margin-bottom: 0.4rem;
+}
+
+/* the badge and Build keep their size beside the growing command box */
+.dock > .profile,
+button.build-toggle {
+  flex: none;
+}
+
+button.build-toggle {
+  margin-bottom: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+button.build-toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.builder {
+  grid-area: builder;
+  overflow-y: auto;
+  padding: 0.75rem 16px 1.5rem;
+  border-left: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+
+.builder button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.builder h2 {
+  margin: 0.4rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.builder-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.builder-head .quota {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+.builder .quiet,
+.builder .try-head button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+}
+
+.builder .primary {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.builder .tabs {
+  display: flex;
+  gap: 1rem;
+  margin: 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.builder .tabs button {
+  padding: 0.5rem 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+}
+
+.builder .tabs button[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--fg);
+}
+
+.build-card {
+  margin-bottom: 0.6rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.build-card p {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.build-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.build-card-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.build-card-head .key,
+.field-name {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+.build-card-head .key {
+  margin-left: auto;
+}
+
+.build-card .remove {
+  padding: 0 0.3rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.build-fields {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* a field's label sits above its input; the page's own `label` rule hides
+   labels for the sign-in form, so these undo it */
+.builder label.field {
+  display: grid;
+  gap: 0.25rem;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.builder label.field.check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.builder input:not([type='checkbox']),
+.builder textarea {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.builder textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.builder .add {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px dashed var(--rule);
+  border-radius: 8px;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+
+.builder .palette {
+  margin: 0.5rem 0;
+  padding: 0.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+  list-style: none;
+}
+
+.builder .palette button {
+  display: grid;
+  width: 100%;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+
+.builder .palette button:hover {
+  background: var(--bg);
+}
+
+.builder .palette code {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.abilities {
+  margin: 1rem 0;
+}
+
+.abilities ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.abilities .chip {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: #2b8a3e;
+  font-size: 0.75rem;
+}
+
+.place-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.place-confirm p {
+  margin: 0.75rem 0 0;
+}
+
+.builder .notice {
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid #2b8a3e;
+  background: var(--surface);
+}
+
+.builder .error {
+  color: var(--error);
+}
+
+.builder .warn {
+  color: var(--warn);
+}
+
+.try-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.try-log {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--bg);
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.try-log .echo {
+  color: var(--muted);
+}
+
+.try-log .changes {
+  margin: 0.35rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--accent);
+  list-style: none;
+  font-family: var(--sans);
+}
+
+.try-log .kind.added {
+  color: var(--accent);
+}
+
+.try-log .kind.removed {
+  color: var(--error);
+}
+
+.try-it .actions {
+  padding: 0 0 0.5rem;
+}
+
+@media (max-width: 720px) {
+  .play.building {
+    grid-template-areas: 'head' 'builder';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .play.building > .transcript,
+  .play.building > .actions,
+  .play.building > .dock {
+    display: none;
+  }
+
+  .builder {
+    border-left: 0;
+  }
+}
