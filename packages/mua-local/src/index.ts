@@ -21,5 +21,7 @@ export {
   type PreviewResult,
   type PreviewSource,
   type PreviewWorld,
-  type ToPreview
+  type ToPreview,
+  type TryIt,
+  type TryItOrigin
 } from './preview';
