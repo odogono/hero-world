@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
+    "setup": "bun install && sh tools/elixir/deps.sh",
     "check": "bun run lint && bun run format:check && bun run typecheck && bun run test && bun run check:elixir",
     "check:elixir": "sh tools/elixir/check.sh",
     "lint": "bun run --filter odgn-ecs --filter ecs-talk --filter ecs-engine --filter arcade --filter mua-world --filter mua-local --filter mua-client lint",
