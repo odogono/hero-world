@@ -31,22 +31,28 @@ defmodule MuaWorld.Perception do
 
   @doc "The Perception of `character`, whose place is `place` (`nil` for none)."
   @spec of(OdgnEcs.t(), integer(), integer() | nil) :: t()
-  def of(world, character, place) do
-    carried = contents(world, character)
+  def of(world, character, place), do: of(world, character, place, around(world, place))
 
-    around =
-      if place do
-        elements = contents(world, place)
-        [place | elements] ++ doors(world, place)
-      else
-        []
-      end
+  @doc """
+  As `of/3`, given `around(world, place)`, which every Character in the place
+  shares, so a caller working out many Perceptions reads it once a place.
+  """
+  def of(world, character, place, around) do
+    carried = contents(world, character)
 
     %__MODULE__{
       character: character,
       place: place,
       entities: MapSet.new([character | carried ++ around])
     }
+  end
+
+  @doc "What anyone in `place` sees there: the place, its Elements and its doors."
+  def around(_world, nil), do: []
+
+  def around(world, place) do
+    elements = contents(world, place)
+    [place | elements] ++ doors(world, place)
   end
 
   @doc "Whether `eid` is within the Perception."

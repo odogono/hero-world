@@ -55,6 +55,46 @@ defmodule MuaWorldTest do
 
   @moduletag :tmp_dir
 
+  describe "when the World is behind (#139)" do
+    test "a command is refused at once while its queue is full, and changes nothing",
+         %{path: path} do
+      world = with_ada(start(path))
+      {account, ada} = Process.get(:ada)
+      chapel = MuaWorld.named(world, "chapel")
+
+      :ok = :sys.suspend(world)
+      for _ <- 1..5, do: send(world, :ignored)
+
+      assert {:error, :busy} =
+               MuaWorld.command(world, account, ada, "take candle", max_queue: 3)
+
+      :ok = :sys.resume(world)
+      assert location(world, "candle") == chapel
+      assert ["Taken."] = cmd(world, "take candle")
+    end
+
+    test "a command that waited past its deadline isn't run", %{path: path} do
+      world = with_ada(start(path))
+      {account, ada} = Process.get(:ada)
+
+      assert {:error, :busy} = MuaWorld.command(world, account, ada, "take candle", within: -1)
+      assert location(world, "candle") == MuaWorld.named(world, "chapel")
+    end
+
+    test "other calls still queue and run", %{path: path} do
+      world = with_ada(start(path))
+      {account, ada} = Process.get(:ada)
+
+      :ok = :sys.suspend(world)
+      for _ <- 1..5, do: send(world, :ignored)
+      task = Task.async(fn -> MuaWorld.leave(world, account, ada) end)
+      :ok = :sys.resume(world)
+
+      assert :ok = Task.await(task)
+      assert {:error, :not_in_play} = MuaWorld.command(world, account, ada, "look")
+    end
+  end
+
   test "a Script reads an Entity through its Message Path, keeping the Receiver", %{path: path} do
     world = start(path)
     # chapel passes `look`; room answers it with the chapel as `the target`
