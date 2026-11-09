@@ -13,6 +13,7 @@ import {
   get,
   put,
   query,
+  type ChangeSetEntry,
   type Data,
   type Eid,
   type Store,
@@ -61,6 +62,8 @@ export type MuaWorldOptions = {
   clock?: () => number;
   /** Limits for every Script */
   limits?: Partial<Limits>;
+  /** Called with each committed Step's change set, as a Preview World reports them */
+  onChanges?: (changes: ChangeSetEntry[]) => void;
   /** Reads a Script's source, by its path */
   readFile: (path: string) => string;
   /** Where `packages/mua-scripts` is, for mua's Libraries and Services */
@@ -258,6 +261,7 @@ export const startMuaWorld = async (
         notices.length = 0;
         return;
       }
+      options.onChanges?.(result.output.changes);
       for (const [character, line] of result.output.output as [Eid, string][]) {
         for (const fn of subscribers.get(character) ?? []) {
           fn(line);
