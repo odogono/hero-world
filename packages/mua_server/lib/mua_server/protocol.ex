@@ -40,6 +40,15 @@ defmodule MuaServer.Protocol do
   @doc "What the Character can see (`MuaWorld.View`)."
   def state(view), do: view
 
+  @doc """
+  What the Character perceives, as rows in the shared layout
+  (`MuaWorld.Mirror.snapshot/2`), for the client's mirror of the World.
+  """
+  def mirror(snapshot), do: snapshot
+
+  @doc "What changed in the Character's Perception in one Step (`MuaWorld.Mirror.change_set/5`)."
+  def changes(change_set), do: change_set
+
   @doc "The Connection's status: `connected`, `replaced` or `limbo`."
   def status(status) when status in [:connected, :replaced, :limbo],
     do: %{status: Atom.to_string(status)}

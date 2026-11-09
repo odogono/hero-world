@@ -99,6 +99,18 @@ defmodule MuaServer.CharacterChannelTest do
       assert "Bob" in players
     end
 
+    test "joining sends a mirror of the Perception, and each Step's changes", %{ada: ada} do
+      a = join_as(ada)
+      assert_push("mirror", %{character: character, components: %{"described" => described}})
+      assert character == ada.character
+      assert Enum.any?(described, &(&1["name"] == "West of house"))
+      flush_pushes()
+
+      ref = push(a, "command", %{"text" => "open mailbox", "ref" => "c1"})
+      assert_reply(ref, :ok, %{ref: "c1"})
+      assert_push("changes", %{put: %{"container" => [%{"is_closed" => false}]}})
+    end
+
     test "an invalid command is refused without reaching the World", %{ada: ada} do
       a = join_as(ada)
       ref = push(a, "command", %{"text" => "   "})
