@@ -87,7 +87,9 @@ defmodule MuaWorld do
   Starts a World. Options: `path` (required), `edl`, the path of the EDL to
   build an empty World from (required), `starting_room`, the Definition name
   of the room Characters enter when they have nowhere to return to
-  (required), `tick` in milliseconds (100 by default, or `:manual`),
+  (required), `tick` in milliseconds (100 by default, or `:manual`, when
+  World time moves only by `advance/2`, never with the wall clock, so a
+  slow machine can't make a timer fire early),
   `limits` for every Script, and, in tests only, `fault`, a point where the
   World stops itself: `:before_commit` or `:after_commit`, before
   publishing.
@@ -782,6 +784,9 @@ defmodule MuaWorld do
     do: {:stop, reason, state}
 
   def handle_info(_, state), do: {:noreply, state}
+
+  # A World ticked by hand keeps World time where `advance/2` put it
+  defp advance_clock(%{tick: :manual} = state), do: state
 
   defp advance_clock(state) do
     now = now_ms()
