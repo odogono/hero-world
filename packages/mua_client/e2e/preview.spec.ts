@@ -18,7 +18,7 @@ test('an admin previews the World, runs a command and inspects what changed', as
   await ada.getByRole('button', { name: /profile/i }).click();
   await ada.getByRole('menuitem', { name: 'Preview World' }).click();
   await expect(
-    ada.getByRole('heading', { name: 'Preview World' })
+    ada.getByRole('heading', { name: 'World editor' })
   ).toBeVisible();
 
   const input = ada.getByLabel('Preview command');
@@ -39,6 +39,33 @@ test('an admin previews the World, runs a command and inspects what changed', as
   await expect(
     ada.getByRole('region', { name: /west_of_house/ })
   ).toBeVisible();
+
+  // edit the EDL, and migrate the preview to it: the mailbox stays open
+  const edl = ada.getByLabel('EDL text');
+  const text = await edl.inputValue();
+  expect(text).toContain('A small mailbox on a wooden post.');
+  await edl.fill(
+    text.replace('A small mailbox on a wooden post.', 'A dented green mailbox.')
+  );
+  await ada.getByRole('button', { name: 'Migrate' }).click();
+  const migrationPlan = ada.getByLabel('Migration plan');
+  await expect(migrationPlan).toContainText('Updated');
+  await expect(migrationPlan).toContainText('Kept play state');
+  await input.fill('examine mailbox');
+  await input.press('Enter');
+  await expect(ada.getByLabel('Preview transcript')).toContainText(
+    'A dented green mailbox.'
+  );
+  await ada.screenshot({
+    fullPage: true,
+    path: process.env.EDITOR_SHOT ?? 'test-results/editor.png'
+  });
+
+  // Build starts afresh from the edited EDL
+  await ada.getByRole('button', { name: 'Build' }).click();
+  await expect(ada.getByLabel('Preview transcript')).toContainText(
+    'Built a fresh World'
+  );
 
   await ada.getByRole('button', { name: 'Reset' }).click();
   await expect(changes).toHaveCount(0);
