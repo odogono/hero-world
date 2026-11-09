@@ -24,6 +24,7 @@ let preview: PreviewWorld | undefined;
 const opened = (p: PreviewWorld) =>
   send({
     definitions: p.definitions(),
+    edl: p.edl,
     entities: p.entities(),
     event: 'opened',
     runs: p.runs()
@@ -57,6 +58,17 @@ const receive = async (message: ToPreview) => {
         entities: p.entities(),
         event: 'result',
         ref: message.ref
+      });
+      break;
+    }
+    case 'migrate': {
+      const p = loaded();
+      const migration = await p.migrate(message.edl);
+      send({
+        ...migration,
+        definitions: p.definitions(),
+        entities: p.entities(),
+        event: 'migrated'
       });
       break;
     }

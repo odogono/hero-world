@@ -105,3 +105,59 @@ describe('a Preview World loaded from a subset', () => {
     preview.close();
   });
 });
+
+describe('migrating a Preview World', () => {
+  const MAIN = FILES[EDL_PATH]!;
+
+  test('applies edited EDL, keeps play state, and reports the plan and changes', async () => {
+    const preview = await fromEDL();
+    expect(preview.edl).toBe(MAIN);
+    const mailbox = eidOf(preview, 'mailbox');
+    // play state the Migration must keep
+    await preview.command('open mailbox');
+    expect((await preview.command('take leaflet')).lines).toContain('Taken.');
+    const leaflet = eidOf(preview, 'leaflet');
+
+    const edited = MAIN.replace(
+      'A small mailbox on a wooden post.',
+      'A dented mailbox, painted green.'
+    );
+    expect(edited).not.toBe(MAIN);
+    const migrated = await preview.migrate(edited);
+    if (!migrated.ok) {
+      throw new Error(migrated.reason);
+    }
+    expect(migrated.plan.updated).toContainEqual(
+      expect.objectContaining({ changed: ['described'], eid: mailbox })
+    );
+    expect(migrated.changes).toContainEqual([
+      mailbox,
+      'described',
+      'changed',
+      expect.objectContaining({
+        description: 'A dented mailbox, painted green.'
+      })
+    ]);
+    expect(get(preview.store, leaflet, 'location')).toEqual({
+      in: preview.author
+    });
+    expect(preview.edl).toBe(edited);
+    expect(get(preview.store, mailbox, 'container')?.is_closed).toBe(false);
+
+    // and it still plays
+    const looked = await preview.command('examine mailbox');
+    expect(looked.lines.join('\n')).toContain('dented');
+    preview.close();
+  });
+
+  test('a Migration that fails changes nothing', async () => {
+    const preview = await fromEDL();
+    const before = preview.entities();
+    const failed = await preview.migrate('entity broken { nope');
+    expect(failed.ok).toBe(false);
+    expect(preview.entities()).toEqual(before);
+    expect(preview.edl).toBe(MAIN);
+    expect((await preview.command('open mailbox')).ok).toBe(true);
+    preview.close();
+  });
+});

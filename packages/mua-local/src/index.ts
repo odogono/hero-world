@@ -16,6 +16,7 @@ export {
   type FromPreview,
   type PreviewDefinition,
   type PreviewEntity,
+  type PreviewMigration,
   type PreviewOptions,
   type PreviewResult,
   type PreviewSource,
