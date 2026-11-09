@@ -153,8 +153,13 @@ export class WasmDatabaseWrapper implements Database {
     Bun.write(path, binary);
   }
 
+  /**
+   * Runs `fn` in a transaction, or in a savepoint within one already open,
+   * as Bun's driver nests them
+   */
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn);
+    const open = this.sqlite3.capi.sqlite3_get_autocommit(this.db) === 0;
+    return open ? this.db.savepoint(fn) : this.db.transaction(fn);
   }
 
   dump(): string {
