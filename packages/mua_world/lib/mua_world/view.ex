@@ -14,15 +14,24 @@ defmodule MuaWorld.View do
       }
   """
 
-  @doc "The view for a Character in `room`, or `nil` when it has no room to see."
+  @doc """
+  The view for a Character in `room`, or `nil` when it has no room to see.
+  It reads only through the Character's `MuaWorld.Perception`.
+  """
   def for_character(world, character, room) do
+    perception = MuaWorld.Perception.of(world, character, room)
+
     case room && OdgnEcs.get(world, room, "described") do
       %{} = described ->
-        contents = Enum.reject(entities_in(world, room), &(elem(&1, 0) == character))
+        contents =
+          Enum.reject(entities_in(perception, world, room), &(elem(&1, 0) == character))
+
         exits = for {_e, %{"portal" => portal}} <- contents, do: portal
-        closed = closed_doors(world, exits)
+        closed = closed_doors(perception, world, exits)
         things = for {e, data} <- contents, thing?(data), n = name(data), do: {e, data, n}
-        carried = for {_e, data} <- entities_in(world, character), n = name(data), do: n
+
+        carried =
+          for {_e, data} <- entities_in(perception, world, character), n = name(data), do: n
 
         %{
           room: %{
@@ -49,13 +58,17 @@ defmodule MuaWorld.View do
 
   @read ~w(portal item container player npc described)
 
-  # The entities in a place, each with the components the view reads
-  defp entities_in(world, place),
-    do: OdgnEcsTalk.elements(world, place, select: @read)
+  # The perceived entities in a place, each with the components the view reads
+  defp entities_in(perception, world, place),
+    do: MuaWorld.Perception.elements(perception, world, place, @read)
 
   # The exits' doors that are closed
-  defp closed_doors(world, exits) do
-    doors = for %{"door" => door} <- exits, is_integer(door), do: door
+  defp closed_doors(perception, world, exits) do
+    doors =
+      for %{"door" => door} <- exits,
+          is_integer(door),
+          MuaWorld.Perception.perceives?(perception, door),
+          do: door
 
     world
     |> OdgnEcs.select(["door"], eids: doors, where: [{"door", "is_closed", true}])
