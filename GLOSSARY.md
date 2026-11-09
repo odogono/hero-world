@@ -28,6 +28,14 @@ _Avoid_: whitelist, invite list
 An Account allowed to change the World live from the browser, beyond what play allows.
 _Avoid_: operator, superuser, wizard
 
+**Builder**:
+An Account allowed to place new things in the World as it plays, within its limits: how many it may place, and how big a container it may make. An Admin makes an Account a Builder, and can stop it building; what it placed stays.
+_Avoid_: creator, author, owner
+
+**Maker**:
+The Account that placed a thing. The World keeps it with the thing, and never shows it to the browser.
+_Avoid_: owner (which is a Script's), creator, author
+
 ## World data
 
 **World**:

@@ -31,6 +31,31 @@ defmodule MuaServer.Protocol do
 
   def command(_), do: {:error, "a command needs text"}
 
+  @doc """
+  Checks a `place` message from a builder's client (#258): a composition,
+  a map of component names to their data. What may be in it is the
+  World's to decide.
+  """
+  @spec place(map()) ::
+          {:ok, %{composition: map(), ref: String.t() | integer() | nil}} | {:error, String.t()}
+  def place(%{"composition" => composition} = msg) when is_map(composition) do
+    ref = msg["ref"]
+
+    if is_nil(ref) or is_binary(ref) or is_integer(ref),
+      do: {:ok, %{composition: composition, ref: ref}},
+      else: {:error, "ref must be text or a number"}
+  end
+
+  def place(_), do: {:error, "a place needs a composition"}
+
+  @doc """
+  What a builder's client is told on joining: how many things the Account
+  has placed and may place, and the largest container it may make, or
+  `nil` for an Account that doesn't build.
+  """
+  def builder(nil), do: nil
+  def builder(%{} = b), do: Map.take(b, [:placed, :max_placed, :max_capacity])
+
   @doc "Lines a Character was told."
   def output(lines), do: %{lines: List.wrap(lines)}
 

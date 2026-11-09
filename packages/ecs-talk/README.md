@@ -18,7 +18,7 @@ The same as from `odgn_ecs_talk`:
 
 - **Handles:** each component is a read-only property of an entity: its data, or Nothing. Floats reach Scripts as Decimals. A reference field (an `eid` column) holds the Handle of the entity it names, or Nothing. Elements are the entities whose Location (`location.in` by default) is the entity, in id order, named by `meta.props.id` by default.
 - **Message Path:** an unhandled message climbs the scripted atoms of the entity's Lineage, linearized (`linearize`). An atom on several paths gets a Host Object for each, running a copy of its Script named `atom@path`.
-- **`world`:** `change` and `moveTo` are Segment-bound Host Commands, each Segment a SAVEPOINT. `show` calls the `onShow` option. `find`, `resolve` and `named` are lookups.
+- **`world`:** `change`, `remove` and `moveTo` are Segment-bound Host Commands, each Segment a SAVEPOINT. `show` calls the `onShow` option. `find`, `resolve` and `named` are lookups.
 - **`clock`:** `now`, the Pump's Clock reading.
 - **Libraries, Service Scripts, Deliveries:** `addLibrary`, `loadServiceScript`, `putServiceScript`, `requestService` and `decideService`, and the `host` send option that a Capability reads back with `delivery(call)`.
 

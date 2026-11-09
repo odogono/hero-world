@@ -9,6 +9,8 @@ defmodule MuaWorld.Talk do
     `actor`, `target`, `indirect`, `text` and `direction` (Nothing for any it
     doesn't have), or Nothing outside a command.
   - `homed place`: the things whose `home` is `place`, for a reset.
+  - `placed account`: how many things the Account has placed, by their
+    `made_by`, for a builder's quota (#258).
   - `notice place, message, who, text`: sends `message who` (or
     `message who, text` when `text` is given) to the Scripts of the things
     in a place but `who`, once the Run's Pump ends.
@@ -137,6 +139,12 @@ defmodule MuaWorld.Talk do
          fn [place], _ ->
            place = Values.from_value(place)
            {:ok, Enum.map(OdgnEcs.query(world, where: [{"home", "in", place}]), &handle/1)}
+         end},
+      "placed" =>
+        {[args: [entity], result: "number", cost: 1],
+         fn [account], _ ->
+           account = Values.from_value(account)
+           {:ok, length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))}
          end},
       "notice" =>
         {[

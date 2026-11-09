@@ -6,6 +6,7 @@ import {
   list,
   map,
   nothing,
+  num,
   shape,
   text,
   type Call,
@@ -17,7 +18,7 @@ import { charactersAt, output, queueAct, type Act } from './tables';
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `command`, `homed`, `notice` and `verbs`. The command a Run handles is
+ * `command`, `homed`, `notice`, `placed` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -145,6 +146,18 @@ export const muaCapability =
           });
         },
         mode: 'fire-and-forget'
+      },
+      placed: {
+        args: [entity],
+        cost: { fuel: 1 },
+        do: (_call, account) =>
+          num(
+            query(store, {
+              where: [['made_by', 'account', account.native.eid]]
+            }).length
+          ),
+        mode: 'immediate',
+        result: shape.number
       },
       verbs: {
         args: [],

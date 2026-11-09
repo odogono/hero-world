@@ -281,7 +281,7 @@ defmodule MuaWorld.Dispatch do
   }
 
   @doc "The Service Scripts mua loads, by name."
-  def services, do: ~w(room exit lock thing open speech help lifecycle)
+  def services, do: ~w(room exit lock thing open speech help lifecycle build)
 
   # What to send for an action: `{:send, {:service, name}, message, args}`,
   # or `{:refused, message}` when it can't happen. The Service replies text

@@ -1,0 +1,106 @@
+-- The build Service: placing a thing a builder composed (#258), as a
+-- Script. mua makes an empty entity, `thing`, then sends
+-- `place thing, composition, actor`, where `composition` is a map of
+-- component names to their data, such as
+--
+--   {described: {name: "Satchel", description: "A leather satchel."},
+--    item: {}, container: {capacity: 5}}
+--
+-- It returns `{message, placed, max_placed}` when the thing stands in the
+-- actor's room, or `{refused: text}` when it said no. mua keeps nothing of
+-- a refusal, the empty entity included.
+--
+-- An Account builds only if it has a `builder` component, which holds its
+-- limits. The thing records its Maker in `made_by`.
+
+use theName, messageFor from messages
+use join, trim from text
+
+-- the components a builder may compose
+function buildable
+  return ["described", "noun", "item", "container", "readable"]
+end buildable
+
+-- why `composition` can't be built by an Account with `builder`, or Nothing
+function refusal composition, builder
+  if kindOf(composition) is not "map" then
+    return "A composition is a map of components."
+  end if
+  repeat for each name in the keys of composition
+    if name is not in buildable() then
+      return `You can't build with ${name}: only ${join(buildable(), ", ")}.`
+    end if
+    if kindOf(the (name) of composition) is not "map" then
+      return `The ${name} must be a map of its properties.`
+    end if
+  end repeat
+
+  put the optional described of composition into described
+  if described is nothing then
+    return "A thing needs a described, with its name."
+  end if
+  put the optional name of described into name
+  if kindOf(name) is not "text" or the length of trim(name) is 0 then
+    return "A thing needs a name."
+  end if
+  if the length of name > 40 then
+    return "A name can be at most 40 characters."
+  end if
+  put the optional description of described into description
+  if description is not nothing and kindOf(description) is "text" then
+    if the length of description > 500 then
+      return "A description can be at most 500 characters."
+    end if
+  end if
+  return nothing
+end refusal
+
+-- why the thing as written is too big a container, or Nothing. It reads
+-- what was written, so a capacity left out counts at its default.
+function capacityRefusal thing, builder
+  if the container of thing is nothing then
+    return nothing
+  end if
+  if the capacity of the container of thing > the max_capacity of builder then
+    return `A container can hold at most ${the max_capacity of builder}.`
+  end if
+  return nothing
+end capacityRefusal
+
+on place thing, composition, actor
+  put the optional account of the player of actor into account
+  if account is nothing or the builder of account is nothing then
+    return {refused: "You can't build."}
+  end if
+  put the builder of account into builder
+  if the location of actor is nothing then
+    return {refused: "You are nowhere."}
+  end if
+
+  ask mua to placed account into placed
+  if placed >= the max_placed of builder then
+    return {refused: `You have placed all ${the max_placed of builder} things you may.`}
+  end if
+
+  put refusal(composition, builder) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+
+  repeat for each name in the keys of composition
+    change thing, name, the (name) of composition
+  end repeat
+  put capacityRefusal(thing, builder) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  change thing, "made_by", {account: account}
+
+  put the in of the location of actor into room
+  moveTo thing, room
+  put {actor: actor, target: thing} into about
+  put messageFor("place", "omsg", about) otherwise `${the name of the player of actor} makes ${theName(thing)}.` into others
+  tell mua to announce room, others, actor
+  put messageFor("place", "msg", about) otherwise `You make ${theName(thing)}.` into message
+  return {message: message, placed: placed + 1, max_placed: the max_placed of builder}
+end place

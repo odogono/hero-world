@@ -136,6 +136,26 @@ defmodule OdgnEcsTalkTest do
       assert OdgnEcs.get(world, hero, "stats")["hp"] == 20
     end
 
+    test "removes a component, and refuses one the World doesn't define" do
+      {world, talk} = setup_world()
+      hero = id(world, "hero")
+
+      :ok =
+        OdgnEcsTalk.load_atom_script(talk, "person", """
+        on calm
+          remove the target, "stats"
+        end calm
+
+        on forget
+          remove the target, "nonesuch"
+        end forget
+        """)
+
+      ask(talk, hero, "calm")
+      assert OdgnEcs.get(world, hero, "stats") == nil
+      assert {:error, %ScriptError{}} = ask(talk, hero, "forget")
+    end
+
     test "a Run that writes and then faults leaves no trace" do
       {world, talk} = setup_world()
       hero = id(world, "hero")

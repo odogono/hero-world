@@ -22,7 +22,8 @@ defmodule MuaServer.CharacterChannel do
          {:ok, lines} <- MuaWorld.enter(@world, account, character) do
       :ok = Connection.attach(account, character, self())
       send(self(), {:after_join, lines})
-      {:ok, assign(socket, :character, character)}
+      reply = %{builder: Protocol.builder(MuaWorld.builder(@world, account))}
+      {:ok, reply, assign(socket, :character, character)}
     else
       {:error, reason} -> {:error, %{reason: to_string(reason)}}
       _ -> {:error, %{reason: "no_such_character"}}
@@ -51,6 +52,28 @@ defmodule MuaServer.CharacterChannel do
             # after the output the command produced, which is already queued
             send(self(), :refresh)
             {:reply, command_reply(result, ref), socket}
+        end
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  end
+
+  # A builder's composed thing, placed in the Character's room (#258)
+  def handle_in("place", payload, socket) do
+    %{account: account, character: character} = socket.assigns
+
+    case Protocol.place(payload) do
+      {:ok, %{composition: composition, ref: ref}} ->
+        run = fn -> MuaWorld.place(@world, account, character, composition) end
+
+        case Connection.run(character, self(), run) do
+          {:ok, placed} ->
+            send(self(), :refresh)
+            {:reply, {:ok, Map.put(placed, :ref, ref)}, socket}
+
+          {:error, reason} ->
+            {:reply, {:error, %{ref: ref, reason: to_string(reason)}}, socket}
         end
 
       {:error, reason} ->

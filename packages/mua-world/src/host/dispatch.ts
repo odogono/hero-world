@@ -165,7 +165,8 @@ export const SERVICE_NAMES = [
   'open',
   'speech',
   'help',
-  'lifecycle'
+  'lifecycle',
+  'build'
 ];
 
 const target = (ctx: Context): Arg =>

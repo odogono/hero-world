@@ -158,6 +158,49 @@ defmodule MuaServer.CharacterChannelTest do
     end
   end
 
+  describe "building (#258)" do
+    @lantern %{
+      "described" => %{"name" => "Lantern", "description" => "A tin lantern."},
+      "item" => %{}
+    }
+
+    test "joining tells a builder their quota, and a place puts the thing in their room",
+         %{ada: ada} do
+      :ok = MuaWorld.set_component(@world, ada.account, "builder", %{"max_placed" => 100})
+
+      {:ok, reply, a} =
+        subscribe_and_join(socket_for(ada), CharacterChannel, "character:#{ada.character}")
+
+      assert %{builder: %{placed: before, max_placed: 100, max_capacity: 20}} = reply
+      flush_pushes()
+
+      ref = push(a, "place", %{"composition" => @lantern, "ref" => "p1"})
+      assert_reply(ref, :ok, %{ref: "p1", eid: eid, placed: placed, max_placed: 100})
+      assert placed == before + 1
+      assert_push("output", %{lines: ["You make the lantern."]})
+      assert_push("state", %{room: %{items: items}})
+      assert Enum.any?(items, &(&1 =~ "Lantern"))
+
+      room = MuaWorld.component(@world, ada.character, "location")
+      assert MuaWorld.component(@world, eid, "location") == room
+    end
+
+    test "a player who doesn't build is refused, with the reason", %{bob: bob} do
+      {:ok, reply, b} =
+        subscribe_and_join(socket_for(bob), CharacterChannel, "character:#{bob.character}")
+
+      assert reply == %{builder: nil}
+      ref = push(b, "place", %{"composition" => @lantern, "ref" => "p2"})
+      assert_reply(ref, :error, %{ref: "p2", reason: "You can't build."})
+    end
+
+    test "a place without a composition is refused without reaching the World", %{ada: ada} do
+      a = join_as(ada)
+      ref = push(a, "place", %{"composition" => "lantern"})
+      assert_reply(ref, :error, %{reason: "a place needs a composition"})
+    end
+  end
+
   describe "the controlling Connection" do
     test "a new Connection takes over, and the old one can't command", %{ada: ada} do
       old = join_as(ada)
