@@ -1,4 +1,4 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 import { effect } from '@preact/signals';
 
@@ -16,6 +16,7 @@ import {
   saveHistory
 } from './history';
 import { chooseName, offline, playOffline } from './offline';
+import { Preview } from './preview/Preview';
 import { commands, lines, session, status } from './store';
 import { restored } from './transcript';
 
@@ -23,7 +24,19 @@ const refresh = async () => {
   session.value = await getSession();
 };
 
+// The page a hash names: `#preview` is the Admin Preview World (#243)
+const useHash = () => {
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => {
+    const changed = () => setHash(location.hash);
+    addEventListener('hashchange', changed);
+    return () => removeEventListener('hashchange', changed);
+  }, []);
+  return hash;
+};
+
 export const App = () => {
+  const hash = useHash();
   useEffect(() => {
     void refresh();
   }, []);
@@ -86,6 +99,16 @@ export const App = () => {
   }
   if (!character) {
     return <NameForm onCreated={refresh} />;
+  }
+  if (hash === '#preview' && current.admin) {
+    // the Character stays connected underneath, to come back to
+    return (
+      <Preview
+        onClose={() => {
+          location.hash = '';
+        }}
+      />
+    );
   }
   const left = async () => {
     await signOut();

@@ -81,6 +81,20 @@ export const Profile = ({
             </svg>
             Settings <span class="soon">soon</span>
           </button>
+          {admin && (
+            <a
+              class="profile-item"
+              href="#preview"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+                <circle cx="8" cy="8" r="2" />
+              </svg>
+              Preview World
+            </a>
+          )}
           {onSave && (
             <button
               class="profile-item"
