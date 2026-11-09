@@ -25,11 +25,20 @@ export const leaveAll = async () => {
   await Promise.all(contexts.splice(0).map(context => context.close()));
 };
 
-/** Signs in by email, making the Character if the Account has none */
-export const enter = async (browser: Browser, email: string, name: string) => {
+/**
+ * Signs in by email, making the Character if the Account has none.
+ * `before` is called with the page before it opens, to watch it.
+ */
+export const enter = async (
+  browser: Browser,
+  email: string,
+  name: string,
+  before?: (page: Page) => void
+) => {
   const context = await browser.newContext();
   contexts.push(context);
   const page = await context.newPage();
+  before?.(page);
   await page.goto('/');
   await page.getByLabel(/Email/).fill(email);
   await page.getByRole('button', { name: 'Sign in' }).click();
