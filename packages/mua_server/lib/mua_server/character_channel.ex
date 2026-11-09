@@ -4,7 +4,9 @@ defmodule MuaServer.CharacterChannel do
   (docs/protocol.md). Joining enters the Character into play, or resumes
   control of it, and takes over from any other Connection. Every line the
   Character is told arrives as `output` after the World commits the change
-  behind it (ADR 0012); `state` and any `prompt` follow.
+  behind it (ADR 0012); `state` and any `prompt` follow. On joining, the
+  client is sent a `mirror` of what the Character perceives, and then a
+  `changes` after each Step that changed it (#164).
   """
   use Phoenix.Channel
 
@@ -71,12 +73,26 @@ defmodule MuaServer.CharacterChannel do
     if lines != [], do: push(socket, "output", Protocol.output(lines))
     # subscribed after the entry's own lines, so none arrives twice
     :ok = MuaWorld.subscribe(@world, socket.assigns.character)
+    # after subscribing, so no Step falls between the mirror and its changes
+    case MuaWorld.mirror(@world, socket.assigns.account, socket.assigns.character) do
+      {:ok, mirror} -> push(socket, "mirror", Protocol.mirror(mirror))
+      {:error, _} -> :ok
+    end
+
     refresh(socket)
     {:noreply, socket}
   end
 
   def handle_info({:mua, character, text}, %{assigns: %{character: character}} = socket) do
     push(socket, "output", Protocol.output([text]))
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:mua_changes, character, change_set},
+        %{assigns: %{character: character}} = socket
+      ) do
+    push(socket, "changes", Protocol.changes(change_set))
     {:noreply, socket}
   end
 

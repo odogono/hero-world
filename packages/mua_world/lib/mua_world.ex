@@ -137,6 +137,16 @@ defmodule MuaWorld do
     do: GenServer.call(world, {:view, account, character})
 
   @doc """
+  A fresh mirror of what a Character perceives (`MuaWorld.Mirror.snapshot/2`),
+  for a client that has just connected. From then on, each subscriber of the
+  Character is sent `{:mua_changes, character, change_set}` after every Step
+  that changed what it perceives (`MuaWorld.Mirror.change_set/5`). Refused as
+  `view/3` is.
+  """
+  def mirror(world, account, character),
+    do: GenServer.call(world, {:mirror, account, character})
+
+  @doc """
   The Characters in play (not in Limbo), as `{account, character}`. After a
   restart no Connection controls them, so the caller gives each its grace
   before it leaves (#97).
@@ -375,7 +385,7 @@ defmodule MuaWorld do
         timers: %{Lifecycle.timers_script() => &fire_lifecycle(in_step(state, &1), &2)},
         between: Talk.between(talk, world, table),
         output: fn -> Tables.take_outbox(world) end,
-        on_step: &on_step(table, &1),
+        on_step: &on_step(Map.take(state, [:world, :table, :places]), &1),
         telemetry: [:mua_world],
         metadata: &%{lines: length(&1)}
       )
@@ -383,9 +393,40 @@ defmodule MuaWorld do
     %{state | engine: engine}
   end
 
-  defp on_step(table, {:ok, %{output: lines}}), do: publish(table, lines)
+  defp on_step(state, {:ok, %{output: lines, changes: changes}}) do
+    publish(state.table, lines)
+    publish_changes(state, changes)
+  end
+
   # notices queued by the Step's Scripts went with it
-  defp on_step(table, {:error, _}), do: Talk.take_notices(table)
+  defp on_step(state, {:error, _}), do: Talk.take_notices(state.table)
+
+  # Each mirrored Character with subscribers is sent what changed in its
+  # Perception, which is then kept for the next Step
+  defp publish_changes(state, changes) do
+    for {{:perceived, character}, {before, held}} <-
+          :ets.match_object(state.table, {{:perceived, :_}, :_}),
+        pids = subscribers(state.table, character),
+        pids != [] do
+      now = perception(state, character)
+      {change_set, held} = MuaWorld.Mirror.change_set(state.world, before, held, now, changes)
+      :ets.insert(state.table, {{:perceived, character}, {now, held}})
+
+      case change_set do
+        nil -> :ok
+        change_set -> for pid <- pids, do: send(pid, {:mua_changes, character, change_set})
+      end
+    end
+
+    :ok
+  end
+
+  # A Character in Limbo perceives only itself and what it carries
+  defp perception(state, character) do
+    place = location(state, character)
+    place = if place == state.places.limbo, do: nil, else: place
+    MuaWorld.Perception.of(state.world, character, place)
+  end
 
   defp publish(table, lines) do
     for {character, text} <- lines,
@@ -516,6 +557,19 @@ defmodule MuaWorld do
     end
   end
 
+  def handle_call({:mirror, account, character}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character) do
+      perception = perception(state, character)
+      snapshot = MuaWorld.Mirror.snapshot(state.world, perception)
+      held = MuaWorld.Mirror.held(snapshot)
+      :ets.insert(state.table, {{:perceived, character}, {perception, held}})
+      {:reply, {:ok, snapshot}, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:characters, account}, _from, state) do
     owned =
       for eid <- OdgnEcs.query(state.world, where: [{"player", "account", account}]),
@@ -622,6 +676,8 @@ defmodule MuaWorld do
   def handle_call({:unsubscribe, character, pid}, _from, state) do
     pids = List.delete(subscribers(state.table, character), pid)
     :ets.insert(state.table, {{:subscribers, character}, pids})
+    # nothing mirrors it now; a new subscriber fetches a fresh mirror
+    if pids == [], do: :ets.delete(state.table, {:perceived, character})
     {:reply, :ok, state}
   end
 
