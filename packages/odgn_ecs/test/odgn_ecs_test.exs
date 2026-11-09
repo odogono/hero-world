@@ -125,6 +125,38 @@ defmodule OdgnEcsTest do
       refute OdgnEcs.component(w, "door").play_state
     end
 
+    @tag :tmp_dir
+    test "a definition keeps whether it is buildable, across a reopen", %{tmp_dir: dir} do
+      path = Path.join(dir, "w.db")
+      {:ok, w} = OdgnEcs.open(path)
+
+      item = %Component{
+        name: "item",
+        buildable: true,
+        columns: [%Column{name: "weight", type: :float}]
+      }
+
+      {:ok, w} = OdgnEcs.define(w, item)
+      assert OdgnEcs.component(w, "item").buildable
+      OdgnEcs.close(w)
+
+      {:ok, w} = OdgnEcs.open(path)
+      assert OdgnEcs.component(w, "item").buildable
+      {:ok, w} = OdgnEcs.define(w, %{item | buildable: false})
+      refute OdgnEcs.component(w, "item").buildable
+      OdgnEcs.close(w)
+    end
+
+    test "a definition stored before buildable reads as not buildable" do
+      json = ~s({"columns": [], "play_state": true})
+      assert %Component{play_state: true, buildable: false} = Component.from_json("door", json)
+    end
+
+    test "stores the same text as the TypeScript store, keys sorted" do
+      assert Component.to_json(%Component{name: "door", play_state: true, buildable: true}) ==
+               ~s({"buildable":true,"columns":[],"play_state":true})
+    end
+
     test "deleting an entity removes its components" do
       w = world()
       eid = with_health(w, 5)

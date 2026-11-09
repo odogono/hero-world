@@ -18,7 +18,7 @@ import { charactersAt, output, queueAct, type Act } from './tables';
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `command`, `homed`, `notice`, `placed` and `verbs`. The command a Run handles is
+ * `buildable`, `command`, `homed`, `notice`, `placed` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -95,6 +95,20 @@ export const muaCapability =
           }
         },
         mode: 'fire-and-forget'
+      },
+      buildable: {
+        args: [],
+        cost: { fuel: 1 },
+        do: () =>
+          list(
+            ...[...store.components.values()]
+              .filter(c => c.buildable)
+              .map(c => c.name)
+              .sort()
+              .map(text)
+          ),
+        mode: 'immediate',
+        result: shape.listOf(shape.text)
       },
       command: {
         args: [],

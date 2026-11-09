@@ -38,7 +38,7 @@ A `command` reply of `error {reason: "busy"}` means the World is too far behind 
 A `place` puts a new thing a Builder composed in the room their Character stands in, as one Step (#258). The World's `build` Service Script ([`mua-scripts/scripts/services/build.talk`](../../mua-scripts/scripts/services/build.talk)) decides, and refuses, with the `reason` to show, unless:
 
 - the Account is a Builder (it has a `builder` component) and has placed fewer than its `max_placed`;
-- the composition holds only the components a builder may compose, `described`, `noun`, `item`, `container` and `readable`, each a map of that component's properties, with values its columns take;
+- the composition holds only the components a builder may compose, those whose definitions are marked `buildable` (`described`, `noun`, `item`, `container` and `readable`), each a map of that component's properties, with values its columns take;
 - `described` has a `name` of at most 40 characters, and any `description` is at most 500;
 - a `container`'s `capacity`, or its default if left out, is at most the Builder's `max_capacity`.
 

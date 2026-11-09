@@ -1,0 +1,686 @@
+{
+  "account": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": false,
+        "index": false,
+        "name": "admin",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      }
+    ]
+  },
+  "builder": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": 20,
+        "index": false,
+        "name": "max_capacity",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "int",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": 50,
+        "index": false,
+        "name": "max_placed",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "int",
+        "unique": false
+      }
+    ]
+  },
+  "container": {
+    "buildable": true,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": 10,
+        "index": false,
+        "name": "capacity",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "float",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": false,
+        "index": false,
+        "name": "is_closed",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      }
+    ]
+  },
+  "described": {
+    "buildable": true,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "description",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "name",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      }
+    ]
+  },
+  "door": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": true,
+        "index": false,
+        "name": "is_closed",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      }
+    ]
+  },
+  "exits": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "down",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "east",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "in",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "north",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "northeast",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "northwest",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "out",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "south",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "southeast",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "southwest",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "up",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "west",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "home": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "in",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      }
+    ]
+  },
+  "item": {
+    "buildable": true,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": true,
+        "index": false,
+        "name": "is_takeable",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": 1,
+        "index": false,
+        "name": "weight",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "float",
+        "unique": false
+      }
+    ]
+  },
+  "key": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "opens",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "array",
+        "unique": false
+      }
+    ]
+  },
+  "location": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "in",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      }
+    ]
+  },
+  "lockable": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": false,
+        "index": false,
+        "name": "is_locked",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "lock",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      }
+    ]
+  },
+  "made_by": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "account",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      }
+    ]
+  },
+  "messages": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "msg",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "omsg",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "meta": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": {},
+        "index": false,
+        "name": "props",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "noun": {
+    "buildable": true,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "words",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "array",
+        "unique": false
+      }
+    ]
+  },
+  "npc": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": true,
+        "index": false,
+        "name": "active",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
+        "unique": false
+      }
+    ]
+  },
+  "player": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "account",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "last_input",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "last_target_id",
+        "on_delete": "nullify",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      },
+      {
+        "case_insensitive": true,
+        "default": null,
+        "index": false,
+        "name": "name",
+        "on_delete": "restrict",
+        "optional": false,
+        "type": "string",
+        "unique": true
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "pending",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "return_to",
+        "on_delete": "nullify",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      }
+    ]
+  },
+  "portal": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "dir",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "door",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "msg",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "to",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "eid",
+        "unique": false
+      }
+    ]
+  },
+  "readable": {
+    "buildable": true,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "text",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      }
+    ]
+  },
+  "responses": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "indirect",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "room",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "target",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "veto",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "script": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "src",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      }
+    ]
+  },
+  "timers": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "every",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "verbs": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "defs",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
+  "words": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "aliases",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "articles",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "array",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "directions",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  }
+}

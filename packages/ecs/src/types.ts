@@ -60,6 +60,8 @@ export type CDefColumnInfo = {
 };
 
 export type CDef = {
+  /** A player may compose a new entity from this component */
+  buildable?: boolean;
   columns: CDefColumnInfo[];
   hash: string;
   id: string;

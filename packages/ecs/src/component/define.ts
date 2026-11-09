@@ -14,6 +14,7 @@ export const defineComponent = <
   props: DefineComponentProps<S, Name>
 ): CDefWithSchema<S, Name> => {
   const {
+    buildable,
     id: componentId,
     playState,
     schema,
@@ -55,6 +56,7 @@ export const defineComponent = <
     hash,
     id: componentId as Name,
     ...(playState ? { playState } : {}),
+    ...(buildable ? { buildable } : {}),
     statements
   } as CDefWithSchema<S, Name>;
 };

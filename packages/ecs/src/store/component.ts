@@ -42,6 +42,8 @@ export type Column = {
 };
 
 export type Component = {
+  /** A player may compose a new entity from it */
+  buildable: boolean;
   columns: Column[];
   name: string;
   playState: boolean;
@@ -67,8 +69,14 @@ export const column = (input: ColumnInput): Column => ({
 export const component = (
   name: string,
   columns: ColumnInput[],
-  playState = false
-): Component => ({ columns: columns.map(column), name, playState });
+  playState = false,
+  buildable = false
+): Component => ({
+  buildable,
+  columns: columns.map(column),
+  name,
+  playState
+});
 
 const RESERVED = new Set(['id', 'eid']);
 const TIME_NOW = new Set(['current_timestamp', 'current_date', 'current_time']);
@@ -435,6 +443,7 @@ export const decode = (c: Component, values: unknown[]) =>
  */
 export const toJSON = (c: Component) =>
   JSON.stringify({
+    buildable: c.buildable,
     columns: c.columns.map(col => ({
       case_insensitive: col.caseInsensitive,
       default: col.default,
@@ -461,12 +470,15 @@ type StoredColumn = {
 
 export const fromJSON = (name: string, json: string): Component => {
   const parsed = JSON.parse(json) as
-    StoredColumn[] | { columns: StoredColumn[]; play_state?: boolean };
-  // Definitions stored before `play_state` are a bare list of columns
-  const [stored, playState] = Array.isArray(parsed)
-    ? [parsed, false]
-    : [parsed.columns, parsed.play_state === true];
+    | StoredColumn[]
+    | { buildable?: boolean; columns: StoredColumn[]; play_state?: boolean };
+  // Definitions stored before `play_state` are a bare list of columns, and
+  // those stored before `buildable` don't say
+  const [stored, playState, buildable] = Array.isArray(parsed)
+    ? [parsed, false, false]
+    : [parsed.columns, parsed.play_state === true, parsed.buildable === true];
   return {
+    buildable,
     columns: stored.map(c => ({
       caseInsensitive: c.case_insensitive === true,
       default: c.default ?? null,

@@ -4,7 +4,9 @@ import { defineComponent, s } from 'odgn-ecs/component';
  * mua's components, as `MuaWorld.Components` defines them, with
  * `odgn_ecs_talk`'s `location`. Keys are snake_case, the columns both
  * Hosts store, so a World reads the same from either. `playState` marks
- * those play changes, which a Migration treats differently.
+ * those play changes, which a Migration treats differently, and `buildable`
+ * those a builder may compose a new entity from. Both Hosts agree on them:
+ * `spec/mua/components.json`.
  */
 
 // The columns of `exits`, one per Direction in the Base Verbs
@@ -30,6 +32,7 @@ const location = defineComponent({
 });
 
 const container = defineComponent({
+  buildable: true,
   id: 'container',
   playState: true,
   schema: {
@@ -39,6 +42,7 @@ const container = defineComponent({
 });
 
 const item = defineComponent({
+  buildable: true,
   id: 'item',
   schema: {
     is_takeable: s.boolean().default(true).optional(),
@@ -114,6 +118,7 @@ const words = defineComponent({
 });
 
 const readable = defineComponent({
+  buildable: true,
   id: 'readable',
   schema: { text: s.string().optional() }
 });
@@ -125,6 +130,7 @@ const home = defineComponent({
 });
 
 const noun = defineComponent({
+  buildable: true,
   id: 'noun',
   schema: { words: s.array('string').optional() }
 });
@@ -150,6 +156,7 @@ const script = defineComponent({
 });
 
 const described = defineComponent({
+  buildable: true,
   id: 'described',
   schema: { description: s.string().optional(), name: s.string().optional() }
 });

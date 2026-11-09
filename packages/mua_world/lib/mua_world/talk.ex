@@ -3,6 +3,8 @@ defmodule MuaWorld.Talk do
   mua's own Capability for Scripts, beside `odgn_ecs_talk`'s `world`, `clock`
   and `timer`, ported from `scripts/mua-capability.ts`:
 
+  - `buildable`: the names of the components a builder may compose a new
+    entity from, as their definitions mark them (#259), in name order.
   - `announce place, text, except`: tells every Character in `place` but
     `except` (which may be Nothing).
   - `command`: the command the Script is handling, as a map of `verb`,
@@ -114,6 +116,11 @@ defmodule MuaWorld.Talk do
                do: MuaWorld.Tables.output(world, c, text)
 
            :noreply
+         end},
+      "buildable" =>
+        {[args: [], result: %{"list" => "text"}, cost: 1],
+         fn [], _ ->
+           {:ok, for({name, %{buildable: true}} <- Enum.sort(world.components), do: name)}
          end},
       "command" =>
         {[args: [], result: "any", cost: 1],

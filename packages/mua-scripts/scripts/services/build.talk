@@ -16,19 +16,17 @@
 use theName, messageFor from messages
 use join, trim from text
 
--- the components a builder may compose
-function buildable
-  return ["described", "noun", "item", "container", "readable"]
-end buildable
-
--- why `composition` can't be built by an Account with `builder`, or Nothing
+-- why `composition` can't be built by an Account with `builder`, or Nothing.
+-- What a builder may compose is World data: the components whose
+-- definitions are marked `buildable`.
 function refusal composition, builder
   if kindOf(composition) is not "map" then
     return "A composition is a map of components."
   end if
+  ask mua to buildable into buildable
   repeat for each name in the keys of composition
-    if name is not in buildable() then
-      return `You can't build with ${name}: only ${join(buildable(), ", ")}.`
+    if name is not in buildable then
+      return `You can't build with ${name}: only ${join(buildable, ", ")}.`
     end if
     if kindOf(the (name) of composition) is not "map" then
       return `The ${name} must be a map of its properties.`

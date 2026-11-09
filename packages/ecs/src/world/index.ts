@@ -151,12 +151,16 @@ const registerComponentDef = <TComponents extends Components>(
   world: World<TComponents>,
   cdef: CDef
 ): void => {
-  // A definition the World already has keeps whether it is Play state,
-  // unless this one says
+  // A definition the World already has keeps whether it is Play state and
+  // buildable, unless this one says
   const stored = world.store.components.get(cdef.id);
   const component = defineInStore(
     world.store,
-    cdefToComponent(cdef, cdef.playState ?? stored?.playState)
+    cdefToComponent(
+      cdef,
+      cdef.playState ?? stored?.playState,
+      cdef.buildable ?? stored?.buildable
+    )
   );
   const table = tableName(component);
 

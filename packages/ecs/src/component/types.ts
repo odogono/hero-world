@@ -50,6 +50,8 @@ export type DefineComponentProps<
   S extends DefineComponentSchema,
   Name extends string
 > = {
+  /** A player may compose a new entity from this component */
+  buildable?: boolean;
   id: Name;
   /** Play changes this component, so a migration never overwrites it */
   playState?: boolean;

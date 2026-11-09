@@ -64,12 +64,19 @@ defmodule OdgnEcs.Component do
 
   `play_state` marks a component that play changes, such as whether a door
   is open; a Migration treats it differently from static components.
+  `buildable` marks one a player may compose a new entity from, as a
+  builder does in mua.
   """
   alias OdgnEcs.{Column, Error}
 
-  defstruct name: nil, columns: [], play_state: false
+  defstruct name: nil, columns: [], play_state: false, buildable: false
 
-  @type t :: %__MODULE__{name: String.t(), columns: [Column.t()], play_state: boolean()}
+  @type t :: %__MODULE__{
+          name: String.t(),
+          columns: [Column.t()],
+          play_state: boolean(),
+          buildable: boolean()
+        }
 
   @reserved ~w(id eid)
   @time_now ~w(current_timestamp current_date current_time)
@@ -261,7 +268,7 @@ defmodule OdgnEcs.Component do
   `{:error, reason}` for a change the data can't follow. Compatible: adding a column that is optional or has a default,
   removing one, making one optional, changing a default, `index` or
   `on_delete`, changing `unique` or `case_insensitive` where the data allows,
-  and flipping `play_state`. Incompatible: changing a column's type, adding a
+  and flipping `play_state` or `buildable`. Incompatible: changing a column's type, adding a
   unique column, and making one required with no default.
   """
   def changes(%__MODULE__{columns: old}, %__MODULE__{name: name, columns: new}) do
@@ -421,7 +428,7 @@ defmodule OdgnEcs.Component do
   defp decode_value(_, v), do: v
 
   @doc false
-  def to_json(%__MODULE__{columns: columns, play_state: play_state}) do
+  def to_json(%__MODULE__{columns: columns, play_state: play_state, buildable: buildable}) do
     columns
     |> Enum.map(fn c ->
       %{
@@ -435,17 +442,18 @@ defmodule OdgnEcs.Component do
         "on_delete" => Atom.to_string(c.on_delete)
       }
     end)
-    |> then(&%{"columns" => &1, "play_state" => play_state})
+    |> then(&%{"columns" => &1, "play_state" => play_state, "buildable" => buildable})
     |> JSON.encode!()
   end
 
   @doc false
   def from_json(name, json) do
-    # Definitions stored before `play_state` are a bare list of columns
-    {stored, play_state} =
+    # Definitions stored before `play_state` are a bare list of columns, and
+    # those stored before `buildable` don't say
+    {stored, play_state, buildable} =
       case JSON.decode!(json) do
-        %{"columns" => columns} = d -> {columns, d["play_state"] == true}
-        columns when is_list(columns) -> {columns, false}
+        %{"columns" => columns} = d -> {columns, d["play_state"] == true, d["buildable"] == true}
+        columns when is_list(columns) -> {columns, false, false}
       end
 
     columns =
@@ -462,6 +470,6 @@ defmodule OdgnEcs.Component do
         }
       end
 
-    %__MODULE__{name: name, columns: columns, play_state: play_state}
+    %__MODULE__{name: name, columns: columns, play_state: play_state, buildable: buildable}
   end
 end
