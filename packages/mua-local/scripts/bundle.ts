@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 // Builds the browser's Workers into `outdir`: worker.js, a Local World
 // (ADR 0023) with the World's files inlined by a macro (scripts/files.ts);
-// mirror.js, which holds a mirror of a server's World (#164); and the
-// sqlite-wasm files both load from beside them. The page that starts it must be cross-origin
+// mirror.js, which holds a mirror of a server's World (#164); preview.js,
+// a Preview World for authors (#243); and the sqlite-wasm files they load
+// from beside them. The page that starts it must be cross-origin
 // isolated (COOP and COEP), since sqlite-wasm's OPFS needs SharedArrayBuffer.
 //
 //   bun scripts/bundle.ts <outdir> [--dev]
@@ -14,38 +15,33 @@ const ROOT = resolve(import.meta.dir, '..');
 // sqlite-wasm loads these by URL, relative to the Worker
 const SQLITE_FILES = ['sqlite3.wasm', 'sqlite3-opfs-async-proxy.js'];
 
+// Each Worker's source and the file it is built to
+const WORKERS = [
+  // a Local World (ADR 0023)
+  { entry: 'worker.ts', name: 'worker.js' },
+  // the mirror of a server's World (#164)
+  { entry: 'mirror-worker.ts', name: 'mirror.js' },
+  // a Preview World for authors (#243)
+  { entry: 'preview-worker.ts', name: 'preview.js' }
+];
+
 export const bundleWorker = async (outdir: string, dev = false) => {
-  const built = await Bun.build({
-    entrypoints: [join(ROOT, 'src/worker.ts')],
-    // odgn-ecs loads its Bun database only when asked for one, which a
-    // Worker never is
-    external: ['bun:sqlite', 'node:fs'],
-    format: 'esm',
-    minify: !dev,
-    naming: { entry: 'worker.js' },
-    outdir,
-    sourcemap: dev ? 'linked' : 'none',
-    target: 'browser'
-  });
-  if (!built.success) {
-    throw new AggregateError(
-      built.logs,
-      'the Local World Worker did not build'
-    );
-  }
-  // the mirror of a server's World (#164), which needs no World files
-  const mirror = await Bun.build({
-    entrypoints: [join(ROOT, 'src/mirror-worker.ts')],
-    external: ['bun:sqlite', 'node:fs'],
-    format: 'esm',
-    minify: !dev,
-    naming: { entry: 'mirror.js' },
-    outdir,
-    sourcemap: dev ? 'linked' : 'none',
-    target: 'browser'
-  });
-  if (!mirror.success) {
-    throw new AggregateError(mirror.logs, 'the mirror Worker did not build');
+  for (const { entry, name } of WORKERS) {
+    const built = await Bun.build({
+      entrypoints: [join(ROOT, 'src', entry)],
+      // odgn-ecs loads its Bun database only when asked for one, which a
+      // Worker never is
+      external: ['bun:sqlite', 'node:fs'],
+      format: 'esm',
+      minify: !dev,
+      naming: { entry: name },
+      outdir,
+      sourcemap: dev ? 'linked' : 'none',
+      target: 'browser'
+    });
+    if (!built.success) {
+      throw new AggregateError(built.logs, `${name} did not build`);
+    }
   }
   const dist = dirname(Bun.resolveSync('@sqlite.org/sqlite-wasm', ROOT));
   for (const file of SQLITE_FILES) {

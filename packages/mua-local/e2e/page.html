@@ -5,7 +5,10 @@
   // Talks to the Worker as mua_client will, and keeps what it hears for the
   // test to read
   window.heard = [];
-  const worker = new Worker('/worker.js', { type: 'module' });
+  // `?worker=preview.js` drives another of the Workers
+  const script =
+    new URLSearchParams(location.search).get('worker') ?? 'worker.js';
+  const worker = new Worker(`/${script}`, { type: 'module' });
   worker.addEventListener('message', event => window.heard.push(event.data));
   worker.addEventListener('error', event =>
     window.heard.push({ event: 'error', message: event.message })
