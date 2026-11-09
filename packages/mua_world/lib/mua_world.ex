@@ -160,6 +160,28 @@ defmodule MuaWorld do
     do: GenServer.call(world, {:admin_line, account, character, text}, 30_000)
 
   @doc """
+  Places a thing a builder composed in the room their Character stands in,
+  as one Step (#258). `composition` is a map of component names to their
+  data. Whether it may be placed is the `build` Service Script's to decide
+  (`mua-scripts/scripts/services/build.talk`): the Account must have a
+  `builder` component and be under its `max_placed`, and the composition
+  must be valid. The thing records its Maker in `made_by`.
+
+  Returns `{:ok, %{eid, placed, max_placed}}`, or `{:error, reason}` with
+  nothing written: the Script's refusal as text, or `:not_owner` and
+  `:not_in_play` as `command/4` gives them.
+  """
+  def place(world, account, character, composition),
+    do: GenServer.call(world, {:place, account, character, composition}, 30_000)
+
+  @doc """
+  An Account's building limits and how many things it has placed, as
+  `%{placed, max_placed, max_capacity}`, or `nil` for an Account that
+  doesn't build.
+  """
+  def builder(world, account), do: GenServer.call(world, {:builder, account})
+
+  @doc """
   What a Character can see: its room, what it carries and the commands it
   could type next (`MuaWorld.View`). `{:error, :not_owner}` if the Account
   doesn't own it, `{:error, :not_in_play}` if it is in Limbo.
@@ -610,6 +632,32 @@ defmodule MuaWorld do
     end
   end
 
+  def handle_call({:place, account, character, composition}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character) do
+      reply_result(advance_clock(state), &place_thing(&1, character, composition))
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:builder, account}, _from, state) do
+    reply =
+      case OdgnEcs.get(state.world, account, "builder") do
+        nil ->
+          nil
+
+        builder ->
+          %{
+            placed: placed(state.world, account),
+            max_placed: builder["max_placed"],
+            max_capacity: builder["max_capacity"]
+          }
+      end
+
+    {:reply, reply, state}
+  end
+
   def handle_call({:sign_in, sub, email, admin?}, _from, state) do
     reply_result(state, fn state ->
       world = state.world
@@ -626,6 +674,8 @@ defmodule MuaWorld do
         end
 
       :ok = OdgnEcs.put(world, account, "account", %{"admin" => admin? == true})
+      # Scripts reach an Account through its Characters' `player.account`
+      OdgnEcsTalk.handle(state.talk, account)
       Tables.put_identity(world, sub, email, account)
       {:ok, account}
     end)
@@ -680,6 +730,7 @@ defmodule MuaWorld do
     reply_result(state, fn state ->
       {:ok, eid} = OdgnEcs.create(state.world)
       :ok = OdgnEcs.put(state.world, eid, "account", %{})
+      OdgnEcsTalk.handle(state.talk, eid)
       {:ok, eid}
     end)
   end
@@ -1046,6 +1097,74 @@ defmodule MuaWorld do
         tell(state, actor, "!! " <> MuaWorld.Admin.failure(other, line))
     end
   end
+
+  # A builder's thing: an empty entity the `build` Service fills in and
+  # places, in a savepoint released only if it did. A refusal, or a Script
+  # that fails, leaves no change, the entity included.
+  defp place_thing(state, actor, composition) do
+    world = state.world
+    talk = state.talk
+    :ok = OdgnEcs.savepoint(world, "mua_place")
+    {:ok, thing} = OdgnEcs.create(world)
+    handle = OdgnEcsTalk.handle(talk, thing)
+
+    {:ok, pending} =
+      OdgnEcsEngine.deliver(state.step, %Delivery{
+        to: {:service, "build"},
+        message: "place",
+        args: [handle, OdgnEcsTalk.Values.to_value(composition), OdgnEcsTalk.handle(talk, actor)],
+        asks: :request
+      })
+
+    :ok = OdgnEcsEngine.pump(state.step)
+    outcome = OdgnEcsTalk.outcome(pending)
+    if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
+
+    case placed_reply(outcome) do
+      {:ok, message, reply} ->
+        :ok = OdgnEcs.release(world, "mua_place")
+        tell(state, actor, message)
+        {:ok, Map.put(reply, :eid, thing)}
+
+      {:error, reason} ->
+        # The id comes back for the next entity made, so its Handle is
+        # kept: NorthTalk won't make another with the same id, and an
+        # entity made at play has no Lineage, so the Handle fits it
+        :ok = OdgnEcs.rollback_to(world, "mua_place")
+        {:error, reason}
+    end
+  end
+
+  # What the `build` Service's reply means: `{message, placed, max_placed}`
+  # when it placed the thing, `{refused: text}` when it said no
+  defp placed_reply({:replied, %NorthTalk.Map{} = value}) do
+    value = OdgnEcsTalk.Values.from_value(value)
+
+    case value do
+      %{"refused" => reason} when is_binary(reason) ->
+        {:error, reason}
+
+      %{"message" => message, "placed" => placed, "max_placed" => max}
+      when is_binary(message) and is_integer(placed) and is_integer(max) ->
+        {:ok, message, %{placed: placed, max_placed: max}}
+
+      _ ->
+        Logger.error("build replied #{inspect(value)}", event: :malformed_reply)
+        {:error, "Something went wrong."}
+    end
+  end
+
+  # A write the composition doesn't fit, such as text for a number, fails
+  # the Script: that is the builder's to fix, so it says why
+  defp placed_reply(other) do
+    why = MuaWorld.Admin.failure(other)
+    Logger.warning("build failed: #{why}", event: :build_failed)
+    {:error, "That can't be built: #{why}"}
+  end
+
+  # How many things an Account has placed
+  defp placed(world, account),
+    do: length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))
 
   defp tell(state, character, text) do
     Tables.output(state.world, character, text)

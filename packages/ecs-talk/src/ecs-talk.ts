@@ -6,6 +6,7 @@ import {
   ident,
   put,
   query,
+  remove as removeComponent,
   elements as storeElements,
   type Data,
   type Eid,
@@ -383,6 +384,25 @@ export const createEcsTalk = <TComponents extends Components>(
         },
         mode: 'immediate',
         result: shape.optional(entity)
+      },
+      remove: {
+        args: [entity, shape.text],
+        command: true,
+        cost: COST,
+        do: (_call, thing, name) => {
+          const eid = live(thing);
+          try {
+            removeComponent(store, eid, name);
+          } catch (error) {
+            if (error instanceof StoreError) {
+              throw new ScriptError('invalid value', error.message);
+            }
+            throw error;
+          }
+          return nothing;
+        },
+        mode: 'immediate',
+        segmentBound: true
       },
       resolve: {
         args: [shape.number],

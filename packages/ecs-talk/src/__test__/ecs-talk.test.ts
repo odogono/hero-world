@@ -158,6 +158,27 @@ end fetch`
     expect(get(hero, 'stats')?.hp).toBe(20);
   });
 
+  test("removes a component, and refuses one the World doesn't define", async () => {
+    const { get, id, talk } = await setup();
+    const hero = id('hero');
+    talk.loadAtomScript(
+      'person',
+      `on calm
+  remove the target, "stats"
+end calm
+
+on forget
+  remove the target, "nonesuch"
+end forget`
+    );
+    await ask(talk, hero, 'calm');
+    expect(get(hero, 'stats')).toBeUndefined();
+    const result = await ask(talk, hero, 'forget');
+    expect(result.kind === 'failed' && result.error).toBeInstanceOf(
+      ScriptError
+    );
+  });
+
   test('a Run that writes and then faults leaves no trace', async () => {
     const { get, id, talk } = await setup();
     const hero = id('hero');

@@ -21,18 +21,48 @@ The session is an HttpOnly, SameSite=Lax cookie, which keeps it off cross-site P
 
 Connect the socket at `/socket` with `{token: socket_token}`, then join `character:<id>`. Joining is refused with `{reason}`: `not_owner` for another Account's Character, `no_such_character` for a topic that names none.
 
-Joining brings the Character into play, or resumes control of it, and takes over from any other Connection.
+Joining brings the Character into play, or resumes control of it, and takes over from any other Connection. The join's reply is `{builder}`: for a Builder's Account, `{placed, max_placed, max_capacity}`, how many things it has placed, how many it may, and the largest container `capacity` it may make; otherwise `null`.
 
 ### From the client
 
-| Event     | Payload                                                                      | Reply                                                                    |
-| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `command` | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}` |
-| `logout`  | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes         |
+| Event     | Payload                                                                      | Reply                                                                                |
+| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `command` | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}`             |
+| `place`   | `{composition, ref?}`: a map of component names to their data                | `ok {ref, eid, placed, max_placed}` once the thing is placed; `error {ref?, reason}` |
+| `logout`  | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes                     |
 
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
 A `command` reply of `error {reason: "busy"}` means the World is too far behind to take it (#139). The command did nothing, and the client shows it as not sent; it may be sent again.
+
+A `place` puts a new thing a Builder composed in the room their Character stands in, as one Step (#258). The World's `build` Service Script ([`mua-scripts/scripts/services/build.talk`](../../mua-scripts/scripts/services/build.talk)) decides, and refuses, with the `reason` to show, unless:
+
+- the Account is a Builder (it has a `builder` component) and has placed fewer than its `max_placed`;
+- the composition holds only the components a builder may compose, `described`, `noun`, `item`, `container` and `readable`, each a map of that component's properties, with values its columns take;
+- `described` has a `name` of at most 40 characters, and any `description` is at most 500;
+- a `container`'s `capacity`, or its default if left out, is at most the Builder's `max_capacity`.
+
+A refused `place` writes nothing. A placed thing records its Maker, the Account, in `made_by`, which no `mirror` or `changes` carries. The Builder is told `You make the satchel.`, and everyone else in the room that they made it.
+
+```json
+{
+  "composition": {
+    "described": { "name": "Satchel", "description": "A leather satchel." },
+    "item": {},
+    "container": { "capacity": 5, "is_closed": true }
+  },
+  "ref": 7
+}
+```
+
+An Admin makes an Account a Builder at the `;` prompt, and stops it building there; what it placed stays:
+
+```
+;change the account of the player of actor, "builder", {}
+;remove the account of the player of actor, "builder"
+```
+
+For another player in the room, `element "bob" of here` stands for their Character. `{max_placed: 10, max_capacity: 5}` sets other limits than the defaults (50 and 20).
 
 A `command` whose text starts with `;` is a line of NorthTalk for an admin, one whose email is on `MUA_ADMINS` (#91). It runs as one Step and changes nothing unless it completes. Its result comes back as `output` to that admin only, `=> value` or `!! ` and why. Anyone else is told "You can't do that."
 

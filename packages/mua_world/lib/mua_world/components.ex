@@ -66,6 +66,16 @@ defmodule MuaWorld.Components do
       # `admin` lets the Account run NorthTalk at the prompt (#91); sign-in
       # sets it from the configured admins each time.
       c("account", true, [col("admin", :boolean, default: false)]),
+      # An Account that may build (#258): how many things it may place in
+      # all, and the largest container it may make. An Admin grants it; taking
+      # it away stops new building, and what was placed stays.
+      c("builder", true, [
+        col("max_placed", :int, default: 50),
+        col("max_capacity", :int, default: 20)
+      ]),
+      # The Maker of a placed thing: the Account that built it. It stays on
+      # the server: no Perception reads an Account.
+      c("made_by", true, [col("account", :eid)]),
       c("player", false, [
         # unique among Characters, ignoring case
         col("name", :string, optional: false, unique: true, case_insensitive: true),

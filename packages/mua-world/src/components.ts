@@ -160,6 +160,26 @@ const account = defineComponent({
   schema: { admin: s.boolean().default(false).optional() }
 });
 
+/**
+ * An Account that may build: how many things it may place in all, and the
+ * largest container it may make
+ */
+const builder = defineComponent({
+  id: 'builder',
+  playState: true,
+  schema: {
+    max_capacity: s.int().default(20).optional(),
+    max_placed: s.int().default(50).optional()
+  }
+});
+
+/** The Maker of a placed thing: the Account that built it */
+const made_by = defineComponent({
+  id: 'made_by',
+  playState: true,
+  schema: { account: s.entityId() }
+});
+
 const player = defineComponent({
   id: 'player',
   schema: {
@@ -198,5 +218,7 @@ export const components = [
   script,
   described,
   account,
+  builder,
+  made_by,
   player
 ];
