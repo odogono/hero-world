@@ -65,7 +65,19 @@ describe('a Preview World built from EDL', () => {
   test('describes its Component Definitions and an entity', async () => {
     const preview = await fromEDL();
     const portal = preview.definitions().find(d => d.name === 'portal')!;
-    expect(portal.columns).toContainEqual({ name: 'to', type: 'eid' });
+    expect(portal.columns).toContainEqual({
+      default: null,
+      name: 'to',
+      type: 'eid'
+    });
+    expect(portal.buildable).toBe(false);
+    const container = preview.definitions().find(d => d.name === 'container')!;
+    expect(container.buildable).toBe(true);
+    expect(container.columns).toContainEqual({
+      default: 10,
+      name: 'capacity',
+      type: 'float'
+    });
     const mailbox = preview.entity(eidOf(preview, 'mailbox'));
     expect(mailbox.described?.name).toBe('Mailbox');
     preview.close();

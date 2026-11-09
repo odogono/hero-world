@@ -94,3 +94,27 @@ describe('mirror', () => {
     expect(mirror.place).toBe(9);
   });
 });
+
+describe('a snapshot of the mirror', () => {
+  test('gives back what it holds, for Try it', async () => {
+    const mirror = await open();
+    const again = mirror.snapshot()!;
+    expect(again.character).toBe(ADA);
+    expect(again.place).toBe(ROOM);
+    expect(again.components.described).toContainEqual(
+      expect.objectContaining({ eid: LAMP, name: 'Lamp' })
+    );
+    expect(again.components.location).toContainEqual({ eid: LAMP, in: ROOM });
+    expect(again.components.container).toContainEqual(
+      expect.objectContaining({ eid: CRATE, is_closed: true })
+    );
+  });
+
+  test('is undefined before one is loaded', async () => {
+    const mirror = await openMirror({
+      path: ':memory:',
+      type: DatabaseType.BUN
+    });
+    expect(mirror.snapshot()).toBeUndefined();
+  });
+});

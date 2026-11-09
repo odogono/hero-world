@@ -30,3 +30,16 @@ export const lines = signal<Line[]>([]);
 export const commands = signal<string[]>([]);
 /** Commands the Character could type next, from the latest `state` */
 export const actions = signal<string[]>([]);
+
+/**
+ * A Builder's limits and how many things their Account has placed (#258),
+ * from joining, kept current by each place
+ */
+export type Builder = {
+  max_capacity: number;
+  max_placed: number;
+  placed: number;
+};
+
+/** `null` for an Account that doesn't build, or playing offline */
+export const builder = signal<Builder | null>(null);

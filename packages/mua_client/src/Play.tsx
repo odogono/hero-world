@@ -1,8 +1,23 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { Profile } from './Profile';
-import { loadLocal, logout, saveLocal, sendCommand } from './connection';
-import { actions, commands, lines, status, type Status } from './store';
+import { Builder } from './builder/Builder';
+import {
+  loadLocal,
+  logout,
+  mirrorSnapshot,
+  place,
+  saveLocal,
+  sendCommand
+} from './connection';
+import {
+  actions,
+  builder,
+  commands,
+  lines,
+  status,
+  type Status
+} from './store';
 import type { Line } from './transcript';
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -276,6 +291,10 @@ export const Play = ({
 }) => {
   const end = useRef<HTMLLIElement>(null);
   const joined = status.value === 'joined';
+  // the composer (#260), for a Builder only
+  const limits = builder.value;
+  const [building, setBuilding] = useState(false);
+  const composing = building && limits !== null && joined;
   const count = lines.value.length;
   const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
 
@@ -293,7 +312,7 @@ export const Play = ({
   };
 
   return (
-    <div class="play">
+    <div class={composing ? 'play building' : 'play'}>
       <header>
         <strong class="brand">MUA</strong>
         <span class="version">v{MUA_VERSION}</span>
@@ -361,8 +380,27 @@ export const Play = ({
           status={status.value}
           statusText={STATUS_TEXT[status.value]}
         />
+        {limits && (
+          <button
+            aria-pressed={composing}
+            class="build-toggle"
+            disabled={!joined}
+            onClick={() => setBuilding(!building)}
+            type="button"
+          >
+            Build
+          </button>
+        )}
         <Composer joined={joined} />
       </div>
+      {composing && (
+        <Builder
+          limits={limits}
+          onClose={() => setBuilding(false)}
+          place={place}
+          snapshot={mirrorSnapshot}
+        />
+      )}
     </div>
   );
 };

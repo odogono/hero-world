@@ -1,6 +1,13 @@
 import { components } from 'mua-world';
 import type { CreateDatabaseOptions } from 'odgn-ecs/db';
-import { putMany, remove, type Eid, type Store } from 'odgn-ecs/store';
+import {
+  components as componentsOf,
+  putMany,
+  query,
+  remove,
+  type Eid,
+  type Store
+} from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 /** A row in the shared layout (ADR 0019): a component's fields and its `eid` */
@@ -24,7 +31,15 @@ export type MirrorChangeSet = {
 /** From the UI to the mirror's Worker (`mirror-worker.ts`) */
 export type ToMirror =
   | { snapshot: MirrorSnapshot; type: 'load' }
-  | { changes: MirrorChangeSet; type: 'apply' };
+  | { changes: MirrorChangeSet; type: 'apply' }
+  /** Asks for the mirror as it is now, for Try it (#259) */
+  | { type: 'snapshot' };
+
+/** From the mirror's Worker: the reply to `snapshot`, or nothing yet */
+export type FromMirror = {
+  event: 'snapshot';
+  snapshot: MirrorSnapshot | undefined;
+};
 
 /**
  * A client's mirror of the server's World (#164, ADR 0019): a World in the
@@ -117,6 +132,23 @@ export const openMirror = async (database: CreateDatabaseOptions) => {
     /** The Character's place, or null when it has none */
     get place() {
       return place;
+    },
+
+    /**
+     * The mirror as it is now, as a snapshot, or undefined before one is
+     * loaded. A field the server didn't send reads as its default.
+     */
+    snapshot: (): MirrorSnapshot | undefined => {
+      if (character === undefined) {
+        return undefined;
+      }
+      const rows: Record<string, MirrorRow[]> = {};
+      for (const eid of query(store, {})) {
+        for (const [name, data] of Object.entries(componentsOf(store, eid))) {
+          (rows[name] ??= []).push({ ...data, eid });
+        }
+      }
+      return { character, components: rows, place };
     },
 
     store

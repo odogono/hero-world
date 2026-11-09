@@ -14,6 +14,8 @@ const commands: string[] = [];
 void mock.module('../connection', () => ({
   loadLocal: () => Promise.resolve(),
   logout: () => Promise.resolve(),
+  mirrorSnapshot: () => Promise.resolve(undefined),
+  place: () => Promise.resolve({ ok: false, reason: 'not in tests' }),
   saveLocal: () => {},
   sendCommand: (text: string) => {
     commands.push(text);
@@ -21,9 +23,18 @@ void mock.module('../connection', () => ({
   }
 }));
 
+// the composer's Preview World, which never answers here
+void mock.module('../preview/client', () => ({
+  openPreviewClient: () => ({
+    close: () => {},
+    open: () => new Promise(() => {})
+  })
+}));
+
 const { Play } = await import('../Play');
 const {
   actions,
+  builder,
   commands: sentCommands,
   lines,
   status
@@ -33,6 +44,7 @@ afterEach(() => {
   cleanup();
   commands.length = 0;
   actions.value = [];
+  builder.value = null;
   lines.value = [];
   sentCommands.value = [];
   status.value = 'connecting';
@@ -274,5 +286,23 @@ describe('the profile badge', () => {
     });
     render(<Play name="Ada" onLeft={() => {}} />);
     expect(screen.getByRole('separator').textContent).toContain('reloaded');
+  });
+
+  test('offers Build to a Builder only, and opens the composer beside the transcript', () => {
+    status.value = 'joined';
+    const { container, rerender } = render(
+      <Play name="Ada" onLeft={() => {}} />
+    );
+    expect(screen.queryByRole('button', { name: 'Build' })).toBeNull();
+
+    builder.value = { max_capacity: 20, max_placed: 50, placed: 0 };
+    rerender(<Play name="Ada" onLeft={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Build' }));
+    expect(screen.getByRole('complementary', { name: 'Builder' })).toBeTruthy();
+    expect(container.querySelector('.play.building')).toBeTruthy();
+    expect(screen.getByLabelText('Transcript')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to play' }));
+    expect(screen.queryByRole('complementary', { name: 'Builder' })).toBeNull();
   });
 });

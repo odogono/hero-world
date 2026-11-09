@@ -6,6 +6,7 @@ export {
 } from './local';
 export type { FromWorld, ToWorld } from './protocol';
 export type {
+  FromMirror,
   MirrorChangeSet,
   MirrorRow,
   MirrorSnapshot,

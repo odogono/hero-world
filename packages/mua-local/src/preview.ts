@@ -126,9 +126,11 @@ export type PreviewMigration =
   | { changes: ChangeSetEntry[]; ok: true; plan: MigrationPlan }
   | { ok: false; reason: string };
 
-/** A Component Definition, as the inspector draws its cards */
+/** A Component Definition, as the inspector and the composer draw its cards */
 export type PreviewDefinition = {
-  columns: { name: string; type: string }[];
+  /** A builder may compose a new entity from it (#259) */
+  buildable: boolean;
+  columns: { default?: unknown; name: string; type: string }[];
   name: string;
 };
 
@@ -480,7 +482,12 @@ export const openPreviewWorld = async (options: PreviewOptions) => {
     definitions: (): PreviewDefinition[] =>
       [...current.store.components.values()]
         .map(c => ({
-          columns: c.columns.map(col => ({ name: col.name, type: col.type })),
+          buildable: c.buildable,
+          columns: c.columns.map(col => ({
+            default: col.default,
+            name: col.name,
+            type: col.type
+          })),
           name: c.name
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),

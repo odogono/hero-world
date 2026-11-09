@@ -16,15 +16,24 @@ import type { PreviewClient } from '../preview/client';
 afterEach(cleanup);
 
 const definitions = [
-  { columns: [{ name: 'in', type: 'eid' }], name: 'location' },
   {
+    buildable: false,
+    columns: [{ name: 'in', type: 'eid' }],
+    name: 'location'
+  },
+  {
+    buildable: true,
     columns: [
       { name: 'name', type: 'string' },
       { name: 'description', type: 'string' }
     ],
     name: 'described'
   },
-  { columns: [{ name: 'is_closed', type: 'boolean' }], name: 'container' }
+  {
+    buildable: true,
+    columns: [{ name: 'is_closed', type: 'boolean' }],
+    name: 'container'
+  }
 ];
 
 const entities = [

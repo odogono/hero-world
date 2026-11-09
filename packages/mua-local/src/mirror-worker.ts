@@ -4,7 +4,12 @@
  * an in-memory sqlite-wasm World of what the Character perceives. The UI
  * posts the server's `mirror` and `changes` messages to it, in order.
  */
-import { openMirror, type Mirror, type ToMirror } from './mirror';
+import {
+  openMirror,
+  type FromMirror,
+  type Mirror,
+  type ToMirror
+} from './mirror';
 
 const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
 
@@ -20,7 +25,13 @@ scope.addEventListener('message', (event: MessageEvent<ToMirror>) => {
   queue = queue
     .then(async () => {
       const mirror = await opened;
-      if (message.type === 'load') {
+      if (message.type === 'snapshot') {
+        const reply: FromMirror = {
+          event: 'snapshot',
+          snapshot: loaded ? mirror.snapshot() : undefined
+        };
+        scope.postMessage(reply);
+      } else if (message.type === 'load') {
         mirror.load(message.snapshot);
         loaded = true;
       } else if (loaded) {
