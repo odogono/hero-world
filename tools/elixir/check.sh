@@ -8,13 +8,13 @@ set -e
 [ -z "$CHECK_ELIXIR_SKIP" ] || { echo 'check:elixir: CHECK_ELIXIR_SKIP is set, skipping' >&2; exit 0; }
 command -v mix >/dev/null 2>&1 || { echo 'check:elixir: mix not found, skipping (CI still runs it)' >&2; exit 0; }
 root=$(cd "$(dirname "$0")/../.." && pwd)
+sh "$root/tools/elixir/deps.sh"
 for dir in "$root"/packages/*/; do
   [ -f "$dir/mix.exs" ] || continue
   name=$(basename "$dir")
   echo "== $name" >&2
   (
     cd "$dir"
-    mix deps.get >/dev/null
     mix format --check-formatted
     mix compile --warnings-as-errors >/dev/null
     mix test

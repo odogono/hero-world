@@ -41,7 +41,7 @@ scope: mua
 Let things set their own action messages.
 ```
 
-Copy `type` and `scope` from your PR title, and leave `scope` out when the title has none. Write the entry for a reader of the changelog. [The fragment format](../../changelog/README.md) covers `breaking: true`. There is no way to skip this: a change with nothing worth recording has the wrong type, so retitle it.
+Copy `type` and `scope` from your PR title, and format only your own fragment (`bunx prettier --write changelog/unreleased/<slug>.md`), and leave `scope` out when the title has none. Write the entry for a reader of the changelog. [The fragment format](../../changelog/README.md) covers `breaking: true`. There is no way to skip this: a change with nothing worth recording has the wrong type, so retitle it.
 
 To see the unreleased changelog, run `bun run changelog`.
 
