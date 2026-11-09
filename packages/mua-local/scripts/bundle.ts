@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-// Builds a Local World's Worker for the browser (ADR 0023) into `outdir`:
-// worker.js, with the World's files inlined by a macro (scripts/files.ts), and the sqlite-wasm files
-// it loads from beside it. The page that starts it must be cross-origin
+// Builds the browser's Workers into `outdir`: worker.js, a Local World
+// (ADR 0023) with the World's files inlined by a macro (scripts/files.ts);
+// mirror.js, which holds a mirror of a server's World (#164); and the
+// sqlite-wasm files both load from beside them. The page that starts it must be cross-origin
 // isolated (COOP and COEP), since sqlite-wasm's OPFS needs SharedArrayBuffer.
 //
 //   bun scripts/bundle.ts <outdir> [--dev]
@@ -31,6 +32,20 @@ export const bundleWorker = async (outdir: string, dev = false) => {
       built.logs,
       'the Local World Worker did not build'
     );
+  }
+  // the mirror of a server's World (#164), which needs no World files
+  const mirror = await Bun.build({
+    entrypoints: [join(ROOT, 'src/mirror-worker.ts')],
+    external: ['bun:sqlite', 'node:fs'],
+    format: 'esm',
+    minify: !dev,
+    naming: { entry: 'mirror.js' },
+    outdir,
+    sourcemap: dev ? 'linked' : 'none',
+    target: 'browser'
+  });
+  if (!mirror.success) {
+    throw new AggregateError(mirror.logs, 'the mirror Worker did not build');
   }
   const dist = dirname(Bun.resolveSync('@sqlite.org/sqlite-wasm', ROOT));
   for (const file of SQLITE_FILES) {

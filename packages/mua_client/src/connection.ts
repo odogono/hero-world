@@ -1,4 +1,9 @@
-import type { FromWorld } from 'mua-local';
+import type {
+  FromWorld,
+  MirrorChangeSet,
+  MirrorSnapshot,
+  ToMirror
+} from 'mua-local';
 import { Socket, type Channel } from 'phoenix';
 
 import { actions, lines, status } from './store';
@@ -20,8 +25,15 @@ let socket: Socket | undefined;
 let channel: Channel | undefined;
 /** A Local World's Worker, while playing offline (ADR 0023) */
 let worker: Worker | undefined;
+/** The mirror of the server's World, while playing online (#164) */
+let mirror: Worker | undefined;
 /** The local Character's name, to join again after loading a save */
 let localName = '';
+
+const toMirror = (message: ToMirror) => {
+  mirror ??= new Worker('/local/mirror.js', { type: 'module' });
+  mirror.postMessage(message);
+};
 
 const add = (line: Parameters<typeof append>[1]) => {
   lines.value = append(lines.value, line);
@@ -55,6 +67,14 @@ export const connect = (token: string, character: number) => {
   channel.on('state', ({ actions: next }: State) => {
     actions.value = next ?? [];
   });
+  // the server's World as the Character perceives it: fresh on every join,
+  // then kept current Step by Step
+  channel.on('mirror', (snapshot: MirrorSnapshot) =>
+    toMirror({ snapshot, type: 'load' })
+  );
+  channel.on('changes', (changes: MirrorChangeSet) =>
+    toMirror({ changes, type: 'apply' })
+  );
   channel.on('prompt', ({ options, text }: Prompt) =>
     add({ kind: 'prompt', options, text })
   );
@@ -240,6 +260,9 @@ const logoutRemote = () =>
     socket?.disconnect();
     socket = undefined;
     channel = undefined;
+    // nothing of the World stays in the browser once the Character has left
+    mirror?.terminate();
+    mirror = undefined;
   });
 
 /** The socket, for the browser checks to cut its Connection */
