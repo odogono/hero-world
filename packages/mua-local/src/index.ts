@@ -11,3 +11,11 @@ export type {
   MirrorSnapshot,
   ToMirror
 } from './mirror';
+export {
+  openPreviewWorld,
+  type PreviewDefinition,
+  type PreviewOptions,
+  type PreviewResult,
+  type PreviewSource,
+  type PreviewWorld
+} from './preview';
