@@ -130,3 +130,28 @@ test('holds only a subset it is loaded from', async () => {
   });
   await page.close();
 }, 60_000);
+
+test('migrates a Preview World to edited EDL, and reports the plan', async () => {
+  const page = await open();
+  await post(page, { type: 'open' });
+  const opened = await nth(page, 1);
+  const edl = String(opened.edl);
+  const mailbox = eidOf(opened, 'mailbox');
+
+  await post(page, {
+    edl: edl.replace(
+      'A small mailbox on a wooden post.',
+      'A dented green mailbox.'
+    ),
+    type: 'migrate'
+  });
+  const migrated = await nth(page, 2);
+  expect(migrated).toMatchObject({ event: 'migrated', ok: true });
+  expect(migrated.changes).toContainEqual([
+    mailbox,
+    'described',
+    'changed',
+    expect.objectContaining({ description: 'A dented green mailbox.' })
+  ]);
+  await page.close();
+}, 60_000);

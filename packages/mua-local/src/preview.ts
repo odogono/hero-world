@@ -4,9 +4,12 @@ import {
   type MuaWorld
 } from 'mua-world';
 import type { CreateDatabaseOptions } from 'odgn-ecs/db';
+import { migrateEDL, type MigrationPlan } from 'odgn-ecs/edl';
 import {
   components,
+  inSavepoint,
   query,
+  takeChanges,
   type ChangeSetEntry,
   type Data,
   type Eid,
@@ -40,6 +43,8 @@ export type ToPreview =
   /** Loads a Preview World, from the main World's EDL if no source is given */
   | { source?: PreviewSource; type: 'open' }
   | { ref: number; text: string; type: 'command' }
+  /** Migrates the World to edited EDL, keeping its play state (ADR 0005) */
+  | { edl: string; type: 'migrate' }
   | { type: 'reset' }
   | { eid: Eid; type: 'entity' };
 
@@ -51,10 +56,18 @@ export type FromPreview =
   /** The reply to `open` and `reset` */
   | {
       definitions: PreviewDefinition[];
+      /** The EDL it was built from, for an editor to start from */
+      edl?: string;
       entities: PreviewEntity[];
       event: 'opened';
       runs: boolean;
     }
+  /** The reply to `migrate`, with the entities after it */
+  | ({
+      definitions: PreviewDefinition[];
+      entities: PreviewEntity[];
+      event: 'migrated';
+    } & PreviewMigration)
   /** The reply to a `command`, with the entities after it */
   | ({
       entities: PreviewEntity[];
@@ -75,6 +88,11 @@ export type PreviewResult = {
   reason?: string;
 };
 
+/** What a Migration did: its plan, and the components it changed */
+export type PreviewMigration =
+  | { changes: ChangeSetEntry[]; ok: true; plan: MigrationPlan }
+  | { ok: false; reason: string };
+
 /** A Component Definition, as the inspector draws its cards */
 export type PreviewDefinition = {
   columns: { name: string; type: string }[];
@@ -94,32 +112,43 @@ const load = async (options: PreviewOptions) => {
     return {
       author: undefined,
       command: undefined,
+      edl: undefined,
       labels: new Map<Eid, string>(),
+      migrate: undefined,
       store: mirror.store
     };
   }
 
   const readFile = reader(options.files);
-  const world = await createWorld(muaComponents, options.database);
-  world.executeEDL(source.edl, {
+  const read = {
     path: EDL_PATH,
     readFile,
     roots: { 'mua-scripts': SCRIPTS_DIR }
-  });
+  };
+  const world = await createWorld(muaComponents, options.database);
+  world.executeEDL(source.edl, read);
   world.flush();
+  let edl = source.edl;
+
   const labels = new Map<Eid, string>();
-  for (const [name, eid] of world.getDefinitionNames()) {
-    labels.set(eid, name);
-  }
+  const relabel = () => {
+    labels.clear();
+    for (const [name, eid] of world.getDefinitionNames()) {
+      labels.set(eid, name);
+    }
+  };
+  relabel();
 
   let collect: ChangeSetEntry[] | undefined;
-  const mua: MuaWorld = await startMuaWorld(world, {
-    clock: options.clock,
-    onChanges: changes => collect?.push(...changes),
-    readFile,
-    scriptsDir: SCRIPTS_DIR,
-    startingRoom: options.startingRoom ?? 'west_of_house'
-  });
+  const start = () =>
+    startMuaWorld(world, {
+      clock: options.clock,
+      onChanges: changes => collect?.push(...changes),
+      readFile,
+      scriptsDir: SCRIPTS_DIR,
+      startingRoom: options.startingRoom ?? 'west_of_house'
+    });
+  let mua: MuaWorld = await start();
   const account = await mua.createAccount();
   const author = await mua.createCharacter(account, AUTHOR);
   await mua.enter(account, author);
@@ -141,7 +170,44 @@ const load = async (options: PreviewOptions) => {
     }
   };
 
-  return { author, command, labels, store: mua.store };
+  // A Migration of the running World, then its Scripts started again over
+  // what the Migration made, as a restarted server would
+  const migrate = async (next: string): Promise<PreviewMigration> => {
+    const store = mua.store;
+    // anything outside a Step so far isn't the Migration's
+    takeChanges(store);
+    let plan: MigrationPlan;
+    try {
+      // all or nothing: a Migration that fails leaves the World as it was
+      plan = inSavepoint(store, 'preview_migrate', () => {
+        const done = migrateEDL(world, next, read);
+        world.flush();
+        return done;
+      });
+    } catch (error) {
+      takeChanges(store);
+      return {
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      };
+    }
+    const changes = takeChanges(store);
+    edl = next;
+    relabel();
+    mua = await start();
+    return { changes, ok: true, plan };
+  };
+
+  return {
+    author,
+    command,
+    get edl() {
+      return edl;
+    },
+    labels,
+    migrate,
+    store: mua.store
+  };
 };
 
 /**
@@ -207,6 +273,21 @@ export const openPreviewWorld = async (options: PreviewOptions) => {
       close();
       current = await load(options);
     },
+
+    /** The EDL it was last built or migrated from, if it came from EDL */
+    get edl(): string | undefined {
+      return current.edl;
+    },
+
+    /**
+     * Migrates it to edited EDL, keeping its play state as a server's
+     * World would (ADR 0005), and reports the plan and what changed. A
+     * subset can't be migrated.
+     */
+    migrate: (edl: string): Promise<PreviewMigration> =>
+      current.migrate
+        ? current.migrate(edl)
+        : Promise.resolve({ ok: false, reason: 'inspect_only' }),
 
     /** Whether it can run commands, or only be inspected */
     runs: () => current.command !== undefined,
