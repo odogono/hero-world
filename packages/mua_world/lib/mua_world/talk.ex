@@ -153,6 +153,18 @@ defmodule MuaWorld.Talk do
            account = Values.from_value(account)
            {:ok, length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))}
          end},
+      # an Account's Signature: the Character that speaks for it wherever
+      # it is shown as a Maker, its first while it has one (#276)
+      "signature" =>
+        {[args: [entity], result: optional, cost: 1],
+         fn [account], _ ->
+           account = Values.from_value(account)
+
+           case OdgnEcs.query(world, where: [{"player", "account", account}]) do
+             [] -> {:ok, nil}
+             characters -> {:ok, handle(Enum.min(characters))}
+           end
+         end},
       "notice" =>
         {[
            args: [entity, "text", entity, %{"optional" => "text"}],

@@ -47,6 +47,32 @@ defmodule MuaWorld.BuildTest do
     assert MuaWorld.component(world, satchel, "container")["is_closed"] == false
   end
 
+  test "looking at a placed thing names its Maker by its Signature (#276)",
+       %{world: world, ada: ada, bob: bob} do
+    grant(world, ada)
+    assert {:ok, _} = place(world, ada, @satchel)
+
+    assert send_command(world, bob, "examine satchel") ==
+             "A leather satchel.\nMade by ada.\nIt is closed."
+
+    # the room and what is carried say nothing of who made it
+    refute send_command(world, bob, "look") =~ "Made by"
+    assert send_command(world, bob, "take satchel") == "Taken."
+    refute send_command(world, bob, "inventory") =~ "Made by"
+    # nor does a thing the EDL made
+    refute send_command(world, bob, "examine spoon") =~ "Made by"
+  end
+
+  test "a placed thing whose Maker has no Character names no one (#276)",
+       %{world: world, ada: ada, bob: bob} do
+    grant(world, ada)
+    assert {:ok, %{eid: satchel}} = place(world, ada, @satchel)
+    # an Account no Character speaks for: here, an entity no player names
+    :ok = MuaWorld.set_component(world, satchel, "made_by", %{"account" => satchel})
+
+    assert send_command(world, bob, "examine satchel") == "A leather satchel.\nIt is closed."
+  end
+
   test "an Account without builder is refused, and nothing is written", %{world: world, ada: ada} do
     assert MuaWorld.builder(world, account(ada)) == nil
     assert place(world, ada, @satchel) == {:error, "You can't build."}

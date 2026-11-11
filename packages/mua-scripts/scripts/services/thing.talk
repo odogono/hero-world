@@ -47,6 +47,16 @@ on examine target, actor
     put "You see nothing special." after lines
   end if
 
+  -- a placed thing names its Maker by its Signature; the Account itself
+  -- is never shown (#276)
+  put the optional made_by of target into maker
+  if maker is not nothing then
+    ask mua to signature the account of maker into signer
+    if signer is not nothing then
+      put `Made by ${the name of the player of signer}.` after lines
+    end if
+  end if
+
   if the door of target is not nothing then
     if not the is_closed of the door of target then
       put "It is open." after lines
