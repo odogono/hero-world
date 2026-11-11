@@ -166,3 +166,25 @@ describe('editing a placed thing (#274)', () => {
     expect(get(mua.store, bob.eid, 'editing')).toEqual({ thing: satchel });
   });
 });
+
+describe("a placed thing's Maker (#276)", () => {
+  test('examining it names its Maker by their Signature', async () => {
+    const mua = await start('lifecycle.edl');
+    const bob = await join_(mua, 'bob');
+    const ann = await join_(mua, 'ann');
+    const satchel = createEntity(mua.store);
+    put(mua.store, satchel, 'described', {
+      description: 'A leather satchel.',
+      name: 'Satchel'
+    });
+    put(mua.store, satchel, 'location', { in: where(mua, bob.eid)! });
+    put(mua.store, satchel, 'made_by', { account: bob.account });
+
+    expect(await mua.command(ann.account, ann.eid, 'examine satchel')).toEqual([
+      'A leather satchel.\nMade by bob.'
+    ]);
+    expect(
+      (await mua.command(ann.account, ann.eid, 'examine lamp')).join('\n')
+    ).not.toContain('Made by');
+  });
+});

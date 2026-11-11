@@ -18,7 +18,8 @@ import { charactersAt, output, queueAct, type Act } from './tables';
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `buildable`, `command`, `homed`, `notice`, `placed` and `verbs`. The command a Run handles is
+ * `buildable`, `command`, `homed`, `notice`, `placed`, `signature` and
+ * `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -172,6 +173,22 @@ export const muaCapability =
           ),
         mode: 'immediate',
         result: shape.number
+      },
+      // an Account's Signature: the Character that speaks for it wherever
+      // it is shown as a Maker, its first while it has one (#276)
+      signature: {
+        args: [entity],
+        cost: { fuel: 1 },
+        do: (_call, account) => {
+          const characters = query(store, {
+            where: [['player', 'account', account.native.eid]]
+          });
+          return characters.length === 0
+            ? nothing
+            : handle(Math.min(...characters));
+        },
+        mode: 'immediate',
+        result: shape.optional(entity)
       },
       verbs: {
         args: [],

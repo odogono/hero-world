@@ -109,4 +109,6 @@ test('a builder composes, tries and places a satchel; another player uses it', a
   await expect(transcript(bob)).toContainText('Ada reshapes the satchel.');
   await play(bob, 'examine satchel');
   await expect(transcript(bob)).toContainText('A battered satchel.');
+  // its Maker, by their Signature (#276)
+  await expect(transcript(bob)).toContainText('Made by Ada.');
 });

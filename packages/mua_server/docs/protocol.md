@@ -44,7 +44,7 @@ A `place` puts a new thing a Builder composed in the room their Character stands
 - `described` has a `name` of at most 40 characters, and any `description` is at most 500;
 - a `container`'s `capacity`, or its default if left out, is at most the Builder's `max_capacity`.
 
-A refused `place` writes nothing. A placed thing records its Maker, the Account, in `made_by`, which no `mirror` or `changes` carries. The Builder is told `You make the satchel.`, offering the Suggestion `edit the satchel`, and everyone else in the room that they made it.
+A refused `place` writes nothing. A placed thing records its Maker, the Account, in `made_by`, which no `mirror` or `changes` carries. Examining it names the Maker by their Signature, the Account's Character: `Made by Ada.` The Builder is told `You make the satchel.`, offering the Suggestion `edit the satchel`, and everyone else in the room that they made it.
 
 ```json
 {
