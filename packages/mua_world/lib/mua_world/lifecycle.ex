@@ -19,12 +19,20 @@ defmodule MuaWorld.Lifecycle do
 
   def timers_script, do: @timers
 
-  @doc "Gives every located thing without one a home: where it is now."
+  @doc """
+  Gives every located thing without one a home: where it is now. A placed
+  thing, one with a Maker, has none, so resets leave it where play puts it;
+  one given a home before that rule loses it.
+  """
   def record_homes(world) do
+    for eid <- OdgnEcs.query(world, with: ["made_by", "home"]),
+        do: :ok = OdgnEcs.remove(world, eid, "home")
+
     for eid <- OdgnEcs.query(world, with: ["location"]),
         OdgnEcs.get(world, eid, "home") == nil,
         OdgnEcs.get(world, eid, "player") == nil,
         OdgnEcs.get(world, eid, "portal") == nil,
+        OdgnEcs.get(world, eid, "made_by") == nil,
         do:
           :ok =
             OdgnEcs.put(world, eid, "home", %{"in" => OdgnEcs.get(world, eid, "location")["in"]})
