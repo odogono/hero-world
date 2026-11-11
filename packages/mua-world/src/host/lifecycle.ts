@@ -1,5 +1,5 @@
 import { scheduleTimer, timersOf, type Timer } from 'ecs-engine';
-import { get, put, query, type Eid, type Store } from 'odgn-ecs/store';
+import { get, put, query, remove, type Eid, type Store } from 'odgn-ecs/store';
 
 /**
  * Homes and mua's own timers, as `MuaWorld.Lifecycle`. Every located thing
@@ -10,13 +10,21 @@ import { get, put, query, type Eid, type Store } from 'odgn-ecs/store';
  */
 export const TIMERS_SCRIPT = 'mua:timers';
 
-/** Gives every located thing without one a home: where it is now */
+/**
+ * Gives every located thing without one a home: where it is now. A placed
+ * thing, one with a Maker, has none, so resets leave it where play puts it;
+ * one given a home before that rule loses it.
+ */
 export const recordHomes = (store: Store) => {
+  for (const eid of query(store, { with: ['made_by', 'home'] })) {
+    remove(store, eid, 'home');
+  }
   for (const eid of query(store, { with: ['location'] })) {
     if (
       !get(store, eid, 'home') &&
       !get(store, eid, 'player') &&
-      !get(store, eid, 'portal')
+      !get(store, eid, 'portal') &&
+      !get(store, eid, 'made_by')
     ) {
       put(store, eid, 'home', { in: get(store, eid, 'location')!.in });
     }

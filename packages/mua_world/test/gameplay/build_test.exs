@@ -88,6 +88,25 @@ defmodule MuaWorld.BuildTest do
     assert received(ada) == []
   end
 
+  test "a placed thing has no home, across a restart, so a reset leaves it where play put it (#271)",
+       %{world: world, ada: ada, tmp_dir: dir} do
+    grant(world, ada)
+    assert {:ok, %{eid: satchel}} = place(world, ada, @satchel)
+    vault = location(world, ada)
+    # one given a home before #271 loses it at the next start
+    :ok = MuaWorld.set_component(world, satchel, "home", %{"in" => vault})
+    GenServer.stop(world)
+
+    world = start("locks.edl", dir)
+    assert MuaWorld.component(world, satchel, "home") == nil
+    assert MuaWorld.component(world, MuaWorld.named(world, "spoon"), "home") == %{"in" => vault}
+
+    strongbox = MuaWorld.named(world, "strongbox")
+    :ok = MuaWorld.set_component(world, satchel, "location", %{"in" => strongbox})
+    assert MuaWorld.reset(world, vault) == 0
+    assert location(world, satchel) == strongbox
+  end
+
   test "a container left at its default capacity is held to the builder's limit",
        %{world: world, ada: ada} do
     grant(world, ada, %{"max_capacity" => 5})

@@ -5,9 +5,10 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
-import { get } from 'odgn-ecs/store';
+import { createEntity, get, put } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
+import { recordHomes } from '../host/lifecycle';
 import { components, startMuaWorld, type MuaWorld } from '../index';
 
 const REPO = join(import.meta.dir, '../../../..');
@@ -96,6 +97,22 @@ describe('lifecycle', () => {
     const shrine = (await mua.named('west_of_house'))!;
     const lamp = (await mua.named('lamp'))!;
     expect(get(mua.store, lamp, 'home')).toEqual({ in: shrine });
+  });
+
+  test('gives a placed thing no home, and takes away one it had (#271)', async () => {
+    const mua = await start('lifecycle.edl');
+    const shrine = (await mua.named('west_of_house'))!;
+    const account = await mua.createAccount();
+    const satchel = createEntity(mua.store);
+    put(mua.store, satchel, 'location', { in: shrine });
+    put(mua.store, satchel, 'made_by', { account });
+    const pouch = createEntity(mua.store);
+    put(mua.store, pouch, 'location', { in: shrine });
+    put(mua.store, pouch, 'made_by', { account });
+    put(mua.store, pouch, 'home', { in: shrine });
+    recordHomes(mua.store);
+    expect(get(mua.store, satchel, 'home')).toBeUndefined();
+    expect(get(mua.store, pouch, 'home')).toBeUndefined();
   });
 
   test('puts strayed things back when a place resets, and tells its Scripts', async () => {
