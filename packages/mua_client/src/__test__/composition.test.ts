@@ -3,11 +3,13 @@ import { describe, expect, test } from 'bun:test';
 import {
   abilities,
   fresh,
+  patchOf,
   problems,
   startFields,
   toSend,
+  unchanged,
   wordsOf
-} from '../builder/composition';
+} from '../composer/composition';
 
 const container = {
   buildable: true,
@@ -95,5 +97,62 @@ describe('a composition', () => {
       'A container can hold at most 20.'
     ]);
     expect(problems({ described: { name: 'Satchel' } }, 20)).toEqual([]);
+  });
+});
+
+describe('an edit as a patch (#275)', () => {
+  const opened = {
+    container: { capacity: 5, is_closed: true },
+    described: { description: 'A leather satchel.', name: 'Satchel' },
+    item: { is_takeable: true, weight: 1 }
+  };
+
+  test('is empty while nothing has changed', () => {
+    expect(unchanged(patchOf(opened, structuredClone(opened)))).toBe(true);
+  });
+
+  test('puts only the fields that changed, so play keeps the rest', () => {
+    expect(
+      patchOf(opened, {
+        ...opened,
+        container: { capacity: 8, is_closed: true },
+        described: { ...opened.described, description: 'A battered satchel.' }
+      })
+    ).toEqual({
+      put: {
+        container: { capacity: 8 },
+        described: { description: 'A battered satchel.' }
+      },
+      remove: []
+    });
+  });
+
+  test('puts a new component whole, and removes one that is gone', () => {
+    const { item: _item, ...rest } = opened;
+    expect(
+      patchOf(opened, { ...rest, readable: { text: 'Ada', unused: '' } })
+    ).toEqual({ put: { readable: { text: 'Ada' } }, remove: ['item'] });
+  });
+
+  test('a component removed and added back is a change of its fields', () => {
+    expect(
+      patchOf(opened, {
+        ...opened,
+        container: { capacity: 10, is_closed: false }
+      })
+    ).toEqual({
+      put: { container: { capacity: 10, is_closed: false } },
+      remove: []
+    });
+  });
+
+  test('sends a cleared text field empty, and keeps a number left empty', () => {
+    expect(
+      patchOf(opened, {
+        ...opened,
+        described: { ...opened.described, description: '' },
+        item: { is_takeable: true, weight: null }
+      })
+    ).toEqual({ put: { described: { description: '' } }, remove: [] });
   });
 });

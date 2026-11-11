@@ -1,8 +1,8 @@
 import type { PreviewDefinition } from 'mua-local';
 
 /**
- * A composition: the components a Builder gives a new thing, by name, each
- * a map of its fields (#260). What the World accepts is the `build`
+ * A composition: the components a Builder gives a thing, new or placed, by
+ * name, each a map of its fields (#260). What the World accepts is the `build`
  * Service's to decide (#258); this only helps the Builder get it right.
  */
 export type Composition = Record<string, Record<string, unknown>>;
@@ -126,6 +126,45 @@ export const toSend = (composition: Composition) =>
       )
     ])
   );
+
+/**
+ * An edit as a patch (#275): what changed from the composition the thing
+ * was opened with. A new component is put whole, as Place sends it; a
+ * changed one puts only the fields that differ; a missing one is removed.
+ * A cleared text field is sent as it is, empty, for the World to judge; a
+ * number left empty keeps its value.
+ */
+export const patchOf = (opened: Composition, now: Composition) => {
+  const put: Composition = {};
+  for (const [component, fields] of Object.entries(now)) {
+    const was = opened[component];
+    if (!was) {
+      put[component] = toSend({ [component]: fields })[component] ?? {};
+      continue;
+    }
+    const changed = Object.fromEntries(
+      Object.entries(fields).filter(
+        ([field, v]) =>
+          v !== null &&
+          v !== undefined &&
+          !(typeof v === 'number' && Number.isNaN(v)) &&
+          !same(v, was[field])
+      )
+    );
+    if (Object.keys(changed).length > 0) {
+      put[component] = changed;
+    }
+  }
+  const remove = Object.keys(opened).filter(component => !(component in now));
+  return { put, remove };
+};
+
+/** Whether a patch would change nothing */
+export const unchanged = (patch: ReturnType<typeof patchOf>) =>
+  patch.remove.length === 0 && Object.keys(patch.put).length === 0;
+
+const same = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 /** What a composition lets a thing do, in a few words each */
 export const abilities = (composition: Composition): string[] => {

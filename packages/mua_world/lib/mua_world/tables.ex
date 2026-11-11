@@ -9,7 +9,7 @@ defmodule MuaWorld.Tables do
   alias OdgnEcs.SQL
 
   @schema """
-  CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT);
   CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_identities (sub TEXT PRIMARY KEY, email TEXT, account INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL);
@@ -23,6 +23,10 @@ defmodule MuaWorld.Tables do
   def ensure(%OdgnEcs{conn: conn} = world) do
     OdgnEcsEngine.Tables.ensure(world)
     SQL.exec!(conn, @schema)
+
+    # a World made before a line could offer Suggestions (#275)
+    if not column?(conn, "mua_outbox", "suggestions"),
+      do: SQL.exec!(conn, "ALTER TABLE mua_outbox ADD COLUMN suggestions TEXT")
 
     if table?(conn, "mua_meta") or table?(conn, "mua_waiting") do
       :ok = OdgnEcs.begin(world)
@@ -49,10 +53,17 @@ defmodule MuaWorld.Tables do
     :ok
   end
 
+  defp column?(conn, table, name),
+    do:
+      SQL.one!(conn, "SELECT 1 FROM pragma_table_info(?1) WHERE name = ?2", [table, name]) != nil
+
   defp table?(conn, name),
     do:
       SQL.one!(conn, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1", [name]) !=
         nil
+
+  defp line(text, nil), do: text
+  defp line(text, suggestions), do: %{text: text, suggestions: Jason.decode!(suggestions)}
 
   @doc "The Characters (entities with `player`) whose Location is `place`."
   def characters_at(world, place) do
@@ -73,15 +84,33 @@ defmodule MuaWorld.Tables do
     :ok
   end
 
-  def output(%OdgnEcs{conn: conn}, character, text),
+  @doc """
+  Queues a line for a Character, once the Step commits. `suggestions` are
+  Commands the line offers the player to send with one click (#275).
+  """
+  def output(world, character, text, suggestions \\ [])
+
+  def output(%OdgnEcs{conn: conn}, character, text, []),
     do:
       SQL.run!(conn, "INSERT INTO mua_outbox (character, text) VALUES (?1, ?2)", [character, text])
 
-  @doc "Takes the Step's output: read and cleared inside the Step's transaction."
+  def output(%OdgnEcs{conn: conn}, character, text, suggestions),
+    do:
+      SQL.run!(
+        conn,
+        "INSERT INTO mua_outbox (character, text, suggestions) VALUES (?1, ?2, ?3)",
+        [character, text, Jason.encode!(suggestions)]
+      )
+
+  @doc """
+  Takes the Step's output: read and cleared inside the Step's transaction.
+  Each line is its text, or `%{text, suggestions}` when it offers any.
+  """
   def take_outbox(%OdgnEcs{conn: conn}) do
     rows =
-      for [c, t] <- SQL.all!(conn, "SELECT character, text FROM mua_outbox ORDER BY id"),
-          do: {c, t}
+      for [c, t, s] <-
+            SQL.all!(conn, "SELECT character, text, suggestions FROM mua_outbox ORDER BY id"),
+          do: {c, line(t, s)}
 
     SQL.run!(conn, "DELETE FROM mua_outbox")
     rows

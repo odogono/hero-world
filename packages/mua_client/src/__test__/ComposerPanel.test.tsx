@@ -14,9 +14,10 @@ import {
   within
 } from '@testing-library/preact';
 
-import { Builder } from '../builder/Builder';
-import type { Placed } from '../connection';
+import { ComposerPanel } from '../composer/ComposerPanel';
+import type { Patch, Placed, Saved } from '../connection';
 import type { PreviewClient } from '../preview/client';
+import type { Editing } from '../store';
 
 afterEach(cleanup);
 
@@ -114,7 +115,7 @@ const setup = async (
   const fake = fakeClient();
   const placed: Record<string, unknown>[] = [];
   render(
-    <Builder
+    <ComposerPanel
       client={fake.client}
       limits={limits}
       onClose={() => {}}
@@ -143,7 +144,7 @@ const addComponent = async (label: string) => {
   );
 };
 
-describe('the composer', () => {
+describe('the Composer', () => {
   test('composes a satchel from cards, and shows what it can do', async () => {
     await setup();
     expect(screen.getByText('3 of 50 placed')).toBeTruthy();
@@ -280,5 +281,176 @@ describe('Try it', () => {
     await waitFor(() =>
       expect(screen.queryByText(/reached beyond/)).toBeNull()
     );
+  });
+});
+
+// the satchel Ada placed, as the `compose` message brings it
+const SATCHEL: Editing = {
+  composition: {
+    container: { capacity: 5, is_closed: true },
+    described: { description: 'A leather satchel.', name: 'Satchel' },
+    item: { is_takeable: true, weight: 1 }
+  },
+  eid: 42
+};
+
+const LAMP: Editing = {
+  composition: { described: { description: 'A brass lamp.', name: 'Lamp' } },
+  eid: 43
+};
+
+const editSetup = async (
+  save: (eid: number, patch: Patch) => Promise<Saved> = () =>
+    Promise.resolve({ ok: true })
+) => {
+  const fake = fakeClient();
+  const saves: [number, Patch][] = [];
+  const declined: (string | undefined)[] = [];
+  let saved = 0;
+  const panel = (editing: Editing | null) => (
+    <ComposerPanel
+      client={fake.client}
+      editing={editing}
+      limits={limits}
+      onClose={() => {}}
+      onDecline={keeping => declined.push(keeping)}
+      onSaved={() => saved++}
+      place={() => Promise.resolve({ eid: 99, ok: true })}
+      save={(eid, patch) => {
+        saves.push([eid, patch]);
+        return save(eid, patch);
+      }}
+      snapshot={() => Promise.resolve(MIRROR)}
+    />
+  );
+  const { rerender } = render(panel(SATCHEL));
+  await screen.findByLabelText(/Holds up to/);
+  return {
+    ...fake,
+    declined,
+    open: (editing: Editing | null) => rerender(panel(editing)),
+    saved: () => saved,
+    saves
+  };
+};
+
+describe('editing a placed thing (#275)', () => {
+  test('opens it with its name, and Save sends only what changed', async () => {
+    const { saved, saves } = await editSetup();
+    expect(
+      screen.getByRole('heading', { name: 'Editing the satchel' })
+    ).toBeTruthy();
+    expect(screen.queryByText(/placed$/)).toBeNull();
+    const save = screen.getByRole('button', {
+      name: 'Save'
+    }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+
+    type(field('Description', /Description/), 'A battered satchel.');
+    type(field('Container', /Holds up to/), '8');
+    // the heading keeps the name it was opened with
+    type(field('Description', /Name/), 'Bag');
+    expect(
+      screen.getByRole('heading', { name: 'Editing the satchel' })
+    ).toBeTruthy();
+    fireEvent.click(save);
+
+    await waitFor(() => expect(saved()).toBe(1));
+    expect(saves).toEqual([
+      [
+        42,
+        {
+          put: {
+            container: { capacity: 8 },
+            described: { description: 'A battered satchel.', name: 'Bag' }
+          },
+          remove: []
+        }
+      ]
+    ]);
+  });
+
+  test("leaves its capacity to its Maker's limit, which the World checks", async () => {
+    await editSetup();
+    type(field('Container', /Holds up to/), '25');
+    expect(screen.queryByText(/can hold at most/)).toBeNull();
+  });
+
+  test("shows the World's reason, and stays open", async () => {
+    const { saved } = await editSetup(() =>
+      Promise.resolve({
+        ok: false,
+        reason: "The satchel holds 3 things: it can't hold fewer."
+      })
+    );
+    type(field('Container', /Holds up to/), '1');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "Not saved: The satchel holds 3 things: it can't hold fewer."
+    );
+    expect(saved()).toBe(0);
+    expect((field('Container', /Holds up to/) as HTMLInputElement).value).toBe(
+      '1'
+    );
+  });
+
+  test('tries the edit in place of the real one', async () => {
+    const { opened } = await editSetup();
+    fireEvent.click(screen.getByRole('tab', { name: 'Try it' }));
+    await waitFor(() =>
+      expect(opened.at(-1)).toEqual({
+        tryIt: {
+          composition: SATCHEL.composition,
+          mirror: MIRROR,
+          replaces: 42
+        }
+      })
+    );
+  });
+
+  test('the same thing sent again keeps the changes', async () => {
+    const { open } = await editSetup();
+    type(field('Description', /Description/), 'A battered satchel.');
+    open({ ...SATCHEL });
+    expect(
+      (field('Description', /Description/) as HTMLTextAreaElement).value
+    ).toBe('A battered satchel.');
+    expect(screen.queryByRole('group', { name: /Discard/ })).toBeNull();
+  });
+
+  test('another thing replaces an untouched edit at once', async () => {
+    const { open } = await editSetup();
+    open(LAMP);
+    expect(
+      await screen.findByRole('heading', { name: 'Editing the lamp' })
+    ).toBeTruthy();
+  });
+
+  test('asks before another thing replaces unsaved changes', async () => {
+    const { declined, open } = await editSetup();
+    type(field('Description', /Description/), 'A battered satchel.');
+    open(LAMP);
+    const ask = await screen.findByRole('group', { name: /Discard/ });
+    expect(ask.textContent).toContain(
+      'Discard your changes to the satchel to edit the lamp?'
+    );
+    fireEvent.click(within(ask).getByRole('button', { name: 'Keep them' }));
+    expect(declined).toEqual(['Satchel']);
+    expect(
+      screen.getByRole('heading', { name: 'Editing the satchel' })
+    ).toBeTruthy();
+
+    // the World opens the satchel again
+    open({ ...SATCHEL });
+    open({ ...LAMP, eid: 44 });
+    fireEvent.click(
+      within(await screen.findByRole('group', { name: /Discard/ })).getByRole(
+        'button',
+        { name: 'Discard them' }
+      )
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Editing the lamp' })
+    ).toBeTruthy();
   });
 });

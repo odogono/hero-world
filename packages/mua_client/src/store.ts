@@ -43,3 +43,16 @@ export type Builder = {
 
 /** `null` for an Account that doesn't build, or playing offline */
 export const builder = signal<Builder | null>(null);
+
+/**
+ * The placed thing the `edit` Verb opened, for the Composer to edit (#275):
+ * its id and its buildable components as they stood. A new value each time
+ * the server sends it, as it does again on rejoining.
+ */
+export type Editing = {
+  composition: Record<string, Record<string, unknown>>;
+  eid: number;
+};
+
+/** `null` while nothing is open to edit */
+export const editing = signal<Editing | null>(null);

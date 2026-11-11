@@ -32,6 +32,10 @@ _Avoid_: operator, superuser, wizard
 An Account allowed to place new things in the World as it plays, or change things already placed, as far as its permissions and limits allow. Its permissions say whether it may place, and whether it may change only what it made or anything placed; its limits, how many it may place and how big a container it may make. An Admin makes an Account a Builder, and can stop it building; what it placed stays.
 _Avoid_: creator, author, owner
 
+**Composer**:
+The place in the browser where a Builder shapes a thing, either a new one to place or a placed one to change.
+_Avoid_: builder panel, editor, build panel
+
 **Maker**:
 The Account that placed a thing. The World keeps it with the thing, and shows it only through its Signature.
 _Avoid_: owner (which is a Script's), creator, author
@@ -217,6 +221,10 @@ _Avoid_: built-in, effect
 **Reach**:
 The part of a Character's Perception that a Verb's noun can name: here, carried, or the room. It never extends past Perception.
 _Avoid_: scope, range
+
+**Suggestion**:
+A Command the World offers a player to send with one click, which they could equally type.
+_Avoid_: action chip, action (for this), shortcut
 
 **Base Verbs**:
 The Verbs, Directions, Aliases and articles every World starts with, included from shared EDL.

@@ -44,7 +44,7 @@ A `place` puts a new thing a Builder composed in the room their Character stands
 - `described` has a `name` of at most 40 characters, and any `description` is at most 500;
 - a `container`'s `capacity`, or its default if left out, is at most the Builder's `max_capacity`.
 
-A refused `place` writes nothing. A placed thing records its Maker, the Account, in `made_by`, which no `mirror` or `changes` carries. The Builder is told `You make the satchel.`, and everyone else in the room that they made it.
+A refused `place` writes nothing. A placed thing records its Maker, the Account, in `made_by`, which no `mirror` or `changes` carries. The Builder is told `You make the satchel.`, offering the Suggestion `edit the satchel`, and everyone else in the room that they made it.
 
 ```json
 {
@@ -97,7 +97,7 @@ A `command` whose text starts with `;` is a line of NorthTalk for an admin, one 
 
 | Event     | Payload                                                                  | When                                                                                                                                                                                                                                               |
 | --------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output`  | `{lines}`                                                                | Each line the Character is told, only after the World commits the change behind it (ADR 0012).                                                                                                                                                     |
+| `output`  | `{lines, suggestions?}`                                                  | Each line the Character is told, only after the World commits the change behind it (ADR 0012). `suggestions` are Commands the last line offers, which the client shows with it to send in one click; they could equally be typed.                  |
 | `state`   | `{room: {name, description, exits, items, players}, inventory, actions}` | On joining, and after each command. `actions` are commands the Character could type next.                                                                                                                                                          |
 | `prompt`  | `{text, options}`                                                        | After a command, while the Character must choose: "Which do you mean?". The next command answers it, by an option's number (from 1) or words that pick one. A choice whose thing has gone is refused, never swapped for another.                   |
 | `status`  | `{status}`                                                               | `connected` on joining; `replaced` when another Connection takes over, just before this one closes; `limbo` on logging out.                                                                                                                        |

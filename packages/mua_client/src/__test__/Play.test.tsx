@@ -11,15 +11,21 @@ import {
 import { append, connectionLost, rejoined, sent } from '../transcript';
 
 const commands: string[] = [];
+let stopped = 0;
 void mock.module('../connection', () => ({
   loadLocal: () => Promise.resolve(),
   logout: () => Promise.resolve(),
   mirrorSnapshot: () => Promise.resolve(undefined),
   place: () => Promise.resolve({ ok: false, reason: 'not in tests' }),
+  saveEdit: () => Promise.resolve({ ok: true }),
   saveLocal: () => {},
   sendCommand: (text: string) => {
     commands.push(text);
     return true;
+  },
+  stopEditing: () => {
+    stopped++;
+    editing.value = null;
   }
 }));
 
@@ -36,6 +42,7 @@ const {
   actions,
   builder,
   commands: sentCommands,
+  editing,
   lines,
   status
 } = await import('../store');
@@ -45,6 +52,8 @@ afterEach(() => {
   commands.length = 0;
   actions.value = [];
   builder.value = null;
+  editing.value = null;
+  stopped = 0;
   lines.value = [];
   sentCommands.value = [];
   status.value = 'connecting';
@@ -288,21 +297,65 @@ describe('the profile badge', () => {
     expect(screen.getByRole('separator').textContent).toContain('reloaded');
   });
 
-  test('offers Build to a Builder only, and opens the composer beside the transcript', () => {
+  test('offers Compose to a Builder only, and opens the Composer beside the transcript', () => {
     status.value = 'joined';
     const { container, rerender } = render(
       <Play name="Ada" onLeft={() => {}} />
     );
-    expect(screen.queryByRole('button', { name: 'Build' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Compose' })).toBeNull();
 
     builder.value = { max_capacity: 20, max_placed: 50, placed: 0 };
     rerender(<Play name="Ada" onLeft={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Build' }));
-    expect(screen.getByRole('complementary', { name: 'Builder' })).toBeTruthy();
-    expect(container.querySelector('.play.building')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Compose' }));
+    expect(
+      screen.getByRole('complementary', { name: 'Composer' })
+    ).toBeTruthy();
+    expect(container.querySelector('.play.composing')).toBeTruthy();
     expect(screen.getByLabelText('Transcript')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to play' }));
-    expect(screen.queryByRole('complementary', { name: 'Builder' })).toBeNull();
+    expect(
+      screen.queryByRole('complementary', { name: 'Composer' })
+    ).toBeNull();
+    expect(stopped).toBe(0);
+  });
+
+  test('a line offers its Suggestions, which send their Command (#275)', () => {
+    status.value = 'joined';
+    lines.value = append([], {
+      kind: 'output',
+      suggestions: ['edit the satchel'],
+      text: 'You make the satchel.'
+    });
+    lines.value = append(lines.value, { kind: 'output', text: 'Later.' });
+
+    render(<Play name="Ada" onLeft={() => {}} />);
+    // an older line's Suggestion still sends
+    fireEvent.click(screen.getByRole('button', { name: 'edit the satchel' }));
+    expect(commands).toEqual(['edit the satchel']);
+  });
+
+  test('opens a thing the edit Verb opened, and closing it stops the edit (#275)', () => {
+    status.value = 'joined';
+    builder.value = { max_capacity: 20, max_placed: 50, placed: 0 };
+    const { rerender } = render(<Play name="Ada" onLeft={() => {}} />);
+    expect(
+      screen.queryByRole('complementary', { name: 'Composer' })
+    ).toBeNull();
+
+    editing.value = {
+      composition: { described: { description: '', name: 'Satchel' } },
+      eid: 42
+    };
+    rerender(<Play name="Ada" onLeft={() => {}} />);
+    expect(
+      screen.getByRole('heading', { name: 'Editing the satchel' })
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to play' }));
+    expect(stopped).toBe(1);
+    expect(
+      screen.queryByRole('complementary', { name: 'Composer' })
+    ).toBeNull();
   });
 });
