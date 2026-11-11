@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
-import { get } from 'odgn-ecs/store';
+import { createEntity, get, put } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import { components, startMuaWorld, type MuaWorld } from '../index';
@@ -124,5 +124,28 @@ describe('lifecycle', () => {
     const mua = await start('lifecycle.edl');
     const idol = (await mua.named('idol'))!;
     expect(get(mua.store, idol, 'item')?.weight).toBe(7);
+  });
+});
+
+describe('editing a placed thing (#274)', () => {
+  test('the edit Verb opens a thing its Maker placed, as the build Service decides', async () => {
+    const mua = await start('lifecycle.edl');
+    const bob = await join_(mua, 'bob');
+    const ann = await join_(mua, 'ann');
+    const satchel = createEntity(mua.store);
+    put(mua.store, satchel, 'described', { name: 'Satchel' });
+    put(mua.store, satchel, 'location', { in: where(mua, bob.eid)! });
+    put(mua.store, satchel, 'made_by', { account: bob.account });
+    put(mua.store, bob.account, 'builder', {});
+    put(mua.store, ann.account, 'builder', {});
+
+    expect(await mua.command(ann.account, ann.eid, 'edit satchel')).toEqual([
+      "You didn't make that."
+    ]);
+    expect(get(mua.store, ann.eid, 'editing')).toBeUndefined();
+    expect(await mua.command(bob.account, bob.eid, 'edit satchel')).toEqual([
+      'You open the satchel to edit it.'
+    ]);
+    expect(get(mua.store, bob.eid, 'editing')).toEqual({ thing: satchel });
   });
 });

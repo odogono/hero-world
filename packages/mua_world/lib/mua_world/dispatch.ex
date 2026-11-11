@@ -270,6 +270,7 @@ defmodule MuaWorld.Dispatch do
   @services %{
     "close" => "open",
     "drop" => "thing",
+    "edit" => "build",
     "examine" => "thing",
     "help" => "help",
     "inventory" => "thing",

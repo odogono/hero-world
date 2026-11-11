@@ -81,6 +81,39 @@ defmodule MuaServer.CharacterChannel do
     end
   end
 
+  # Saving an edit to the placed thing the `edit` Verb opened (#274)
+  def handle_in("edit", payload, socket) do
+    %{account: account, character: character} = socket.assigns
+
+    case Protocol.edit(payload) do
+      {:ok, %{eid: eid, patch: patch, ref: ref}} ->
+        run = fn -> MuaWorld.edit(@world, account, character, eid, patch) end
+
+        case Connection.run(character, self(), run) do
+          {:ok, edited} ->
+            send(self(), :refresh)
+            {:reply, {:ok, Map.put(edited, :ref, ref)}, socket}
+
+          {:error, reason} ->
+            {:reply, {:error, %{ref: ref, reason: to_string(reason)}}, socket}
+        end
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  end
+
+  # Closing the composer without saving
+  def handle_in("stop_editing", _payload, socket) do
+    %{account: account, character: character} = socket.assigns
+    run = fn -> MuaWorld.stop_editing(@world, account, character) end
+
+    case Connection.run(character, self(), run) do
+      :ok -> {:reply, :ok, assign(socket, :composing, nil)}
+      {:error, reason} -> {:reply, {:error, %{reason: to_string(reason)}}, socket}
+    end
+  end
+
   def handle_in("logout", _payload, socket) do
     case Connection.logout(socket.assigns.character, self()) do
       :ok ->
@@ -107,8 +140,7 @@ defmodule MuaServer.CharacterChannel do
       {:error, _} -> :ok
     end
 
-    refresh(socket)
-    {:noreply, socket}
+    {:noreply, refresh(socket)}
   end
 
   def handle_info({:mua, character, text}, %{assigns: %{character: character}} = socket) do
@@ -124,10 +156,7 @@ defmodule MuaServer.CharacterChannel do
     {:noreply, socket}
   end
 
-  def handle_info(:refresh, socket) do
-    refresh(socket)
-    {:noreply, socket}
-  end
+  def handle_info(:refresh, socket), do: {:noreply, refresh(socket)}
 
   # Another Connection took the Character over: this one may not command it
   def handle_info({:replaced, character}, %{assigns: %{character: character}} = socket) do
@@ -143,8 +172,26 @@ defmodule MuaServer.CharacterChannel do
   # Channel into a rejoin, would only add to its queue (#139).
   defp refresh(socket) do
     push_view(socket)
+    push_compose(socket)
   catch
-    :exit, {:timeout, _} -> :ok
+    :exit, {:timeout, _} -> socket
+  end
+
+  # The thing the `edit` Verb opened, once each time it changes, so the
+  # client opens it in the composer (#274). A rejoin opens it again.
+  defp push_compose(socket) do
+    %{account: account, character: character} = socket.assigns
+
+    case MuaWorld.editing(@world, account, character) do
+      {:ok, %{eid: eid} = editing} ->
+        if socket.assigns[:composing] != eid,
+          do: push(socket, "compose", Protocol.compose(editing))
+
+        assign(socket, :composing, eid)
+
+      _ ->
+        assign(socket, :composing, nil)
+    end
   end
 
   defp push_view(socket) do

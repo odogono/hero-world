@@ -21,6 +21,16 @@
     "columns": [
       {
         "case_insensitive": false,
+        "default": "own",
+        "index": false,
+        "name": "edit",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
         "default": 20,
         "index": false,
         "name": "max_capacity",
@@ -37,6 +47,16 @@
         "on_delete": "restrict",
         "optional": true,
         "type": "int",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": true,
+        "index": false,
+        "name": "place",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "boolean",
         "unique": false
       }
     ]
@@ -105,6 +125,22 @@
         "on_delete": "restrict",
         "optional": true,
         "type": "boolean",
+        "unique": false
+      }
+    ]
+  },
+  "editing": {
+    "buildable": false,
+    "play_state": true,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "thing",
+        "on_delete": "nullify",
+        "optional": true,
+        "type": "eid",
         "unique": false
       }
     ]

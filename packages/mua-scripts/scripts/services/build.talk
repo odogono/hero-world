@@ -11,10 +11,19 @@
 -- a refusal, the empty entity included.
 --
 -- An Account builds only if it has a `builder` component, which holds its
--- limits. The thing records its Maker in `made_by`.
+-- permissions and limits. The thing records its Maker in `made_by`.
+--
+-- Editing a placed thing (#274) takes two messages. The `edit` Verb sends
+-- `edit target, actor`, which opens the thing in the actor's composer by
+-- giving the actor `editing`. Saving sends `save thing, patch, current,
+-- actor`: `current` is the thing's composition as it stands, and `patch`
+-- is `{put: {name: {property: value}}, remove: [name]}`, the components
+-- and properties to change. Both reply text, or `{refused: text}`. mua
+-- keeps nothing of a refused save.
 
-use theName, messageFor from messages
+use theName, messageFor, capitalised from messages
 use join, trim from text
+use merge, without, withPath from map
 
 -- why `composition` can't be built by an Account with `builder`, or Nothing.
 -- What a builder may compose is World data: the components whose
@@ -71,6 +80,9 @@ on place thing, composition, actor
     return {refused: "You can't build."}
   end if
   put the builder of account into builder
+  if the place of builder is false then
+    return {refused: "You can't place things."}
+  end if
   if the location of actor is nothing then
     return {refused: "You are nowhere."}
   end if
@@ -102,3 +114,145 @@ on place thing, composition, actor
   put messageFor("place", "msg", about) otherwise `You make ${theName(thing)}.` into message
   return {message: message, placed: placed + 1, max_placed: the max_placed of builder}
 end place
+
+-- why the Account can't edit this thing, or Nothing. Only a placed thing,
+-- one with a Maker, is edited this way. `builder.edit` says which: `none`,
+-- `own` (what the Account made) or `any`.
+function editRefusal thing, account
+  if account is nothing or the builder of account is nothing then
+    return "You can't build."
+  end if
+  if the made_by of thing is nothing then
+    return `Only a thing someone placed can be edited.`
+  end if
+  put the edit of the builder of account into may
+  if may is "any" then
+    return nothing
+  end if
+  if may is "own" and the account of the made_by of thing is account then
+    return nothing
+  end if
+  if may is "own" then
+    return "You didn't make that."
+  end if
+  return "You can't edit things."
+end editRefusal
+
+-- whether a Character holds this, directly or inside something they carry
+function carried thing, seen
+  if the location of thing is nothing then
+    return false
+  end if
+  put the in of the location of thing into holder
+  if holder is nothing or holder is in seen then
+    return false
+  end if
+  if the player of holder is not nothing then
+    return true
+  end if
+  return carried(holder, [...seen, thing])
+end carried
+
+-- why the thing, as written, would strand what it holds or who holds it,
+-- or Nothing. An edit never moves anything to make room.
+function strandRefusal thing
+  ask world to find thing, "location" into inside
+  put the length of inside into held
+  if held > 0 and the container of thing is nothing then
+    return `${capitalised(theName(thing))} holds things: empty it first.`
+  end if
+  if the container of thing is not nothing and the capacity of the container of thing < held then
+    return `${capitalised(theName(thing))} holds ${held} things: it can't hold fewer.`
+  end if
+  if the item of thing is nothing and carried(thing, []) then
+    return `Someone is carrying ${theName(thing)}: it must stay a thing that can be carried.`
+  end if
+  return nothing
+end strandRefusal
+
+-- `patch` applied to `composition`: its `remove`d components gone, and
+-- its `put` properties over the rest. Gives `{composition}`, or
+-- `{refused: text}` when the patch can't be read.
+function patched composition, patch, buildable
+  if kindOf(patch) is not "map" then
+    return {refused: "An edit is a map of what to put and remove."}
+  end if
+  put the optional remove of patch otherwise [] into removes
+  put the optional put of patch otherwise {} into puts
+  if kindOf(removes) is not "list" or kindOf(puts) is not "map" then
+    return {refused: "An edit puts a map of components, and removes a list of them."}
+  end if
+  repeat for each name in removes
+    if name is not in buildable then
+      return {refused: `You can't edit ${name}: only ${join(buildable, ", ")}.`}
+    end if
+    put without(composition, [name]) into composition
+  end repeat
+  repeat for each name in the keys of puts
+    if name is not in buildable then
+      return {refused: `You can't edit ${name}: only ${join(buildable, ", ")}.`}
+    end if
+    put the (name) of puts into changed
+    if kindOf(changed) is not "map" then
+      return {refused: `The ${name} must be a map of its properties.`}
+    end if
+    put the optional (name) of composition otherwise {} into was
+    put withPath(composition, [name], merge(was, changed)) into composition
+  end repeat
+  return {composition: composition}
+end patched
+
+-- The `edit` Verb: opens a placed thing in the actor's composer
+on edit thing, actor
+  if thing is nothing then
+    return {refused: "What do you want to edit?"}
+  end if
+  put editRefusal(thing, the optional account of the player of actor) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  change actor, "editing", {thing: thing}
+  return `You open ${theName(thing)} to edit it.`
+end edit
+
+-- Saving an edit: the thing's components as `patch` changes `current`
+on save thing, patch, current, actor
+  put the optional account of the player of actor into account
+  put editRefusal(thing, account) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+
+  ask mua to buildable into buildable
+  put patched(current, patch, buildable) into result
+  if the optional refused of result is not nothing then
+    return result
+  end if
+  put the composition of result into composition
+  put refusal(composition, nothing) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+
+  repeat for each name in the keys of current
+    if name is not in the keys of composition then
+      remove thing, name
+    end if
+  end repeat
+  repeat for each name in the keys of composition
+    change thing, name, the (name) of composition
+  end repeat
+
+  -- a thing's limits are its Maker's, whoever edits it
+  put the optional builder of the account of the made_by of thing otherwise the builder of account into limits
+  put capacityRefusal(thing, limits) otherwise strandRefusal(thing) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  remove actor, "editing"
+
+  put {actor: actor, target: thing} into about
+  put messageFor("edit", "omsg", about) otherwise `${the name of the player of actor} reshapes ${theName(thing)}.` into others
+  tell mua to announce the in of the location of actor, others, actor
+  return messageFor("edit", "msg", about) otherwise `You reshape ${theName(thing)}.`
+end save

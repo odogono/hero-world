@@ -199,6 +199,61 @@ defmodule MuaServer.CharacterChannelTest do
       ref = push(a, "place", %{"composition" => "lantern"})
       assert_reply(ref, :error, %{reason: "a place needs a composition"})
     end
+
+    test "the edit Verb opens a placed thing in the composer, and an edit saves it (#274)",
+         %{ada: ada} do
+      :ok = MuaWorld.set_component(@world, ada.account, "builder", %{"max_placed" => 100})
+      # the World is shared across tests, so this kettle has a word of its own
+      word = "kettle#{System.unique_integer([:positive])}"
+
+      kettle = %{
+        "described" => %{"name" => "Kettle", "description" => "A copper kettle."},
+        "noun" => %{"words" => [word]},
+        "item" => %{}
+      }
+
+      a = join_as(ada)
+      ref = push(a, "place", %{"composition" => kettle})
+      assert_reply(ref, :ok, %{eid: eid})
+      flush_pushes()
+
+      ref = push(a, "command", %{"text" => "edit #{word}", "ref" => 1})
+      assert_reply(ref, :ok, %{ref: 1})
+      assert_push("output", %{lines: ["You open the kettle to edit it."]})
+      assert_push("compose", %{eid: ^eid, composition: composition})
+      assert composition["described"]["description"] == "A copper kettle."
+      refute Map.has_key?(composition, "made_by")
+
+      # another command doesn't open it again
+      ref = push(a, "command", %{"text" => "look", "ref" => 2})
+      assert_reply(ref, :ok, %{ref: 2})
+      assert_push("state", _)
+      refute_push("compose", _)
+
+      patch = %{"put" => %{"described" => %{"description" => "A dented kettle."}}}
+      ref = push(a, "edit", %{"eid" => eid, "patch" => patch, "ref" => "e1"})
+      assert_reply(ref, :ok, %{ref: "e1", eid: ^eid})
+      assert_push("output", %{lines: ["You reshape the kettle."]})
+      assert MuaWorld.component(@world, eid, "described")["description"] == "A dented kettle."
+
+      # saved, it is closed: a second save must open it again
+      ref = push(a, "edit", %{"eid" => eid, "patch" => patch, "ref" => "e2"})
+      assert_reply(ref, :error, %{ref: "e2", reason: "Open it with edit first."})
+
+      ref = push(a, "command", %{"text" => "edit #{word}"})
+      assert_reply(ref, :ok, _)
+      assert_push("compose", %{eid: ^eid})
+      ref = push(a, "stop_editing", %{})
+      assert_reply(ref, :ok)
+      assert MuaWorld.editing(@world, ada.account, ada.character) == {:ok, nil}
+    end
+
+    test "an edit without an eid and a patch is refused without reaching the World",
+         %{ada: ada} do
+      a = join_as(ada)
+      ref = push(a, "edit", %{"eid" => "kettle", "patch" => %{}})
+      assert_reply(ref, :error, %{reason: "an edit needs an eid and a patch"})
+    end
   end
 
   describe "the controlling Connection" do

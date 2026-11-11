@@ -146,6 +146,7 @@ export const afters = (store: Store, ctx: Context) =>
 const SERVICES: Record<string, string> = {
   close: 'open',
   drop: 'thing',
+  edit: 'build',
   examine: 'thing',
   help: 'help',
   inventory: 'thing',

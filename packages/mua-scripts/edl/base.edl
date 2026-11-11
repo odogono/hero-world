@@ -112,6 +112,11 @@ entity base_verbs {
         ]
         incomplete: "What do you want to say?"
       }
+      {
+        names: ["edit"]
+        forms: [{ handler: "edit" pattern: "obj" }]
+        incomplete: "What do you want to edit?"
+      }
     ]
   }
 
