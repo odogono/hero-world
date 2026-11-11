@@ -487,6 +487,24 @@ test("a Service Script's code can be replaced, keeping its Grants", async () => 
   ).toBe(2);
 });
 
+test('a change keeps a Handle inside a map as its entity', async () => {
+  const { get, id, talk } = await setup();
+  talk.putServiceScript(
+    'probe',
+    'on run who, place\n  change who, "location", {in: place}\nend run'
+  );
+  await settle(
+    talk,
+    talk.requestService(
+      'probe',
+      'run',
+      [h(talk, id('hero')), h(talk, id('cellar'))],
+      now()
+    )
+  );
+  expect(get(id('hero'), 'location')).toEqual({ in: id('cellar') });
+});
+
 test('a Service Script that fails to load can be loaded again', async () => {
   const { id, talk } = await setup();
   const hero = h(talk, id('hero'));

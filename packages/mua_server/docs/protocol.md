@@ -25,11 +25,13 @@ Joining brings the Character into play, or resumes control of it, and takes over
 
 ### From the client
 
-| Event     | Payload                                                                      | Reply                                                                                |
-| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `command` | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}`             |
-| `place`   | `{composition, ref?}`: a map of component names to their data                | `ok {ref, eid, placed, max_placed}` once the thing is placed; `error {ref?, reason}` |
-| `logout`  | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes                     |
+| Event          | Payload                                                                      | Reply                                                                                |
+| -------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `command`      | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}`             |
+| `place`        | `{composition, ref?}`: a map of component names to their data                | `ok {ref, eid, placed, max_placed}` once the thing is placed; `error {ref?, reason}` |
+| `logout`       | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes                     |
+| `edit`         | `{eid, patch, ref?}`: the thing the `edit` Verb opened, and what to change   | `ok {ref, eid}` once the edit is saved; `error {ref?, reason}`                       |
+| `stop_editing` | `{}`                                                                         | `ok`; the thing the `edit` Verb opened is closed without saving                      |
 
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
@@ -55,6 +57,31 @@ A refused `place` writes nothing. A placed thing records its Maker, the Account,
 }
 ```
 
+A Builder edits a thing it placed in two steps (#274). The `edit` Verb (`edit satchel`) opens a placed thing within reach; the server then pushes `compose` with the thing's composition as it stands. Saving sends `edit` with a patch: the components to add or change, with only the properties that changed, and the components to remove. Properties left out keep their values, so an edit doesn't undo what play changed meanwhile, such as someone closing the satchel.
+
+```json
+{
+  "eid": 42,
+  "patch": {
+    "put": {
+      "described": { "description": "A battered satchel." },
+      "readable": { "text": "Property of ada." }
+    },
+    "remove": ["container"]
+  },
+  "ref": 8
+}
+```
+
+The `build` Service Script decides, as for a `place`, and refuses with the `reason` to show, unless:
+
+- the thing is the one the `edit` Verb opened, and is still in the room or carried;
+- the Account is a Builder whose `edit` permission covers it: `own` for things it made, `any` for any placed thing, never `none`;
+- the thing as edited keeps to the rules of a `place`, with its Maker's `max_capacity`, whoever edits;
+- it strands nothing: a container that holds things keeps `container` and room for them, and a thing a Character carries keeps `item`.
+
+A refused edit writes nothing, and the thing stays open. A saved one closes it, and the room is told the Builder reshaped it. An edit never changes a thing's Maker, location or Home, nor uses up its Maker's `max_placed`.
+
 An Admin makes an Account a Builder at the `;` prompt, and stops it building there; what it placed stays:
 
 ```
@@ -62,7 +89,7 @@ An Admin makes an Account a Builder at the `;` prompt, and stops it building the
 ;remove the account of the player of actor, "builder"
 ```
 
-For another player in the room, `element "bob" of here` stands for their Character. `{max_placed: 10, max_capacity: 5}` sets other limits than the defaults (50 and 20).
+For another player in the room, `element "bob" of here` stands for their Character. `{max_placed: 10, max_capacity: 5}` sets other limits than the defaults (50 and 20). `builder` also holds the Account's permissions: `place` (`true` or `false`, default `true`) and `edit` (`"none"`, `"own"` or `"any"`, default `"own"`). An Admin who will edit others' things gives themselves `{edit: "any"}`.
 
 A `command` whose text starts with `;` is a line of NorthTalk for an admin, one whose email is on `MUA_ADMINS` (#91). It runs as one Step and changes nothing unless it completes. Its result comes back as `output` to that admin only, `=> value` or `!! ` and why. Anyone else is told "You can't do that."
 
@@ -74,6 +101,7 @@ A `command` whose text starts with `;` is a line of NorthTalk for an admin, one 
 | `state`   | `{room: {name, description, exits, items, players}, inventory, actions}` | On joining, and after each command. `actions` are commands the Character could type next.                                                                                                                                                          |
 | `prompt`  | `{text, options}`                                                        | After a command, while the Character must choose: "Which do you mean?". The next command answers it, by an option's number (from 1) or words that pick one. A choice whose thing has gone is refused, never swapped for another.                   |
 | `status`  | `{status}`                                                               | `connected` on joining; `replaced` when another Connection takes over, just before this one closes; `limbo` on logging out.                                                                                                                        |
+| `compose` | `{eid, composition}`                                                     | After the `edit` Verb opens a placed thing, and again on rejoining while it is open: its buildable components as they stand, for the composer.                                                                                                     |
 | `mirror`  | `{character, place, components: {name: [row]}}`                          | On joining. Only what the Character perceives: its place, the Elements there it can see, and what it carries, as rows in the shared layout (ADR 0019), each with its `eid`.                                                                        |
 | `changes` | `{place, gone, put, remove}`                                             | After each Step that changed what the Character perceives. `gone`: eids to drop entirely; `put`: rows to add or replace; `remove`: `{name: [eid]}` components to drop. A client that missed one rejoins for a fresh `mirror`; nothing is replayed. |
 

@@ -168,16 +168,26 @@ const account = defineComponent({
 });
 
 /**
- * An Account that may build: how many things it may place in all, and the
- * largest container it may make
+ * An Account that may build: whether it may place, and which placed things
+ * it may edit (`none`, `own` or `any`); how many things it may place in all,
+ * and the largest container it may make
  */
 const builder = defineComponent({
   id: 'builder',
   playState: true,
   schema: {
+    edit: s.string().default('own').optional(),
     max_capacity: s.int().default(20).optional(),
-    max_placed: s.int().default(50).optional()
+    max_placed: s.int().default(50).optional(),
+    place: s.boolean().default(true).optional()
   }
+});
+
+/** The placed thing a Character has open in the composer */
+const editing = defineComponent({
+  id: 'editing',
+  playState: true,
+  schema: { thing: s.entityId().onDelete('nullify') }
 });
 
 /** The Maker of a placed thing: the Account that built it */
@@ -226,6 +236,7 @@ export const components = [
   described,
   account,
   builder,
+  editing,
   made_by,
   player
 ];

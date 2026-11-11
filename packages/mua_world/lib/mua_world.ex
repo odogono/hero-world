@@ -54,7 +54,7 @@ defmodule MuaWorld do
     Talk
   }
 
-  alias MuaWorld.Commands.Verbs
+  alias MuaWorld.Commands.{Scope, Verbs}
   alias OdgnEcsEngine.Delivery
 
   import OdgnEcsEngine, only: [instant_us: 1]
@@ -173,6 +173,33 @@ defmodule MuaWorld do
   """
   def place(world, account, character, composition),
     do: GenServer.call(world, {:place, account, character, composition}, 30_000)
+
+  @doc """
+  The placed thing a Character has open to edit, after the `edit` Verb
+  opened it (#274), as `{:ok, %{eid, composition}}`: its buildable
+  components as they stand. `{:ok, nil}` when it has none open, and
+  `{:error, :not_owner}` if the Account doesn't own the Character.
+  """
+  def editing(world, account, character),
+    do: GenServer.call(world, {:editing, account, character})
+
+  @doc """
+  Saves an edit to the placed thing a Character has open, as one Step
+  (#274). `patch` is `%{"put" => %{name => properties}, "remove" =>
+  [name]}`. The thing must be the one the `edit` Verb opened, and still
+  within the Character's reach; whether the edit may be made is the
+  `build` Service Script's to decide. A saved edit closes the thing.
+
+  Returns `{:ok, %{eid}}`, or `{:error, reason}` with nothing written: the
+  refusal as text, or `:not_owner` and `:not_in_play` as `command/4` gives
+  them.
+  """
+  def edit(world, account, character, eid, patch),
+    do: GenServer.call(world, {:edit, account, character, eid, patch}, 30_000)
+
+  @doc "Closes the thing a Character has open to edit, if any, as one Step."
+  def stop_editing(world, account, character),
+    do: GenServer.call(world, {:stop_editing, account, character}, 30_000)
 
   @doc """
   An Account's building limits and how many things it has placed, as
@@ -636,6 +663,41 @@ defmodule MuaWorld do
     with :ok <- owns(state, account, character),
          :ok <- in_play(state, character) do
       reply_result(advance_clock(state), &place_thing(&1, character, composition))
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:editing, account, character}, _from, state) do
+    with :ok <- owns(state, account, character) do
+      reply =
+        case OdgnEcs.get(state.world, character, "editing") do
+          %{"thing" => thing} when is_integer(thing) ->
+            %{eid: thing, composition: composition(state.world, thing)}
+
+          _ ->
+            nil
+        end
+
+      {:reply, {:ok, reply}, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:edit, account, character, eid, patch}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character),
+         :ok <- editing_this(state, character, eid) do
+      reply_result(advance_clock(state), &save_edit(&1, character, eid, patch))
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:stop_editing, account, character}, _from, state) do
+    with :ok <- owns(state, account, character) do
+      reply_result(state, &OdgnEcs.remove(&1.world, character, "editing"))
     else
       error -> {:reply, error, state}
     end
@@ -1159,6 +1221,86 @@ defmodule MuaWorld do
   defp placed_reply(other) do
     why = MuaWorld.Admin.failure(other)
     Logger.warning("build failed: #{why}", event: :build_failed)
+    {:error, "That can't be built: #{why}"}
+  end
+
+  # Only the thing the `edit` Verb opened can be saved, and only while it
+  # is still within reach, as the Verb found it
+  defp editing_this(state, character, eid) do
+    world = state.world
+
+    cond do
+      OdgnEcs.get(world, character, "editing") != %{"thing" => eid} ->
+        {:error, "Open it with edit first."}
+
+      not Enum.any?(Scope.in_reach(world, character, "here"), &(&1.id == eid)) ->
+        {:error, "You can't reach that from here."}
+
+      true ->
+        :ok
+    end
+  end
+
+  # A placed thing's buildable components, as they stand
+  defp composition(world, thing) do
+    for {name, %{buildable: true}} <- world.components,
+        data = OdgnEcs.get(world, thing, name),
+        into: %{},
+        do: {name, data}
+  end
+
+  # An edit to a placed thing, which the `build` Service checks and writes,
+  # in a savepoint released only if it did, as `place_thing/3` does
+  defp save_edit(state, actor, thing, patch) do
+    world = state.world
+    talk = state.talk
+    :ok = OdgnEcs.savepoint(world, "mua_edit")
+
+    {:ok, pending} =
+      OdgnEcsEngine.deliver(state.step, %Delivery{
+        to: {:service, "build"},
+        message: "save",
+        args: [
+          OdgnEcsTalk.handle(talk, thing),
+          OdgnEcsTalk.Values.to_value(patch),
+          OdgnEcsTalk.Values.to_value(composition(world, thing)),
+          OdgnEcsTalk.handle(talk, actor)
+        ],
+        asks: :request
+      })
+
+    :ok = OdgnEcsEngine.pump(state.step)
+    outcome = OdgnEcsTalk.outcome(pending)
+    if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
+
+    case edited_reply(outcome) do
+      {:ok, message} ->
+        :ok = OdgnEcs.release(world, "mua_edit")
+        tell(state, actor, message)
+        {:ok, %{eid: thing}}
+
+      {:error, reason} ->
+        :ok = OdgnEcs.rollback_to(world, "mua_edit")
+        {:error, reason}
+    end
+  end
+
+  defp edited_reply({:replied, message}) when is_binary(message), do: {:ok, message}
+
+  defp edited_reply({:replied, %NorthTalk.Map{} = value}) do
+    case OdgnEcsTalk.Values.from_value(value) do
+      %{"refused" => reason} when is_binary(reason) ->
+        {:error, reason}
+
+      value ->
+        Logger.error("build replied #{inspect(value)}", event: :malformed_reply)
+        {:error, "Something went wrong."}
+    end
+  end
+
+  defp edited_reply(other) do
+    why = MuaWorld.Admin.failure(other)
+    Logger.warning("edit failed: #{why}", event: :build_failed)
     {:error, "That can't be built: #{why}"}
   end
 

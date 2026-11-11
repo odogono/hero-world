@@ -584,6 +584,8 @@ export const startMuaWorld = async (
         resultOf(() => {
           const eid = store.db.addEntity();
           put(store, eid, 'account', {});
+          // Scripts reach an Account through its Characters' `player.account`
+          talk.handle(eid);
           return eid;
         })
       ),

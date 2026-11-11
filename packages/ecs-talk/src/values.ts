@@ -2,6 +2,7 @@ import type { Component } from 'odgn-ecs/store';
 
 import {
   Decimal,
+  Value,
   bool,
   dec,
   fromValue,
@@ -10,8 +11,7 @@ import {
   nothing,
   num,
   text,
-  type HostObject,
-  type Value
+  type HostObject
 } from '@northtalk/ts';
 
 /**
@@ -88,6 +88,11 @@ const isHandle = (v: unknown): v is HostObject<EntityNative> =>
 export const isDecimal = (v: unknown): v is Decimal =>
   typeof v === 'object' && v !== null && v.constructor === Decimal;
 
+const isValue = (v: unknown): v is Value =>
+  typeof v === 'object' &&
+  v !== null &&
+  typeof (v as Value).asObject === 'function';
+
 const plain = (v: unknown): unknown => {
   if (isDecimal(v)) {
     return Number(v.toString());
@@ -97,6 +102,11 @@ const plain = (v: unknown): unknown => {
   }
   if (isHandle(v)) {
     return v.native.eid;
+  }
+  // a Handle inside a list or map stays a Value
+  if (isValue(v)) {
+    const o = v.asObject();
+    return isHandle(o) ? o.native.eid : v;
   }
   if (Array.isArray(v)) {
     return v.map(plain);
