@@ -29,12 +29,24 @@ An Account allowed to change the World live from the browser, beyond what play a
 _Avoid_: operator, superuser, wizard
 
 **Builder**:
-An Account allowed to place new things in the World as it plays, within its limits: how many it may place, and how big a container it may make. An Admin makes an Account a Builder, and can stop it building; what it placed stays.
+An Account allowed to place new things in the World as it plays, or change things already placed, as far as its permissions and limits allow. Its permissions say whether it may place, and whether it may change only what it made or anything placed; its limits, how many it may place and how big a container it may make. An Admin makes an Account a Builder, and can stop it building; what it placed stays.
 _Avoid_: creator, author, owner
 
 **Maker**:
-The Account that placed a thing. The World keeps it with the thing, and never shows it to the browser.
+The Account that placed a thing. The World keeps it with the thing, and shows it only through its Signature.
 _Avoid_: owner (which is a Script's), creator, author
+
+**Signature**:
+The one Character that speaks for an Account wherever it is shown as a Maker, the same on everything it made.
+_Avoid_: byline, author name
+
+**Store**:
+To take a placed thing out of play by moving it to Limbo, from where it can be brought back. A stored thing still counts against its Maker's limit.
+_Avoid_: soft delete, recycle, trash
+
+**Destroy**:
+To remove a placed thing for good, taking away every component it has, so nothing of it is left and it no longer counts against its Maker's limit.
+_Avoid_: delete, recycle, store (for this)
 
 ## World data
 
