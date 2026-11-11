@@ -143,6 +143,14 @@ defmodule MuaServer.CharacterChannel do
     {:noreply, refresh(socket)}
   end
 
+  def handle_info(
+        {:mua, character, %{text: text, suggestions: suggestions}},
+        %{assigns: %{character: character}} = socket
+      ) do
+    push(socket, "output", Protocol.output([text], suggestions))
+    {:noreply, socket}
+  end
+
   def handle_info({:mua, character, text}, %{assigns: %{character: character}} = socket) do
     push(socket, "output", Protocol.output([text]))
     {:noreply, socket}

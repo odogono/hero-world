@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { Profile } from './Profile';
-import { Builder } from './builder/Builder';
+import { ComposerPanel } from './composer/ComposerPanel';
 import {
   loadLocal,
   logout,
   mirrorSnapshot,
   place,
+  saveEdit,
   saveLocal,
-  sendCommand
+  sendCommand,
+  stopEditing
 } from './connection';
 import {
   actions,
   builder,
   commands,
+  editing,
   lines,
   status,
   type Status
@@ -31,13 +34,16 @@ const STATUS_TEXT: Record<Status, string> = {
 /**
  * A transcript line. Only the latest choice can be answered by clicking: a
  * choice answers by its number, so an older list's numbers would mean
- * nothing now.
+ * nothing now. A line's Suggestions stay clickable: each is a Command, as
+ * if typed, which the World answers as it is now (#275).
  */
 const TranscriptLine = ({
   answerable,
+  joined,
   line
 }: {
   answerable: boolean;
+  joined: boolean;
   line: Line;
 }) => {
   switch (line.kind) {
@@ -79,6 +85,27 @@ const TranscriptLine = ({
               </li>
             ))}
           </ol>
+        </li>
+      );
+    case 'output':
+      return (
+        <li class="line output">
+          {line.text}
+          {line.suggestions && line.suggestions.length > 0 && (
+            <span class="suggestions">
+              {line.suggestions.map(suggestion => (
+                <button
+                  class="chip"
+                  disabled={!joined}
+                  key={suggestion}
+                  onClick={() => sendCommand(suggestion)}
+                  type="button"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </span>
+          )}
         </li>
       );
     default:
@@ -130,7 +157,7 @@ const BlockCaret = ({ at, text }: { at: number; text: string }) => (
  * Shift+Enter starts a new line, for an admin's NorthTalk of more than one
  * statement.
  */
-const Composer = ({ joined }: { joined: boolean }) => {
+const CommandBox = ({ joined }: { joined: boolean }) => {
   const [text, setText] = useState('');
   const [caret, setCaret] = useState<number | null>(null);
   /** how far back ↑ has gone through sent commands; null while typing anew */
@@ -222,11 +249,11 @@ const Composer = ({ joined }: { joined: boolean }) => {
 
   return (
     <form
-      class="composer"
+      class="command-box"
       onClick={() => box.current?.focus()}
       onSubmit={submit}
     >
-      <div class={`composer-input${NATIVE_BLOCK ? '' : ' drawn-caret'}`}>
+      <div class={`command-box-input${NATIVE_BLOCK ? '' : ' drawn-caret'}`}>
         {!NATIVE_BLOCK && caret !== null && (
           <BlockCaret at={caret} text={text} />
         )}
@@ -255,7 +282,7 @@ const Composer = ({ joined }: { joined: boolean }) => {
           value={text}
         />
       </div>
-      <div class="composer-bar">
+      <div class="command-box-bar">
         <span class="hint">
           <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new
           line
@@ -291,10 +318,12 @@ export const Play = ({
 }) => {
   const end = useRef<HTMLLIElement>(null);
   const joined = status.value === 'joined';
-  // the composer (#260), for a Builder only
+  // the Composer (#260), for a Builder only: opened by Compose, or with a
+  // placed thing the `edit` Verb opened (#275)
   const limits = builder.value;
+  const opened = editing.value;
   const [building, setBuilding] = useState(false);
-  const composing = building && limits !== null && joined;
+  const composing = (building || opened !== null) && limits !== null && joined;
   const count = lines.value.length;
   const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
 
@@ -306,13 +335,32 @@ export const Play = ({
     }
   }, [count]);
 
+  // closing an edit without saving closes the thing in the World too
+  const close = () => {
+    if (editing.value) {
+      stopEditing();
+    }
+    setBuilding(false);
+  };
+
+  // an edit arrived over unsaved changes, which the Builder kept: the World
+  // has opened the new thing, so a new draft closes it, and a placed
+  // thing's draft opens that thing again
+  const keep = (keeping: string | undefined) => {
+    if (keeping === undefined) {
+      stopEditing();
+    } else {
+      sendCommand(`edit the ${keeping.toLowerCase()}`);
+    }
+  };
+
   const leave = async () => {
     await logout();
     onLeft();
   };
 
   return (
-    <div class={composing ? 'play building' : 'play'}>
+    <div class={composing ? 'play composing' : 'play'}>
       <header>
         <strong class="brand">MUA</strong>
         <span class="version">v{MUA_VERSION}</span>
@@ -348,6 +396,7 @@ export const Play = ({
         {lines.value.map(line => (
           <TranscriptLine
             answerable={joined && line.id === lastPrompt}
+            joined={joined}
             key={line.id}
             line={line}
           />
@@ -383,21 +432,25 @@ export const Play = ({
         {limits && (
           <button
             aria-pressed={composing}
-            class="build-toggle"
+            class="compose-toggle"
             disabled={!joined}
-            onClick={() => setBuilding(!building)}
+            onClick={() => (composing ? close() : setBuilding(true))}
             type="button"
           >
-            Build
+            Compose
           </button>
         )}
-        <Composer joined={joined} />
+        <CommandBox joined={joined} />
       </div>
       {composing && (
-        <Builder
+        <ComposerPanel
+          editing={opened}
           limits={limits}
-          onClose={() => setBuilding(false)}
+          onClose={close}
+          onDecline={keep}
+          onSaved={() => setBuilding(false)}
           place={place}
+          save={saveEdit}
           snapshot={mirrorSnapshot}
         />
       )}

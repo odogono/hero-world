@@ -167,6 +167,45 @@ describe('Try it', () => {
     );
   });
 
+  test('an edited thing stands in place of its copy, where it is (#275)', async () => {
+    // Ada edits the lamp she carries: no container, new words
+    const preview = await tryIt({
+      composition: {
+        described: { description: 'A dented lamp.', name: 'Lamp' },
+        readable: { text: 'Made in Hall.' }
+      },
+      mirror: MIRROR,
+      replaces: 12
+    });
+    const lamp = composed(preview);
+    expect(originOf(preview, 'composition')).toHaveLength(1);
+    expect(
+      originOf(preview, 'perceived').some(
+        ([, o]) => (o as { eid: number }).eid === 12
+      )
+    ).toBe(false);
+    expect(get(preview.store, lamp, 'location')).toEqual({
+      in: preview.author
+    });
+    expect(get(preview.store, lamp, 'described')?.description).toBe(
+      'A dented lamp.'
+    );
+    // a buildable component the edit took away is gone from the copy
+    expect(get(preview.store, lamp, 'item')).toBeUndefined();
+    const read = await preview.command('read lamp');
+    expect(read.lines.join('\n')).toContain('Made in Hall.');
+    preview.close();
+  });
+
+  test("an edited thing the mirror doesn't hold is made in the room", async () => {
+    const preview = await tryIt({ ...SATCHEL, replaces: 99 });
+    const satchel = composed(preview);
+    expect(get(preview.store, satchel, 'location')).toEqual({
+      in: get(preview.store, preview.author!, 'location')!.in
+    });
+    preview.close();
+  });
+
   test('a Try it World is not migrated', async () => {
     const preview = await tryIt();
     expect(await preview.migrate('entity x {}')).toEqual({

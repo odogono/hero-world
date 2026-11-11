@@ -177,7 +177,9 @@ defmodule MuaServer.CharacterChannelTest do
       ref = push(a, "place", %{"composition" => @lantern, "ref" => "p1"})
       assert_reply(ref, :ok, %{ref: "p1", eid: eid, placed: placed, max_placed: 100})
       assert placed == before + 1
-      assert_push("output", %{lines: ["You make the lantern."]})
+
+      assert_push("output", %{lines: ["You make the lantern."], suggestions: ["edit the lantern"]})
+
       assert_push("state", %{room: %{items: items}})
       assert Enum.any?(items, &(&1 =~ "Lantern"))
 

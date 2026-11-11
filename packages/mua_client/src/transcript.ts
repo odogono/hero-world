@@ -11,7 +11,8 @@ export type Line =
   | { id: number; kind: 'error'; text: string }
   /** output may have been missed: after a dropped Connection, or a reload */
   | { id: number; kind: 'gap'; reason?: 'drop' | 'reload' }
-  | { id: number; kind: 'output'; text: string }
+  /** `suggestions`: Commands the line offers, to send with one click */
+  | { id: number; kind: 'output'; suggestions?: string[]; text: string }
   | { id: number; kind: 'prompt'; options: string[]; text: string }
   | { id: number; kind: 'status'; text: string };
 

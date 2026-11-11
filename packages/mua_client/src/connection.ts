@@ -7,7 +7,15 @@ import type {
 } from 'mua-local';
 import { Socket, type Channel } from 'phoenix';
 
-import { actions, builder, lines, status, type Builder } from './store';
+import {
+  actions,
+  builder,
+  editing,
+  lines,
+  status,
+  type Builder,
+  type Editing
+} from './store';
 import {
   append,
   confirmed,
@@ -17,7 +25,7 @@ import {
   unconfirmed
 } from './transcript';
 
-type Output = { lines: string[] };
+type Output = { lines: string[]; suggestions?: string[] };
 type Prompt = { options: string[]; text: string };
 type State = { actions?: string[] };
 type Status = { status: 'connected' | 'limbo' | 'replaced' };
@@ -82,10 +90,19 @@ export const connect = (token: string, character: number) => {
 
   let joinedBefore = false;
   channel = socket.channel(`character:${character}`);
-  channel.on('output', ({ lines: told }: Output) => {
-    for (const text of told) {
-      add({ kind: 'output', text });
-    }
+  channel.on('output', ({ lines: told, suggestions }: Output) => {
+    told.forEach((text, i) =>
+      add(
+        // the Suggestions go with the last line
+        suggestions?.length && i === told.length - 1
+          ? { kind: 'output', suggestions, text }
+          : { kind: 'output', text }
+      )
+    );
+  });
+  // a placed thing the `edit` Verb opened, for the Composer (#275)
+  channel.on('compose', (opened: Editing) => {
+    editing.value = opened;
   });
   channel.on('state', ({ actions: next }: State) => {
     actions.value = next ?? [];
@@ -286,6 +303,56 @@ export const place = (composition: Record<string, unknown>) =>
       );
   });
 
+/** What saving an edit came to: done, or the World's reason for refusing */
+export type Saved = { ok: true } | { ok: false; reason: string };
+
+/**
+ * A patch to a placed thing: the components to add or change, with only
+ * the properties that changed, and those to remove
+ */
+export type Patch = {
+  put: Record<string, Record<string, unknown>>;
+  remove: string[];
+};
+
+let edits = 0;
+
+/**
+ * Saves an edit to the placed thing the `edit` Verb opened (#275). The
+ * World checks it all; a saved edit closes the thing, a refused one leaves
+ * it open.
+ */
+export const saveEdit = (eid: number, patch: Patch) =>
+  new Promise<Saved>(resolve => {
+    if (!channel || status.value !== 'joined' || !socket?.isConnected()) {
+      resolve({ ok: false, reason: "You aren't connected." });
+      return;
+    }
+    channel
+      .push('edit', { eid, patch, ref: `edit-${++edits}` })
+      .receive('ok', () => {
+        editing.value = null;
+        resolve({ ok: true });
+      })
+      .receive('error', ({ reason }: { reason: string }) =>
+        resolve({ ok: false, reason })
+      )
+      .receive('timeout', () =>
+        resolve({
+          ok: false,
+          reason: 'No answer from the World yet: it may have been saved.'
+        })
+      );
+  });
+
+/** Closes the thing the `edit` Verb opened, without saving */
+export const stopEditing = () => {
+  editing.value = null;
+  if (channel && status.value === 'joined') {
+    channel.push('stop_editing', {});
+  }
+};
+
 /** Leaves the World: the Character goes to Limbo at once */
 export const logout = () => (worker ? logoutLocal() : logoutRemote());
 
@@ -321,6 +388,7 @@ const logoutRemote = () =>
     socket = undefined;
     channel = undefined;
     // nothing of the World stays in the browser once the Character has left
+    editing.value = null;
     mirror?.terminate();
     mirror = undefined;
   });

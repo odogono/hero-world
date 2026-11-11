@@ -29,4 +29,22 @@ defmodule MuaWorld.TablesTest do
              "SELECT name FROM sqlite_master WHERE name IN ('mua_meta', 'mua_waiting')"
            ) == []
   end
+
+  test "an outbox from before Suggestions gains them, and its lines keep" do
+    {:ok, world} = OdgnEcs.open(":memory:")
+
+    SQL.exec!(world.conn, """
+    CREATE TABLE mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
+    INSERT INTO mua_outbox (character, text) VALUES (7, 'You wake.');
+    """)
+
+    :ok = MuaWorld.Tables.ensure(world)
+    :ok = MuaWorld.Tables.ensure(world)
+    MuaWorld.Tables.output(world, 7, "You make the satchel.", ["edit the satchel"])
+
+    assert MuaWorld.Tables.take_outbox(world) == [
+             {7, "You wake."},
+             {7, %{text: "You make the satchel.", suggestions: ["edit the satchel"]}}
+           ]
+  end
 end

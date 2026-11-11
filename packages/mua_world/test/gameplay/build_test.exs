@@ -30,7 +30,8 @@ defmodule MuaWorld.BuildTest do
     received(bob)
 
     assert {:ok, %{eid: satchel, placed: 1, max_placed: 50}} = place(world, ada, @satchel)
-    assert received(ada) == ["You make the satchel."]
+    # the line offers its Maker a way back to it (#275)
+    assert received(ada) == [%{text: "You make the satchel.", suggestions: ["edit the satchel"]}]
     assert received(bob) == ["ada makes the satchel."]
 
     assert location(world, satchel) == location(world, ada)

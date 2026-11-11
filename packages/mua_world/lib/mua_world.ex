@@ -265,8 +265,9 @@ defmodule MuaWorld do
     do: GenServer.call(world, {:leave, account, character}, 30_000)
 
   @doc """
-  Sends the calling process `{:mua, character, text}` for each line of the
-  Character's output, from now on. Notices left from before a restart come
+  Sends the calling process `{:mua, character, line}` for each line of the
+  Character's output, from now on: its text, or `%{text, suggestions}` when
+  it offers Suggestions. Notices left from before a restart come
   first.
   """
   def subscribe(world, character), do: GenServer.call(world, {:subscribe, character, self()})
@@ -553,9 +554,9 @@ defmodule MuaWorld do
   end
 
   defp publish(table, lines) do
-    for {character, text} <- lines,
+    for {character, line} <- lines,
         pid <- subscribers(table, character),
-        do: send(pid, {:mua, character, text})
+        do: send(pid, {:mua, character, line})
   end
 
   defp subscribers(table, character) do
@@ -1183,9 +1184,9 @@ defmodule MuaWorld do
     if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
 
     case placed_reply(outcome) do
-      {:ok, message, reply} ->
+      {:ok, message, suggestions, reply} ->
         :ok = OdgnEcs.release(world, "mua_place")
-        tell(state, actor, message)
+        tell(state, actor, message, suggestions)
         {:ok, Map.put(reply, :eid, thing)}
 
       {:error, reason} ->
@@ -1198,7 +1199,8 @@ defmodule MuaWorld do
   end
 
   # What the `build` Service's reply means: `{message, placed, max_placed}`
-  # when it placed the thing, `{refused: text}` when it said no
+  # when it placed the thing, with any `suggestions` the message offers
+  # (#275), and `{refused: text}` when it said no
   defp placed_reply({:replied, %NorthTalk.Map{} = value}) do
     value = OdgnEcsTalk.Values.from_value(value)
 
@@ -1208,7 +1210,8 @@ defmodule MuaWorld do
 
       %{"message" => message, "placed" => placed, "max_placed" => max}
       when is_binary(message) and is_integer(placed) and is_integer(max) ->
-        {:ok, message, %{placed: placed, max_placed: max}}
+        suggestions = Enum.filter(List.wrap(value["suggestions"]), &is_binary/1)
+        {:ok, message, suggestions, %{placed: placed, max_placed: max}}
 
       _ ->
         Logger.error("build replied #{inspect(value)}", event: :malformed_reply)
@@ -1308,8 +1311,8 @@ defmodule MuaWorld do
   defp placed(world, account),
     do: length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))
 
-  defp tell(state, character, text) do
-    Tables.output(state.world, character, text)
+  defp tell(state, character, text, suggestions \\ []) do
+    Tables.output(state.world, character, text, suggestions)
     state
   end
 end

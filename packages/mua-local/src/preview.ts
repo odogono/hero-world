@@ -11,6 +11,7 @@ import {
   inSavepoint,
   put,
   query,
+  remove,
   takeChanges,
   type ChangeSetEntry,
   type Data,
@@ -37,6 +38,11 @@ export type PreviewSource =
 export type TryIt = {
   composition: Record<string, Data>;
   mirror: MirrorSnapshot;
+  /**
+   * A placed thing being edited (#275), by its id in the mirror: the
+   * composition stands in its place, where it is, rather than beside it
+   */
+  replaces?: Eid;
 };
 
 /**
@@ -300,7 +306,11 @@ entity ${TRY_IT_ROOM} {
  * stand-in, carrying copies of what they carry. What the mirror names but
  * doesn't hold, such as where an exit leads, becomes a placeholder.
  */
-const seedTryIt = (store: Store, room: Eid, { composition, mirror }: TryIt) => {
+const seedTryIt = (
+  store: Store,
+  room: Eid,
+  { composition, mirror, replaces }: TryIt
+) => {
   if (mirror.place === null) {
     throw new Error(
       'The Character is nowhere, so there is no room to try it in'
@@ -391,11 +401,24 @@ const seedTryIt = (store: Store, room: Eid, { composition, mirror }: TryIt) => {
   put(store, standIn, 'meta', { props: { id: name.toLowerCase() } });
   put(store, standIn, 'location', { in: room });
 
-  const thing = make({ kind: 'composition' });
+  // an edited thing takes the place of its copy, carried or not, so there
+  // aren't two of it; one the mirror no longer holds is made anew
+  const copy = replaces === undefined ? undefined : ids.get(replaces);
+  const thing = copy ?? make({ kind: 'composition' });
+  if (copy !== undefined) {
+    origins.set(copy, { kind: 'composition' });
+    for (const [name, c] of store.components) {
+      if (c.buildable && !(name in composition)) {
+        remove(store, copy, name);
+      }
+    }
+  }
   for (const [component, data] of Object.entries(composition)) {
     put(store, thing, component, data);
   }
-  put(store, thing, 'location', { in: room });
+  if (copy === undefined) {
+    put(store, thing, 'location', { in: room });
+  }
 
   return { account, origins, outside, standIn, thing };
 };

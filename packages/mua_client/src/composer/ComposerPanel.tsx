@@ -14,9 +14,9 @@ import type {
   TryItOrigin
 } from 'mua-local';
 
-import type { Placed } from '../connection';
+import type { Patch, Placed, Saved } from '../connection';
 import { openPreviewClient, type PreviewClient } from '../preview/client';
-import type { Builder as Limits } from '../store';
+import type { Editing, Builder as Limits } from '../store';
 import {
   REQUIRED,
   abilities,
@@ -24,9 +24,11 @@ import {
   fieldOrder,
   fresh,
   nameOf,
+  patchOf,
   problems,
   startFields,
   toSend,
+  unchanged,
   wordsOf,
   type Composition
 } from './composition';
@@ -35,32 +37,69 @@ type Tab = 'compose' | 'try';
 
 type Tried = { text: string } & PreviewResult;
 
+/** A placed thing open in the Composer: its id, and how it stood */
+type Opened = { composition: Composition; eid: number; name: string };
+
+const openedFrom = (editing: Editing): Opened => ({
+  composition: editing.composition,
+  eid: editing.eid,
+  name: nameOf(editing.composition).trim()
+});
+
 /**
- * The composer (#260): a Builder makes a new thing from component cards,
+ * The Composer (#260): a Builder makes a new thing from component cards,
  * tries it out in a private copy of where they stand (#259), and places it
  * in their room (#258). Nothing reaches the World until Place, and the
  * World checks it all again then.
+ *
+ * Given a placed thing the `edit` Verb opened, it edits that instead
+ * (#275): Save sends what changed, and Try it puts the edited thing where
+ * the real one is.
  */
-export const Builder = ({
+export const ComposerPanel = ({
   client: given,
+  editing = null,
   limits,
   onClose,
+  onDecline,
+  onSaved,
   place,
+  save,
   snapshot
 }: {
   /** In tests, a stand-in for the Preview World's Worker */
   client?: PreviewClient;
+  /** The placed thing the `edit` Verb opened, if any */
+  editing?: Editing | null;
   limits: Limits;
   onClose: () => void;
+  /**
+   * An edit arrived over unsaved changes, and the Builder kept them: the
+   * name of the placed thing they were editing, or undefined for a new one
+   */
+  onDecline?: (keeping: string | undefined) => void;
+  /** The edit was saved, and the thing is closed */
+  onSaved?: () => void;
   place: (composition: Record<string, unknown>) => Promise<Placed>;
+  save?: (eid: number, patch: Patch) => Promise<Saved>;
   /** The mirror of what the Character perceives, as it is now */
   snapshot: () => Promise<MirrorSnapshot | undefined>;
 }) => {
   const client = useMemo(() => given ?? openPreviewClient(), [given]);
   const [tab, setTab] = useState<Tab>('compose');
-  const [composition, setComposition] = useState<Composition>(fresh);
-  // the noun's words follow the name until the Builder edits them
-  const [wordsEdited, setWordsEdited] = useState(false);
+  const [opened, setOpened] = useState<Opened | null>(() =>
+    editing ? openedFrom(editing) : null
+  );
+  // what the composition started as, to tell whether it has changed
+  const [start, setStart] = useState<Composition>(
+    () => editing?.composition ?? fresh()
+  );
+  const [composition, setComposition] = useState<Composition>(start);
+  // an edit that arrived while the composition had unsaved changes
+  const [pending, setPending] = useState<Editing | null>(null);
+  // the noun's words follow the name until the Builder edits them; a
+  // placed thing's are its own
+  const [wordsEdited, setWordsEdited] = useState(editing !== null);
   const [definitions, setDefinitions] = useState<PreviewDefinition[]>([]);
   const [adding, setAdding] = useState(false);
   const [placing, setPlacing] = useState<'idle' | 'confirm' | 'sending'>(
@@ -72,22 +111,66 @@ export const Builder = ({
 
   const buildable = definitions.filter(d => d.buildable);
   const name = nameOf(composition).trim();
-  const wrong = problems(composition, limits.max_capacity);
+  const patch = patchOf(start, composition);
+  const changed = !unchanged(patch);
+  // an edit's capacity limit is its Maker's, which only the World knows
+  const wrong = problems(composition, opened ? undefined : limits.max_capacity);
   const full = limits.placed >= limits.max_placed;
+
+  const load = (next: Editing) => {
+    const o = openedFrom(next);
+    setOpened(o);
+    setStart(o.composition);
+    setComposition(o.composition);
+    setWordsEdited(true);
+    setPending(null);
+    setPlacing('idle');
+    setNotice(undefined);
+    setRefusal(undefined);
+    setTab('compose');
+  };
+
+  // the same thing sent again, as on rejoining, keeps the work on it
+  useEffect(() => {
+    if (!editing) {
+      return;
+    }
+    if (editing.eid === opened?.eid) {
+      setPending(null);
+      return;
+    }
+    if (changed) {
+      setPending(editing);
+    } else {
+      load(editing);
+    }
+    // only a newly opened thing matters, not each keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   // a Try it World of where the Character stands, for the definitions the
   // cards are drawn from, and to try the composition in
   const openTry = useCallback(
-    async (from: Composition) => {
+    async (from: Composition, replaces?: number) => {
       const mirror = await snapshot();
       if (!mirror) {
         throw new Error("There's nowhere to try it yet: wait to be connected.");
       }
       return client.open({
-        tryIt: { composition: toSend(from), mirror }
+        tryIt: {
+          composition: toSend(from),
+          mirror,
+          ...(replaces === undefined ? {} : { replaces })
+        }
       });
     },
     [client, snapshot]
+  );
+
+  const editingEid = opened?.eid;
+  const tryOpen = useCallback(
+    (from: Composition) => openTry(from, editingEid),
+    [openTry, editingEid]
   );
 
   useEffect(() => {
@@ -141,6 +224,25 @@ export const Builder = ({
     change(rest);
   };
 
+  const confirmSave = async () => {
+    if (!opened || !save) {
+      return;
+    }
+    setPlacing('sending');
+    const saved = await save(opened.eid, patch);
+    setPlacing('idle');
+    if (saved.ok) {
+      onSaved?.();
+    } else {
+      setRefusal(saved.reason);
+    }
+  };
+
+  const keepDraft = () => {
+    setPending(null);
+    onDecline?.(opened?.name);
+  };
+
   const confirmPlace = async () => {
     setPlacing('sending');
     const placed = await place(toSend(composition));
@@ -155,18 +257,47 @@ export const Builder = ({
   };
 
   return (
-    <aside aria-label="Builder" class="builder">
-      <header class="builder-head">
-        <span class="eyebrow">Build</span>
-        <span class="quota">
-          {limits.placed} of {limits.max_placed} placed
-        </span>
+    <aside aria-label="Composer" class="composer">
+      <header class="composer-head">
+        <span class="eyebrow">{opened ? 'Edit' : 'Compose'}</span>
+        {!opened && (
+          <span class="quota">
+            {limits.placed} of {limits.max_placed} placed
+          </span>
+        )}
         <button class="quiet" onClick={onClose} type="button">
           Back to play
         </button>
       </header>
-      <h2>{name || 'Something new'}</h2>
-      <div aria-label="Builder views" class="tabs" role="tablist">
+      <h2>
+        {opened ? `Editing ${theName(opened.name)}` : name || 'Something new'}
+      </h2>
+      {pending && (
+        <div
+          aria-label="Discard your changes?"
+          class="place-confirm"
+          role="group"
+        >
+          <p>
+            Discard your changes to{' '}
+            {opened
+              ? theName(opened.name)
+              : name
+                ? theName(name)
+                : 'your new thing'}{' '}
+            to edit {theName(nameOf(pending.composition).trim())}?
+          </p>
+          <div class="place-bar">
+            <button class="primary" onClick={() => load(pending)} type="button">
+              Discard them
+            </button>
+            <button class="quiet" onClick={keepDraft} type="button">
+              Keep them
+            </button>
+          </div>
+        </div>
+      )}
+      <div aria-label="Composer views" class="tabs" role="tablist">
         <button
           aria-selected={tab === 'compose'}
           onClick={() => setTab('compose')}
@@ -239,16 +370,32 @@ export const Builder = ({
               ))}
             </ul>
           </section>
-          <PlaceBar
-            components={Object.keys(composition)}
-            full={full}
-            name={name}
-            onCancel={() => setPlacing('idle')}
-            onConfirm={() => void confirmPlace()}
-            onPlace={() => setPlacing('confirm')}
-            placing={placing}
-            ready={wrong.length === 0}
-          />
+          {opened ? (
+            <div class="place-bar">
+              <button
+                class="primary"
+                disabled={!changed || wrong.length > 0 || placing === 'sending'}
+                onClick={() => void confirmSave()}
+                type="button"
+              >
+                {placing === 'sending' ? 'Saving…' : 'Save'}
+              </button>
+              {!changed && (
+                <span class="muted small">Nothing has changed yet.</span>
+              )}
+            </div>
+          ) : (
+            <PlaceBar
+              components={Object.keys(composition)}
+              full={full}
+              name={name}
+              onCancel={() => setPlacing('idle')}
+              onConfirm={() => void confirmPlace()}
+              onPlace={() => setPlacing('confirm')}
+              placing={placing}
+              ready={wrong.length === 0}
+            />
+          )}
           {notice && (
             <p class="notice" role="status">
               {notice}
@@ -256,17 +403,19 @@ export const Builder = ({
           )}
           {refusal && (
             <p class="error" role="alert">
-              Not placed: {refusal}
+              {opened ? 'Not saved' : 'Not placed'}: {refusal}
             </p>
           )}
           <p class="muted small">
-            Only you see this until you place it. Try it first, if you like.
+            {opened
+              ? 'Only you see your changes until you save them. Try them first, if you like.'
+              : 'Only you see this until you place it. Try it first, if you like.'}
           </p>
         </div>
       ) : (
         <TryIt
           composition={composition}
-          open={openTry}
+          open={tryOpen}
           reset={client.reset}
           send={client.command}
         />

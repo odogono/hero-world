@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 import { enter, leaveAll, play, transcript } from './helpers';
 
 // Building (#149): an Admin makes Ada a Builder; she composes a satchel from
-// cards, tries it out, and places it; Bob takes it and opens it.
+// cards, tries it out, and places it; Bob takes it and opens it. Then she
+// edits it from the line that made it (#275).
 
 test.afterEach(leaveAll);
 
@@ -13,8 +14,8 @@ test('a builder composes, tries and places a satchel; another player uses it', a
   const ada = await enter(browser, 'ada@example.com', 'Ada');
   const bob = await enter(browser, 'bob@example.com', 'Bob');
 
-  // no Build button until the Account is a Builder
-  await expect(bob.getByRole('button', { name: 'Build' })).toHaveCount(0);
+  // no Compose button until the Account is a Builder
+  await expect(bob.getByRole('button', { name: 'Compose' })).toHaveCount(0);
   await play(
     ada,
     ';change the account of the player of actor, "builder", {max_placed: 50}'
@@ -24,8 +25,8 @@ test('a builder composes, tries and places a satchel; another player uses it', a
   await ada.reload();
   await expect(ada.getByRole('status')).toHaveText('Connected');
 
-  await ada.getByRole('button', { name: 'Build' }).click();
-  const builder = ada.getByRole('complementary', { name: 'Builder' });
+  await ada.getByRole('button', { exact: true, name: 'Compose' }).click();
+  const builder = ada.getByRole('complementary', { name: 'Composer' });
   await expect(builder.getByText(/of 50 placed/)).toBeVisible();
 
   // compose, without code
@@ -70,4 +71,42 @@ test('a builder composes, tries and places a satchel; another player uses it', a
   // the plaza is shared with the other checks, which expect Bob empty-handed
   await play(bob, 'drop satchel');
   await expect(transcript(bob)).toContainText('Dropped.');
+
+  // Ada edits it from the line that made it
+  await builder.getByRole('button', { name: 'Back to play' }).click();
+  await transcript(ada)
+    .getByRole('button', { name: 'edit the satchel' })
+    .click();
+  await expect(
+    builder.getByRole('heading', { name: 'Editing the satchel' })
+  ).toBeVisible();
+
+  // the World refuses what the Composer lets through, and the edit stays open
+  await builder.getByLabel('Holds up to').fill('25');
+  await builder.getByRole('button', { name: 'Save' }).click();
+  await expect(builder.getByRole('alert')).toHaveText(
+    'Not saved: A container can hold at most 20.'
+  );
+
+  await builder.getByLabel('Holds up to').fill('8');
+  await builder
+    .getByLabel('Description', { exact: false })
+    .last()
+    .fill('A battered satchel.');
+
+  // Try it holds the one satchel, edited, where the real one is
+  await builder.getByRole('tab', { name: 'Try it' }).click();
+  await builder.getByLabel('Try a command').fill('examine satchel');
+  await builder.getByLabel('Try a command').press('Enter');
+  const edited = builder.getByLabel('Try it transcript');
+  await expect(edited).toContainText('A battered satchel.');
+  await expect(edited).not.toContainText('Which do you mean');
+
+  await builder.getByRole('tab', { name: 'Compose' }).click();
+  await builder.getByRole('button', { name: 'Save' }).click();
+  await expect(builder).toHaveCount(0);
+  await expect(transcript(ada)).toContainText('You reshape the satchel.');
+  await expect(transcript(bob)).toContainText('Ada reshapes the satchel.');
+  await play(bob, 'examine satchel');
+  await expect(transcript(bob)).toContainText('A battered satchel.');
 });

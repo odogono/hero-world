@@ -80,8 +80,13 @@ defmodule MuaServer.Protocol do
   def builder(nil), do: nil
   def builder(%{} = b), do: Map.take(b, [:placed, :max_placed, :max_capacity])
 
-  @doc "Lines a Character was told."
-  def output(lines), do: %{lines: List.wrap(lines)}
+  @doc """
+  Lines a Character was told. `suggestions` are Commands the last line
+  offers, to send with one click (#275).
+  """
+  def output(lines, suggestions \\ [])
+  def output(lines, []), do: %{lines: List.wrap(lines)}
+  def output(lines, suggestions), do: %{lines: List.wrap(lines), suggestions: suggestions}
 
   @doc "A question the Character must answer, such as \"which do you mean?\"."
   def prompt(text, options), do: %{text: text, options: options}

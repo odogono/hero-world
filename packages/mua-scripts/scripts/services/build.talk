@@ -6,8 +6,9 @@
 --   {described: {name: "Satchel", description: "A leather satchel."},
 --    item: {}, container: {capacity: 5}}
 --
--- It returns `{message, placed, max_placed}` when the thing stands in the
--- actor's room, or `{refused: text}` when it said no. mua keeps nothing of
+-- It returns `{message, placed, max_placed, suggestions}` when the thing
+-- stands in the actor's room, `suggestions` being the Commands the message
+-- offers the actor (#275), or `{refused: text}` when it said no. mua keeps nothing of
 -- a refusal, the empty entity included.
 --
 -- An Account builds only if it has a `builder` component, which holds its
@@ -112,7 +113,8 @@ on place thing, composition, actor
   put messageFor("place", "omsg", about) otherwise `${the name of the player of actor} makes ${theName(thing)}.` into others
   tell mua to announce room, others, actor
   put messageFor("place", "msg", about) otherwise `You make ${theName(thing)}.` into message
-  return {message: message, placed: placed + 1, max_placed: the max_placed of builder}
+  put [`edit ${theName(thing)}`] into suggestions
+  return {message: message, placed: placed + 1, max_placed: the max_placed of builder, suggestions: suggestions}
 end place
 
 -- why the Account can't edit this thing, or Nothing. Only a placed thing,
