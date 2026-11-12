@@ -20,7 +20,8 @@ The caller drives it: it Pumps with `pump/2` inside its own transaction, as Mua'
 - **Handles:** each component is a read-only property of an entity: its data, or Nothing. Floats reach Scripts as Decimals, and maps as ordered maps. A reference field (an `:eid` column, such as `location.in`) holds the Handle of the entity it names, or Nothing if that entity has none, so `the in of the location of x is y` compares Handles. Elements are the entities whose Location (`location.in` by default) is the entity, in id order, named by `meta.props.id` by default.
 - **Message Path:** an unhandled message climbs the scripted atoms of the entity's Lineage, linearized: each base, rightmost first, then that base's own bases, with a shared ancestor after every atom built on it (`OdgnEcsTalk.MessagePath`). An atom that sits on several paths gets a Host Object for each, running a copy of its Script named `atom@path`.
 - **`world`:**
-  - `change` and `moveTo` are Segment-bound Host Commands: each Segment is a SAVEPOINT, so a Segment that rolls back leaves no trace.
+  - `change`, `remove`, `moveTo` and `destroy` are Segment-bound Host Commands: each Segment is a SAVEPOINT, so a Segment that rolls back leaves no trace.
+  - `destroy` deletes an entity and every component it has, so lookups and Elements no longer find it. It refuses one that a `:restrict` Reference names, such as the Location of something inside it. The Handle stays, reading as gone, so a rollback that brings the entity back finds it again.
   - `show` is a fire-and-forget Host Command that calls the `:on_show` option.
   - `find`, `resolve` (a bare id to its Handle) and `named` (an entity by Definition name) are lookups.
 - **`clock`:** `now`, the Pump's Clock reading.
@@ -30,6 +31,6 @@ The caller drives it: it Pumps with `pump/2` inside its own transaction, as Mua'
 
 ## How it differs from `ecs-talk`
 
-- **Read-only properties:** components can't be set as properties. Scripts change the World through `change` and `moveTo`, so every write can roll back with its Segment (ADR 0015).
+- **Read-only properties:** components can't be set as properties. Scripts change the World through `change`, `remove`, `moveTo` and `destroy`, so every write can roll back with its Segment (ADR 0015).
 - **Handles made outside a Pump:** callbacks can't make Host Objects, so an entity made during play needs `handle/2` before a Script can reach it.
 - **NorthTalk pin:** the adapter needs a NorthTalk with Elixir Host Commands and Library declarations (odogono/odgn-talk#1993).

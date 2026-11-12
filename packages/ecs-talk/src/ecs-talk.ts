@@ -1,6 +1,7 @@
 import { defineComponent, s } from 'odgn-ecs/component';
 import {
   StoreError,
+  deleteEntity,
   exists,
   get,
   ident,
@@ -146,6 +147,18 @@ const failed = (error: unknown) => ({
   status: 'failed' as const
 });
 
+/** Runs a Store write, failing the Run with `invalid value` if it refuses */
+const storeWrite = (fn: () => void) => {
+  try {
+    fn();
+  } catch (error) {
+    if (error instanceof StoreError) {
+      throw new ScriptError('invalid value', error.message);
+    }
+    throw error;
+  }
+};
+
 const fromReply = (value: Value): Outcome => ({ kind: 'replied', value });
 
 const fromRejection = (error: unknown): Outcome =>
@@ -228,16 +241,8 @@ export const createEcsTalk = <TComponents extends Components>(
     return eid;
   };
 
-  const write = (eid: Eid, name: string, data: Data) => {
-    try {
-      put(store, eid, name, data);
-    } catch (error) {
-      if (error instanceof StoreError) {
-        throw new ScriptError('invalid value', error.message);
-      }
-      throw error;
-    }
-  };
+  const write = (eid: Eid, name: string, data: Data) =>
+    storeWrite(() => put(store, eid, name, data));
 
   // -- Elements -------------------------------------------------------------
 
@@ -345,6 +350,19 @@ export const createEcsTalk = <TComponents extends Components>(
         mode: 'immediate',
         segmentBound: true
       },
+      // the Handle stays, reading as gone, so a rollback finds it again
+      destroy: {
+        args: [entity],
+        command: true,
+        cost: COST,
+        do: (_call, thing) => {
+          const eid = live(thing);
+          storeWrite(() => deleteEntity(store, eid));
+          return nothing;
+        },
+        mode: 'immediate',
+        segmentBound: true
+      },
       find: {
         args: [entity, shape.text],
         cost: COST,
@@ -391,14 +409,7 @@ export const createEcsTalk = <TComponents extends Components>(
         cost: COST,
         do: (_call, thing, name) => {
           const eid = live(thing);
-          try {
-            removeComponent(store, eid, name);
-          } catch (error) {
-            if (error instanceof StoreError) {
-              throw new ScriptError('invalid value', error.message);
-            }
-            throw error;
-          }
+          storeWrite(() => removeComponent(store, eid, name));
           return nothing;
         },
         mode: 'immediate',

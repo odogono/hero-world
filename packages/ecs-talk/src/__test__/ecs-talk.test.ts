@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
+import { exists, query } from 'odgn-ecs/store';
 
 import {
   LoadError,
@@ -177,6 +178,82 @@ end forget`
     expect(result.kind === 'failed' && result.error).toBeInstanceOf(
       ScriptError
     );
+  });
+
+  const TOKEN = `
+entity token {
+  meta { props: { id: "token" } }
+  location { in: $hall }
+  link { to: $cellar }
+}
+`;
+
+  const UNMAKE = `on unmake thing, place
+  destroy thing
+  ask world to named "token"
+  return {elements: the number of elements of place, named: it is nothing, link: the link of thing is nothing}
+end unmake
+
+on unmakeThenFault thing
+  destroy thing
+  repeat forever
+  end repeat
+end unmakeThenFault`;
+
+  test('destroys an entity, so nothing reads or finds it', async () => {
+    const { get, id, talk, world } = await setup(TOKEN);
+    talk.loadAtomScript('person', UNMAKE);
+    const [token, hall, cellar] = [id('token'), id('hall'), id('cellar')];
+    const linkedTo = () =>
+      query(world.store, { where: [['link', 'to', cellar]] });
+    expect(linkedTo()).toEqual([token]);
+
+    const result = await ask(talk, id('hero'), 'unmake', [
+      h(talk, token),
+      h(talk, hall)
+    ]);
+    expect(value(result)).toEqual({ elements: 3, link: true, named: true });
+
+    expect(exists(world.store, token)).toBe(false);
+    for (const name of ['meta', 'location', 'link']) {
+      expect(get(token, name)).toBeUndefined();
+    }
+    expect(linkedTo()).toEqual([]);
+    expect(
+      query(world.store, { where: [['location', 'in', hall]] }).sort()
+    ).toEqual([id('hero'), id('lamp'), id('dust')].sort());
+    expect(
+      query(world.store, { where: [['edl_definition', 'name', 'token']] })
+    ).toEqual([]);
+  });
+
+  test("refuses to destroy what something else's Location names", async () => {
+    const { get, id, talk } = await setup();
+    talk.loadAtomScript('person', UNMAKE);
+    const hall = h(talk, id('hall'));
+    const result = await ask(talk, id('hero'), 'unmake', [hall, hall]);
+    expect(result.kind === 'failed' && result.error).toBeInstanceOf(
+      ScriptError
+    );
+    expect(get(id('hall'), 'meta')).toEqual({ props: { id: 'hall' } });
+  });
+
+  test('a Run that destroys and then faults leaves the entity whole', async () => {
+    const { get, id, talk, world } = await setup(TOKEN);
+    talk.loadAtomScript('person', UNMAKE, { limits: { fuelPerRun: 500 } });
+    const token = id('token');
+    const result = await ask(talk, id('hero'), 'unmakeThenFault', [
+      h(talk, token)
+    ]);
+    expect(result.kind).toBe('failed');
+    expect(get(token, 'link')).toEqual({ locked: false, to: id('cellar') });
+    expect(get(token, 'location')).toEqual({ in: id('hall') });
+    expect(
+      query(world.store, { where: [['link', 'to', id('cellar')]] })
+    ).toEqual([token]);
+    expect(
+      query(world.store, { where: [['edl_definition', 'name', 'token']] })
+    ).toEqual([token]);
   });
 
   test('a Run that writes and then faults leaves no trace', async () => {

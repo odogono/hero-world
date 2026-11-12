@@ -156,6 +156,81 @@ defmodule OdgnEcsTalkTest do
       assert {:error, %ScriptError{}} = ask(talk, hero, "forget")
     end
 
+    @token """
+    entity token {
+      meta { props: { id: "token" } }
+      location { in: $hall }
+      link { to: $cellar }
+    }
+    """
+
+    @unmake """
+    on unmake thing, place
+      destroy thing
+      ask world to named "token"
+      return {elements: the number of elements of place, named: it is nothing, link: the link of thing is nothing}
+    end unmake
+
+    on unmakeThenFault thing
+      destroy thing
+      repeat forever
+      end repeat
+    end unmakeThenFault
+    """
+
+    test "destroys an entity, so nothing reads or finds it" do
+      {world, talk} = setup_world(@token)
+      :ok = OdgnEcsTalk.load_atom_script(talk, "person", @unmake)
+      token = id(world, "token")
+      hall = id(world, "hall")
+      cellar = id(world, "cellar")
+      assert OdgnEcs.query(world, where: [{"link", "to", cellar}]) == [token]
+
+      args = [OdgnEcsTalk.handle(talk, token), OdgnEcsTalk.handle(talk, hall)]
+
+      assert value(ask(talk, id(world, "hero"), "unmake", args)) ==
+               map([{"elements", 3}, {"named", true}, {"link", true}])
+
+      refute OdgnEcs.exists?(world, token)
+      for name <- ~w(meta location link), do: assert(OdgnEcs.get(world, token, name) == nil)
+      assert OdgnEcs.query(world, where: [{"link", "to", cellar}]) == []
+
+      assert OdgnEcsTalk.element_ids(talk, hall) ==
+               Enum.map(~w(hero lamp dust), &id(world, &1)) |> Enum.sort()
+
+      assert id(world, "token") == nil
+    end
+
+    test "refuses to destroy what something else's Location names" do
+      {world, talk} = setup_world()
+      :ok = OdgnEcsTalk.load_atom_script(talk, "person", @unmake)
+      hall = OdgnEcsTalk.handle(talk, id(world, "hall"))
+
+      assert {:error, %ScriptError{}} = ask(talk, id(world, "hero"), "unmake", [hall, hall])
+      assert OdgnEcs.get(world, id(world, "hall"), "meta") == %{"props" => %{"id" => "hall"}}
+    end
+
+    test "a Run that destroys and then faults leaves the entity whole" do
+      {world, talk} = setup_world(@token)
+
+      :ok =
+        OdgnEcsTalk.load_atom_script(talk, "person", @unmake, limits: [fuel_per_run: 500])
+
+      token = id(world, "token")
+
+      assert {:error, %ScriptError{}} =
+               ask(talk, id(world, "hero"), "unmakeThenFault", [OdgnEcsTalk.handle(talk, token)])
+
+      assert OdgnEcs.get(world, token, "link") == %{
+               "to" => id(world, "cellar"),
+               "locked" => false
+             }
+
+      assert OdgnEcs.get(world, token, "location") == %{"in" => id(world, "hall")}
+      assert OdgnEcs.query(world, where: [{"link", "to", id(world, "cellar")}]) == [token]
+      assert id(world, "token") == token
+    end
+
     test "a Run that writes and then faults leaves no trace" do
       {world, talk} = setup_world()
       hero = id(world, "hero")
