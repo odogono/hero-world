@@ -25,8 +25,12 @@ defmodule OdgnEcsTalk do
     has one parent, so an atom that sits on several paths with different
     atoms above it gets a Host Object for each, owning a copy of its Script
     named `atom@path`. Copies don't share Script Variables.
-  - **`world`:** `change`, `remove` and `moveTo` are Segment-bound: each Segment is a
-    SAVEPOINT, so a Segment that rolls back leaves no trace. `find`,
+  - **`world`:** `change`, `remove`, `moveTo` and `destroy` are Segment-bound:
+    each Segment is a SAVEPOINT, so a Segment that rolls back leaves no trace.
+    `destroy` deletes the entity and every component it has, and refuses one
+    that another entity's `:restrict` Reference names, such as the Location
+    of something inside it. Its Handle stays, so a rollback that brings the
+    entity back finds it again; until then it reads as gone. `find`,
     `resolve`, `named` and `show` are not; `show` calls the `:on_show`
     option. `named` finds an entity by its Definition name.
   - **`clock`:** `now`, the Pump's Clock reading.
@@ -612,6 +616,13 @@ defmodule OdgnEcsTalk do
                   :ok <- remove(world, eid, name),
                   do: {:ok, nil}
            end},
+        "destroy" =>
+          {[args: [entity], cost: 1, segment_bound: true, command: true],
+           fn [thing], _ ->
+             with {:ok, eid} <- live(world, thing),
+                  :ok <- delete(world, eid),
+                  do: {:ok, nil}
+           end},
         "moveTo" =>
           {[args: [entity, entity], cost: 1, segment_bound: true, command: true],
            fn [thing, place], _ ->
@@ -693,6 +704,13 @@ defmodule OdgnEcsTalk do
 
   defp remove(world, eid, name) do
     case OdgnEcs.remove(world, eid, name) do
+      :ok -> :ok
+      {:error, error} -> {:error, %{code: "invalid value", message: error.message}}
+    end
+  end
+
+  defp delete(world, eid) do
+    case OdgnEcs.delete(world, eid) do
       :ok -> :ok
       {:error, error} -> {:error, %{code: "invalid value", message: error.message}}
     end
