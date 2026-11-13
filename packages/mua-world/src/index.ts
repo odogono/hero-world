@@ -10,6 +10,7 @@ export {
   startMuaWorld,
   type Builder,
   type Editing,
+  type Hear,
   type Listener,
   type MuaWorld,
   type MuaWorldOptions,

@@ -8,7 +8,7 @@ import { get, type Eid, type Store } from 'odgn-ecs/store';
  * NPC queue. Sign-in identities are the server's, so a Local World has none.
  */
 const SCHEMA = [
-  'CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT)',
   'CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS mua_identities (sub TEXT PRIMARY KEY, email TEXT, account INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL)'
@@ -23,17 +23,46 @@ export const ensureMuaTables = (store: Store) => {
   for (const sql of SCHEMA) {
     store.db.exec(sql);
   }
+  // a World made before a line could offer Suggestions (#275, #292)
+  const hasSuggestions =
+    rows(
+      store,
+      "SELECT 1 FROM pragma_table_info('mua_outbox') WHERE name = 'suggestions'"
+    ).length > 0;
+  if (!hasSuggestions) {
+    store.db.exec('ALTER TABLE mua_outbox ADD COLUMN suggestions TEXT');
+  }
 };
 
 /** The Characters (entities with `player`) whose Location is `place` */
 export const charactersAt = (store: Store, place: Eid): Eid[] =>
   elements(store, place, { with: ['player'] });
 
-export const output = (store: Store, character: Eid, text: string) =>
-  store.db.exec('INSERT INTO mua_outbox (character, text) VALUES (?1, ?2)', [
-    character,
-    text
-  ]);
+/**
+ * A line a Character is told, and the Commands it offers to send with one
+ * click (#275), as `MuaWorld.Tables` keeps them
+ */
+export type Line = [character: Eid, text: string, suggestions?: string[]];
+
+/**
+ * Queues a line for a Character, once the Step commits. `suggestions` are
+ * Commands the line offers the player to send with one click (#275).
+ */
+export const output = (
+  store: Store,
+  character: Eid,
+  text: string,
+  suggestions: string[] = []
+) =>
+  suggestions.length > 0
+    ? store.db.exec(
+        'INSERT INTO mua_outbox (character, text, suggestions) VALUES (?1, ?2, ?3)',
+        [character, text, JSON.stringify(suggestions)]
+      )
+    : store.db.exec(
+        'INSERT INTO mua_outbox (character, text) VALUES (?1, ?2)',
+        [character, text]
+      );
 
 /**
  * Tells an entity something: a Character hears it; any other entity (a
@@ -51,14 +80,22 @@ export const tell = (store: Store, to: Eid, text: string, except?: Eid) => {
   }
 };
 
-/** Takes the Step's output, inside the Step's transaction */
-export const takeOutbox = (store: Store): [Eid, string][] => {
-  const out = rows<{ character: Eid; text: string }>(
-    store,
-    'SELECT character, text FROM mua_outbox ORDER BY id'
-  );
+/**
+ * Takes the Step's output, inside the Step's transaction: each line with
+ * its Suggestions, when it offers any
+ */
+export const takeOutbox = (store: Store): Line[] => {
+  const out = rows<{
+    character: Eid;
+    suggestions: string | null;
+    text: string;
+  }>(store, 'SELECT character, text, suggestions FROM mua_outbox ORDER BY id');
   store.db.exec('DELETE FROM mua_outbox');
-  return out.map(({ character, text }) => [character, text]);
+  return out.map(({ character, suggestions, text }) =>
+    suggestions === null
+      ? [character, text]
+      : [character, text, JSON.parse(suggestions) as string[]]
+  );
 };
 
 /**

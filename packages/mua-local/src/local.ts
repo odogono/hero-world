@@ -10,11 +10,11 @@ import {
   type CreateDatabaseOptions
 } from 'odgn-ecs/db';
 import { isEDLBuilt, isEDLChanged, migrateEDL } from 'odgn-ecs/edl';
-import { get, type Eid } from 'odgn-ecs/store';
+import { get, put, type Eid } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import { EDL_PATH, SCRIPTS_DIR, reader, type WorldFiles } from './files';
-import type { FromWorld, ToWorld } from './protocol';
+import type { Builder, FromWorld, ToWorld } from './protocol';
 
 /** Commands are at most this long, as on the server */
 const MAX_COMMAND = 500;
@@ -42,11 +42,31 @@ export type LocalWorldOptions = {
 const LOCAL_SCHEMA =
   'CREATE TABLE IF NOT EXISTS mua_local (key TEXT PRIMARY KEY, value INTEGER NOT NULL)';
 
+type Ref = number | string;
+
+// A message's `ref`, as the Channel takes it: text, a number or none
+const isRef = (ref: unknown): ref is Ref | undefined =>
+  ref === undefined || typeof ref === 'string' || typeof ref === 'number';
+
+const isMap = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// The World's reason for refusing; anything else is the Worker's to report
+const fail = (error: unknown) => {
+  if (error instanceof MuaWorldError) {
+    return error.code;
+  }
+  throw error;
+};
+
 /**
  * A Local World (ADR 0023): one mua World and the single Character played
  * in it, speaking the Channel's messages. It has a local Account, with no
  * sign-in or Allowlist, and never syncs with a server. Its database is its
  * save. A World built from an older EDL is migrated before it plays.
+ *
+ * The local Account builds, with the default limits (#292): there is no
+ * Admin prompt offline to make it a Builder.
  */
 export const openLocalWorld = async (options: LocalWorldOptions) => {
   const { files, send } = options;
@@ -93,6 +113,38 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   let account: Eid | undefined = stored('account');
   let character: Eid | undefined = stored('character');
   let unsubscribe: (() => void) | undefined;
+  // The placed thing the client has open in its Composer, as the Channel
+  // tracks it, and whether a Step has changed it since it was last checked
+  let composing: Eid | undefined;
+  let editingChanged = false;
+
+  // The thing the `edit` Verb opened, once each time it changes, so the
+  // client opens it in the Composer; `closed` when it closes in the World
+  // without the client asking (#274, #284)
+  const compose = async () => {
+    editingChanged = false;
+    if (account === undefined || character === undefined) {
+      return;
+    }
+    let opened;
+    try {
+      opened = await mua.editing(account, character);
+    } catch (error) {
+      fail(error);
+      return;
+    }
+    if (opened) {
+      if (composing !== opened.eid) {
+        send({ event: 'compose', ...opened });
+      }
+      composing = opened.eid;
+    } else {
+      if (composing !== undefined) {
+        send({ eid: composing, event: 'closed' });
+      }
+      composing = undefined;
+    }
+  };
 
   // What the Character sees, and any "Which do you mean?", after each command
   const refresh = async () => {
@@ -118,6 +170,19 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
         text: 'Which do you mean?'
       });
     }
+    await compose();
+  };
+
+  // The Account's building limits and count, as the Channel's join replies
+  const builderOf = async (of: Eid): Promise<Builder | null> => {
+    const b = await mua.builder(of);
+    return b
+      ? {
+          max_capacity: b.maxCapacity,
+          max_placed: b.maxPlaced,
+          placed: b.placed
+        }
+      : null;
   };
 
   const join = async (name: string) => {
@@ -125,21 +190,39 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
       account = await mua.createAccount();
       keep('account', account);
     }
+    // made with the Account, or on the next join of a World saved before
+    // a Local World could build; `{}` takes the default limits
+    if (!get(store, account, 'builder')) {
+      put(store, account, 'builder', {});
+    }
     if (character === undefined) {
       character = await mua.createCharacter(account, name);
       keep('character', character);
     }
     const lines = await mua.enter(account, character);
-    send({ character, event: 'joined' });
+    send({ builder: await builderOf(account), character, event: 'joined' });
     send({ event: 'status', status: 'connected' });
     if (lines.length > 0) {
       send({ event: 'output', lines });
     }
     // subscribed after the entry's own lines, so none arrives twice
     unsubscribe?.();
-    unsubscribe = await mua.subscribe(character, line =>
-      send({ event: 'output', lines: [line] })
+    unsubscribe = await mua.subscribe(
+      character,
+      (line, suggestions) =>
+        send(
+          suggestions
+            ? { event: 'output', lines: [line], suggestions }
+            : { event: 'output', lines: [line] }
+        ),
+      {
+        onEditing: () => {
+          editingChanged = true;
+        }
+      }
     );
+    // a rejoin opens what the Character has open again, as the Channel does
+    composing = undefined;
     await refresh();
   };
 
@@ -162,10 +245,115 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     await refresh();
   };
 
+  // Runs one of the Channel's building messages for the local Character,
+  // replying with `done`'s payload or the World's reason for refusing
+  const building = async (
+    ref: unknown,
+    run: (account: Eid, character: Eid) => Promise<Record<string, unknown>>
+  ) => {
+    if (!isRef(ref)) {
+      send({
+        event: 'reply',
+        ok: false,
+        reason: 'ref must be text or a number'
+      });
+      return;
+    }
+    if (account === undefined || character === undefined) {
+      send({ event: 'reply', ok: false, reason: 'not_joined', ref });
+      return;
+    }
+    try {
+      const done = await run(account, character);
+      send({ event: 'reply', ok: true, ref, ...done } as FromWorld);
+    } catch (error) {
+      send({ event: 'reply', ok: false, reason: fail(error), ref });
+    }
+    await refresh();
+  };
+
+  // A builder's composed thing, placed in the Character's room (#258)
+  const place = (ref: unknown, composition: unknown) => {
+    if (!isMap(composition)) {
+      send({
+        event: 'reply',
+        ok: false,
+        reason: 'a place needs a composition'
+      });
+      return;
+    }
+    return building(ref, async (a, c) => {
+      const { eid, maxPlaced, placed } = await mua.place(a, c, composition);
+      return { eid, max_placed: maxPlaced, placed };
+    });
+  };
+
+  // Saving an edit to the placed thing the `edit` Verb opened (#274)
+  const edit = (ref: unknown, eid: unknown, patch: unknown) => {
+    if (!Number.isInteger(eid) || !isMap(patch)) {
+      send({
+        event: 'reply',
+        ok: false,
+        reason: 'an edit needs an eid and a patch'
+      });
+      return;
+    }
+    return building(ref, (a, c) => mua.edit(a, c, eid as Eid, patch));
+  };
+
+  // Storing or destroying the placed thing the `edit` Verb opened, from
+  // the Composer, as the `store` and `destroy` Verbs do (#284)
+  const putAway = (ref: unknown, eid: unknown, verb: 'destroy' | 'store') => {
+    if (!Number.isInteger(eid)) {
+      send({
+        event: 'reply',
+        ok: false,
+        reason: 'it needs the eid of the thing'
+      });
+      return;
+    }
+    return building(ref, async (a, c) => {
+      const done = await mua.putAway(a, c, eid as Eid, verb);
+      return { eid: done.eid, max_placed: done.maxPlaced, placed: done.placed };
+    });
+  };
+
+  // Closing the Composer without saving: the client asked, so no `closed`
+  const stopEditing = async (ref: unknown) => {
+    const safeRef = isRef(ref) ? ref : undefined;
+    if (account === undefined || character === undefined) {
+      send({ event: 'reply', ok: false, reason: 'not_joined', ref: safeRef });
+      return;
+    }
+    try {
+      await mua.stopEditing(account, character);
+      composing = undefined;
+      editingChanged = false;
+      send({ event: 'reply', ok: true, ref: safeRef });
+    } catch (error) {
+      send({ event: 'reply', ok: false, reason: fail(error), ref: safeRef });
+    }
+  };
+
+  // A mirror of what the Character perceives, for Try it (#259, #291)
+  const snapshot = async () => {
+    let mirror;
+    if (account !== undefined && character !== undefined) {
+      try {
+        mirror = await mua.mirror(account, character);
+      } catch (error) {
+        fail(error);
+      }
+    }
+    send({ event: 'snapshot', snapshot: mirror });
+  };
+
   const logout = async () => {
     if (account !== undefined && character !== undefined) {
       unsubscribe?.();
       unsubscribe = undefined;
+      composing = undefined;
+      editingChanged = false;
       await mua.leave(account, character);
     }
     send({ event: 'status', status: 'limbo' });
@@ -181,6 +369,17 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
           return command(message.ref, message.text);
         case 'logout':
           return logout();
+        case 'place':
+          return place(message.ref, message.composition);
+        case 'edit':
+          return edit(message.ref, message.eid, message.patch);
+        case 'store':
+        case 'destroy':
+          return putAway(message.ref, message.eid, message.type);
+        case 'stop_editing':
+          return stopEditing(message.ref);
+        case 'snapshot':
+          return snapshot();
       }
     },
     /** Closes the World's database */
@@ -190,8 +389,16 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     },
     /** The World as an SQLite file's bytes, between Steps */
     save: () => store.db.export(),
-    /** Runs what is due at World time; the Worker calls it on a timer */
-    tick: () => mua.tick(),
+    /**
+     * Runs what is due at World time, and tells the client if that closed
+     * what it has open; the Worker calls it on a timer
+     */
+    tick: async () => {
+      await mua.tick();
+      if (editingChanged) {
+        await compose();
+      }
+    },
     world: mua
   };
 };
