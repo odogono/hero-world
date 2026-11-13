@@ -1,0 +1,86 @@
+# The Ship: Porthleven's inn, its bar and back room.
+
+
+atom ship_room: room {
+  timers { every: { reset: 1200 } }
+}
+
+# Won't let go of what is on it while Jory is behind the bar
+atom guarded_counter {
+  script { src: "scripts/ship/counter.talk" }
+}
+
+atom innkeeper {
+  script { src: "scripts/ship/jory.talk" }
+}
+
+
+# ======
+# Places
+# ======
+
+entity ship_bar: ship_room {
+  described {
+    name: "The Ship"
+    description: "A low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north."
+  }
+  exits { north: $back_room }
+}
+
+entity back_room: ship_room {
+  described {
+    name: "Back Room"
+    description: "A cramped room stacked with barrels. Coats nobody came back for hang on a row of pegs."
+  }
+}
+
+
+# ======
+# Things
+# ======
+
+entity counter: container guarded_counter {
+  described { name: "Counter" description: "A long oak counter, polished by a century of elbows." }
+  noun { words: ["counter" "bar"] }
+  container { capacity: 5 is_closed: false }
+  location { in: $ship_bar }
+}
+
+entity tankard: item {
+  described { name: "Tankard" description: "A pewter tankard of something dark, with a good head on it." }
+  noun { words: ["tankard" "ale" "beer"] }
+  location { in: $counter }
+}
+
+entity lost_property: container {
+  described { name: "Lost property box" description: "A tea chest labelled LOST PROPERTY in Jory's capitals." }
+  noun { words: ["box" "chest" "property"] }
+  container { capacity: 10 is_closed: true }
+  location { in: $back_room }
+}
+
+entity oilskin: item {
+  described { name: "Oilskin" description: "A yellow oilskin coat, cracked at the elbows." }
+  noun { words: ["oilskin" "coat"] }
+  location { in: $lost_property }
+}
+
+entity logbook_page: item {
+  described { name: "Torn page" description: "A page torn from a lighthouse logbook, in a careful, upright hand." }
+  noun { words: ["page" "torn"] }
+  readable {
+    text: "14th. Wind backing south-west, glass falling fast. Lamp trimmed and lit at dusk. The spare key to the lamp room is in the shed at the cottage, as ever. If the weather holds I shall... The rest is torn away."
+  }
+  location { in: $lost_property }
+}
+
+
+# ======
+# People
+# ======
+
+entity jory: npc innkeeper {
+  described { name: "Jory" description: "The landlord of The Ship, broad as a door, polishing a glass that is already clean." }
+  noun { words: ["jory" "landlord" "innkeeper"] }
+  location { in: $ship_bar }
+}

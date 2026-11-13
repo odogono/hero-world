@@ -197,7 +197,7 @@ describe('building in a Local World (#292)', () => {
     expect(snapshot?.character).toBe(character);
     expect(
       snapshot?.components.described?.map(r => r.name as string)
-    ).toContain('Mailbox');
+    ).toContain('Crate');
   });
 
   test('a World saved before it could build builds after loading', async () => {

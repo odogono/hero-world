@@ -15,7 +15,7 @@ bun run load --players 150 --seconds 110 --think 1000 --out result.json
 
 ## The workload
 
-Each simulated player has its own WebSocket and joins its Character's Channel, as the browser client does (`phoenix` package). It then repeats: wait a random 0.5× to 1.5× `--think`, send one `command`, and wait for the reply. Commands are mostly what the player's `state.actions` offers, which means moving through exits, taking what is in view, and examining or dropping what it carries. The rest are 15% `say …`, 5% `look`, 5% `open mailbox`, and 10% `take leaflet` / `take key`. There are very few takeable things, so most takes fail inside the game. Those still count as acknowledged Steps.
+Each simulated player has its own WebSocket and joins its Character's Channel, as the browser client does (`phoenix` package). It then repeats: wait a random 0.5× to 1.5× `--think`, send one `command`, and wait for the reply. Commands are mostly what the player's `state.actions` offers, which means moving through exits, taking what is in view, and examining or dropping what it carries. The rest are 15% `say …`, 5% `look`, 5% `open crate`, and 10% `take card` / `take key`. There are very few takeable things, so most takes fail inside the game. Those still count as acknowledged Steps.
 
 All players start West of House and spread over the house and the garden. Hollis the gardener (an NPC) runs on his 45-second `potter` timer, and the garden rooms' 600-second `reset` timers keep running. Player 1 walks to the Garden Path and stays there to watch Hollis.
 

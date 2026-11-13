@@ -1,0 +1,154 @@
+# The Quay: where newcomers land, and where the sea turns the tide.
+
+
+# Quay places put back what has strayed every twenty minutes
+atom quay_room: room {
+  timers { every: { reset: 1200 } }
+}
+
+# Turns the tide on a timer, and tells the town (scripts/quay/sea.talk)
+atom sea_script {
+  script { src: "scripts/quay/sea.talk" }
+}
+
+atom harbourmaster {
+  script { src: "scripts/quay/morwenna.talk" }
+}
+
+atom net_mender {
+  script { src: "scripts/quay/tamsin.talk" }
+}
+
+
+# ======
+# Places
+# ======
+
+# The Starting room
+entity harbour_steps: quay_room tidal {
+  described {
+    name: "Harbour Steps"
+    description: "Worn granite steps climb from the ferry landing to the quay. Gulls squabble on the bollards, and the town rises behind you in terraces of slate and whitewash."
+  }
+  shore {
+    high: "The tide is in, slapping at the harbour wall."
+    low: "The tide is out. Boats lean on their keels in the harbour mud, and past the headland the causeway to the lighthouse stands clear of the water."
+    lit: "The lighthouse beam sweeps across the harbour."
+  }
+  exits {
+    north: $square
+    east: $fish_market
+    west: $slipway
+    south: { msg: "The ferry has gone, and the next isn't due for days." }
+  }
+}
+
+entity fish_market: quay_room fragrant {
+  described {
+    name: "Fish Market"
+    description: "Slate counters under a tin roof, hosed clean after the morning's sale. A few boxes of mackerel sit on melting ice."
+  }
+  scent { air: "Fish, salt and diesel: the smell of every harbour there is." }
+}
+
+entity slipway: quay_room tidal {
+  described {
+    name: "Slipway"
+    description: "A concrete slipway runs down into the harbour, green with weed below the tideline. Lobster pots are stacked against the wall, and a yard opens to the west."
+  }
+  shore {
+    high: "The water laps halfway up the slipway."
+    low: "The slipway runs on down into wet sand and mud."
+    lit: "Out past the harbour wall, the lighthouse beam turns."
+  }
+  exits { west: $boatyard }
+}
+
+# Where Builders are invited to build: nothing stops them building
+# elsewhere, but this is the place for it
+entity boatyard: quay_room {
+  described {
+    name: "Boatyard"
+    description: "A yard of cradles and empty berths, smelling of tar and fresh-cut oak. Half-built hulls stand on trestles, and there's room for plenty more."
+  }
+}
+
+
+# ======
+# Things
+# ======
+
+entity sea: sea_script {
+  described { name: "Sea" description: "The harbour opens onto a grey-green sea." }
+  noun { words: ["sea" "harbour" "harbor" "tide" "water"] }
+  item { is_takeable: false }
+  tide { high: false }
+  # The tide turns every five minutes of World time
+  timers { every: { turn: 300 } }
+  location { in: $harbour_steps }
+}
+
+entity noticeboard: fixture {
+  described { name: "Noticeboard" description: "A weathered noticeboard screwed to the harbour wall, its notices pinned under glass." }
+  noun { words: ["noticeboard" "board" "notices" "notice"] }
+  readable {
+    text: "WELCOME TO PORTHLEVEN. Type help for the commands you can use, look to see where you are, and a direction such as north to walk. Tide times are in the crate. THE SHIP is open, Jory presiding. LAMP UNLIT: the lighthouse has been dark since the storm, and its keeper, Ezra Trethewey, has not been seen. Anyone with news, see the harbourmaster."
+  }
+  responses { target: { take: "It's screwed firmly to the wall." } }
+  location { in: $harbour_steps }
+}
+
+entity crate: container {
+  described { name: "Crate" description: "A fish crate with a hinged lid, stencilled PORTHLEVEN HARBOUR." }
+  container { capacity: 5 is_closed: true }
+  location { in: $harbour_steps }
+}
+
+entity tide_card: item {
+  described { name: "Tide card" description: "A printed card of tide times, dog-eared and salt-stained." }
+  noun { words: ["card" "tides"] }
+  readable {
+    text: "PORTHLEVEN TIDES. The tide turns quickly here. At low water the causeway to the lighthouse is dry; at high water the sea covers it, and anyone on the far side waits for the next ebb. Ask the harbourmaster how the tide stands."
+  }
+  location { in: $crate }
+}
+
+entity price_board: fixture {
+  described { name: "Price board" description: "A slate board chalked with the day's prices." }
+  noun { words: ["board" "prices" "slate"] }
+  readable { text: "MACKEREL 2/- A DOZEN. PILCHARDS SOLD OUT. NO CREDIT, NOT EVEN FOR YOU." }
+  location { in: $fish_market }
+}
+
+entity lobster_pot: item {
+  described { name: "Lobster pot" description: "A withy lobster pot, a little crushed on one side." }
+  noun { words: ["pot" "lobster"] }
+  location { in: $slipway }
+}
+
+entity yard_sign: fixture {
+  described { name: "Sign" description: "A painted sign nailed to a cradle: BERTHS FREE. BUILD WHAT YOU LIKE." }
+  noun { words: ["sign"] }
+  readable {
+    text: "BERTHS FREE. Builders may shape a new thing in the Composer and place it where they stand. Afterwards: edit a thing you made to change it, store it to put it away, stored to list what you have put away, unstore it to bring it back, and destroy it to be rid of it for good. Ask an Admin if you'd like to build."
+  }
+  location { in: $boatyard }
+}
+
+
+# ======
+# People
+# ======
+
+entity morwenna: npc harbourmaster {
+  described { name: "Morwenna" description: "Morwenna Pascoe, the harbourmaster, in a navy jersey and sea boots, a tide almanac under one arm." }
+  noun { words: ["morwenna" "harbourmaster" "pascoe"] }
+  location { in: $harbour_steps }
+}
+
+entity tamsin: npc net_mender {
+  described { name: "Tamsin" description: "A net-mender with a wooden needle tucked behind one ear and twine wound round her wrist." }
+  noun { words: ["tamsin" "mender"] }
+  errand { heading: "inn" }
+  location { in: $fish_market }
+}

@@ -239,7 +239,7 @@ describe('Try it from a Local World (#291)', () => {
     const preview = await tryIt({ ...SATCHEL, mirror });
     expect(preview.runs()).toBe(true);
     const look = await preview.command('look');
-    expect(look.lines.join('\n')).toContain('the mailbox');
+    expect(look.lines.join('\n')).toContain('the crate');
     expect(look.lines.join('\n')).toContain('the satchel');
     local.close();
   });

@@ -35,7 +35,7 @@ describe('a Local World', () => {
   test('bundles the main World and mua-scripts', () => {
     expect(Object.keys(FILES)).toContain(EDL_PATH);
     expect(Object.keys(FILES)).toContain('/mua-scripts/edl/base.edl');
-    expect(Object.keys(FILES)).toContain('/world/scripts/room.talk');
+    expect(Object.keys(FILES)).toContain('/world/scripts/town/room.talk');
   });
 
   test('joins its Character, welcomed, connected and shown its room', async () => {
@@ -53,9 +53,9 @@ describe('a Local World', () => {
       state: {
         inventory: [],
         room: {
-          exits: ['north', 'south'],
-          items: ['Mailbox'],
-          name: 'West of house'
+          exits: ['north', 'south', 'east', 'west'],
+          items: ['Sea', 'Noticeboard', 'Crate'],
+          name: 'Harbour Steps'
         }
       }
     });
@@ -67,12 +67,12 @@ describe('a Local World', () => {
     await local.receive({ name: 'Ada', type: 'join' });
     sent.length = 0;
     await local.receive({ ref: 1, text: 'north', type: 'command' });
-    expect(output(sent).join('\n')).toContain('North of house');
+    expect(output(sent).join('\n')).toContain('The Square');
     expect(events(sent, 'reply')).toEqual([
       { event: 'reply', ok: true, ref: 1 }
     ]);
     expect(events(sent, 'state')[0]).toMatchObject({
-      state: { room: { name: 'North of house' } }
+      state: { room: { name: 'The Square' } }
     });
   });
 
@@ -99,7 +99,7 @@ describe('a Local World', () => {
     sent.length = 0;
     await local.receive({ name: 'ignored', type: 'join' });
     expect(events(sent, 'state')[0]).toMatchObject({
-      state: { room: { name: 'North of house' } }
+      state: { room: { name: 'The Square' } }
     });
   });
 
@@ -115,7 +115,7 @@ describe('a Local World', () => {
     const joined = events(second.sent, 'joined')[0];
     expect(joined).toEqual(events(first.sent, 'joined')[0]!);
     expect(events(second.sent, 'state')[0]).toMatchObject({
-      state: { room: { name: 'North of house' } }
+      state: { room: { name: 'The Square' } }
     });
   });
 
@@ -126,11 +126,11 @@ describe('a Local World', () => {
     first.local.world.store.db.close();
 
     const edl = `${FILES[EDL_PATH]!}
-entity shed : room {
-  described { name: "Shed" description: "A garden shed." }
+entity boathouse : room {
+  described { name: "Boathouse" description: "A boathouse." }
 }
 `;
     const second = await open(path, { ...FILES, [EDL_PATH]: edl });
-    expect(await second.local.world.named('shed')).toBeNumber();
+    expect(await second.local.world.named('boathouse')).toBeNumber();
   });
 });

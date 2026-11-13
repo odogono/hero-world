@@ -1,0 +1,73 @@
+# The High Street: the square, the chandler's shop and the lane up the hill.
+
+
+atom street_room: room {
+  timers { every: { reset: 1200 } }
+}
+
+
+# ======
+# Places
+# ======
+
+entity square: street_room {
+  described {
+    name: "The Square"
+    description: "A cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south."
+  }
+  # The way back south to the Harbour Steps comes from their `north`
+  exits {
+    west: $ship_bar
+    east: $chandlers
+    north: $hill_lane
+  }
+}
+
+entity chandlers: street_room {
+  described {
+    name: "Chandler's Shop"
+    description: "Rope, tar, brass fittings and oilskins crowd every shelf. Nobody minds the shop, but there's an honesty box on the counter."
+  }
+}
+
+entity hill_lane: street_room {
+  described {
+    name: "Hill Lane"
+    description: "A steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland."
+  }
+  exits {
+    north: $garden_path
+    east: $headland
+  }
+}
+
+
+# ======
+# Things
+# ======
+
+entity cross: fixture {
+  described { name: "Cross" description: "A granite cross, worn smooth by weather and leaning children." }
+  noun { words: ["cross" "granite"] }
+  readable { text: "ERECTED BY THE PEOPLE OF PORTHLEVEN FOR THOSE WHO WENT TO SEA AND DID NOT COME HOME." }
+  location { in: $square }
+}
+
+entity honesty_box: container {
+  described { name: "Honesty box" description: "A tin box with a slot in the lid, chained to the counter." }
+  noun { words: ["box" "honesty"] }
+  container { capacity: 20 is_closed: false }
+  location { in: $chandlers }
+}
+
+entity matches: item {
+  described { name: "Matches" description: "A box of storm matches, the kind that stay lit in a gale." }
+  noun { words: ["matches" "match"] }
+  location { in: $chandlers }
+}
+
+entity rope: item {
+  described { name: "Rope" description: "A coil of tarred hemp rope." }
+  noun { words: ["rope" "coil"] }
+  location { in: $chandlers }
+}

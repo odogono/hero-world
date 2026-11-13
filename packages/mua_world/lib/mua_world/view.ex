@@ -7,10 +7,10 @@ defmodule MuaWorld.View do
   name, never ids or components.
 
       %{
-        room: %{name: "West of House", description: "...", exits: ["north", "east (closed)"],
-                items: ["mailbox"], players: ["Bob", "Hollis"]},
-        inventory: ["leaflet"],
-        actions: ["north", "take mailbox", "examine leaflet", "drop leaflet"]
+        room: %{name: "Harbour Steps", description: "...", exits: ["north", "east"],
+                items: ["Crate"], players: ["Bob", "Morwenna"]},
+        inventory: ["Tide card"],
+        actions: ["north", "open crate", "examine tide card", "drop tide card"]
       }
   """
 

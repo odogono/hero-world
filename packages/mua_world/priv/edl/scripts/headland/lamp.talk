@@ -1,0 +1,35 @@
+-- The great lamp in the lamp room: `light lamp` lights it, with matches,
+-- and the town sees its beam (town/tidal.talk). It stays lit until the
+-- lamp room resets (lamp-room.talk).
+
+on light role, actor
+  if role is not "target" then
+    pass light
+  end if
+  if the is_lit of the beacon of the target then
+    return {refused: "The lamp is already lit."}
+  end if
+  ask world to named "matches"
+  if it is nothing or the in of the location of it is not actor then
+    return {refused: "You have nothing to light it with."}
+  end if
+
+  change the target, "beacon", {is_lit: true}
+  put the name of the player of actor into who
+  tell mua to announce the in of the location of the target, `${who} lights the great lamp. The lens begins to turn.`, actor
+  repeat for each name in ["harbour_steps", "slipway", "headland"]
+    ask world to named name
+    show it, "Out on its island, the lighthouse flares into life, and its beam sweeps across the harbour."
+  end repeat
+  return "You strike a storm match and hold it to the wick. The lamp catches, the great lens begins to turn, and its beam swings out across the sea."
+end light
+
+on examine role, actor
+  if role is not "target" then
+    pass examine
+  end if
+  if the is_lit of the beacon of the target then
+    return "The great lamp burns steadily, its lens turning slowly about it."
+  end if
+  return "A great paraffin lamp inside a lens as tall as a man. It is cold, and its wick is trimmed and ready."
+end examine

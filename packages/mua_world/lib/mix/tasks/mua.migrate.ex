@@ -6,7 +6,7 @@ defmodule Mix.Tasks.Mua.Migrate do
   offline maintenance: stop the World first. It refuses while another
   process, such as a running World, holds the database.
 
-      mix mua.migrate --db world.db --edl main.edl --starting-room west_of_house [--dry-run] [--prune]
+      mix mua.migrate --db world.db --edl main.edl --starting-room harbour_steps [--dry-run] [--prune]
 
     * `--db` - the World's database, which must exist.
     * `--edl` - the changed EDL.

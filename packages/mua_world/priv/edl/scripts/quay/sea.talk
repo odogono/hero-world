@@ -1,0 +1,43 @@
+-- The sea turns the tide on its `turn` timer (quay.edl), and the town
+-- hears it: the quay and the causeway see the water move, and Morwenna,
+-- the harbourmaster, calls it out. The causeway reads the tide to decide
+-- who may cross (headland/causeway.talk).
+
+on turn actor
+  put not the high of the tide of the target into high
+  change the target, "tide", {high: high}
+
+  if high then
+    put "The tide turns, and the sea comes creeping back across the mud." into quay
+    put "The sea rises over the causeway, and the stones are gone." into causeway
+    put "Tide's turned. The causeway will be under in no time." into call
+  else
+    put "The tide turns, and the water drains away from the harbour wall." into quay
+    put "The sea drains off the causeway, leaving the stones bare." into causeway
+    put "Tide's on the ebb. The causeway will be clear soon enough." into call
+  end if
+
+  repeat for each name in ["harbour_steps", "slipway"]
+    ask world to named name
+    show it, quay
+  end repeat
+  repeat for each name in ["headland", "lighthouse"]
+    ask world to named name
+    show it, causeway
+  end repeat
+
+  ask world to named "morwenna"
+  if it is not nothing then
+    tell mua to act it, {verb: "say", text: call}
+  end if
+end turn
+
+on examine role, actor
+  if role is not "target" then
+    pass examine
+  end if
+  if the high of the tide of the target then
+    return "The tide is in, and the harbour is full of grey-green water."
+  end if
+  return "The tide is out. The harbour is mud and stranded boats, and the sea is a line of white far beyond the wall."
+end examine

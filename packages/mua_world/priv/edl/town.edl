@@ -1,0 +1,112 @@
+# What every district of Porthleven shares: the components its Scripts keep
+# state in, the atoms its places and things are built from, and its Verbs.
+
+
+# ======
+# Components
+# ======
+#
+# A Script changes these as the town plays, so they are Play state: a
+# Migration leaves them as play left them.
+
+# The sea's tide: in or out. The sea turns it on a timer (quay.edl).
+def tide {
+  high: boolean default false
+}
+
+# What a tidal place adds to its description at each tide, and while the
+# lighthouse is lit (scripts/town/tidal.talk)
+def shore {
+  high: string
+  low: string
+  lit: string null
+}
+
+# What the air of a place smells of, for `smell` with nothing named
+def scent {
+  air: string
+}
+
+# Which way Tamsin is going on her round: "inn" or "market"
+def errand {
+  heading: string default "inn"
+}
+
+# Whether a lamp is lit
+def beacon {
+  is_lit: boolean default false
+}
+
+
+# ======
+# Atoms
+# ======
+
+atom container {
+  container { capacity: 10 is_closed: false }
+}
+
+# Every place. Its Script answers `look`.
+atom room: container {
+  described { name: "Room" description: "An unremarkable room." }
+  script { src: "scripts/town/room.talk" }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+# Something too big or too fixed to carry, which says so
+atom fixture: responsive {
+  item { is_takeable: false }
+  responses { target: { take: "It won't budge." } }
+}
+
+# An NPC acts through commands, as a player does (ADR 0003)
+atom npc {
+  npc { active: true }
+}
+
+# A place by the sea, whose description says how the tide stands. A room
+# lists its mix-ins first, so `quay_room tidal` asks tidal's Script before
+# the room's.
+atom tidal {
+  script { src: "scripts/town/tidal.talk" }
+}
+
+# A place that smells of its `scent` when you sniff the air
+atom fragrant {
+  script { src: "scripts/town/fragrant.talk" }
+}
+
+
+# ======
+# Verbs
+# ======
+#
+# The Verbs Porthleven adds to the Base Verbs. Mua reads them; the Scripts
+# of the things they name carry them out.
+
+entity town_verbs was garden_verbs {
+  verbs {
+    defs: [
+      {
+        names: ["smell" "sniff"]
+        forms: [
+          { handler: "smell" pattern: "obj" }
+          { handler: "smell" pattern: "" }
+        ]
+      }
+      {
+        names: ["water"]
+        forms: [{ handler: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
+        incomplete: "Water what, with what?"
+      }
+      {
+        names: ["light"]
+        forms: [{ handler: "light" pattern: "obj" }]
+        incomplete: "What do you want to light?"
+      }
+    ]
+  }
+}

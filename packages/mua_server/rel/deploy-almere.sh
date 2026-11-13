@@ -326,7 +326,7 @@ if [[ -z "$(_existing SECRET_KEY_BASE || true)" ]]; then
 else
   note "SECRET_KEY_BASE already set; keeping it so sessions survive."
 fi
-[[ -n "$(_existing MUA_STARTING_ROOM || true)" ]] || write_env MUA_STARTING_ROOM west_of_house
+[[ -n "$(_existing MUA_STARTING_ROOM || true)" ]] || write_env MUA_STARTING_ROOM harbour_steps
 chmod 600 "$ENV_FILE"
 pause
 

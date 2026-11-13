@@ -42,7 +42,7 @@ export const parseEDLDefault = (
 
 type EDLComponentNode = { columns?: CDefColumnInfo[]; id: string };
 
-const cdefFromEDL = (d: EDLComponentNode) => {
+export const cdefFromEDL = (d: EDLComponentNode) => {
   const columns = (d.columns || []).map((c: CDefColumnInfo) => ({
     foreignKey: c.foreignKey,
     isIndexed: c.isIndexed,

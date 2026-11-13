@@ -8,7 +8,7 @@ File.mkdir_p!(dir)
 world = [
   path: Path.join(dir, "world.db"),
   edl: Path.join(:code.priv_dir(:mua_world), "edl/main.edl"),
-  starting_room: "west_of_house",
+  starting_room: "harbour_steps",
   tick: :manual
 ]
 

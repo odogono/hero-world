@@ -1,0 +1,22 @@
+-- Morwenna Pascoe, the harbourmaster: answers what is said near her about
+-- the tide and the lighthouse. The sea has her call each turn of the tide
+-- (sea.talk).
+
+on heard speaker, words
+  if speaker is the target then
+    pass heard
+  end if
+  put lower(words) into said
+
+  if said contains "tide" or said contains "causeway" then
+    ask world to named "sea"
+    if the high of the tide of it then
+      put "The tide's in. Nobody crosses to the lighthouse till it ebbs." into reply
+    else
+      put "It's out now, but it turns quick here. Don't get caught on the far side." into reply
+    end if
+    tell mua to act the target, {verb: "say", text: reply}
+  else if said contains "lighthouse" or said contains "keeper" or said contains "ezra" or said contains "lamp" then
+    tell mua to act the target, {verb: "say", text: "Ezra Trethewey kept that light thirty years. He went out the night of the storm and hasn't come back, and it's been dark since. He kept a spare key to the lamp room in the shed at his cottage, up Hill Lane. Hollis minds the garden now."}
+  end if
+end heard

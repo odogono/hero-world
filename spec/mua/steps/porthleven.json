@@ -1,0 +1,466 @@
+{
+  "edl": "../../../packages/mua_world/priv/edl/main.edl",
+  "starting_room": "harbour_steps",
+  "cases": [
+    {
+      "name": "the keeper's thread, from the noticeboard to the lit lamp, seen from the quay",
+      "join": [
+        "ada",
+        "bob"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "read noticeboard",
+          "told": [
+            "WELCOME TO PORTHLEVEN. Type help for the commands you can use, look to see where you are, and a direction such as north to walk. Tide times are in the crate. THE SHIP is open, Jory presiding. LAMP UNLIT: the lighthouse has been dark since the storm, and its keeper, Ezra Trethewey, has not been seen. Anyone with news, see the harbourmaster."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
+          ],
+          "heard": {
+            "bob": [
+              "ada goes north."
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Chandler's Shop\nRope, tar, brass fittings and oilskins crowd every shelf. Nobody minds the shop, but there's an honesty box on the counter.\n\nYou see: the matches, the rope\nThere is: the honesty box\nExits: west"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "take matches",
+          "told": [
+            "Taken."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "west",
+          "told": [
+            "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "west",
+          "told": [
+            "The Ship\nA low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north.\n\nThere is: the counter\nAlso here: Jory\nExits: north, east"
+          ],
+          "heard": {
+            "ada": [
+              "Jory says, \"Welcome aboard The Ship, ada.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "take tankard",
+          "told": [
+            "Jory slides the tankard out of your reach. \"That's paid for, that is.\""
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Back Room\nA cramped room stacked with barrels. Coats nobody came back for hang on a row of pegs.\n\nThere is: the lost property box\nExits: south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "open box",
+          "told": [
+            "Opening the lost property box reveals: the oilskin, the torn page."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "take page",
+          "told": [
+            "Taken."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "read page",
+          "told": [
+            "14th. Wind backing south-west, glass falling fast. Lamp trimmed and lit at dusk. The spare key to the lamp room is in the shed at the cottage, as ever. If the weather holds I shall... The rest is torn away."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "south",
+          "told": [
+            "The Ship\nA low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north.\n\nThere is: the counter\nAlso here: Jory\nExits: north, east"
+          ],
+          "heard": {
+            "ada": [
+              "Jory says, \"Welcome aboard The Ship, ada.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "say what about the page?",
+          "told": [
+            "You say, \"what about the page?\""
+          ],
+          "heard": {
+            "ada": [
+              "Jory says, \"That torn page? Washed up on the slipway after the storm. It's in the lost property box in the back.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east (closed), south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Orchard\nOld apple trees lean together over long grass. Windfalls lie where they dropped.\n\nAlso here: Hollis\nExits: north, south"
+          ],
+          "heard": {
+            "ada": [
+              "Hollis says, \"Mind the roses, ada.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "say have you seen a key?",
+          "told": [
+            "You say, \"have you seen a key?\""
+          ],
+          "heard": {
+            "ada": [
+              "Hollis says, \"The shed key? I dropped it in the well bucket, I think.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Old Well\nA mossy stone well sits in a clearing, a rope and bucket hanging from its winch.\n\nThere is: the bucket\nExits: south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "take key from bucket",
+          "told": [
+            "Taken."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "south",
+          "told": [
+            "Orchard\nOld apple trees lean together over long grass. Windfalls lie where they dropped.\n\nAlso here: Hollis\nExits: north, south"
+          ],
+          "heard": {
+            "ada": [
+              "Hollis says, \"Mind the roses, ada.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "south",
+          "told": [
+            "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east (closed), south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "unlock door",
+          "told": [
+            "(with the shed key)\nYou unlock the shed door with the shed key."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "open door",
+          "told": [
+            "Opened."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Garden Shed\nShelves of pots and tools line the walls. It smells of earth and creosote.\n\nYou see: the seed catalogue, the watering can, the trowel, the brass key\nExits: west"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "take brass key",
+          "told": [
+            "Taken."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "west",
+          "told": [
+            "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "south",
+          "told": [
+            "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "up",
+          "told": [
+            "The iron door is closed."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "unlock door",
+          "told": [
+            "(with the brass key)\nYou unlock the iron door with the brass key."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "open door",
+          "told": [
+            "Opened."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "up",
+          "told": [
+            "Lamp Room\nA round room of glass at the top of the tower, the great lamp at its centre. Through the salt-crusted panes you can see the whole harbour.\n\nYou see: the lamp, the logbook\nExits: down"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "read logbook",
+          "told": [
+            "The keeper's last entry, after the torn page: 15th. Storm through the night. A light seen out past the Bar, where no light should be. Took the punt out at first ebb to look. Mrs Pascoe will say I'm a fool. Nothing is written after it."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "light lamp",
+          "told": [
+            "You strike a storm match and hold it to the wick. The lamp catches, the great lens begins to turn, and its beam swings out across the sea."
+          ],
+          "heard": {
+            "bob": [
+              "Out on its island, the lighthouse flares into life, and its beam sweeps across the harbour."
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "light lamp",
+          "told": [
+            "The lamp is already lit."
+          ]
+        },
+        {
+          "where": {
+            "lamp_key": "ada",
+            "matches": "ada",
+            "shed_key": "ada",
+            "tankard": "counter"
+          }
+        },
+        {
+          "as": "bob",
+          "type": "look",
+          "told": [
+            "Harbour Steps\nWorn granite steps climb from the ferry landing to the quay. Gulls squabble on the bollards, and the town rises behind you in terraces of slate and whitewash.\n\nYou see: the sea, the noticeboard\nThere is: the crate\nAlso here: Morwenna\nExits: north, south, east, west\n\nThe tide is out. Boats lean on their keels in the harbour mud, and past the headland the causeway to the lighthouse stands clear of the water. The lighthouse beam sweeps across the harbour."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the tide strands you at the lighthouse until it turns",
+      "join": [
+        "ada"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": [
+            "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "east",
+          "told": [
+            "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west"
+          ]
+        },
+        {
+          "advance": 300,
+          "heard": {
+            "ada": [
+              "The sea rises over the causeway, and the stones are gone."
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "west",
+          "told": [
+            "The causeway is under the sea. You're stuck here until the tide turns."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "look",
+          "told": [
+            "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west\n\nThrough the door, the sea covers the causeway back to the headland."
+          ]
+        },
+        {
+          "advance": 300,
+          "heard": {
+            "ada": [
+              "The sea drains off the causeway, leaving the stones bare."
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "west",
+          "told": [
+            "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
+          ]
+        },
+        {
+          "where": {
+            "ada": "headland"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the harbourmaster tells you how the tide stands",
+      "join": [
+        "ada"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "look",
+          "told": [
+            "Harbour Steps\nWorn granite steps climb from the ferry landing to the quay. Gulls squabble on the bollards, and the town rises behind you in terraces of slate and whitewash.\n\nYou see: the sea, the noticeboard\nThere is: the crate\nAlso here: Morwenna\nExits: north, south, east, west\n\nThe tide is out. Boats lean on their keels in the harbour mud, and past the headland the causeway to the lighthouse stands clear of the water."
+          ]
+        },
+        {
+          "as": "ada",
+          "type": "say how is the tide?",
+          "told": [
+            "You say, \"how is the tide?\""
+          ],
+          "heard": {
+            "ada": [
+              "Morwenna says, \"It's out now, but it turns quick here. Don't get caught on the far side.\""
+            ]
+          }
+        },
+        {
+          "advance": 300,
+          "heard": {
+            "ada": [
+              "Tamsin arrives.",
+              "Tamsin goes north.",
+              "Tamsin arrives.",
+              "Tamsin goes east.",
+              "The tide turns, and the sea comes creeping back across the mud.",
+              "Morwenna says, \"Tide's turned. The causeway will be under in no time.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "say and now, the tide?",
+          "told": [
+            "You say, \"and now, the tide?\""
+          ],
+          "heard": {
+            "ada": [
+              "Morwenna says, \"The tide's in. Nobody crosses to the lighthouse till it ebbs.\""
+            ]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "examine sea",
+          "told": [
+            "The tide is in, and the harbour is full of grey-green water."
+          ]
+        }
+      ]
+    }
+  ]
+}

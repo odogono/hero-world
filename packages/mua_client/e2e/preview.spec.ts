@@ -23,12 +23,12 @@ test('an admin previews the World, runs a command and inspects what changed', as
 
   const input = ada.getByLabel('Preview command');
   await expect(input).toBeEnabled({ timeout: 30_000 });
-  await input.fill('open mailbox');
+  await input.fill('open crate');
   await input.press('Enter');
   const changes = ada.getByRole('list', { name: 'Changes' });
   await expect(changes).toContainText('container');
 
-  await changes.getByRole('button', { name: 'mailbox' }).click();
+  await changes.getByRole('button', { name: 'crate' }).click();
   const card = ada.getByRole('article', { name: 'container' });
   await expect(card).toContainText('false');
   // a Reference opens the entity it names
@@ -37,24 +37,33 @@ test('an admin previews the World, runs a command and inspects what changed', as
     .getByRole('button')
     .click();
   await expect(
-    ada.getByRole('region', { name: /west_of_house/ })
+    ada.getByRole('region', { name: /harbour_steps/ })
   ).toBeVisible();
 
-  // edit the EDL, and migrate the preview to it: the mailbox stays open
+  // edit the EDL, and migrate the preview to it: the crate stays open. The
+  // editor holds main.edl, which includes the districts, so add a buoy.
   const edl = ada.getByLabel('EDL text');
   const text = await edl.inputValue();
-  expect(text).toContain('A small mailbox on a wooden post.');
-  await edl.fill(
-    text.replace('A small mailbox on a wooden post.', 'A dented green mailbox.')
-  );
+  expect(text).toContain('include "quay.edl"');
+  await edl.fill(`${text}
+entity buoy : item {
+  described { name: "Buoy" description: "A dented green buoy." }
+  location { in: $harbour_steps }
+}
+`);
   await ada.getByRole('button', { name: 'Migrate' }).click();
   const migrationPlan = ada.getByLabel('Migration plan');
-  await expect(migrationPlan).toContainText('Updated');
+  await expect(migrationPlan).toContainText('Created');
   await expect(migrationPlan).toContainText('Kept play state');
-  await input.fill('examine mailbox');
+  await input.fill('examine buoy');
   await input.press('Enter');
   await expect(ada.getByLabel('Preview transcript')).toContainText(
-    'A dented green mailbox.'
+    'A dented green buoy.'
+  );
+  await input.fill('examine crate');
+  await input.press('Enter');
+  await expect(ada.getByLabel('Preview transcript')).toContainText(
+    'It contains: the tide card.'
   );
   await ada.screenshot({
     fullPage: true,

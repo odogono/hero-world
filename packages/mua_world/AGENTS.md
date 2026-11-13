@@ -10,7 +10,7 @@ mua's World in Elixir. `README.md` explains how it works (Steps, Dispatch, Limbo
 - `components.ex`: the component definitions. `tables.ex`: mua's own SQL tables (time, outbox, pending input, NPC queue).
 - `places.ex` (Limbo, Starting room), `exits.ex`, `lifecycle.ex` (homes, resets, timers, `start`), `view.ex`.
 - `migration.ex`, `backup.ex`, `lock.ex`: operating a World kept in a file.
-- Content: `priv/edl/main.edl` and its Scripts in `priv/edl/scripts/`. The Base Verbs every World includes (`include "mua-scripts:edl/base.edl"`) are in `../mua-scripts/edl/base.edl`.
+- Content: Porthleven, `priv/edl/main.edl`, which includes one file per district (`quay.edl`, `ship.edl` …) and `town.edl` for what they share. Their Scripts are in `priv/edl/scripts/<district>/`. `test/fixtures/house-world/` keeps the World it replaced, to test the Migration from it. The Base Verbs every World includes (`include "mua-scripts:edl/base.edl"`) are in `../mua-scripts/edl/base.edl`.
 
 ## Tests
 

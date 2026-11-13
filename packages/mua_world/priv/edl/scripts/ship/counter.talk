@@ -1,0 +1,13 @@
+-- The counter at The Ship: nothing comes off it while Jory is behind the
+-- bar. A Veto, asked of what holds the thing before it is taken.
+
+on beforeRemove actor, thing, deciding
+  ask world to named "jory"
+  put it into jory
+  if jory is not nothing and jory is not actor then
+    if the in of the location of jory is the in of the location of the target then
+      veto `Jory slides the ${lower(the name of the described of thing)} out of your reach. "That's paid for, that is."`
+    end if
+  end if
+  pass beforeRemove
+end beforeRemove

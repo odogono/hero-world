@@ -21,7 +21,7 @@ Everything comes from the environment, read at start (`config/runtime.exs`). In 
 | Variable | Release | Elsewhere |
 | --- | --- | --- |
 | `DATABASE_PATH` | required; the image sets `/data/world.db` | `data/world.db` |
-| `MUA_STARTING_ROOM` | required, a Definition name | `west_of_house` |
+| `MUA_STARTING_ROOM` | required, a Definition name | `harbour_steps` |
 | `MUA_EDL` | optional | `mua_world`'s `priv/edl/main.edl` |
 | `MUA_ALLOWLIST` | comma-separated emails; empty admits nobody | the same |
 | `MUA_ADMINS` | comma-separated emails of admins, who can run NorthTalk at the prompt with `;` | the same |
@@ -50,7 +50,7 @@ PHX_HOST=almere.example.ts.net
 SECRET_KEY_BASE=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-MUA_STARTING_ROOM=west_of_house
+MUA_STARTING_ROOM=harbour_steps
 MUA_ALLOWLIST=you@example.com
 MUA_ADMINS=you@example.com
 ```

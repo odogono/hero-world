@@ -83,7 +83,7 @@ defmodule MuaServer.CharacterChannelTest do
 
       assert_push("status", %{status: "connected"})
       assert_push("output", %{lines: [_ | _]})
-      assert_push("state", %{room: %{name: "West of house"}, inventory: [], actions: actions})
+      assert_push("state", %{room: %{name: "Harbour Steps"}, inventory: [], actions: actions})
       assert "north" in actions
       refute in_limbo?(ada)
     end
@@ -103,10 +103,10 @@ defmodule MuaServer.CharacterChannelTest do
       a = join_as(ada)
       assert_push("mirror", %{character: character, components: %{"described" => described}})
       assert character == ada.character
-      assert Enum.any?(described, &(&1["name"] == "West of house"))
+      assert Enum.any?(described, &(&1["name"] == "Harbour Steps"))
       flush_pushes()
 
-      ref = push(a, "command", %{"text" => "open mailbox", "ref" => "c1"})
+      ref = push(a, "command", %{"text" => "open crate", "ref" => "c1"})
       assert_reply(ref, :ok, %{ref: "c1"})
       assert_push("changes", %{put: %{"container" => [%{"is_closed" => false}]}})
     end
@@ -475,26 +475,26 @@ defmodule MuaServer.CharacterChannelTest do
            %{ada: ada} do
         a = join_as(ada)
         Process.unlink(a.channel_pid)
-        ref = push(a, "command", %{"text" => "open mailbox", "ref" => "o"})
+        ref = push(a, "command", %{"text" => "open crate", "ref" => "o"})
         assert_reply(ref, :ok)
 
-        push(a, "command", %{"text" => "take leaflet", "ref" => "t"})
+        push(a, "command", %{"text" => "take card", "ref" => "t"})
         if unquote(wait?), do: assert_push("output", %{lines: ["Taken."]})
         Process.exit(a.channel_pid, :kill)
 
         _again = join_as_view(ada)
         Process.sleep(100)
         {:ok, view} = MuaWorld.view(@world, ada.account, ada.character)
-        held = Enum.count(view.inventory, &(&1 =~ ~r/leaflet/i))
+        held = Enum.count(view.inventory, &(&1 =~ ~r/tide card/i))
         if unquote(wait?), do: assert(held == 1), else: assert(held <= 1)
         refute_push("output", %{lines: ["Taken."]})
 
-        # back in the closed mailbox, for the other tests
-        mailbox = MuaWorld.named(@world, "mailbox")
-        leaflet = MuaWorld.named(@world, "leaflet")
-        MuaWorld.set_component(@world, leaflet, "location", %{"in" => mailbox})
-        box = MuaWorld.component(@world, mailbox, "container")
-        MuaWorld.set_component(@world, mailbox, "container", %{box | "is_closed" => true})
+        # back in the closed crate, for the other tests
+        crate = MuaWorld.named(@world, "crate")
+        card = MuaWorld.named(@world, "tide_card")
+        MuaWorld.set_component(@world, card, "location", %{"in" => crate})
+        box = MuaWorld.component(@world, crate, "container")
+        MuaWorld.set_component(@world, crate, "container", %{box | "is_closed" => true})
       end
     end
   end
