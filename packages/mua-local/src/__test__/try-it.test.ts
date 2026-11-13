@@ -5,6 +5,7 @@ import { DatabaseType } from 'odgn-ecs/db';
 import { get } from 'odgn-ecs/store';
 
 import { worldFiles } from '../../scripts/files';
+import { openLocalWorld } from '../local';
 import type { MirrorSnapshot } from '../mirror';
 import { openPreviewWorld, type TryIt } from '../preview';
 
@@ -213,5 +214,33 @@ describe('Try it', () => {
       reason: 'try_it'
     });
     preview.close();
+  });
+});
+
+describe('Try it from a Local World (#291)', () => {
+  test("opens from the Local World's own mirror of its Character", async () => {
+    let character = -1;
+    const local = await openLocalWorld({
+      clock: () => 0,
+      database: DATABASE,
+      files: FILES,
+      send: message => {
+        if (message.event === 'joined') {
+          character = message.character;
+        }
+      }
+    });
+    await local.receive({ name: 'Ada', type: 'join' });
+    const account = get(local.world.store, character, 'player')
+      ?.account as number;
+    const mirror = await local.world.mirror(account, character);
+    expect(mirror.character).toBe(character);
+
+    const preview = await tryIt({ ...SATCHEL, mirror });
+    expect(preview.runs()).toBe(true);
+    const look = await preview.command('look');
+    expect(look.lines.join('\n')).toContain('the mailbox');
+    expect(look.lines.join('\n')).toContain('the satchel');
+    local.close();
   });
 });

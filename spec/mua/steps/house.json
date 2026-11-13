@@ -196,6 +196,279 @@
           "told": ["You can't see any unicorn here."]
         }
       ]
+    },
+    {
+      "name": "mirrors what a Character perceives, and no more",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "mirror": "ada",
+          "place": "hall",
+          "sees": {
+            "ada": {
+              "location": {
+                "in": "hall"
+              },
+              "player": {
+                "name": "ada"
+              }
+            },
+            "bob": {
+              "location": {
+                "in": "hall"
+              },
+              "player": {
+                "name": "bob"
+              }
+            },
+            "box": {
+              "container": {
+                "is_closed": false
+              },
+              "described": {
+                "description": "A wooden box.",
+                "name": "Box"
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "brass_key": {
+              "described": {
+                "description": "A small brass key.",
+                "name": "Brass key"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "hall"
+              },
+              "noun": {
+                "words": ["key"]
+              }
+            },
+            "chest": {
+              "container": {
+                "is_closed": true
+              },
+              "described": {
+                "description": "A heavy chest.",
+                "name": "Chest"
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "door": {
+              "described": {
+                "description": "An oak door.",
+                "name": "Door"
+              },
+              "door": {
+                "is_closed": true
+              }
+            },
+            "hall": {
+              "container": {
+                "is_closed": false
+              },
+              "described": {
+                "description": "A long hall.",
+                "name": "Hall"
+              }
+            },
+            "hall north": {
+              "location": {
+                "in": "hall"
+              },
+              "portal": {
+                "dir": "north",
+                "door": "door"
+              }
+            },
+            "lamp": {
+              "described": {
+                "description": "A brass oil lamp.",
+                "name": "Lamp"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "hall"
+              },
+              "noun": {
+                "words": ["lantern"]
+              }
+            },
+            "note": {
+              "described": {
+                "description": "A folded note.",
+                "name": "Note"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "pebble": {
+              "described": {
+                "description": "A smooth pebble.",
+                "name": "Pebble"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "box"
+              }
+            }
+          }
+        },
+        {
+          "as": "ada",
+          "type": "open chest",
+          "told": ["Opening the chest reveals: the gem."],
+          "heard": {
+            "bob": ["ada opens the chest."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "take lamp",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the lamp."]
+          }
+        },
+        {
+          "mirror": "bob",
+          "place": "hall",
+          "sees": {
+            "ada": {
+              "location": {
+                "in": "hall"
+              },
+              "player": {
+                "name": "ada"
+              }
+            },
+            "bob": {
+              "location": {
+                "in": "hall"
+              },
+              "player": {
+                "name": "bob"
+              }
+            },
+            "box": {
+              "container": {
+                "is_closed": false
+              },
+              "described": {
+                "description": "A wooden box.",
+                "name": "Box"
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "brass_key": {
+              "described": {
+                "description": "A small brass key.",
+                "name": "Brass key"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "hall"
+              },
+              "noun": {
+                "words": ["key"]
+              }
+            },
+            "chest": {
+              "container": {
+                "is_closed": false
+              },
+              "described": {
+                "description": "A heavy chest.",
+                "name": "Chest"
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "door": {
+              "described": {
+                "description": "An oak door.",
+                "name": "Door"
+              },
+              "door": {
+                "is_closed": true
+              }
+            },
+            "gem": {
+              "described": {
+                "description": "A red gem.",
+                "name": "Gem"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "chest"
+              }
+            },
+            "hall": {
+              "container": {
+                "is_closed": false
+              },
+              "described": {
+                "description": "A long hall.",
+                "name": "Hall"
+              }
+            },
+            "hall north": {
+              "location": {
+                "in": "hall"
+              },
+              "portal": {
+                "dir": "north",
+                "door": "door"
+              }
+            },
+            "note": {
+              "described": {
+                "description": "A folded note.",
+                "name": "Note"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "hall"
+              }
+            },
+            "pebble": {
+              "described": {
+                "description": "A smooth pebble.",
+                "name": "Pebble"
+              },
+              "item": {
+                "is_takeable": true
+              },
+              "location": {
+                "in": "box"
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

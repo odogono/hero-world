@@ -9,7 +9,12 @@ import { DatabaseType } from 'odgn-ecs/db';
 import { get, type Eid } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
-import { components, startMuaWorld, type MuaWorld } from '../index';
+import {
+  components,
+  startMuaWorld,
+  type MirrorSnapshot,
+  type MuaWorld
+} from '../index';
 
 const REPO = join(import.meta.dir, '../../../..');
 const SPEC_DIR = join(REPO, 'spec/mua/steps');
@@ -27,12 +32,13 @@ const start = async (spec: Spec) => {
     roots: { 'mua-scripts': SCRIPTS }
   });
   world.flush();
-  return startMuaWorld(world, {
+  const mua = await startMuaWorld(world, {
     clock: () => 0,
     readFile: file => readFileSync(file, 'utf8'),
     scriptsDir: SCRIPTS,
     startingRoom: spec.starting_room
   });
+  return { definitions: world.getDefinitionNames(), mua };
 };
 
 /** Joins a Character with an Account of its own, and hears its output */
@@ -74,8 +80,47 @@ const heardSince = (
   return out;
 };
 
+/**
+ * A mirror snapshot by label, as the Elixir runner gives it: each perceived
+ * entity's shown components, with every id a label. An exit with no
+ * Definition name is its place's label and its direction, as `hall north`.
+ */
+const labelled = (
+  snapshot: MirrorSnapshot,
+  named: (eid: Eid) => string | undefined
+) => {
+  const rows = Object.values(snapshot.components).flat();
+  const label = (eid: unknown): string => {
+    const name = typeof eid === 'number' ? named(eid) : undefined;
+    if (name !== undefined) {
+      return name;
+    }
+    const at = rows.find(r => r.eid === eid && 'in' in r)?.in;
+    const dir = rows.find(r => r.eid === eid && 'dir' in r)?.dir;
+    if (at !== undefined && typeof dir === 'string') {
+      return `${label(at)} ${dir}`;
+    }
+    throw new Error(`No label for ${String(eid)}`);
+  };
+  const refs = (name: string, field: string, value: unknown) =>
+    (name === 'location' && field === 'in') ||
+    (name === 'portal' && field === 'door' && value !== null)
+      ? label(value)
+      : value;
+
+  const sees: Record<string, Record<string, Record<string, unknown>>> = {};
+  for (const [name, list] of Object.entries(snapshot.components)) {
+    for (const { eid, ...fields } of list) {
+      (sees[label(eid)] ??= {})[name] = Object.fromEntries(
+        Object.entries(fields).map(([f, v]) => [f, refs(name, f, v)])
+      );
+    }
+  }
+  return { place: label(snapshot.place), sees };
+};
+
 const runCase = async (spec: Spec, c: Case) => {
-  const mua = await start(spec);
+  const { definitions, mua } = await start(spec);
   const characters = new Map<string, Joined>();
   for (const name of c.join) {
     characters.set(name, await join_(mua, name));
@@ -91,8 +136,21 @@ const runCase = async (spec: Spec, c: Case) => {
     return id;
   };
 
+  const named = (id: Eid) =>
+    [...characters].find(([, c]) => c.eid === id)?.[0] ??
+    [...definitions].find(([, e]) => e === id)?.[0];
+
   for (const step of c.steps) {
-    if ('where' in step) {
+    if ('mirror' in step) {
+      const name = step.mirror as string;
+      const who = characters.get(name)!;
+      const snapshot = await mua.mirror(who.account, who.eid);
+      expect(snapshot.character).toBe(who.eid);
+      expect([name, labelled(snapshot, named)]).toEqual([
+        name,
+        { place: step.place, sees: step.sees }
+      ] as never);
+    } else if ('where' in step) {
       const where = step.where as Record<string, string>;
       for (const [thing, place] of Object.entries(where)) {
         const at = get(mua.store, await eid(thing), 'location')?.in;

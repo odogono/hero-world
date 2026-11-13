@@ -41,7 +41,9 @@ defmodule MuaWorld.StepsConformanceTest do
       actual = run_step(world, characters, step)
 
       if record?() do
-        IO.puts(JSON.encode!(Map.merge(Map.take(step, ["as", "type", "advance"]), actual)))
+        IO.puts(
+          JSON.encode!(Map.merge(Map.take(step, ["as", "type", "advance", "mirror"]), actual))
+        )
       else
         check(step, actual)
       end
@@ -56,6 +58,14 @@ defmodule MuaWorld.StepsConformanceTest do
   defp run_step(world, characters, %{"advance" => seconds}) do
     :ok = run_for(world, seconds)
     %{"heard" => heard(characters, nil)}
+  end
+
+  # The Character's mirror snapshot, by label (`labelled/3`)
+  defp run_step(world, characters, %{"mirror" => name}) do
+    character = characters[name]
+    {:ok, snapshot} = MuaWorld.mirror(world, account(character), character)
+    assert snapshot.character == character
+    labelled(world, characters, snapshot)
   end
 
   # Where each thing is: the label of what holds it
@@ -87,6 +97,9 @@ defmodule MuaWorld.StepsConformanceTest do
 
   defp check(%{"where" => where}, actual), do: assert(actual["where"] == where)
 
+  defp check(%{"mirror" => name} = step, actual),
+    do: assert(actual == Map.take(step, ["place", "sees"]), "#{name}: mirror")
+
   defp check(step, actual) do
     if Map.has_key?(step, "told"),
       do: assert(actual["told"] == step["told"], "#{step["type"]}: told")
@@ -94,6 +107,50 @@ defmodule MuaWorld.StepsConformanceTest do
     assert actual["heard"] == Map.get(step, "heard", %{}),
            "#{step["type"] || "advance"}: heard"
   end
+
+  # A mirror snapshot as `%{"place" => label, "sees" => %{label => rows}}`:
+  # each perceived entity's shown components, with every id a label. An exit
+  # with no Definition name is its place's label and its direction, as
+  # `hall north`
+  defp labelled(world, characters, snapshot) do
+    names =
+      Map.merge(
+        :sys.get_state(world).world
+        |> OdgnEdl.definition_names()
+        |> Map.new(fn {n, e} -> {e, n} end),
+        Map.new(characters, fn {n, e} -> {e, n} end)
+      )
+
+    rows = snapshot.components |> Map.values() |> List.flatten()
+    label = &mirror_label(&1, names, rows)
+
+    sees =
+      for {name, list} <- snapshot.components, row <- list, reduce: %{} do
+        acc ->
+          fields =
+            for {field, value} <- Map.delete(row, "eid"),
+                into: %{},
+                do: {field, mirror_ref(name, field, value, label)}
+
+          Map.update(acc, label.(row["eid"]), %{name => fields}, &Map.put(&1, name, fields))
+      end
+
+    %{"place" => label.(snapshot.place), "sees" => sees}
+  end
+
+  defp mirror_label(eid, names, rows) do
+    Map.get_lazy(names, eid, fn ->
+      at = Enum.find_value(rows, &(&1["eid"] == eid && &1["in"]))
+      dir = Enum.find_value(rows, &(&1["eid"] == eid && &1["dir"]))
+
+      (at && is_binary(dir) && "#{mirror_label(at, names, rows)} #{dir}") ||
+        flunk("No label for #{eid}")
+    end)
+  end
+
+  defp mirror_ref("location", "in", value, label), do: label.(value)
+  defp mirror_ref("portal", "door", value, label) when value != nil, do: label.(value)
+  defp mirror_ref(_, _, value, _), do: value
 
   # A Character by its join name, or anything else by its Definition name
   defp eid(world, characters, name),
