@@ -181,6 +181,25 @@ const registerComponentDef = <TComponents extends Components>(
   });
 };
 
+/**
+ * Defines components an EDL's `def` blocks declare, as a Migration does
+ * before it reads atoms and entities: new ones are added, and one the World
+ * already has is redefined, keeping whether it is Play state.
+ */
+export const defineComponentDefs = <TComponents extends Components>(
+  world: World<TComponents>,
+  cdefs: readonly CDef[]
+): void => {
+  world.db.transaction(() => {
+    for (const cdef of cdefs) {
+      registerComponentDef(world, cdef);
+      if (!world.componentTypes.includes(cdef.id as keyof TComponents)) {
+        world.componentTypes.push(cdef.id as keyof TComponents);
+      }
+    }
+  });
+};
+
 export type { ScriptOwner } from '../edl/record';
 
 export class World<TComponents extends Components> {

@@ -1,0 +1,10 @@
+-- The lamp room: when it resets, the lamp goes out, ready for the next
+-- player to light.
+
+on reset actor
+  ask world to named "lamp"
+  if it is not nothing and the is_lit of the beacon of it then
+    change it, "beacon", {is_lit: false}
+    show the target, "The lamp gutters and goes out."
+  end if
+end reset

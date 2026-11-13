@@ -1,242 +1,30 @@
+# Porthleven: a harbour town, and mua's main World Definition.
+#
+# Newcomers step off the ferry onto the Harbour Steps. From there the town
+# runs north up the High Street to The Ship, a chandler's shop, the
+# lighthouse keeper's walled garden and the headland, where a causeway
+# crosses to the lighthouse when the tide is out.
+#
+# The lighthouse has been dark since a storm, and its keeper, Ezra
+# Trethewey, is missing. Following that thread takes a player through most
+# of what mua can do, but nothing in the town is reachable only through it.
+#
+# Each district is its own file, with its Scripts in `scripts/<district>/`:
+#
+#   town.edl         the atoms, component definitions and Verbs every district shares
+#   quay.edl         the Harbour Steps, fish market, slipway, boatyard, and the sea
+#   high-street.edl  the square, the chandler's shop and Hill Lane
+#   ship.edl         The Ship, its bar and back room
+#   headland.edl     the headland, the lighthouse and its lamp room
+#   garden.edl       the keeper's walled garden, orchard, well and shed
+#
+# The Starting room is `harbour_steps`.
+
 include "mua-scripts:edl/base.edl"
 
-
-# ======
-# Atoms
-# ======
-
-atom root {
-}
-
-
-# Base container atom (reusable defaults)
-atom container {
-  meta { props: { id: "container" } }
-  container { capacity: 10 is_closed: false }
-}
-
-# Room atom (conceptually inherits container via entity-level extension)
-atom room: container {
-  # Provide defaults; entities will override name/description
-  described { name: "Room" description: "An unremarkable room." }
-  script { src: "scripts/room.talk" }
-}
-
-# Exit atom
-atom exit {
-  
-}
-
-# Generic item atom
-atom item {
-  meta { props: { id: "item atom" } }
-  item { weight: 1 is_takeable: true }
-}
-
-
-
-# ==========
-# World Map
-# ==========
-
-entity west_of_house : room {
-  meta { props: { id: "west_of_house" } }
-  described {
-    name: "West of house"
-    description: "This is an open field west of a white house, with a boarded front door."
-  }
-  # Paths round the house are one way: their ways back go elsewhere
-  exits {
-    north: { to: $north_of_house one_way: true }
-    south: { to: $south_of_house one_way: true }
-  }
-}
-
-
-entity north_of_house : room {
-  meta { props: { id: "north_of_house" } }
-  described {
-    name: "North of house"
-    description: "You are facing the north side of a white house.  There is no door here, and all the windows are barred."
-  }
-  exits {
-    east: $behind_house
-    south: { msg: "The windows are all barred." }
-  }
-}
-
-entity south_of_house : room {
-  meta { props: { id: "south_of_house" } }
-  described {
-    name: "South of House"
-    description: "You are facing the south side of a white house.  There is no door here, and all the windows are barred."
-  }
-  exits {
-    west: { to: $west_of_house one_way: true }
-    east: $behind_house
-    north: { msg: "The windows are all barred." }
-  }
-}
-
-entity behind_house : room {
-  meta { props: { id: "behind_house" } }
-  described {
-    name: "Behind House"
-    description: "You are behind the white house.  In one corner of the house there is a small window which is slightly ajar."
-  }
-  exits {
-    west: { msg: "The window is closed." }
-    north: $north_of_house
-    south: $south_of_house
-    east: $garden_path
-  }
-}
-
-# ==========
-# Items
-# ==========
-
-
-entity mailbox: container {
-  described { name: "Mailbox" description: "A small mailbox on a wooden post." }
-  container { capacity: 5 is_closed: true }
-  location { in: $west_of_house }
-}
-
-entity leaflet: item {
-  described { name: "Leaflet" description: "A leaflet with bold letters on it." }
-  readable { text: "WELCOME TO MUA! Explore the house and its grounds. Type help for a list of commands." }
-  item { weight: 1 }
-  location { in: $mailbox }
-}
-
-
-# ==========
-# The walled garden, east of the house
-# ==========
-
-# Verbs the garden adds; its Scripts handle them (see scripts/)
-entity garden_verbs {
-  verbs {
-    defs: [
-      {
-        names: ["smell" "sniff"]
-        forms: [
-          { handler: "smell" pattern: "obj" }
-          { handler: "smell" pattern: "" }
-        ]
-      }
-      {
-        names: ["water"]
-        forms: [{ handler: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
-        incomplete: "Water what, with what?"
-      }
-    ]
-  }
-}
-
-# The garden puts itself back every ten minutes
-atom garden_room : room {
-  timers { every: { reset: 600 } }
-}
-
-atom roses {
-  script { src: "scripts/roses.talk" }
-}
-
-atom fragrant {
-  script { src: "scripts/fragrant.talk" }
-}
-
-atom npc {
-  npc { active: true }
-}
-
-atom gardener {
-  script { src: "scripts/gardener.talk" }
-}
-
-entity garden_path : garden_room fragrant {
-  described {
-    name: "Garden Path"
-    description: "A gravel path runs between high brick walls. Rose bushes crowd the borders, and a wooden shed stands at the far end."
-  }
-  exits {
-    north: $orchard
-    east: { to: $shed door: $shed_door }
-  }
-}
-
-entity orchard : garden_room {
-  described {
-    name: "Orchard"
-    description: "Old apple trees lean together over long grass. Windfalls lie where they dropped."
-  }
-  exits { north: $well }
-}
-
-entity well : garden_room {
-  described {
-    name: "Old Well"
-    description: "A mossy stone well sits in a clearing, a rope and bucket hanging from its winch."
-  }
-}
-
-entity shed : garden_room {
-  described {
-    name: "Garden Shed"
-    description: "Shelves of pots and tools line the walls. It smells of earth and creosote."
-  }
-}
-
-entity shed_door {
-  described { name: "Shed door" description: "A green wooden door with a heavy padlock." }
-  noun { words: ["door" "padlock"] }
-  door { is_closed: true }
-  lockable { is_locked: true lock: "shed" }
-}
-
-entity rose_bushes : roses {
-  described { name: "Roses" description: "Tangled bushes heavy with red and white blooms, a little wilted in the heat." }
-  noun { words: ["rose" "bushes" "bush" "flowers"] }
-  item { is_takeable: false }
-  location { in: $garden_path }
-}
-
-entity hollis : npc gardener {
-  described { name: "Hollis" description: "An elderly gardener in a battered straw hat, secateurs in hand." }
-  noun { words: ["gardener" "hollis"] }
-  location { in: $orchard }
-}
-
-entity bucket : container {
-  described { name: "Bucket" description: "A dented tin bucket on the end of the well rope." }
-  container { capacity: 3 is_closed: false }
-  location { in: $well }
-}
-
-entity shed_key : item {
-  described { name: "Shed key" description: "A small iron key, rusty from the damp." }
-  noun { words: ["key"] }
-  key { opens: ["shed"] }
-  location { in: $bucket }
-}
-
-entity catalogue : item {
-  described { name: "Seed catalogue" description: "A dog-eared catalogue of seeds, its pages soft with handling." }
-  noun { words: ["catalogue" "catalog" "book"] }
-  readable { text: "Page after page of roses, each ringed in pencil. In the margin someone has written: 'Water them every evening. Never forget.'" }
-  location { in: $shed }
-}
-
-entity watering_can : item {
-  described { name: "Watering can" description: "A battered galvanised watering can, half full." }
-  noun { words: ["can"] }
-  location { in: $shed }
-}
-
-entity trowel : item {
-  described { name: "Trowel" description: "A trowel with a worn ash handle." }
-  location { in: $shed }
-}
-
+include "town.edl"
+include "quay.edl"
+include "high-street.edl"
+include "ship.edl"
+include "headland.edl"
+include "garden.edl"

@@ -1,0 +1,124 @@
+# The walled garden behind the lighthouse keeper's cottage, up Hill Lane.
+# Hollis keeps it while Ezra is away.
+
+
+# The garden puts itself back every ten minutes
+atom garden_room: room {
+  timers { every: { reset: 600 } }
+}
+
+atom roses {
+  script { src: "scripts/garden/roses.talk" }
+}
+
+atom gardener {
+  script { src: "scripts/garden/gardener.talk" }
+}
+
+
+# ======
+# Places
+# ======
+
+entity garden_path: garden_room fragrant {
+  described {
+    name: "Garden Path"
+    description: "A gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end."
+  }
+  scent { air: "The air is thick with the scent of roses." }
+  # The way back south to Hill Lane comes from its `north`
+  exits {
+    north: $orchard
+    east: { to: $shed door: $shed_door }
+  }
+}
+
+entity orchard: garden_room {
+  described {
+    name: "Orchard"
+    description: "Old apple trees lean together over long grass. Windfalls lie where they dropped."
+  }
+  exits { north: $well }
+}
+
+entity well: garden_room {
+  described {
+    name: "Old Well"
+    description: "A mossy stone well sits in a clearing, a rope and bucket hanging from its winch."
+  }
+}
+
+entity shed: garden_room {
+  described {
+    name: "Garden Shed"
+    description: "Shelves of pots and tools line the walls. It smells of earth and creosote."
+  }
+}
+
+
+# ======
+# Things
+# ======
+
+entity shed_door {
+  described { name: "Shed door" description: "A green wooden door with a heavy padlock." }
+  noun { words: ["door" "padlock"] }
+  door { is_closed: true }
+  lockable { is_locked: true lock: "shed" }
+}
+
+entity rose_bushes: roses {
+  described { name: "Roses" description: "Tangled bushes heavy with red and white blooms, a little wilted in the heat." }
+  noun { words: ["rose" "bushes" "bush" "flowers"] }
+  item { is_takeable: false }
+  location { in: $garden_path }
+}
+
+entity bucket: container {
+  described { name: "Bucket" description: "A dented tin bucket on the end of the well rope." }
+  container { capacity: 3 is_closed: false }
+  location { in: $well }
+}
+
+entity shed_key: item {
+  described { name: "Shed key" description: "A small iron key, rusty from the damp." }
+  noun { words: ["key"] }
+  key { opens: ["shed"] }
+  location { in: $bucket }
+}
+
+entity catalogue: item {
+  described { name: "Seed catalogue" description: "A dog-eared catalogue of seeds, its pages soft with handling." }
+  noun { words: ["catalogue" "catalog" "book"] }
+  readable { text: "Page after page of roses, each ringed in pencil. In the margin Ezra has written: 'Water them every evening. Never forget.'" }
+  location { in: $shed }
+}
+
+entity watering_can: item {
+  described { name: "Watering can" description: "A battered galvanised watering can, half full." }
+  noun { words: ["can"] }
+  location { in: $shed }
+}
+
+entity trowel: item {
+  described { name: "Trowel" description: "A trowel with a worn ash handle." }
+  location { in: $shed }
+}
+
+entity lamp_key: item {
+  described { name: "Brass key" description: "A heavy brass key on a loop of tarred twine, with a paper tag: LAMP ROOM." }
+  noun { words: ["key" "brass" "tag"] }
+  key { opens: ["lamp room"] }
+  location { in: $shed }
+}
+
+
+# ======
+# People
+# ======
+
+entity hollis: npc gardener {
+  described { name: "Hollis" description: "An elderly gardener in a battered straw hat, secateurs in hand." }
+  noun { words: ["gardener" "hollis"] }
+  location { in: $orchard }
+}

@@ -1,0 +1,89 @@
+# The Headland: a causeway to the lighthouse, open only at low tide, and
+# the lamp room at the top of the tower.
+
+
+# Headland places put back what has strayed every fifteen minutes
+atom headland_room: room {
+  timers { every: { reset: 900 } }
+}
+
+# Won't let anyone cross the causeway while the tide is in
+# (scripts/headland/causeway.talk)
+atom causeway_end {
+  script { src: "scripts/headland/causeway.talk" }
+}
+
+# Puts the lamp out when the lamp room resets
+atom lamp_room_script {
+  script { src: "scripts/headland/lamp-room.talk" }
+}
+
+atom great_lamp {
+  script { src: "scripts/headland/lamp.talk" }
+}
+
+
+# ======
+# Places
+# ======
+
+entity headland: headland_room causeway_end tidal {
+  described {
+    name: "Headland"
+    description: "Short turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island."
+  }
+  shore {
+    high: "The tide is in, and the sea pours over the causeway."
+    low: "The tide is out, and the causeway is clear to cross."
+  }
+  exits { east: $lighthouse }
+}
+
+entity lighthouse: headland_room causeway_end tidal {
+  described {
+    name: "Lighthouse"
+    description: "The whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark."
+  }
+  shore {
+    high: "Through the door, the sea covers the causeway back to the headland."
+    low: "Through the door, the causeway back to the headland is clear."
+  }
+  exits {
+    up: { to: $lamp_room door: $lamp_door }
+  }
+}
+
+entity lamp_room: headland_room lamp_room_script {
+  described {
+    name: "Lamp Room"
+    description: "A round room of glass at the top of the tower, the great lamp at its centre. Through the salt-crusted panes you can see the whole harbour."
+  }
+}
+
+
+# ======
+# Things
+# ======
+
+entity lamp_door {
+  described { name: "Iron door" description: "An iron door at the top of the stair, with a brass lock." }
+  noun { words: ["door" "lock"] }
+  door { is_closed: true }
+  lockable { is_locked: true lock: "lamp room" }
+}
+
+entity lamp: fixture great_lamp {
+  described { name: "Lamp" description: "A great paraffin lamp inside a lens as tall as a man." }
+  noun { words: ["lamp" "lens" "light"] }
+  beacon { is_lit: false }
+  location { in: $lamp_room }
+}
+
+entity logbook: item {
+  described { name: "Logbook" description: "The lighthouse logbook, its last page torn out and its cover warped by damp." }
+  noun { words: ["logbook" "log" "book"] }
+  readable {
+    text: "The keeper's last entry, after the torn page: 15th. Storm through the night. A light seen out past the Bar, where no light should be. Took the punt out at first ebb to look. Mrs Pascoe will say I'm a fool. Nothing is written after it."
+  }
+  location { in: $lamp_room }
+}

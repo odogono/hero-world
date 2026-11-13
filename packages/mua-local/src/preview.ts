@@ -65,7 +65,7 @@ export type PreviewOptions = {
   /** mua-scripts and any Scripts the EDL names, from `scripts/files.ts` */
   files: WorldFiles;
   source: PreviewSource;
-  /** The room the author enters; `west_of_house` by default */
+  /** The room the author enters; `harbour_steps` by default */
   startingRoom?: string;
 };
 
@@ -200,7 +200,7 @@ const load = async (options: PreviewOptions) => {
       scriptsDir: SCRIPTS_DIR,
       startingRoom: tried
         ? TRY_IT_ROOM
-        : (options.startingRoom ?? 'west_of_house')
+        : (options.startingRoom ?? 'harbour_steps')
     });
   let mua: MuaWorld = await start();
   let account: Eid;

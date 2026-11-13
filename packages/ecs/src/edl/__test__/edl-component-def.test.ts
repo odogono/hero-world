@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import { parseEDL } from '..';
+import { DatabaseType } from '../../db';
+import { createWorld } from '../../world';
+
+// An included file that declares a component
+const readDefs = (file: string) => {
+  if (file !== '/game/defs.edl') {
+    throw new Error('no such file');
+  }
+  return 'def tide {\n  high: boolean default false\n}';
+};
 
 describe('EDL Component Definitions', () => {
   it('should parse multiple component definitions mixed with atoms/entities', () => {
@@ -62,5 +72,23 @@ describe('EDL Component Definitions', () => {
         type: 'component'
       }
     ]);
+  });
+
+  it('defines the components it declares when a World is built from it, in an include too', async () => {
+    const world = await createWorld([], {
+      path: ':memory:',
+      type: DatabaseType.BUN
+    });
+    world.executeEDL('include "defs.edl"\nentity sea { tide { high: true } }', {
+      path: '/game/main.edl',
+      readFile: readDefs
+    });
+    // the World was made with no components, so its types know none
+    const [sea] = world.queryAll({ with: ['tide' as never] }) as unknown as {
+      tide?: unknown;
+    }[];
+
+    expect(world.defs.has('tide')).toBe(true);
+    expect(sea?.tide).toEqual({ high: true });
   });
 });

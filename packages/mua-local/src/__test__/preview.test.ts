@@ -27,23 +27,23 @@ describe('a Preview World built from EDL', () => {
   test('runs take and open, and reports what each changed', async () => {
     const preview = await fromEDL();
     expect(preview.runs()).toBe(true);
-    const mailbox = eidOf(preview, 'mailbox');
+    const crate = eidOf(preview, 'crate');
 
-    const opened = await preview.command('open mailbox');
+    const opened = await preview.command('open crate');
     expect(opened.ok).toBe(true);
     expect(opened.lines.join('\n')).toMatch(/open/i);
     expect(opened.changes).toContainEqual([
-      mailbox,
+      crate,
       'container',
       'changed',
       expect.objectContaining({ is_closed: false })
     ]);
 
-    const leaflet = eidOf(preview, 'leaflet');
-    const taken = await preview.command('take leaflet');
+    const card = eidOf(preview, 'tide_card');
+    const taken = await preview.command('take card');
     expect(taken.lines).toContain('Taken.');
     expect(taken.changes).toContainEqual([
-      leaflet,
+      card,
       'location',
       'changed',
       { in: preview.author }
@@ -53,12 +53,12 @@ describe('a Preview World built from EDL', () => {
 
   test('reset puts it back to what it was built from', async () => {
     const preview = await fromEDL();
-    const mailbox = eidOf(preview, 'mailbox');
-    await preview.command('open mailbox');
-    expect(get(preview.store, mailbox, 'container')?.is_closed).toBe(false);
+    const crate = eidOf(preview, 'crate');
+    await preview.command('open crate');
+    expect(get(preview.store, crate, 'container')?.is_closed).toBe(false);
 
     await preview.reset();
-    expect(get(preview.store, mailbox, 'container')?.is_closed).toBe(true);
+    expect(get(preview.store, crate, 'container')?.is_closed).toBe(true);
     preview.close();
   });
 
@@ -78,8 +78,8 @@ describe('a Preview World built from EDL', () => {
       name: 'capacity',
       type: 'float'
     });
-    const mailbox = preview.entity(eidOf(preview, 'mailbox'));
-    expect(mailbox.described?.name).toBe('Mailbox');
+    const crate = preview.entity(eidOf(preview, 'crate'));
+    expect(crate.described?.name).toBe('Crate');
     preview.close();
   });
 });
@@ -124,40 +124,39 @@ describe('migrating a Preview World', () => {
   test('applies edited EDL, keeps play state, and reports the plan and changes', async () => {
     const preview = await fromEDL();
     expect(preview.edl).toBe(MAIN);
-    const mailbox = eidOf(preview, 'mailbox');
+    const crate = eidOf(preview, 'crate');
     // play state the Migration must keep
-    await preview.command('open mailbox');
-    expect((await preview.command('take leaflet')).lines).toContain('Taken.');
-    const leaflet = eidOf(preview, 'leaflet');
+    await preview.command('open crate');
+    expect((await preview.command('take card')).lines).toContain('Taken.');
+    const card = eidOf(preview, 'tide_card');
 
-    const edited = MAIN.replace(
-      'A small mailbox on a wooden post.',
-      'A dented mailbox, painted green.'
-    );
-    expect(edited).not.toBe(MAIN);
+    // The Preview edits main.edl, which includes the districts: add a buoy
+    const edited = `${MAIN}
+entity buoy : item {
+  described { name: "Buoy" description: "A dented buoy, painted green." }
+  location { in: $harbour_steps }
+}
+`;
     const migrated = await preview.migrate(edited);
     if (!migrated.ok) {
       throw new Error(migrated.reason);
     }
-    expect(migrated.plan.updated).toContainEqual(
-      expect.objectContaining({ changed: ['described'], eid: mailbox })
-    );
+    expect(migrated.plan.created).toEqual(['buoy']);
+    const buoy = eidOf(preview, 'buoy');
     expect(migrated.changes).toContainEqual([
-      mailbox,
+      buoy,
       'described',
-      'changed',
-      expect.objectContaining({
-        description: 'A dented mailbox, painted green.'
-      })
+      'added',
+      expect.objectContaining({ description: 'A dented buoy, painted green.' })
     ]);
-    expect(get(preview.store, leaflet, 'location')).toEqual({
+    expect(get(preview.store, card, 'location')).toEqual({
       in: preview.author
     });
     expect(preview.edl).toBe(edited);
-    expect(get(preview.store, mailbox, 'container')?.is_closed).toBe(false);
+    expect(get(preview.store, crate, 'container')?.is_closed).toBe(false);
 
     // and it still plays
-    const looked = await preview.command('examine mailbox');
+    const looked = await preview.command('examine buoy');
     expect(looked.lines.join('\n')).toContain('dented');
     preview.close();
   });
@@ -169,7 +168,7 @@ describe('migrating a Preview World', () => {
     expect(failed.ok).toBe(false);
     expect(preview.entities()).toEqual(before);
     expect(preview.edl).toBe(MAIN);
-    expect((await preview.command('open mailbox')).ok).toBe(true);
+    expect((await preview.command('open crate')).ok).toBe(true);
     preview.close();
   });
 });

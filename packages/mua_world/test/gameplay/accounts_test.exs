@@ -20,7 +20,7 @@ defmodule MuaWorld.AccountsTest do
 
       assert MuaWorld.component(world, limbo, "described")["name"] == "Limbo"
       assert location(world, system) == limbo
-      assert room == MuaWorld.named(world, "west_of_house")
+      assert room == MuaWorld.named(world, "harbour_steps")
     end
 
     test "refuses to start without a valid Starting room", %{dir: dir} do
@@ -29,7 +29,7 @@ defmodule MuaWorld.AccountsTest do
       for {room, reason} <- [
             {nil, ~r/no starting room/},
             {"nowhere", ~r/not an entity/},
-            {"mailbox", ~r/not a top-level place/}
+            {"crate", ~r/not a top-level place/}
           ] do
         path = Path.join(dir, "bad-#{room}.db")
 
@@ -58,9 +58,9 @@ defmodule MuaWorld.AccountsTest do
       assert {:ok, ["Welcome, bob! Type 'look' to begin, or 'help' for the commands."]} =
                MuaWorld.enter(world, account, bob)
 
-      assert location(world, bob) == MuaWorld.named(world, "west_of_house")
+      assert location(world, bob) == MuaWorld.named(world, "harbour_steps")
       assert {:ok, [look]} = MuaWorld.command(world, account, bob, "look")
-      assert look =~ "West of house"
+      assert look =~ "Harbour Steps"
     end
 
     test "only a Character coming out of Limbo is welcomed", %{world: world} do
@@ -97,8 +97,8 @@ defmodule MuaWorld.AccountsTest do
       GenServer.stop(world)
 
       world = start("main", dir)
-      assert location(world, bob) == MuaWorld.named(world, "north_of_house")
-      assert send_command(world, bob, "look") =~ "North of house"
+      assert location(world, bob) == MuaWorld.named(world, "square")
+      assert send_command(world, bob, "look") =~ "The Square"
     end
   end
 
@@ -115,7 +115,7 @@ defmodule MuaWorld.AccountsTest do
       received(alice)
 
       {:ok, _} = MuaWorld.enter(world, account(bob), bob)
-      assert location(world, bob) == MuaWorld.named(world, "west_of_house")
+      assert location(world, bob) == MuaWorld.named(world, "harbour_steps")
       assert received(alice) == ["bob appears."]
     end
 
@@ -125,18 +125,18 @@ defmodule MuaWorld.AccountsTest do
       :ok = MuaWorld.leave(world, account(bob), bob)
       {:ok, _} = MuaWorld.enter(world, account(bob), bob)
 
-      assert location(world, bob) == MuaWorld.named(world, "north_of_house")
+      assert location(world, bob) == MuaWorld.named(world, "square")
     end
 
     test "leaving or entering twice changes nothing", %{world: world} do
       bob = join(world, "bob")
       {:ok, _} = MuaWorld.enter(world, account(bob), bob)
-      assert location(world, bob) == MuaWorld.named(world, "west_of_house")
+      assert location(world, bob) == MuaWorld.named(world, "harbour_steps")
 
       :ok = MuaWorld.leave(world, account(bob), bob)
       :ok = MuaWorld.leave(world, account(bob), bob)
       {:ok, _} = MuaWorld.enter(world, account(bob), bob)
-      assert location(world, bob) == MuaWorld.named(world, "west_of_house")
+      assert location(world, bob) == MuaWorld.named(world, "harbour_steps")
     end
   end
 
@@ -190,23 +190,23 @@ defmodule MuaWorld.AccountsTest do
       assert send_command(world, bob, "say hello") == ~s(You say, "hello")
       assert received(alice) == [~s(bob says, "hello")]
 
-      send_command(world, alice, "open mailbox")
-      assert send_command(world, alice, "take leaflet") == "Taken."
-      assert send_command(world, alice, "north") =~ "North of house"
+      send_command(world, alice, "open crate")
+      assert send_command(world, alice, "take card") == "Taken."
+      assert send_command(world, alice, "north") =~ "The Square"
       assert Enum.join(received(bob), "\n") =~ "alice goes north."
 
-      assert send_command(world, alice, "drop leaflet") == "Dropped."
+      assert send_command(world, alice, "drop card") == "Dropped."
       send_command(world, bob, "north")
-      assert send_command(world, bob, "take leaflet") == "Taken."
-      assert location(world, MuaWorld.named(world, "leaflet")) == bob
-      assert send_command(world, bob, "inventory") =~ "leaflet"
-      refute send_command(world, alice, "inventory") =~ "leaflet"
+      assert send_command(world, bob, "take card") == "Taken."
+      assert location(world, MuaWorld.named(world, "tide_card")) == bob
+      assert send_command(world, bob, "inventory") =~ "tide card"
+      refute send_command(world, alice, "inventory") =~ "tide card"
     end
 
     test "competing to take one item get one consistent outcome", %{world: world} do
       alice = join(world, "alice")
       bob = join(world, "bob")
-      send_command(world, alice, "open mailbox")
+      send_command(world, alice, "open crate")
 
       replies =
         [alice, bob]
@@ -215,7 +215,7 @@ defmodule MuaWorld.AccountsTest do
           account = account(who)
 
           Task.async(fn ->
-            {:ok, lines} = MuaWorld.command(world, account, who, "take leaflet")
+            {:ok, lines} = MuaWorld.command(world, account, who, "take card")
             {who, Enum.join(lines, "\n")}
           end)
         end)
@@ -225,9 +225,9 @@ defmodule MuaWorld.AccountsTest do
       [{loser, refusal}] = Enum.reject(replies, fn {who, _} -> who == winner end)
 
       refute refusal == "Taken."
-      assert location(world, MuaWorld.named(world, "leaflet")) == winner
-      assert send_command(world, winner, "inventory") =~ "leaflet"
-      refute send_command(world, loser, "inventory") =~ "leaflet"
+      assert location(world, MuaWorld.named(world, "tide_card")) == winner
+      assert send_command(world, winner, "inventory") =~ "tide card"
+      refute send_command(world, loser, "inventory") =~ "tide card"
     end
   end
 end

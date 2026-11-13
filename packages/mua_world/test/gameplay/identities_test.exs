@@ -62,9 +62,9 @@ defmodule MuaWorld.IdentitiesTest do
       {:ok, _} = MuaWorld.enter(c.world, bob_account, bob)
 
       assert {:ok, view} = MuaWorld.view(c.world, c.account, c.ada)
-      assert view.room.name == "West of house"
-      assert view.room.exits == ["north", "south"]
-      assert view.room.items == ["Mailbox"]
+      assert view.room.name == "Harbour Steps"
+      assert view.room.exits == ["north", "south", "east", "west"]
+      assert view.room.items == ["Sea", "Noticeboard", "Crate"]
       assert "Bob" in view.room.players
       refute "Ada" in view.room.players
       assert view.inventory == []

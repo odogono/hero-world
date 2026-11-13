@@ -1,0 +1,10 @@
+-- A place that smells of something when you sniff the air: its `scent`
+on smell role, actor
+  if role is "room" then
+    ask mua to command
+    if the target of it is nothing then
+      return the air of the scent of the target
+    end if
+  end if
+  pass smell
+end smell

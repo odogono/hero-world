@@ -58,6 +58,10 @@ _Avoid_: delete, recycle, store (for this)
 The complete, persistent state of one game: its entities and their components. It has one writer at a time.
 _Avoid_: store, database (for the concept), scene
 
+**World Definition**:
+The EDL and Scripts a World is built from and migrated to. Changing it changes every World made from it only through a Migration.
+_Avoid_: world (for the files), map, scenario
+
 **Local World**:
 A World played solo in the browser, with its own local Account. It never syncs with a server's World, and its file is its save.
 _Avoid_: offline world, save game

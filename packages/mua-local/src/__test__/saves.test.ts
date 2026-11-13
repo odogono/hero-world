@@ -51,14 +51,14 @@ describe('saving and loading a Local World', () => {
     const save = await played();
     const other = host();
     await other.local.receive({ name: 'Bob', type: 'join' });
-    expect(room(other.sent)).toBe('West of house');
+    expect(room(other.sent)).toBe('Harbour Steps');
 
     await other.local.receive({ bytes: save, type: 'load' });
     expect(last(other.sent, 'loaded')).toEqual({ event: 'loaded' });
 
     // the save's Character, where it was
     await other.local.receive({ name: 'ignored', type: 'join' });
-    expect(room(other.sent)).toBe('North of house');
+    expect(room(other.sent)).toBe('The Square');
     expect(
       other.sent.flatMap(m => (m.event === 'output' ? m.lines : []))
     ).not.toContain(
@@ -78,7 +78,7 @@ describe('saving and loading a Local World', () => {
       message: 'That file is not a saved World'
     });
     await h.local.receive({ ref: 1, text: 'north', type: 'command' });
-    expect(room(h.sent)).toBe('North of house');
+    expect(room(h.sent)).toBe('The Square');
   });
 
   test('refuses a database that is not a World, and puts the World back', async () => {
@@ -96,21 +96,21 @@ describe('saving and loading a Local World', () => {
       'That file is not a saved World'
     );
     await h.local.receive({ name: 'Bob', type: 'join' });
-    expect(room(h.sent)).toBe('North of house');
+    expect(room(h.sent)).toBe('The Square');
   });
 
   test('migrates a save from an older World before it plays', async () => {
     const save = await played();
     const shed = `${FILES[EDL_PATH]!}
-entity shed : room {
-  described { name: "Shed" description: "A garden shed." }
+entity boathouse : room {
+  described { name: "Boathouse" description: "A boathouse." }
 }
 `;
     const newer = host({ ...FILES, [EDL_PATH]: shed });
     await newer.local.receive({ bytes: save, type: 'load' });
     expect(last(newer.sent, 'loaded')).toBeDefined();
-    expect(await newer.local.world()!.world.named('shed')).toBeNumber();
+    expect(await newer.local.world()!.world.named('boathouse')).toBeNumber();
     await newer.local.receive({ name: 'Ada', type: 'join' });
-    expect(room(newer.sent)).toBe('North of house');
+    expect(room(newer.sent)).toBe('The Square');
   });
 });

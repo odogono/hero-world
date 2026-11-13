@@ -31,7 +31,7 @@ defmodule MuaWorld do
   for a Character names its Account, which must own it. A new Character
   waits in Limbo until it enters.
 
-      {:ok, world} = MuaWorld.start_link(path: "world.db", edl: "main.edl", starting_room: "west_of_house")
+      {:ok, world} = MuaWorld.start_link(path: "world.db", edl: "main.edl", starting_room: "harbour_steps")
       {:ok, account} = MuaWorld.create_account(world)
       {:ok, ada} = MuaWorld.create_character(world, account, "Ada")
       :ok = MuaWorld.subscribe(world, ada)

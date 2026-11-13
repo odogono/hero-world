@@ -18,20 +18,25 @@ defmodule MuaWorld.Case do
   end
 
   @doc """
-  A World built from `fixtures/<name>`, in `dir`, ticking by hand. Its
-  Starting room is `west_of_house` unless `starting_room:` says otherwise.
+  A World built from `fixtures/<name>`, or the main World for `"main"`, in
+  `dir`, ticking by hand. Its Starting room is `harbour_steps` for the main
+  World and `west_of_house` for a fixture, unless `starting_room:` says
+  otherwise.
   """
   def start(name, dir, opts \\ []) do
     path = Keyword.get(opts, :path, Path.join(dir, "world.db"))
 
     {:ok, world} =
       MuaWorld.start(
-        [path: path, edl: edl(name), tick: :manual, starting_room: "west_of_house"]
+        [path: path, edl: edl(name), tick: :manual, starting_room: starting_room(name)]
         |> Keyword.merge(opts)
       )
 
     world
   end
+
+  defp starting_room("main"), do: "harbour_steps"
+  defp starting_room(_), do: "west_of_house"
 
   # The main world ships with mua_world; the rest are test fixtures
   defp edl("main"), do: Path.join(:code.priv_dir(:mua_world), "edl/main.edl")

@@ -26,14 +26,14 @@ test('plays a Local World offline, and a reload plays on', async ({
   await expect(page.getByRole('status')).toHaveText('Connected', starting);
 
   await play(page, 'north');
-  await expect(transcript(page)).toContainText('North of house');
+  await expect(transcript(page)).toContainText('The Square');
 
   // the same browser keeps the World and its Character
   await page.reload();
   await page.getByRole('button', { name: 'Play offline' }).click();
   await expect(page.getByRole('status')).toHaveText('Connected', starting);
   await play(page, 'look');
-  await expect(transcript(page)).toContainText('North of house');
+  await expect(transcript(page)).toContainText('The Square');
 
   await context.close();
 });
@@ -49,7 +49,7 @@ test('saves a Local World as a file, and another browser loads it', async ({
   await page.getByRole('button', { name: 'Enter the world' }).click();
   await expect(page.getByRole('status')).toHaveText('Connected', starting);
   await play(page, 'north');
-  await expect(transcript(page)).toContainText('North of house');
+  await expect(transcript(page)).toContainText('The Square');
 
   await page.getByRole('button', { name: /profile menu/ }).click();
   const [download] = await Promise.all([
@@ -79,6 +79,6 @@ test('saves a Local World as a file, and another browser loads it', async ({
   );
   await expect(other.getByRole('status')).toHaveText('Connected', starting);
   await play(other, 'look');
-  await expect(transcript(other)).toContainText('North of house');
+  await expect(transcript(other)).toContainText('The Square');
   await second.close();
 });

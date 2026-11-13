@@ -1,0 +1,31 @@
+-- A place by the sea. After what the room shows, it says how the tide
+-- stands, from the place's `shore` and the sea's `tide`, and adds its
+-- `shore`'s `lit` line while the lighthouse lamp is lit.
+
+use describe from rooms
+
+on look role, actor
+  if role is not "room" then
+    pass look
+  end if
+  put describe(the target, actor) into text
+  put the shore of the target into shore
+
+  ask world to named "sea"
+  if it is not nothing then
+    if the high of the tide of it then
+      put text & `\n\n` & the high of shore into text
+    else
+      put text & `\n\n` & the low of shore into text
+    end if
+  end if
+
+  ask world to named "lamp"
+  if it is not nothing and the is_lit of the beacon of it then
+    put the optional lit of shore into lit
+    if lit is not nothing then
+      put text & " " & lit into text
+    end if
+  end if
+  return text
+end look

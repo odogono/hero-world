@@ -1,5 +1,5 @@
 # Adapted from packages/mua/src/server/mua-world/__test__/gameplay.test.ts,
-# against the main world (priv/edl/main.edl).
+# against the main world (priv/edl/main.edl), Porthleven.
 defmodule MuaWorld.GameplayTest do
   use ExUnit.Case, async: true
 
@@ -15,30 +15,28 @@ defmodule MuaWorld.GameplayTest do
     bob = join(world, "bob")
     output = send_command(world, bob, "look")
 
-    assert output =~ "West of house"
-    assert output =~ "the mailbox"
-    assert output =~ "Exits: north, south"
+    assert output =~ "Harbour Steps"
+    assert output =~ "There is: the crate"
+    assert output =~ "Exits: north, south, east, west"
   end
 
   test "starts a look with the room, with no stray blank lines", %{world: world} do
     bob = join(world, "bob")
 
     assert send_command(world, bob, "look") =~
-             ~r/^West of house\n.+\n\nThere is: the mailbox\nExits: north, south$/
+             ~r/^Harbour Steps\n.+\n\nYou see: the sea, the noticeboard\nThere is: the crate\nAlso here: Morwenna\nExits: north, south, east, west\n\nThe tide is out\..+$/
   end
 
   test "moves through an exit and describes the new room", %{world: world} do
     bob = join(world, "bob")
 
-    assert send_command(world, bob, "north") =~ "North of house"
-    assert send_command(world, bob, "look") =~ "North of house"
+    assert send_command(world, bob, "north") =~ "The Square"
+    assert send_command(world, bob, "look") =~ "The Square"
   end
 
   test "reports a blocked exit", %{world: world} do
     bob = join(world, "bob")
-    send_command(world, bob, "north")
-
-    assert send_command(world, bob, "s") =~ "The windows are all barred"
+    assert send_command(world, bob, "s") =~ "The ferry has gone"
   end
 
   test "tells others in the room when someone arrives", %{world: world} do
@@ -64,8 +62,8 @@ defmodule MuaWorld.GameplayTest do
     bob = join(world, "bob")
 
     assert send_command(world, bob, "g") =~ "There is nothing to repeat."
-    send_command(world, bob, "north")
-    assert send_command(world, bob, "again") =~ "You can't go north from here."
+    send_command(world, bob, "east")
+    assert send_command(world, bob, "again") =~ "You can't go east from here."
   end
 
   test "lists the commands for help", %{world: world} do
@@ -78,9 +76,9 @@ defmodule MuaWorld.GameplayTest do
 
   test "reads what is written on a thing", %{world: world} do
     bob = join(world, "bob")
-    send_command(world, bob, "open mailbox")
+    send_command(world, bob, "open crate")
 
-    assert send_command(world, bob, "read leaflet") =~ ~r/^WELCOME TO MUA!/
-    assert send_command(world, bob, "read mailbox") == "There's nothing written on it."
+    assert send_command(world, bob, "read card") =~ ~r/^PORTHLEVEN TIDES\./
+    assert send_command(world, bob, "read crate") == "There's nothing written on it."
   end
 end

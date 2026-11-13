@@ -84,7 +84,7 @@ const start = () =>
       `SECRET_KEY_BASE=${crypto.randomUUID()}${crypto.randomUUID()}${crypto.randomUUID()}`,
       'GOOGLE_CLIENT_ID=load',
       'GOOGLE_CLIENT_SECRET=load',
-      'MUA_STARTING_ROOM=west_of_house',
+      'MUA_STARTING_ROOM=harbour_steps',
       'MUA_LOAD_TEST=true'
     ].flatMap(e => ['-e', e]),
     args.image
@@ -208,12 +208,12 @@ class Player {
       return 'look';
     }
     if (roll < 0.25) {
-      return 'open mailbox';
+      return 'open crate';
     }
-    // the few takeable things are in the mailbox and the well's bucket,
+    // the few takeable things are in the crate and the well's bucket,
     // which the view doesn't offer
     if (roll < 0.35) {
-      return pick(['take leaflet', 'take key']);
+      return pick(['take card', 'take key']);
     }
     return actions.length > 0 ? pick(actions) : 'look';
   }

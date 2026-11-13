@@ -1,0 +1,35 @@
+-- Tamsin, the net-mender: on each heartbeat she takes a step of her round
+-- between the fish market and The Ship. Her `errand` remembers which way
+-- she is going, since the Harbour Steps and the Square lie on both legs.
+
+on heartbeat actor
+  put the name of the described of the in of the location of the target into here
+  put the heading of the errand of the target into heading
+
+  if here is "The Ship" then
+    put "market" into heading
+  else if here is "Fish Market" then
+    put "inn" into heading
+  end if
+  change the target, "errand", {heading: heading}
+
+  if heading is "inn" then
+    put {"Fish Market": "west", "Harbour Steps": "north", "The Square": "west"} into route
+  else
+    put {"The Ship": "east", "The Square": "south", "Harbour Steps": "east"} into route
+  end if
+  put the optional (here) of route into way
+  if way is not nothing then
+    tell mua to act the target, {verb: "move", direction: way}
+  end if
+end heartbeat
+
+on heard speaker, words
+  if speaker is the target then
+    pass heard
+  end if
+  put lower(words) into said
+  if said contains "keeper" or said contains "ezra" or said contains "storm" then
+    tell mua to act the target, {verb: "say", text: "Ezra? I saw his punt go out past the Bar the morning after the storm. Nobody saw it come back."}
+  end if
+end heard

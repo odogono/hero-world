@@ -33,7 +33,7 @@ export type LocalWorldOptions = {
   requireBuilt?: boolean;
   /** Called with each message for the UI */
   send: (message: FromWorld) => void;
-  /** The room Characters enter first; `west_of_house` by default */
+  /** The room Characters enter first; `harbour_steps` by default */
   startingRoom?: string;
 };
 
@@ -94,7 +94,7 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     clock: options.clock,
     readFile,
     scriptsDir: SCRIPTS_DIR,
-    startingRoom: options.startingRoom ?? 'west_of_house'
+    startingRoom: options.startingRoom ?? 'harbour_steps'
   });
   const { store } = mua;
   store.db.exec(LOCAL_SCHEMA);

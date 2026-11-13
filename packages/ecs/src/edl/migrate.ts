@@ -1,7 +1,7 @@
 import { addComponents } from '../component';
 import { removeComponent } from '../component/remove';
 import type { Components, GenericEntity } from '../types';
-import type { World } from '../world';
+import { defineComponentDefs, type World } from '../world';
 import { compileNodes, hashEDL, resolveEDL, scriptPath } from './compile';
 import {
   edlValues,
@@ -10,6 +10,7 @@ import {
   readComponents
 } from './edl-values';
 import { EDLExecutionError } from './errors';
+import { cdefFromEDL } from './helpers';
 import { readEDL, type ReadOptions } from './includes';
 import { edlRecord } from './record';
 
@@ -105,6 +106,15 @@ export const migrate = <T extends Components>(
   const { build = false, dryRun = false, path, prune } = options;
   const record = edlRecord(world);
   const { nodes, source } = readEDL(edl, options);
+
+  // The components its `def` blocks declare, before the entities that use them
+  const cdefs = nodes
+    .filter(node => node.type === 'component')
+    .map(node => cdefFromEDL(node as Parameters<typeof cdefFromEDL>[0]));
+  if (cdefs.length > 0) {
+    defineComponentDefs(world, cdefs);
+  }
+
   const compiled = compileNodes(nodes);
   const named = compiled.entities.filter(entity => entity.name);
   const stored = record.getDefinitionNames();

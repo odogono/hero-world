@@ -1,0 +1,12 @@
+-- Every room built on the room atom answers `look` here. A room's mix-ins
+-- come first on its Message Path (the Fish Market is `quay_room fragrant`,
+-- so fragrant's Script, then this one), and may answer or add to it.
+
+use describe from rooms
+
+on look role, actor
+  if role is "room" then
+    return describe(the target, actor)
+  end if
+  pass look
+end look

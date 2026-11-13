@@ -43,7 +43,7 @@ if config_env() != :test do
     world: [
       path: required.("DATABASE_PATH", "data/world.db"),
       edl: System.get_env("MUA_EDL") || Path.join(:code.priv_dir(:mua_world), "edl/main.edl"),
-      starting_room: required.("MUA_STARTING_ROOM", "west_of_house")
+      starting_room: required.("MUA_STARTING_ROOM", "harbour_steps")
     ],
     allowlist: list.("MUA_ALLOWLIST"),
     admins: list.("MUA_ADMINS"),

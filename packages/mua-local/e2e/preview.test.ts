@@ -83,13 +83,13 @@ test('runs commands in a Preview World, reports their changes, and resets', asyn
   const opened = await nth(page, 1);
   expect(opened.event).toBe('opened');
   expect(opened.runs).toBe(true);
-  const mailbox = eidOf(opened, 'mailbox');
+  const crate = eidOf(opened, 'crate');
 
-  await post(page, { ref: 1, text: 'open mailbox', type: 'command' });
+  await post(page, { ref: 1, text: 'open crate', type: 'command' });
   const result = await nth(page, 2);
   expect(result).toMatchObject({ event: 'result', ok: true, ref: 1 });
   expect(result.changes).toContainEqual([
-    mailbox,
+    crate,
     'container',
     'changed',
     expect.objectContaining({ is_closed: false })
@@ -97,7 +97,7 @@ test('runs commands in a Preview World, reports their changes, and resets', asyn
 
   await post(page, { type: 'reset' });
   expect((await nth(page, 3)).event).toBe('opened');
-  await post(page, { eid: mailbox, type: 'entity' });
+  await post(page, { eid: crate, type: 'entity' });
   const entity = await nth(page, 4);
   expect(
     (entity.components as Record<string, Record<string, unknown>>).container
@@ -136,22 +136,24 @@ test('migrates a Preview World to edited EDL, and reports the plan', async () =>
   await post(page, { type: 'open' });
   const opened = await nth(page, 1);
   const edl = String(opened.edl);
-  const mailbox = eidOf(opened, 'mailbox');
 
+  // The Preview edits main.edl, which includes the districts: add a buoy
   await post(page, {
-    edl: edl.replace(
-      'A small mailbox on a wooden post.',
-      'A dented green mailbox.'
-    ),
+    edl: `${edl}
+entity buoy : item {
+  described { name: "Buoy" description: "A dented green buoy." }
+  location { in: $harbour_steps }
+}
+`,
     type: 'migrate'
   });
   const migrated = await nth(page, 2);
   expect(migrated).toMatchObject({ event: 'migrated', ok: true });
   expect(migrated.changes).toContainEqual([
-    mailbox,
+    expect.any(Number),
     'described',
-    'changed',
-    expect.objectContaining({ description: 'A dented green mailbox.' })
+    'added',
+    expect.objectContaining({ description: 'A dented green buoy.' })
   ]);
   await page.close();
 }, 60_000);

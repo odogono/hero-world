@@ -86,7 +86,7 @@ test('plays a Local World in a Worker, and a reload plays on', async () => {
 
   await post(page, { ref: 1, text: 'north', type: 'command' });
   messages = await until(page, m => m.some(x => x.event === 'reply'));
-  expect(lines(messages).join('\n')).toContain('North of house');
+  expect(lines(messages).join('\n')).toContain('The Square');
   expect(messages.find(m => m.event === 'reply')).toEqual({
     event: 'reply',
     ok: true,
@@ -100,7 +100,7 @@ test('plays a Local World in a Worker, and a reload plays on', async () => {
   const state = messages.find(m => m.event === 'state') as unknown as {
     state: { room: { name: string } };
   };
-  expect(state.state.room.name).toBe('North of house');
+  expect(state.state.room.name).toBe('The Square');
   await context.close();
 }, 120_000);
 
@@ -147,6 +147,6 @@ test('saves a World as a file, and another browser loads it and plays on', async
   const state = messages.find(m => m.event === 'state') as unknown as {
     state: { room: { name: string } };
   };
-  expect(state.state.room.name).toBe('North of house');
+  expect(state.state.room.name).toBe('The Square');
   await second.close();
 }, 120_000);

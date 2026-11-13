@@ -1,0 +1,16 @@
+-- Each end of the causeway, the Headland and the Lighthouse: while the
+-- sea's tide is in, nobody crosses it either way. A Veto, asked of the
+-- place being left before a move.
+
+on beforeExit actor, destination, deciding
+  ask world to named "sea"
+  if it is not nothing and the high of the tide of it then
+    put the name of the described of destination into going
+    if going is "Lighthouse" then
+      veto "The sea has covered the causeway. You'll have to wait for the tide to go out."
+    else if going is "Headland" then
+      veto "The causeway is under the sea. You're stuck here until the tide turns."
+    end if
+  end if
+  pass beforeExit
+end beforeExit

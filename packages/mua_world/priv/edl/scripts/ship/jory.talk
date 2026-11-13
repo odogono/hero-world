@@ -1,0 +1,20 @@
+-- Jory, the landlord of The Ship: greets whoever comes in, and minds the
+-- counter (counter.talk asks whether he is behind the bar).
+
+on arrived who
+  if the player of who is not nothing then
+    tell mua to act the target, {verb: "say", text: `Welcome aboard The Ship, ${the name of the player of who}.`}
+  end if
+end arrived
+
+on heard speaker, words
+  if speaker is the target then
+    pass heard
+  end if
+  put lower(words) into said
+  if said contains "page" or said contains "logbook" then
+    tell mua to act the target, {verb: "say", text: "That torn page? Washed up on the slipway after the storm. It's in the lost property box in the back."}
+  else if said contains "keeper" or said contains "ezra" then
+    tell mua to act the target, {verb: "say", text: "Ezra drank here every Friday for thirty years. Ask Morwenna, she knew him best."}
+  end if
+end heard

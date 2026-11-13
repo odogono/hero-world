@@ -257,7 +257,7 @@ export const Preview = ({
             aria-label="Preview command"
             disabled={busy}
             onInput={e => setText((e.target as HTMLInputElement).value)}
-            placeholder={busy ? 'Building…' : 'take leaflet'}
+            placeholder={busy ? 'Building…' : 'take card'}
             value={text}
           />
         </form>
