@@ -11,6 +11,8 @@ defmodule MuaWorld.Talk do
     `actor`, `target`, `indirect`, `text` and `direction` (Nothing for any it
     doesn't have), or Nothing outside a command.
   - `homed place`: the things whose `home` is `place`, for a reset.
+  - `limbo`: Limbo, where a stored thing waits (#282).
+  - `editors thing`: the Characters who have `thing` open in the composer.
   - `placed account`: how many things the Account has placed, by their
     `made_by`, for a builder's quota (#258).
   - `notice place, message, who, text`: sends `message who` (or
@@ -141,6 +143,15 @@ defmodule MuaWorld.Talk do
                 ])}
            end
          end},
+      "editors" =>
+        {[args: [entity], result: %{"list" => entity}, cost: 1],
+         fn [thing], _ ->
+           thing = Values.from_value(thing)
+           {:ok, Enum.map(OdgnEcs.query(world, where: [{"editing", "thing", thing}]), &handle/1)}
+         end},
+      "limbo" =>
+        {[args: [], result: entity, cost: 1],
+         fn [], _ -> {:ok, handle(MuaWorld.Places.limbo(world))} end},
       "homed" =>
         {[args: [entity], result: %{"list" => entity}, cost: 1],
          fn [place], _ ->

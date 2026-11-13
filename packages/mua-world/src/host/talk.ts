@@ -14,12 +14,13 @@ import {
 } from '@northtalk/ts';
 
 import type { Arg, Context } from './dispatch';
+import { limbo } from './places';
 import { charactersAt, output, queueAct, type Act } from './tables';
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `buildable`, `command`, `homed`, `notice`, `placed`, `signature` and
- * `verbs`. The command a Run handles is
+ * `buildable`, `command`, `editors`, `homed`, `limbo`, `notice`, `placed`,
+ * `signature` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -134,6 +135,19 @@ export const muaCapability =
         mode: 'immediate',
         result: shape.any
       },
+      // the Characters who have a thing open in the composer
+      editors: {
+        args: [entity],
+        cost: { fuel: 1 },
+        do: (_call, thing) =>
+          list(
+            ...query(store, {
+              where: [['editing', 'thing', thing.native.eid]]
+            }).map(handle)
+          ),
+        mode: 'immediate',
+        result: shape.listOf(entity)
+      },
       homed: {
         args: [entity],
         cost: { fuel: 1 },
@@ -145,6 +159,14 @@ export const muaCapability =
           ),
         mode: 'immediate',
         result: shape.listOf(entity)
+      },
+      // where a stored thing waits (#282)
+      limbo: {
+        args: [],
+        cost: { fuel: 1 },
+        do: () => handle(limbo(store)),
+        mode: 'immediate',
+        result: entity
       },
       notice: {
         args: [entity, shape.text, entity, shape.optional(shape.text)],

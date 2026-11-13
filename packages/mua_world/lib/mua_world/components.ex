@@ -69,15 +69,16 @@ defmodule MuaWorld.Components do
       # sets it from the configured admins each time.
       c("account", true, [col("admin", :boolean, default: false)]),
       # An Account that may build (#258): whether it may place, and which
-      # placed things it may edit (#274) and destroy (#283), each `none`,
-      # `own` or `any`; how many
-      # things it may place in all, and the largest container it may make.
+      # placed things it may edit (#274), store (#282) and destroy (#283),
+      # each `none`, `own` or `any`; how many things it may place in all,
+      # and the largest container it may make.
       # An Admin grants it; taking it away stops new building, and what was
       # placed stays.
       c("builder", true, [
         col("place", :boolean, default: true),
         col("edit", :string, default: "own"),
         col("destroy", :string, default: "own"),
+        col("store", :string, default: "own"),
         col("max_placed", :int, default: 50),
         col("max_capacity", :int, default: 20)
       ]),

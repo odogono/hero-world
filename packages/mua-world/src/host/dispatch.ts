@@ -143,6 +143,9 @@ export const afters = (store: Store, ctx: Context) =>
   }));
 
 // The Service Script that carries out each Verb's Action
+/** The Verbs whose text, the rest of the line, is a third argument */
+const WITH_TEXT = new Set(['unstore']);
+
 const SERVICES: Record<string, string> = {
   close: 'open',
   destroy: 'build',
@@ -154,8 +157,11 @@ const SERVICES: Record<string, string> = {
   lock: 'lock',
   open: 'open',
   read: 'thing',
+  store: 'build',
+  stored: 'build',
   take: 'thing',
-  unlock: 'lock'
+  unlock: 'lock',
+  unstore: 'build'
 };
 
 /** The Service Scripts mua loads, by name */
@@ -220,7 +226,11 @@ export const plan = (
   return service === undefined
     ? { kind: 'refused', message: CANNOT }
     : {
-        args: [target(ctx), { entity: ctx.actor }],
+        args: [
+          target(ctx),
+          { entity: ctx.actor },
+          ...(WITH_TEXT.has(ctx.verb) ? [ctx.text] : [])
+        ],
         kind: 'send',
         message: ctx.verb,
         to: { service }

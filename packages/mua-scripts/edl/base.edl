@@ -122,6 +122,20 @@ entity base_verbs {
         forms: [{ handler: "destroy" pattern: "obj" }]
         incomplete: "What do you want to destroy?"
       }
+      {
+        names: ["store"]
+        forms: [{ handler: "store" pattern: "obj" }]
+        incomplete: "What do you want to store?"
+      }
+      {
+        names: ["stored"]
+        forms: [{ handler: "stored" pattern: "" }]
+      }
+      {
+        names: ["unstore"]
+        forms: [{ handler: "unstore" pattern: "text" }]
+        incomplete: "What do you want to bring back?"
+      }
     ]
   }
 

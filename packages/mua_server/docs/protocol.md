@@ -89,9 +89,11 @@ An Admin makes an Account a Builder at the `;` prompt, and stops it building the
 ;remove the account of the player of actor, "builder"
 ```
 
-For another player in the room, `element "bob" of here` stands for their Character. `{max_placed: 10, max_capacity: 5}` sets other limits than the defaults (50 and 20). `builder` also holds the Account's permissions: `place` (`true` or `false`, default `true`), and `edit` and `destroy` (each `"none"`, `"own"` or `"any"`, default `"own"`). An Admin who will edit or destroy others' things gives themselves `{edit: "any", destroy: "any"}`.
+For another player in the room, `element "bob" of here` stands for their Character. `{max_placed: 10, max_capacity: 5}` sets other limits than the defaults (50 and 20). `builder` also holds the Account's permissions: `place` (`true` or `false`, default `true`), and `edit`, `store` and `destroy` (each `"none"`, `"own"` or `"any"`, default `"own"`). An Admin who will edit, store or destroy others' things gives themselves `{edit: "any", store: "any", destroy: "any"}`.
 
-The `destroy` Verb (`destroy satchel`) takes away every component of a placed thing within reach, so it is gone for good and its place in its Maker's `max_placed` is free. It refuses while the thing holds anything. Whoever had it open in the Composer finds it closed: `editing` no longer names it.
+The `destroy` Verb (`destroy satchel`) takes away every component of a placed thing within reach, so it is gone for good and its place in its Maker's `max_placed` is free. It refuses while the thing holds anything. Whoever had it open in the Composer finds it closed.
+
+The `store` Verb (`store satchel`) moves a placed thing within reach to Limbo, with what it holds. It keeps its Maker, so it still counts against `max_placed`, and a reset leaves it there. `stored` lists the stored things the Account's `store` permission covers, and `unstore satchel` brings one back, with what it holds, to the room the Character is in. Two stored things with the same name are told apart by number, in the order `stored` lists them: `unstore satchel 2`. Storing a thing closes it in every Composer, as destroying it does.
 
 A `command` whose text starts with `;` is a line of NorthTalk for an admin, one whose email is on `MUA_ADMINS` (#91). It runs as one Step and changes nothing unless it completes. Its result comes back as `output` to that admin only, `=> value` or `!! ` and why. Anyone else is told "You can't do that."
 

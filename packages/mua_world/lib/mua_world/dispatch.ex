@@ -266,12 +266,16 @@ defmodule MuaWorld.Dispatch do
   # -- Scripted actions --------------------------------------------------------
 
   # The Service Script that carries out each Verb's Action, sent
-  # `<verb> target, actor` (`target` may be Nothing)
+  # `<verb> target, actor` (`target` may be Nothing), and the Verbs whose
+  # text, the rest of the line, follows as a third argument
   @services %{
     "close" => "open",
     "drop" => "thing",
     "destroy" => "build",
     "edit" => "build",
+    "store" => "build",
+    "stored" => "build",
+    "unstore" => "build",
     "examine" => "thing",
     "help" => "help",
     "inventory" => "thing",
@@ -281,6 +285,7 @@ defmodule MuaWorld.Dispatch do
     "take" => "thing",
     "unlock" => "lock"
   }
+  @with_text ~w(unstore)
 
   @doc "The Service Scripts mua loads, by name."
   def services, do: ~w(room exit lock thing open speech help lifecycle build)
@@ -312,8 +317,12 @@ defmodule MuaWorld.Dispatch do
 
   defp plan(_world, %{verb: verb} = ctx) do
     case @services[verb] do
-      nil -> {:refused, @cannot}
-      service -> {:send, {:service, service}, verb, [target(ctx), {:entity, ctx.actor}]}
+      nil ->
+        {:refused, @cannot}
+
+      service ->
+        text = if verb in @with_text, do: [ctx[:text]], else: []
+        {:send, {:service, service}, verb, [target(ctx), {:entity, ctx.actor} | text]}
     end
   end
 
