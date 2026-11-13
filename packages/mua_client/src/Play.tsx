@@ -7,6 +7,7 @@ import {
   logout,
   mirrorSnapshot,
   place,
+  putAway,
   saveEdit,
   saveLocal,
   sendCommand,
@@ -450,6 +451,7 @@ export const Play = ({
           onDecline={keep}
           onSaved={() => setBuilding(false)}
           place={place}
+          putAway={putAway}
           save={saveEdit}
           snapshot={mirrorSnapshot}
         />

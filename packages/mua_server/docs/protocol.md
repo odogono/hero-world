@@ -32,6 +32,8 @@ Joining brings the Character into play, or resumes control of it, and takes over
 | `logout`       | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes                     |
 | `edit`         | `{eid, patch, ref?}`: the thing the `edit` Verb opened, and what to change   | `ok {ref, eid}` once the edit is saved; `error {ref?, reason}`                       |
 | `stop_editing` | `{}`                                                                         | `ok`; the thing the `edit` Verb opened is closed without saving                      |
+| `store`        | `{eid, ref?}`: the thing the `edit` Verb opened                              | `ok {ref, eid, placed, max_placed}` once it is stored; `error {ref?, reason}`        |
+| `destroy`      | `{eid, ref?}`: the thing the `edit` Verb opened                              | `ok {ref, eid, placed, max_placed}` once it is destroyed; `error {ref?, reason}`     |
 
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
@@ -95,6 +97,8 @@ The `destroy` Verb (`destroy satchel`) takes away every component of a placed th
 
 The `store` Verb (`store satchel`) moves a placed thing within reach to Limbo, with what it holds. It keeps its Maker, so it still counts against `max_placed`, and a reset leaves it there. `stored` lists the stored things the Account's `store` permission covers, and `unstore satchel` brings one back, with what it holds, to the room the Character is in. Two stored things with the same name are told apart by number, in the order `stored` lists them: `unstore satchel 2`. Storing a thing closes it in every Composer, as destroying it does.
 
+The Composer's Store and Destroy buttons send `store` and `destroy` for the thing it has open (#284). They do what the Verbs do, with the same refusals, and the thing must be the one the `edit` Verb opened and still within reach, as for `edit`. `placed` in the reply is the Account's count after it.
+
 A `command` whose text starts with `;` is a line of NorthTalk for an admin, one whose email is on `MUA_ADMINS` (#91). It runs as one Step and changes nothing unless it completes. Its result comes back as `output` to that admin only, `=> value` or `!! ` and why. Anyone else is told "You can't do that."
 
 ### From the server
@@ -106,6 +110,7 @@ A `command` whose text starts with `;` is a line of NorthTalk for an admin, one 
 | `prompt`  | `{text, options}`                                                        | After a command, while the Character must choose: "Which do you mean?". The next command answers it, by an option's number (from 1) or words that pick one. A choice whose thing has gone is refused, never swapped for another.                   |
 | `status`  | `{status}`                                                               | `connected` on joining; `replaced` when another Connection takes over, just before this one closes; `limbo` on logging out.                                                                                                                        |
 | `compose` | `{eid, composition}`                                                     | After the `edit` Verb opens a placed thing, and again on rejoining while it is open: its buildable components as they stand, for the composer.                                                                                                     |
+| `closed`  | `{eid}`                                                                  | When the World closes the thing the Character had open to edit without the Character asking, as when someone stores or destroys it (#284).                                                                                                         |
 | `mirror`  | `{character, place, components: {name: [row]}}`                          | On joining. Only what the Character perceives: its place, the Elements there it can see, and what it carries, as rows in the shared layout (ADR 0019), each with its `eid`.                                                                        |
 | `changes` | `{place, gone, put, remove}`                                             | After each Step that changed what the Character perceives. `gone`: eids to drop entirely; `put`: rows to add or replace; `remove`: `{name: [eid]}` components to drop. A client that missed one rejoins for a fresh `mirror`; nothing is replayed. |
 

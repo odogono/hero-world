@@ -14,7 +14,7 @@ import type {
   TryItOrigin
 } from 'mua-local';
 
-import type { Patch, Placed, Saved } from '../connection';
+import type { Patch, Placed, PutAway, Saved } from '../connection';
 import { openPreviewClient, type PreviewClient } from '../preview/client';
 import type { Editing, Builder as Limits } from '../store';
 import {
@@ -54,7 +54,8 @@ const openedFrom = (editing: Editing): Opened => ({
  *
  * Given a placed thing the `edit` Verb opened, it edits that instead
  * (#275): Save sends what changed, and Try it puts the edited thing where
- * the real one is.
+ * the real one is. Store and Destroy put it away instead (#284); Destroy
+ * asks first.
  */
 export const ComposerPanel = ({
   client: given,
@@ -64,6 +65,7 @@ export const ComposerPanel = ({
   onDecline,
   onSaved,
   place,
+  putAway,
   save,
   snapshot
 }: {
@@ -78,9 +80,11 @@ export const ComposerPanel = ({
    * name of the placed thing they were editing, or undefined for a new one
    */
   onDecline?: (keeping: string | undefined) => void;
-  /** The edit was saved, and the thing is closed */
+  /** The edit was saved, or the thing stored or destroyed, and it is closed */
   onSaved?: () => void;
   place: (composition: Record<string, unknown>) => Promise<Placed>;
+  /** Stores or destroys the placed thing it has open */
+  putAway?: (eid: number, verb: PutAway) => Promise<Saved>;
   save?: (eid: number, patch: Patch) => Promise<Saved>;
   /** The mirror of what the Character perceives, as it is now */
   snapshot: () => Promise<MirrorSnapshot | undefined>;
@@ -105,6 +109,10 @@ export const ComposerPanel = ({
   const [placing, setPlacing] = useState<'idle' | 'confirm' | 'sending'>(
     'idle'
   );
+  // Destroy asks first; either one waits for the World
+  const [unmaking, setUnmaking] = useState<'idle' | 'confirm' | 'sending'>(
+    'idle'
+  );
   const [notice, setNotice] = useState<string>();
   const [refusal, setRefusal] = useState<string>();
   const [error, setError] = useState<string>();
@@ -125,6 +133,7 @@ export const ComposerPanel = ({
     setWordsEdited(true);
     setPending(null);
     setPlacing('idle');
+    setUnmaking('idle');
     setNotice(undefined);
     setRefusal(undefined);
     setTab('compose');
@@ -234,7 +243,24 @@ export const ComposerPanel = ({
     if (saved.ok) {
       onSaved?.();
     } else {
-      setRefusal(saved.reason);
+      setRefusal(`Not saved: ${saved.reason}`);
+    }
+  };
+
+  const unmake = async (verb: PutAway) => {
+    if (!opened || !putAway) {
+      return;
+    }
+    setUnmaking('sending');
+    setRefusal(undefined);
+    const done = await putAway(opened.eid, verb);
+    setUnmaking('idle');
+    if (done.ok) {
+      onSaved?.();
+    } else {
+      setRefusal(
+        `${verb === 'store' ? 'Not stored' : 'Not destroyed'}: ${done.reason}`
+      );
     }
   };
 
@@ -252,7 +278,7 @@ export const ComposerPanel = ({
       setComposition(fresh());
       setWordsEdited(false);
     } else {
-      setRefusal(placed.reason);
+      setRefusal(`Not placed: ${placed.reason}`);
     }
   };
 
@@ -383,6 +409,26 @@ export const ComposerPanel = ({
               {!changed && (
                 <span class="muted small">Nothing has changed yet.</span>
               )}
+              {putAway && (
+                <>
+                  <button
+                    class="quiet"
+                    disabled={unmaking !== 'idle' || placing === 'sending'}
+                    onClick={() => void unmake('store')}
+                    type="button"
+                  >
+                    Store
+                  </button>
+                  <button
+                    class="quiet"
+                    disabled={unmaking !== 'idle' || placing === 'sending'}
+                    onClick={() => setUnmaking('confirm')}
+                    type="button"
+                  >
+                    Destroy
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <PlaceBar
@@ -401,9 +447,33 @@ export const ComposerPanel = ({
               {notice}
             </p>
           )}
+          {opened && unmaking === 'confirm' && (
+            <div aria-label="Destroy it?" class="place-confirm" role="group">
+              <p>
+                Destroy {theName(opened.name)}? It is gone for good, and
+                can&apos;t be brought back.
+              </p>
+              <div class="place-bar">
+                <button
+                  class="primary"
+                  onClick={() => void unmake('destroy')}
+                  type="button"
+                >
+                  Destroy it
+                </button>
+                <button
+                  class="quiet"
+                  onClick={() => setUnmaking('idle')}
+                  type="button"
+                >
+                  Keep it
+                </button>
+              </div>
+            </div>
+          )}
           {refusal && (
             <p class="error" role="alert">
-              {opened ? 'Not saved' : 'Not placed'}: {refusal}
+              {refusal}
             </p>
           )}
           <p class="muted small">

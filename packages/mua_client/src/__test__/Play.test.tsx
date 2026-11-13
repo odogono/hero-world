@@ -17,6 +17,7 @@ void mock.module('../connection', () => ({
   logout: () => Promise.resolve(),
   mirrorSnapshot: () => Promise.resolve(undefined),
   place: () => Promise.resolve({ ok: false, reason: 'not in tests' }),
+  putAway: () => Promise.resolve({ ok: true }),
   saveEdit: () => Promise.resolve({ ok: true }),
   saveLocal: () => {},
   sendCommand: (text: string) => {

@@ -67,6 +67,25 @@ defmodule MuaServer.Protocol do
   def edit(_), do: {:error, "an edit needs an eid and a patch"}
 
   @doc """
+  Checks a `store` or `destroy` message from a builder's client (#284):
+  the thing the `edit` Verb opened, and an optional `ref`.
+  """
+  @spec thing(map()) ::
+          {:ok, %{eid: integer(), ref: String.t() | integer() | nil}} | {:error, String.t()}
+  def thing(%{"eid" => eid} = msg) when is_integer(eid) do
+    ref = msg["ref"]
+
+    if is_nil(ref) or is_binary(ref) or is_integer(ref),
+      do: {:ok, %{eid: eid, ref: ref}},
+      else: {:error, "ref must be text or a number"}
+  end
+
+  def thing(_), do: {:error, "it needs the eid of the thing"}
+
+  @doc "The placed thing the Character had open to edit, closed in the World (#284)."
+  def closed(eid), do: %{eid: eid}
+
+  @doc """
   The placed thing the Character has open to edit (#274): its eid and its
   buildable components as they stand.
   """
