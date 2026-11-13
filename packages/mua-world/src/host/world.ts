@@ -60,7 +60,8 @@ import {
   takeNotices,
   takeOutbox,
   tell,
-  type Act
+  type Act,
+  type Line
 } from './tables';
 import { argValue, between, muaCapability, type Notices } from './talk';
 import { viewFor } from './view';
@@ -83,6 +84,9 @@ export type Patch = {
   put?: Record<string, Record<string, unknown>>;
   remove?: string[];
 };
+
+/** Hears a line a Character is told, and any Commands it offers (#275) */
+export type Hear = (text: string, suggestions?: string[]) => void;
 
 /** How to hear a Character, from `subscribe` */
 export type Listener = {
@@ -223,12 +227,19 @@ const refusalOf = (value: unknown) =>
 
 /**
  * What placing came to, from the `build` Service's reply: `{message,
- * placed, max_placed}` when it placed the thing, `{refused: text}` when it
- * said no
+ * placed, max_placed}` when it placed the thing, with any `suggestions` the
+ * message offers (#275), and `{refused: text}` when it said no
  */
 const placedReply = (
   o: Outcome
-): Refused | { maxPlaced: number; message: string; placed: number } => {
+):
+  | Refused
+  | {
+      maxPlaced: number;
+      message: string;
+      placed: number;
+      suggestions: string[];
+    } => {
   if (o.kind !== 'replied') {
     return { error: cantBuild(o) };
   }
@@ -242,10 +253,14 @@ const placedReply = (
     typeof value.placed === 'number' &&
     typeof value.max_placed === 'number'
   ) {
+    const offered: unknown[] = Array.isArray(value.suggestions)
+      ? value.suggestions
+      : [];
     return {
       maxPlaced: value.max_placed,
       message: value.message,
-      placed: value.placed
+      placed: value.placed,
+      suggestions: offered.filter(o => typeof o === 'string')
     };
   }
   return { error: 'Something went wrong.' };
@@ -282,7 +297,7 @@ export const startMuaWorld = async (
   const store: Store = world.store;
   const clock = options.clock ?? (() => performance.now());
   const notices: Notices = [];
-  const subscribers = new Map<Eid, Set<(text: string) => void>>();
+  const subscribers = new Map<Eid, Set<Hear>>();
   const editingListeners = new Map<Eid, Set<() => void>>();
   const named = (name: string) => world.getDefinitionNames().get(name);
   const mua = (path: string) =>
@@ -386,9 +401,14 @@ export const startMuaWorld = async (
         return;
       }
       options.onChanges?.(result.output.changes);
-      for (const [character, line] of result.output.output as [Eid, string][]) {
+      for (const [character, text, suggestions] of result.output
+        .output as Line[]) {
         for (const fn of subscribers.get(character) ?? []) {
-          fn(line);
+          if (suggestions) {
+            fn(text, suggestions);
+          } else {
+            fn(text);
+          }
         }
       }
       // a Character whose `editing` the Step changed, such as by storing or
@@ -684,7 +704,7 @@ export const startMuaWorld = async (
     if ('error' in reply) {
       return reply;
     }
-    output(store, actor, reply.message);
+    output(store, actor, reply.message, reply.suggestions);
     return { eid: thing, maxPlaced: reply.maxPlaced, placed: reply.placed };
   };
 
@@ -734,7 +754,7 @@ export const startMuaWorld = async (
     if (!result.ok) {
       throw new MuaWorldError('step_failed');
     }
-    return (result.output.output as [Eid, string][])
+    return (result.output.output as Line[])
       .filter(([c]) => c === character)
       .map(([, line]) => line);
   };
@@ -1008,16 +1028,13 @@ export const startMuaWorld = async (
     store,
 
     /**
-     * Calls `fn` with each line of the Character's output from now on,
-     * after any notices left from before a restart, and `onEditing` after
+     * Calls `fn` with each line of the Character's output from now on, and
+     * the Suggestions it offers if any (#275), after any notices left from
+     * before a restart, and `onEditing` after
      * each Step that changed what it has open to edit. Returns a function
      * that stops both.
      */
-    subscribe: (
-      character: Eid,
-      fn: (text: string) => void,
-      { onEditing }: Listener = {}
-    ) =>
+    subscribe: (character: Eid, fn: Hear, { onEditing }: Listener = {}) =>
       serial(() => {
         store.db.exec('BEGIN IMMEDIATE');
         const left = takeNotices(store, character);

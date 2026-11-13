@@ -71,6 +71,10 @@ describe('placing a composed thing (#258)', () => {
   test('a builder places a thing in their room, which another player takes and opens', async () => {
     const { ada, bob, mua } = await setup();
     grant(mua, ada);
+    const offered: [string, string[] | undefined][] = [];
+    await mua.subscribe(ada.eid, (text, suggestions) =>
+      offered.push([text, suggestions])
+    );
 
     const placed = await place(mua, ada);
     expect(placed).toEqual({
@@ -80,6 +84,8 @@ describe('placing a composed thing (#258)', () => {
     });
     expect(ada.heard).toContain('You make the satchel.');
     expect(bob.heard).toContain('ada makes the satchel.');
+    // the line offers its Maker a way back to it (#275, #292)
+    expect(offered).toEqual([['You make the satchel.', ['edit the satchel']]]);
     expect(where(mua, placed.eid)).toBe(where(mua, ada.eid));
     expect(get(mua.store, placed.eid, 'made_by')).toEqual({
       account: ada.account
