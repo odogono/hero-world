@@ -21,6 +21,11 @@
 -- is `{put: {name: {property: value}}, remove: [name]}`, the components
 -- and properties to change. Both reply text, or `{refused: text}`. mua
 -- keeps nothing of a refused save.
+--
+-- Destroying a placed thing (#283): the `destroy` Verb sends
+-- `destroy target, actor`, which takes away every component the thing
+-- has, `made_by` included, so its place in its Maker's quota is free. It
+-- replies text, or `{refused: text}`.
 
 use theName, messageFor, capitalised from messages
 use join, trim from text
@@ -117,17 +122,18 @@ on place thing, composition, actor
   return {message: message, placed: placed + 1, max_placed: the max_placed of builder, suggestions: suggestions}
 end place
 
--- why the Account can't edit this thing, or Nothing. Only a placed thing,
--- one with a Maker, is edited this way. `builder.edit` says which: `none`,
--- `own` (what the Account made) or `any`.
-function editRefusal thing, account
+-- why the Account can't `verb` this thing, or Nothing. Only a placed
+-- thing, one with a Maker, is edited or destroyed this way. The `builder`
+-- permission named `verb` says which: `none`, `own` (what the Account made)
+-- or `any`. `done` is the verb's past participle.
+function builderRefusal thing, account, verb, done
   if account is nothing or the builder of account is nothing then
     return "You can't build."
   end if
   if the made_by of thing is nothing then
-    return `Only a thing someone placed can be edited.`
+    return `Only a thing someone placed can be ${done}.`
   end if
-  put the edit of the builder of account into may
+  put the (verb) of the builder of account into may
   if may is "any" then
     return nothing
   end if
@@ -137,7 +143,11 @@ function editRefusal thing, account
   if may is "own" then
     return "You didn't make that."
   end if
-  return "You can't edit things."
+  return `You can't ${verb} things.`
+end builderRefusal
+
+function editRefusal thing, account
+  return builderRefusal(thing, account, "edit", "edited")
 end editRefusal
 
 -- whether a Character holds this, directly or inside something they carry
@@ -258,3 +268,31 @@ on save thing, patch, current, actor
   tell mua to announce the in of the location of actor, others, actor
   return messageFor("edit", "msg", about) otherwise `You reshape ${theName(thing)}.`
 end save
+
+-- The `destroy` Verb: takes away every component a placed thing has. It
+-- refuses while the thing holds anything, so nothing is lost by accident.
+-- Whoever had it open in their composer finds `editing` emptied, as its
+-- Reference is nullified.
+on destroy thing, actor
+  if thing is nothing then
+    return {refused: "What do you want to destroy?"}
+  end if
+  put builderRefusal(thing, the optional account of the player of actor, "destroy", "destroyed") into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  ask world to find thing, "location" into inside
+  if the length of inside > 0 then
+    return {refused: `${capitalised(theName(thing))} holds things: empty it first.`}
+  end if
+
+  -- the thing's name and messages, while it still has them
+  put {actor: actor, target: thing} into about
+  put messageFor("destroy", "omsg", about) otherwise `${the name of the player of actor} unmakes ${theName(thing)}.` into others
+  put messageFor("destroy", "msg", about) otherwise `You unmake ${theName(thing)}.` into message
+
+  -- named in full: inside `on destroy`, a bare `destroy` is this handler
+  ask world to destroy thing
+  tell mua to announce the in of the location of actor, others, actor
+  return message
+end destroy

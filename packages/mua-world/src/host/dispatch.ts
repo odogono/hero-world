@@ -145,6 +145,7 @@ export const afters = (store: Store, ctx: Context) =>
 // The Service Script that carries out each Verb's Action
 const SERVICES: Record<string, string> = {
   close: 'open',
+  destroy: 'build',
   drop: 'thing',
   edit: 'build',
   examine: 'thing',

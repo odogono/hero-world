@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
-import { createEntity, get, put } from 'odgn-ecs/store';
+import { createEntity, exists, get, put, query } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import { recordHomes } from '../host/lifecycle';
@@ -186,5 +186,33 @@ describe("a placed thing's Maker (#276)", () => {
     expect(
       (await mua.command(ann.account, ann.eid, 'examine lamp')).join('\n')
     ).not.toContain('Made by');
+  });
+});
+
+describe('destroying a placed thing (#283)', () => {
+  test('the destroy Verb unmakes a thing its Maker placed, as the build Service decides', async () => {
+    const mua = await start('lifecycle.edl');
+    const bob = await join_(mua, 'bob');
+    const ann = await join_(mua, 'ann');
+    const satchel = createEntity(mua.store);
+    put(mua.store, satchel, 'described', { name: 'Satchel' });
+    put(mua.store, satchel, 'location', { in: where(mua, bob.eid)! });
+    put(mua.store, satchel, 'made_by', { account: bob.account });
+    put(mua.store, bob.account, 'builder', {});
+    put(mua.store, ann.account, 'builder', {});
+
+    expect(await mua.command(ann.account, ann.eid, 'destroy satchel')).toEqual([
+      "You didn't make that."
+    ]);
+    expect(get(mua.store, satchel, 'made_by')).toEqual({
+      account: bob.account
+    });
+    expect(await mua.command(bob.account, bob.eid, 'destroy satchel')).toEqual([
+      'You unmake the satchel.'
+    ]);
+    expect(exists(mua.store, satchel)).toBe(false);
+    expect(
+      query(mua.store, { where: [['made_by', 'account', bob.account]] })
+    ).toEqual([]);
   });
 });

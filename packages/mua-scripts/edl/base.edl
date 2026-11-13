@@ -117,6 +117,11 @@ entity base_verbs {
         forms: [{ handler: "edit" pattern: "obj" }]
         incomplete: "What do you want to edit?"
       }
+      {
+        names: ["destroy"]
+        forms: [{ handler: "destroy" pattern: "obj" }]
+        incomplete: "What do you want to destroy?"
+      }
     ]
   }
 
