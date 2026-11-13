@@ -23,6 +23,16 @@
         "case_insensitive": false,
         "default": "own",
         "index": false,
+        "name": "destroy",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": "own",
+        "index": false,
         "name": "edit",
         "on_delete": "restrict",
         "optional": true,
