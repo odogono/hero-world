@@ -30,6 +30,28 @@ defmodule MuaWorld.TablesTest do
            ) == []
   end
 
+  test "moves them inside a Migration's transaction too, and its rollback undoes the move" do
+    {:ok, world} = OdgnEcs.open(":memory:")
+
+    SQL.exec!(world.conn, """
+    CREATE TABLE mua_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    INSERT INTO mua_meta (key, value) VALUES ('world_time', '12345');
+    """)
+
+    # a dry run: the Migration's own transaction, rolled back
+    :ok = OdgnEcs.begin(world)
+    :ok = MuaWorld.Tables.ensure(world)
+    assert OdgnEcsEngine.Tables.world_time(world) == 12_345
+    :ok = OdgnEcs.rollback(world)
+
+    assert SQL.all!(world.conn, "SELECT value FROM mua_meta") == [["12345"]]
+
+    :ok = OdgnEcs.begin(world)
+    :ok = MuaWorld.Tables.ensure(world)
+    :ok = OdgnEcs.commit(world)
+    assert OdgnEcsEngine.Tables.world_time(world) == 12_345
+  end
+
   test "an outbox from before Suggestions gains them, and its lines keep" do
     {:ok, world} = OdgnEcs.open(":memory:")
 

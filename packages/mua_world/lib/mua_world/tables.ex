@@ -28,8 +28,9 @@ defmodule MuaWorld.Tables do
     if not column?(conn, "mua_outbox", "suggestions"),
       do: SQL.exec!(conn, "ALTER TABLE mua_outbox ADD COLUMN suggestions TEXT")
 
+    # a savepoint, not a transaction: a Migration runs this inside its own
     if table?(conn, "mua_meta") or table?(conn, "mua_waiting") do
-      :ok = OdgnEcs.begin(world)
+      :ok = OdgnEcs.savepoint(world, "mua_tables")
 
       if table?(conn, "mua_meta") do
         SQL.exec!(conn, """
@@ -47,7 +48,7 @@ defmodule MuaWorld.Tables do
         """)
       end
 
-      :ok = OdgnEcs.commit(world)
+      :ok = OdgnEcs.release(world, "mua_tables")
     end
 
     :ok
