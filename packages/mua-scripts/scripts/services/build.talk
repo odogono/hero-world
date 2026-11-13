@@ -26,9 +26,19 @@
 -- `destroy target, actor`, which takes away every component the thing
 -- has, `made_by` included, so its place in its Maker's quota is free. It
 -- replies text, or `{refused: text}`.
+--
+-- Storing a placed thing (#282): the `store` Verb sends `store target,
+-- actor`, which moves the thing, and what it holds, to Limbo. It keeps
+-- `made_by`, so it still counts against its Maker's quota. `stored target,
+-- actor` lists the stored things the actor may bring back, and `unstore
+-- target, actor, words` brings the one `words` names to the actor's room.
+-- Each replies text, or `{refused: text}`.
 
 use theName, messageFor, capitalised from messages
-use join, trim from text
+use nameOf from things
+use theNames from rooms
+use join, split, trim from text
+use filter from list
 use merge, without, withPath from map
 
 -- why `composition` can't be built by an Account with `builder`, or Nothing.
@@ -269,10 +279,17 @@ on save thing, patch, current, actor
   return messageFor("edit", "msg", about) otherwise `You reshape ${theName(thing)}.`
 end save
 
+-- Closes the thing in every composer that has it open
+function closeEditors thing
+  ask mua to editors thing into editors
+  repeat for each character in editors
+    remove character, "editing"
+  end repeat
+end closeEditors
+
 -- The `destroy` Verb: takes away every component a placed thing has. It
--- refuses while the thing holds anything, so nothing is lost by accident.
--- Whoever had it open in their composer finds `editing` emptied, as its
--- Reference is nullified.
+-- refuses while the thing holds anything, so nothing is lost by accident,
+-- and closes it in every composer that has it open.
 on destroy thing, actor
   if thing is nothing then
     return {refused: "What do you want to destroy?"}
@@ -291,8 +308,132 @@ on destroy thing, actor
   put messageFor("destroy", "omsg", about) otherwise `${the name of the player of actor} unmakes ${theName(thing)}.` into others
   put messageFor("destroy", "msg", about) otherwise `You unmake ${theName(thing)}.` into message
 
+  closeEditors(thing)
   -- named in full: inside `on destroy`, a bare `destroy` is this handler
   ask world to destroy thing
   tell mua to announce the in of the location of actor, others, actor
   return message
 end destroy
+
+-- The `store` Verb: moves a placed thing to Limbo, with what it holds
+on store thing, actor
+  if thing is nothing then
+    return {refused: "What do you want to store?"}
+  end if
+  put builderRefusal(thing, the optional account of the player of actor, "store", "stored") into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+
+  put {actor: actor, target: thing} into about
+  put messageFor("store", "omsg", about) otherwise `${the name of the player of actor} puts away ${theName(thing)}.` into others
+  closeEditors(thing)
+  ask mua to limbo into limbo
+  moveTo thing, limbo
+  tell mua to announce the in of the location of actor, others, actor
+  return messageFor("store", "msg", about) otherwise `You put away ${theName(thing)}.`
+end store
+
+-- The stored things in Limbo that the Account may bring back, in the
+-- order they were made
+function storedFor account
+  ask mua to limbo into limbo
+  ask world to find limbo, "made_by" into things
+  return filter(things, given t: builderRefusal(t, account, "store", "stored") is nothing)
+end storedFor
+
+-- The words of a name, in lower case, without an article before them
+function wordsOf words
+  put [] into kept
+  repeat for each w in split(lower(trim(words)), " ")
+    if w is not "" and not (kept is empty and w is in ["the", "a", "an"]) then
+      put [...kept, w] into kept
+    end if
+  end repeat
+  return kept
+end wordsOf
+
+-- why an actor can't bring back stored things at all, or Nothing
+function unstoreRefusal account
+  if account is nothing or the builder of account is nothing then
+    return "You can't build."
+  end if
+  if the store of the builder of account is "none" then
+    return "You can't store things."
+  end if
+  return nothing
+end unstoreRefusal
+
+-- The `stored` Verb: lists what the actor may bring back
+on stored target, actor
+  put the optional account of the player of actor into account
+  put unstoreRefusal(account) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  put storedFor(account) into things
+  if things is empty then
+    return "You have nothing stored."
+  end if
+  return `You can bring back ${theNames(things)}.`
+end stored
+
+-- The `unstore` Verb: brings the stored thing `words` names to the actor's
+-- room. Two stored things with the same name are told apart by a number,
+-- in the order `stored` lists them: `unstore satchel 2`.
+on unstore target, actor, words
+  put the optional account of the player of actor into account
+  put unstoreRefusal(account) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  if words is nothing or the length of wordsOf(words) is 0 then
+    return {refused: "What do you want to bring back?"}
+  end if
+  if the location of actor is nothing then
+    return {refused: "You are nowhere."}
+  end if
+
+  put storedFor(account) into things
+  put wordsOf(words) into parts
+  put join(parts, " ") into name
+  put filter(things, given t: nameOf(t) is name) into matches
+  put nothing into which
+  if the length of matches is 0 and the length of parts > 1 then
+    -- the last word may be a number that picks one of several
+    put item (the length of parts) of parts into last
+    put [] into rest
+    repeat for each w in parts
+      if the length of rest < the length of parts - 1 then
+        put [...rest, w] into rest
+      end if
+    end repeat
+    put join(rest, " ") into name
+    put filter(things, given t: nameOf(t) is name) into matches
+    put 0 into i
+    repeat for each t in matches
+      put i + 1 into i
+      if last is `${i}` then
+        put t into which
+      end if
+    end repeat
+    if which is nothing then
+      put [] into matches
+    end if
+  else if the length of matches is 1 then
+    put item 1 of matches into which
+  end if
+
+  if the length of matches is 0 then
+    return {refused: `You have no ${join(parts, " ")} stored.`}
+  end if
+  if which is nothing then
+    return {refused: `You have ${the length of matches} stored called ${name}: say which, from unstore ${name} 1 to unstore ${name} ${the length of matches}.`}
+  end if
+
+  put {actor: actor, target: which} into about
+  moveTo which, the in of the location of actor
+  put messageFor("unstore", "omsg", about) otherwise `${the name of the player of actor} brings out ${theName(which)}.` into others
+  tell mua to announce the in of the location of actor, others, actor
+  return messageFor("unstore", "msg", about) otherwise `You bring out ${theName(which)}.`
+end unstore

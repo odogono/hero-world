@@ -169,8 +169,8 @@ const account = defineComponent({
 
 /**
  * An Account that may build: whether it may place, and which placed things
- * it may edit and destroy (each `none`, `own` or `any`); how many things it
- * may place in all, and the largest container it may make
+ * it may edit, store and destroy (each `none`, `own` or `any`); how many
+ * things it may place in all, and the largest container it may make
  */
 const builder = defineComponent({
   id: 'builder',
@@ -180,7 +180,8 @@ const builder = defineComponent({
     edit: s.string().default('own').optional(),
     max_capacity: s.int().default(20).optional(),
     max_placed: s.int().default(50).optional(),
-    place: s.boolean().default(true).optional()
+    place: s.boolean().default(true).optional(),
+    store: s.string().default('own').optional()
   }
 });
 

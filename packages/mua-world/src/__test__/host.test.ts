@@ -216,3 +216,28 @@ describe('destroying a placed thing (#283)', () => {
     ).toEqual([]);
   });
 });
+
+describe('storing a placed thing (#282)', () => {
+  test('the store Verb puts a thing in Limbo, and unstore brings it back', async () => {
+    const mua = await start('lifecycle.edl');
+    const bob = await join_(mua, 'bob');
+    const room = where(mua, bob.eid)!;
+    const satchel = createEntity(mua.store);
+    put(mua.store, satchel, 'described', { name: 'Satchel' });
+    put(mua.store, satchel, 'location', { in: room });
+    put(mua.store, satchel, 'made_by', { account: bob.account });
+    put(mua.store, bob.account, 'builder', {});
+
+    expect(await mua.command(bob.account, bob.eid, 'store satchel')).toEqual([
+      'You put away the satchel.'
+    ]);
+    expect(where(mua, satchel)).toBe(mua.places.limbo);
+    expect(await mua.command(bob.account, bob.eid, 'stored')).toEqual([
+      'You can bring back the satchel.'
+    ]);
+    expect(await mua.command(bob.account, bob.eid, 'unstore satchel')).toEqual([
+      'You bring out the satchel.'
+    ]);
+    expect(where(mua, satchel)).toBe(room);
+  });
+});

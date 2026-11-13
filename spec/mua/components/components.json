@@ -68,6 +68,16 @@
         "optional": true,
         "type": "boolean",
         "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": "own",
+        "index": false,
+        "name": "store",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
       }
     ]
   },
