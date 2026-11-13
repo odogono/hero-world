@@ -1,47 +1,10 @@
 // The Host's own calls, which spec/mua/steps doesn't reach, adapted from
 // packages/mua_world/test/gameplay/accounts_test.exs and lifecycle_test.exs.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { describe, expect, test } from 'bun:test';
-import { DatabaseType } from 'odgn-ecs/db';
 import { createEntity, exists, get, put, query } from 'odgn-ecs/store';
-import { createWorld } from 'odgn-ecs/world';
 
 import { recordHomes } from '../host/lifecycle';
-import { components, startMuaWorld, type MuaWorld } from '../index';
-
-const REPO = join(import.meta.dir, '../../../..');
-const SCRIPTS = join(REPO, 'packages/mua-scripts');
-const FIXTURES = join(REPO, 'packages/mua_world/test/fixtures');
-
-const start = async (fixture: string, startingRoom = 'west_of_house') => {
-  const path = join(FIXTURES, fixture);
-  const world = await createWorld(components, { type: DatabaseType.BUN });
-  world.executeEDL(readFileSync(path, 'utf8'), {
-    path,
-    roots: { 'mua-scripts': SCRIPTS }
-  });
-  world.flush();
-  return startMuaWorld(world, {
-    clock: () => 0,
-    readFile: file => readFileSync(file, 'utf8'),
-    scriptsDir: SCRIPTS,
-    startingRoom
-  });
-};
-
-const join_ = async (mua: MuaWorld, name: string) => {
-  const account = await mua.createAccount();
-  const eid = await mua.createCharacter(account, name);
-  await mua.enter(account, eid);
-  const heard: string[] = [];
-  await mua.subscribe(eid, line => heard.push(line));
-  return { account, eid, heard };
-};
-
-const where = (mua: MuaWorld, eid: number) =>
-  get(mua.store, eid, 'location')?.in;
+import { join_, start, where } from './mua';
 
 describe('Accounts and Characters', () => {
   test('a new Character waits in Limbo until it enters', async () => {

@@ -8,7 +8,11 @@ export { fromComponents, fromWorld, type Vocabulary } from './commands/verbs';
 export {
   MuaWorldError,
   startMuaWorld,
+  type Builder,
+  type Editing,
+  type Listener,
   type MuaWorld,
-  type MuaWorldOptions
+  type MuaWorldOptions,
+  type Patch
 } from './host/world';
 export type { View } from './host/view';

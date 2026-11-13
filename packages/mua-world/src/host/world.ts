@@ -6,13 +6,22 @@ import {
   type Step,
   type Timer
 } from 'ecs-engine';
-import { createEcsTalk, outcome, type Outcome, type Pending } from 'ecs-talk';
+import {
+  abandon,
+  createEcsTalk,
+  fromScript,
+  outcome,
+  toValue,
+  type Outcome,
+  type Pending
+} from 'ecs-talk';
 import {
   armSystems,
   exists,
   get,
   put,
   query,
+  remove,
   type ChangeSetEntry,
   type Data,
   type Eid,
@@ -22,10 +31,10 @@ import {
 import type { Components } from 'odgn-ecs/types';
 import type { World } from 'odgn-ecs/world';
 
-import type { Limits } from '@northtalk/ts';
+import type { Limits, Value } from '@northtalk/ts';
 
 import type { BoundCommand } from '../commands/bind';
-import { location } from '../commands/scope';
+import { inReach, location } from '../commands/scope';
 import { fromWorld } from '../commands/verbs';
 import { expand } from '../exits';
 import { read, readNpc } from '../input';
@@ -56,6 +65,28 @@ import { viewFor } from './view';
 
 /** mua's Libraries, by the name Scripts `use` them from */
 const LIBRARIES = ['things', 'messages', 'rooms'];
+
+/** An Account's building limits and how many things it has placed */
+export type Builder = {
+  maxCapacity: number | undefined;
+  maxPlaced: number | undefined;
+  placed: number;
+};
+
+/** A placed thing a Character has open to edit, and its buildable components */
+export type Editing = { composition: Record<string, Data>; eid: Eid };
+
+/** A change to a placed thing: components to add or change, and to remove */
+export type Patch = {
+  put?: Record<string, Record<string, unknown>>;
+  remove?: string[];
+};
+
+/** How to hear a Character, from `subscribe` */
+export type Listener = {
+  /** Called after a Step that changed what the Character has open to edit */
+  onEditing?: () => void;
+};
 
 export type MuaWorldOptions = {
   /** Milliseconds of wall time, for World time; `performance.now` by default */
@@ -141,6 +172,96 @@ const replyOf = (q: Question, o: Outcome): Reply => {
 };
 
 /**
+ * Why a Script failed, as `MuaWorld.Admin.failure/2` says it: an error's
+ * code and message, or that it didn't finish
+ */
+const failure = (o: Outcome) => {
+  if (o.kind === 'waiting') {
+    return "the line didn't finish, so nothing changed";
+  }
+  if (o.kind !== 'failed') {
+    return o.kind;
+  }
+  const { error } = o;
+  // a Request whose receiver's Run errored carries that Run's error map
+  const data =
+    error instanceof Error && 'data' in error
+      ? (fromScript(error.data as Value) as { error?: unknown } | null)
+      : null;
+  const run = data?.error as { code?: unknown; message?: unknown } | undefined;
+  if (typeof run?.code === 'string') {
+    return `${run.code}: ${typeof run.message === 'string' ? run.message : ''}`.replace(
+      /: $/,
+      ''
+    );
+  }
+  if (
+    error instanceof Error &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return `${error.code}: ${error.message}`.replace(/: $/, '');
+  }
+  return error instanceof Error ? error.message : String(error);
+};
+
+/** The `build` Service's refusal, or why a Script failed */
+type Refused = { error: string };
+
+/** A write the composition doesn't fit fails the Script: the builder's to fix */
+const cantBuild = (o: Outcome) => `That can't be built: ${failure(o)}`;
+
+/** What the `build` Service replied, if it refused: `{refused: text}` */
+const refusalOf = (value: unknown) =>
+  value !== null &&
+  typeof value === 'object' &&
+  typeof (value as { refused?: unknown }).refused === 'string'
+    ? (value as { refused: string }).refused
+    : undefined;
+
+/**
+ * What placing came to, from the `build` Service's reply: `{message,
+ * placed, max_placed}` when it placed the thing, `{refused: text}` when it
+ * said no
+ */
+const placedReply = (
+  o: Outcome
+): Refused | { maxPlaced: number; message: string; placed: number } => {
+  if (o.kind !== 'replied') {
+    return { error: cantBuild(o) };
+  }
+  const value = fromScript(o.value) as Record<string, unknown> | null;
+  const refusal = refusalOf(value);
+  if (refusal !== undefined) {
+    return { error: refusal };
+  }
+  if (
+    typeof value?.message === 'string' &&
+    typeof value.placed === 'number' &&
+    typeof value.max_placed === 'number'
+  ) {
+    return {
+      maxPlaced: value.max_placed,
+      message: value.message,
+      placed: value.placed
+    };
+  }
+  return { error: 'Something went wrong.' };
+};
+
+/** What an edit, a store or a destroy came to: the actor's line, or why not */
+const editedReply = (o: Outcome): Refused | { message: string } => {
+  if (o.kind !== 'replied') {
+    return { error: cantBuild(o) };
+  }
+  const text = o.value.asText();
+  if (text !== undefined) {
+    return { message: text };
+  }
+  return { error: refusalOf(fromScript(o.value)) ?? 'Something went wrong.' };
+};
+
+/**
  * One mua World, the TypeScript Host that `MuaWorld` is in Elixir (ADR
  * 0023): it owns the World's store and NorthTalk, and orders every change
  * to it. Each input is one Step of an `ecs-engine`. Output goes to the
@@ -160,6 +281,7 @@ export const startMuaWorld = async (
   const clock = options.clock ?? (() => performance.now());
   const notices: Notices = [];
   const subscribers = new Map<Eid, Set<(text: string) => void>>();
+  const editingListeners = new Map<Eid, Set<() => void>>();
   const named = (name: string) => world.getDefinitionNames().get(name);
   const mua = (path: string) =>
     options.readFile(`${options.scriptsDir}/scripts/${path}`);
@@ -265,6 +387,15 @@ export const startMuaWorld = async (
       for (const [character, line] of result.output.output as [Eid, string][]) {
         for (const fn of subscribers.get(character) ?? []) {
           fn(line);
+        }
+      }
+      // a Character whose `editing` the Step changed, such as by storing or
+      // destroying the thing it had open (#284), so its composer can follow
+      for (const [character, name] of result.output.changes) {
+        if (name === 'editing') {
+          for (const fn of editingListeners.get(character) ?? []) {
+            fn();
+          }
         }
       }
     },
@@ -466,6 +597,124 @@ export const startMuaWorld = async (
     }
   };
 
+  // -- Building -------------------------------------------------------------
+
+  // Sends `message args…, actor` to the `build` Service as a Request, and
+  // reads its reply with `read`, in a savepoint released only if it did
+  // what was asked. A refusal, or a Script that fails, writes nothing, and
+  // comes back as `{error}` for the Step to commit as it is.
+  const askBuild = async <T extends object>(
+    s: Step,
+    actor: Eid,
+    message: string,
+    args: Value[],
+    read: (o: Outcome) => Refused | T
+  ): Promise<Refused | T> => {
+    store.db.exec('SAVEPOINT mua_build');
+    const pending = s.deliver({
+      args: [...args, talk.handle(actor).value],
+      asks: 'request',
+      message,
+      to: { service: 'build' }
+    }) as Pending;
+    s.pump();
+    const o = await outcome(pending);
+    if (o.kind === 'waiting') {
+      abandon(pending);
+    }
+    const reply = read(o);
+    if ('error' in reply) {
+      store.db.exec('ROLLBACK TO mua_build');
+    }
+    store.db.exec('RELEASE mua_build');
+    return reply;
+  };
+
+  // How many things an Account has placed
+  const placedBy = (account: Eid) =>
+    query(store, { where: [['made_by', 'account', account]] }).length;
+
+  // A placed thing's buildable components, as they stand
+  const compositionOf = (thing: Eid) => {
+    const composition: Record<string, Data> = {};
+    for (const c of store.components.values()) {
+      const data = c.buildable ? get(store, thing, c.name) : undefined;
+      if (data) {
+        composition[c.name] = data;
+      }
+    }
+    return composition;
+  };
+
+  // Only the thing the `edit` Verb opened can be saved, and only while it
+  // is still within reach, as the Verb found it
+  const editingThis = (character: Eid, eid: Eid) => {
+    if (get(store, character, 'editing')?.thing !== eid) {
+      throw new MuaWorldError('Open it with edit first.');
+    }
+    if (!inReach(store, character, 'here').some(c => c.id === eid)) {
+      throw new MuaWorldError("You can't reach that from here.");
+    }
+  };
+
+  const inPlay = (character: Eid) => {
+    if (location(store, character) === limbo) {
+      throw new MuaWorldError('not_in_play');
+    }
+  };
+
+  // A builder's thing: an empty entity the `build` Service fills in and
+  // places. If it refuses, the entity goes with the rest.
+  const placeThing = async (
+    s: Step,
+    actor: Eid,
+    composition: unknown
+  ): Promise<Refused | { eid: Eid; maxPlaced: number; placed: number }> => {
+    const thing = store.db.addEntity();
+    const handle = talk.handle(thing).value;
+    const reply = await askBuild(
+      s,
+      actor,
+      'place',
+      [handle, toValue(composition)],
+      placedReply
+    );
+    if ('error' in reply) {
+      return reply;
+    }
+    output(store, actor, reply.message);
+    return { eid: thing, maxPlaced: reply.maxPlaced, placed: reply.placed };
+  };
+
+  // An edit, store or destroy, which the `build` Service checks and
+  // writes, then tells the actor
+  const buildEdit = async (
+    s: Step,
+    actor: Eid,
+    message: string,
+    args: Value[]
+  ) => {
+    const reply = await askBuild(s, actor, message, args, editedReply);
+    if ('error' in reply) {
+      return reply;
+    }
+    output(store, actor, reply.message);
+    return { ok: true } as const;
+  };
+
+  /** Runs a building Step, throwing a refusal as a `MuaWorldError` */
+  const building = async <T extends object>(
+    input_: (s: Step) => Promise<Refused | T>
+  ) => {
+    advanceClock();
+    const result = await resultOf(input_);
+    await runNpcs();
+    if ('error' in result) {
+      throw new MuaWorldError(result.error);
+    }
+    return result as T;
+  };
+
   // -- Calls ----------------------------------------------------------------
 
   // Calls run one at a time
@@ -554,6 +803,23 @@ export const startMuaWorld = async (
         worldMs += ms;
       }),
 
+    /**
+     * An Account's building limits and how many things it has placed, or
+     * null for an Account that doesn't build
+     */
+    builder: (account: Eid) =>
+      serial((): Builder | null => {
+        const builder = get(store, account, 'builder');
+        if (!builder) {
+          return null;
+        }
+        return {
+          maxCapacity: builder.max_capacity as number | undefined,
+          maxPlaced: builder.max_placed as number | undefined,
+          placed: placedBy(account)
+        };
+      }),
+
     /** The Characters an Account owns */
     characters: (account: Eid) =>
       serial(() =>
@@ -617,6 +883,42 @@ export const startMuaWorld = async (
       }),
 
     /**
+     * Saves an edit to the placed thing a Character has open, as one Step
+     * (#274). The thing must be the one the `edit` Verb opened, and still
+     * within reach; whether the edit may be made is the `build` Service
+     * Script's to decide. A saved edit closes the thing. A refusal throws
+     * a `MuaWorldError` with its text, and writes nothing.
+     */
+    edit: (account: Eid, character: Eid, eid: Eid, patch: Patch) =>
+      serial(async () => {
+        owns(account, character);
+        inPlay(character);
+        editingThis(character, eid);
+        await building(s =>
+          buildEdit(s, character, 'save', [
+            talk.handle(eid).value,
+            toValue(patch),
+            toValue(compositionOf(eid))
+          ])
+        );
+        return { eid };
+      }),
+
+    /**
+     * The placed thing a Character has open to edit, after the `edit` Verb
+     * opened it (#274), with its buildable components as they stand, or
+     * null when it has none open
+     */
+    editing: (account: Eid, character: Eid) =>
+      serial((): Editing | null => {
+        owns(account, character);
+        const thing = get(store, character, 'editing')?.thing;
+        return typeof thing === 'number'
+          ? { composition: compositionOf(thing), eid: thing }
+          : null;
+      }),
+
+    /**
      * Brings a Character into play from Limbo, as one Step, and returns
      * what it was told: a welcome, or nothing if it was in play already
      */
@@ -638,8 +940,50 @@ export const startMuaWorld = async (
     /** The entity with this Definition name */
     named: (name: string) => serial(() => named(name)),
 
+    /**
+     * Makes a builder's thing from a composition of components and places
+     * it where their Character stands, as one Step (#258). Whether it may
+     * be placed is the `build` Service Script's to decide. The thing
+     * records its Maker in `made_by`. Returns the thing and the Account's
+     * count after it; a refusal throws a `MuaWorldError` with its text, and
+     * writes nothing.
+     */
+    place: (account: Eid, character: Eid, composition: unknown) =>
+      serial(() => {
+        owns(account, character);
+        inPlay(character);
+        return building(s => placeThing(s, character, composition));
+      }),
+
     /** Limbo, the system actor and the Starting room */
     places,
+
+    /**
+     * Stores or destroys the placed thing a Character has open to edit, as
+     * the `store` and `destroy` Verbs do, as one Step (#284). The thing must
+     * be the one the `edit` Verb opened, and still within reach, as for
+     * `edit`. Returns the Account's count after it.
+     */
+    putAway: (
+      account: Eid,
+      character: Eid,
+      eid: Eid,
+      verb: 'destroy' | 'store'
+    ) =>
+      serial(async () => {
+        owns(account, character);
+        inPlay(character);
+        editingThis(character, eid);
+        await building(s =>
+          buildEdit(s, character, verb, [talk.handle(eid).value])
+        );
+        return {
+          eid,
+          maxPlaced: get(store, account, 'builder')?.max_placed as
+            number | undefined,
+          placed: placedBy(account)
+        };
+      }),
 
     /**
      * Resets a place, as its `reset` timer does, as one Step: puts back
@@ -652,14 +996,26 @@ export const startMuaWorld = async (
         return resultOf(s => resetPlace(s, place));
       }),
 
+    /** Closes the thing a Character has open to edit, if any, as one Step */
+    stopEditing: (account: Eid, character: Eid) =>
+      serial(async () => {
+        owns(account, character);
+        await resultOf(() => remove(store, character, 'editing'));
+      }),
+
     store,
 
     /**
      * Calls `fn` with each line of the Character's output from now on,
-     * after any notices left from before a restart. Returns a function
-     * that stops it.
+     * after any notices left from before a restart, and `onEditing` after
+     * each Step that changed what it has open to edit. Returns a function
+     * that stops both.
      */
-    subscribe: (character: Eid, fn: (text: string) => void) =>
+    subscribe: (
+      character: Eid,
+      fn: (text: string) => void,
+      { onEditing }: Listener = {}
+    ) =>
       serial(() => {
         store.db.exec('BEGIN IMMEDIATE');
         const left = takeNotices(store, character);
@@ -670,8 +1026,16 @@ export const startMuaWorld = async (
         const set = subscribers.get(character) ?? new Set();
         set.add(fn);
         subscribers.set(character, set);
+        const editors = editingListeners.get(character) ?? new Set();
+        if (onEditing) {
+          editors.add(onEditing);
+          editingListeners.set(character, editors);
+        }
         return () => {
           set.delete(fn);
+          if (onEditing) {
+            editors.delete(onEditing);
+          }
         };
       }),
 
