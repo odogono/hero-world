@@ -16,3 +16,9 @@ export {
   type Patch
 } from './host/world';
 export type { View } from './host/view';
+export {
+  mirrorComponents,
+  type MirrorRow,
+  type MirrorSnapshot
+} from './host/mirror';
+export { perceptionOf, type Perception } from './host/perception';

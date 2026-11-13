@@ -37,6 +37,20 @@ describe('Accounts and Characters', () => {
     expect(mua.command(other, bob!.id, 'look')).rejects.toThrow('not_owner');
   });
 
+  test('gives a mirror only of an owned Character in play (#291)', async () => {
+    const mua = await start('lifecycle.edl');
+    const account = await mua.createAccount();
+    const bob = await mua.createCharacter(account, 'bob');
+    expect(mua.mirror(account, bob)).rejects.toThrow('not_in_play');
+    await mua.enter(account, bob);
+    const other = await mua.createAccount();
+    expect(mua.mirror(other, bob)).rejects.toThrow('not_owner');
+    expect(await mua.mirror(account, bob)).toMatchObject({
+      character: bob,
+      place: mua.places.startingRoom
+    });
+  });
+
   test('a Character that leaves returns to the room it left', async () => {
     const mua = await start('lifecycle.edl');
     const bob = await join_(mua, 'bob');

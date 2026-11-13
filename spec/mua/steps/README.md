@@ -31,6 +31,7 @@ Language-neutral cases for what a Command does, Actions and all (ADR 0024). `pac
   - **`{"as": name, "type": line, "told"?: [...], "heard"?: {...}}`**: the Character types a line. `told` is what the Command replies, one entry per message, word for word.
   - **`{"advance": seconds, "heard"?: {...}}`**: runs the World on, one tick per second of World time.
   - **`{"where": {thing: place}}`**: what holds each thing. Both are labels: a Character's join name, or anything else's Definition name.
+  - **`{"mirror": name, "place": label, "sees": {...}}`**: the Character's mirror snapshot (`MuaWorld.mirror/3`, ADR 0019): its place, and each entity it perceives with the fields of its shown components. Entities and the ids in `location.in` and `portal.door` are labels. An exit with no Definition name is its place's label and its direction, as `"hall north"`.
 - **`heard`**: the lines each Character was sent since the last step, by label. It leaves out the typer's echo of what it was `told`. A Character not listed must have heard nothing.
 
 To write a case, give its steps without `told` or `heard` and run the Elixir runner with `MUA_STEPS_RECORD=1`. It prints what each step gave. Check every line before copying it in: a case pins what the World does now.

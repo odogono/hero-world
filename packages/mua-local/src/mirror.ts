@@ -1,4 +1,4 @@
-import { components } from 'mua-world';
+import { components, type MirrorRow, type MirrorSnapshot } from 'mua-world';
 import type { CreateDatabaseOptions } from 'odgn-ecs/db';
 import {
   components as componentsOf,
@@ -10,15 +10,8 @@ import {
 } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
-/** A row in the shared layout (ADR 0019): a component's fields and its `eid` */
-export type MirrorRow = Record<string, unknown> & { eid: Eid };
-
-/** The server's `mirror` message (packages/mua_server/docs/protocol.md) */
-export type MirrorSnapshot = {
-  character: Eid;
-  components: Record<string, MirrorRow[]>;
-  place: Eid | null;
-};
+/** The server's `mirror` message, as both Hosts give it (#291) */
+export type { MirrorRow, MirrorSnapshot };
 
 /** The server's `changes` message, after a Step */
 export type MirrorChangeSet = {

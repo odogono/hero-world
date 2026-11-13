@@ -48,6 +48,8 @@ import {
   type Question
 } from './dispatch';
 import { TIMERS_SCRIPT, armLifecycle, rearm, recordHomes } from './lifecycle';
+import { mirrorSnapshot } from './mirror';
+import { perceptionOf } from './perception';
 import { destination, ensurePlaces } from './places';
 import {
   abandonWaiting,
@@ -1058,6 +1060,22 @@ export const startMuaWorld = async (
           throw new MuaWorldError('not_in_play');
         }
         return viewFor(store, character, location(store, character));
+      }),
+
+    /**
+     * A mirror of what a Character perceives, as `MuaWorld.mirror/3` gives
+     * it, for Try it (#259, #291). A Local World runs in the same Worker as
+     * its client, so a snapshot on demand is all it needs: no change sets
+     * follow. Refused as `view` is.
+     */
+    mirror: (account: Eid, character: Eid) =>
+      serial(() => {
+        owns(account, character);
+        const place = location(store, character);
+        if (place === limbo) {
+          throw new MuaWorldError('not_in_play');
+        }
+        return mirrorSnapshot(store, perceptionOf(store, character, place));
       }),
 
     /** World time, in milliseconds */
