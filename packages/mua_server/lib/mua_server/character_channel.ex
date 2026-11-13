@@ -103,6 +103,29 @@ defmodule MuaServer.CharacterChannel do
     end
   end
 
+  # Storing or destroying the placed thing the `edit` Verb opened, from
+  # the composer, as the `store` and `destroy` Verbs do (#284)
+  def handle_in(verb, payload, socket) when verb in ["store", "destroy"] do
+    %{account: account, character: character} = socket.assigns
+
+    case Protocol.thing(payload) do
+      {:ok, %{eid: eid, ref: ref}} ->
+        run = fn -> MuaWorld.put_away(@world, account, character, eid, verb) end
+
+        case Connection.run(character, self(), run) do
+          {:ok, done} ->
+            send(self(), :refresh)
+            {:reply, {:ok, Map.put(done, :ref, ref)}, socket}
+
+          {:error, reason} ->
+            {:reply, {:error, %{ref: ref, reason: to_string(reason)}}, socket}
+        end
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  end
+
   # Closing the composer without saving
   def handle_in("stop_editing", _payload, socket) do
     %{account: account, character: character} = socket.assigns
@@ -166,6 +189,11 @@ defmodule MuaServer.CharacterChannel do
 
   def handle_info(:refresh, socket), do: {:noreply, refresh(socket)}
 
+  # A Step changed what the Character has open to edit, as when someone
+  # stores or destroys it (#284)
+  def handle_info({:mua_editing, character}, %{assigns: %{character: character}} = socket),
+    do: {:noreply, push_compose(socket)}
+
   # Another Connection took the Character over: this one may not command it
   def handle_info({:replaced, character}, %{assigns: %{character: character}} = socket) do
     MuaWorld.unsubscribe(@world, character)
@@ -186,7 +214,8 @@ defmodule MuaServer.CharacterChannel do
   end
 
   # The thing the `edit` Verb opened, once each time it changes, so the
-  # client opens it in the composer (#274). A rejoin opens it again.
+  # client opens it in the composer (#274). A rejoin opens it again. When
+  # it closes in the World, the client is told `closed` (#284).
   defp push_compose(socket) do
     %{account: account, character: character} = socket.assigns
 
@@ -198,8 +227,13 @@ defmodule MuaServer.CharacterChannel do
         assign(socket, :composing, eid)
 
       _ ->
+        if eid = socket.assigns[:composing],
+          do: push(socket, "closed", Protocol.closed(eid))
+
         assign(socket, :composing, nil)
     end
+  catch
+    :exit, {:timeout, _} -> socket
   end
 
   defp push_view(socket) do

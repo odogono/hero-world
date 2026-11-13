@@ -104,6 +104,12 @@ export const connect = (token: string, character: number) => {
   channel.on('compose', (opened: Editing) => {
     editing.value = opened;
   });
+  // the World closed it, as when someone stored or destroyed it (#284)
+  channel.on('closed', ({ eid }: { eid: number }) => {
+    if (editing.value?.eid === eid) {
+      editing.value = null;
+    }
+  });
   channel.on('state', ({ actions: next }: State) => {
     actions.value = next ?? [];
   });
@@ -341,6 +347,46 @@ export const saveEdit = (eid: number, patch: Patch) =>
         resolve({
           ok: false,
           reason: 'No answer from the World yet: it may have been saved.'
+        })
+      );
+  });
+
+/** What the Composer can do to the placed thing it has open, besides save */
+export type PutAway = 'destroy' | 'store';
+
+let putAways = 0;
+
+/**
+ * Stores or destroys the placed thing the `edit` Verb opened, as the
+ * `store` and `destroy` Verbs do (#284). The World checks it all; done, it
+ * closes the thing, and refused, it leaves it open.
+ */
+export const putAway = (eid: number, verb: PutAway) =>
+  new Promise<Saved>(resolve => {
+    if (!channel || status.value !== 'joined' || !socket?.isConnected()) {
+      resolve({ ok: false, reason: "You aren't connected." });
+      return;
+    }
+    channel
+      .push(verb, { eid, ref: `${verb}-${++putAways}` })
+      .receive('ok', (reply: Pick<Builder, 'max_placed' | 'placed'>) => {
+        editing.value = null;
+        if (builder.value) {
+          builder.value = {
+            ...builder.value,
+            max_placed: reply.max_placed,
+            placed: reply.placed
+          };
+        }
+        resolve({ ok: true });
+      })
+      .receive('error', ({ reason }: { reason: string }) =>
+        resolve({ ok: false, reason })
+      )
+      .receive('timeout', () =>
+        resolve({
+          ok: false,
+          reason: 'No answer from the World yet: it may have been done.'
         })
       );
   });

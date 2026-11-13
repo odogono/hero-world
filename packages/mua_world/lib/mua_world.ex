@@ -197,6 +197,18 @@ defmodule MuaWorld do
   def edit(world, account, character, eid, patch),
     do: GenServer.call(world, {:edit, account, character, eid, patch}, 30_000)
 
+  @doc """
+  Stores or destroys the placed thing a Character has open to edit, as the
+  `store` and `destroy` Verbs do, as one Step (#284). `verb` is `"store"`
+  or `"destroy"`. The thing must be the one the `edit` Verb opened, and
+  still within reach, as for `edit/5`.
+
+  Returns `{:ok, %{eid, placed, max_placed}}`, the Account's count after
+  it, or `{:error, reason}` with nothing written, as `edit/5` does.
+  """
+  def put_away(world, account, character, eid, verb) when verb in ["store", "destroy"],
+    do: GenServer.call(world, {:put_away, account, character, eid, verb}, 30_000)
+
   @doc "Closes the thing a Character has open to edit, if any, as one Step."
   def stop_editing(world, account, character),
     do: GenServer.call(world, {:stop_editing, account, character}, 30_000)
@@ -268,7 +280,8 @@ defmodule MuaWorld do
   Sends the calling process `{:mua, character, line}` for each line of the
   Character's output, from now on: its text, or `%{text, suggestions}` when
   it offers Suggestions. Notices left from before a restart come
-  first.
+  first. It is also sent `{:mua_editing, character}` after a Step that
+  changed what the Character has open to edit, for `editing/3` to read.
   """
   def subscribe(world, character), do: GenServer.call(world, {:subscribe, character, self()})
 
@@ -477,10 +490,21 @@ defmodule MuaWorld do
   defp on_step(state, {:ok, %{output: lines, changes: changes}}) do
     publish(state.table, lines)
     publish_changes(state, changes)
+    publish_editing(state.table, changes)
   end
 
   # notices queued by the Step's Scripts went with it
   defp on_step(state, {:error, _}), do: Talk.take_notices(state.table)
+
+  # A Character whose `editing` the Step changed, such as by storing or
+  # destroying the thing it had open (#284), so its composer can follow
+  defp publish_editing(table, changes) do
+    for {character, "editing", _op, _data} <- changes,
+        pid <- subscribers(table, character),
+        do: send(pid, {:mua_editing, character})
+
+    :ok
+  end
 
   # Each mirrored Character with subscribers is sent what changed in its
   # Perception, which is then kept for the next Step. A Character the Step
@@ -691,6 +715,23 @@ defmodule MuaWorld do
          :ok <- in_play(state, character),
          :ok <- editing_this(state, character, eid) do
       reply_result(advance_clock(state), &save_edit(&1, character, eid, patch))
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:put_away, account, character, eid, verb}, _from, state) do
+    with :ok <- owns(state, account, character),
+         :ok <- in_play(state, character),
+         :ok <- editing_this(state, character, eid) do
+      reply_result(advance_clock(state), fn state ->
+        with {:ok, _} <- build(state, character, verb, [OdgnEcsTalk.handle(state.talk, eid)]) do
+          builder = OdgnEcs.get(state.world, account, "builder") || %{}
+
+          {:ok,
+           %{eid: eid, placed: placed(state.world, account), max_placed: builder["max_placed"]}}
+        end
+      end)
     else
       error -> {:reply, error, state}
     end
@@ -1252,23 +1293,31 @@ defmodule MuaWorld do
         do: {name, data}
   end
 
-  # An edit to a placed thing, which the `build` Service checks and writes,
-  # in a savepoint released only if it did, as `place_thing/3` does
+  # An edit to a placed thing, which the `build` Service checks and writes
   defp save_edit(state, actor, thing, patch) do
-    world = state.world
     talk = state.talk
-    :ok = OdgnEcs.savepoint(world, "mua_edit")
+
+    args = [
+      OdgnEcsTalk.handle(talk, thing),
+      OdgnEcsTalk.Values.to_value(patch),
+      OdgnEcsTalk.Values.to_value(composition(state.world, thing))
+    ]
+
+    with {:ok, _} <- build(state, actor, "save", args), do: {:ok, %{eid: thing}}
+  end
+
+  # Sends `message args…, actor` to the `build` Service, in a savepoint
+  # released only if it replied text, which the actor is told, as
+  # `place_thing/3` does. A refusal, or a Script that fails, writes nothing.
+  defp build(state, actor, message, args) do
+    world = state.world
+    :ok = OdgnEcs.savepoint(world, "mua_build")
 
     {:ok, pending} =
       OdgnEcsEngine.deliver(state.step, %Delivery{
         to: {:service, "build"},
-        message: "save",
-        args: [
-          OdgnEcsTalk.handle(talk, thing),
-          OdgnEcsTalk.Values.to_value(patch),
-          OdgnEcsTalk.Values.to_value(composition(world, thing)),
-          OdgnEcsTalk.handle(talk, actor)
-        ],
+        message: message,
+        args: args ++ [OdgnEcsTalk.handle(state.talk, actor)],
         asks: :request
       })
 
@@ -1277,13 +1326,13 @@ defmodule MuaWorld do
     if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
 
     case edited_reply(outcome) do
-      {:ok, message} ->
-        :ok = OdgnEcs.release(world, "mua_edit")
-        tell(state, actor, message)
-        {:ok, %{eid: thing}}
+      {:ok, text} ->
+        :ok = OdgnEcs.release(world, "mua_build")
+        tell(state, actor, text)
+        {:ok, text}
 
       {:error, reason} ->
-        :ok = OdgnEcs.rollback_to(world, "mua_edit")
+        :ok = OdgnEcs.rollback_to(world, "mua_build")
         {:error, reason}
     end
   end

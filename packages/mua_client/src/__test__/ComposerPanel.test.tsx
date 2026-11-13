@@ -15,7 +15,7 @@ import {
 } from '@testing-library/preact';
 
 import { ComposerPanel } from '../composer/ComposerPanel';
-import type { Patch, Placed, Saved } from '../connection';
+import type { Patch, Placed, PutAway, Saved } from '../connection';
 import type { PreviewClient } from '../preview/client';
 import type { Editing } from '../store';
 
@@ -301,9 +301,12 @@ const LAMP: Editing = {
 
 const editSetup = async (
   save: (eid: number, patch: Patch) => Promise<Saved> = () =>
+    Promise.resolve({ ok: true }),
+  putAway: (eid: number, verb: PutAway) => Promise<Saved> = () =>
     Promise.resolve({ ok: true })
 ) => {
   const fake = fakeClient();
+  const putAways: [number, PutAway][] = [];
   const saves: [number, Patch][] = [];
   const declined: (string | undefined)[] = [];
   let saved = 0;
@@ -316,6 +319,10 @@ const editSetup = async (
       onDecline={keeping => declined.push(keeping)}
       onSaved={() => saved++}
       place={() => Promise.resolve({ eid: 99, ok: true })}
+      putAway={(eid, verb) => {
+        putAways.push([eid, verb]);
+        return putAway(eid, verb);
+      }}
       save={(eid, patch) => {
         saves.push([eid, patch]);
         return save(eid, patch);
@@ -329,6 +336,7 @@ const editSetup = async (
     ...fake,
     declined,
     open: (editing: Editing | null) => rerender(panel(editing)),
+    putAways,
     saved: () => saved,
     saves
   };
@@ -452,5 +460,55 @@ describe('editing a placed thing (#275)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Editing the lamp' })
     ).toBeTruthy();
+  });
+});
+
+describe('storing and destroying from the Composer (#284)', () => {
+  test('Store puts the thing away and closes the Composer', async () => {
+    const { putAways, saved } = await editSetup();
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }));
+    await waitFor(() => expect(saved()).toBe(1));
+    expect(putAways).toEqual([[42, 'store']]);
+  });
+
+  test('Destroy asks first, and Keep it sends nothing', async () => {
+    const { putAways, saved } = await editSetup();
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy' }));
+    const ask = screen.getByRole('group', { name: 'Destroy it?' });
+    expect(ask.textContent).toContain('Destroy the satchel?');
+    expect(putAways).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(screen.queryByRole('group', { name: 'Destroy it?' })).toBeNull();
+    expect(putAways).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy it' }));
+    await waitFor(() => expect(saved()).toBe(1));
+    expect(putAways).toEqual([[42, 'destroy']]);
+  });
+
+  test("a refused Destroy shows the World's reason, and stays open", async () => {
+    const { saved } = await editSetup(undefined, () =>
+      Promise.resolve({
+        ok: false,
+        reason: 'The satchel holds things: empty it first.'
+      })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy it' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Not destroyed: The satchel holds things: empty it first.'
+    );
+    expect(saved()).toBe(0);
+    expect(
+      screen.getByRole('heading', { name: 'Editing the satchel' })
+    ).toBeTruthy();
+  });
+
+  test('a new thing has neither', async () => {
+    await setup();
+    expect(screen.queryByRole('button', { name: 'Store' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Destroy' })).toBeNull();
   });
 });

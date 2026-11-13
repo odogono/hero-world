@@ -250,6 +250,84 @@ defmodule MuaServer.CharacterChannelTest do
       assert MuaWorld.editing(@world, ada.account, ada.character) == {:ok, nil}
     end
 
+    # a placed thing with a word of its own, since the World is shared
+    # across tests, and the word
+    defp place_own(chan, name, more \\ %{}) do
+      word = "#{String.downcase(name)}#{System.unique_integer([:positive])}"
+
+      composition =
+        Map.merge(
+          %{
+            "described" => %{"name" => name, "description" => "A #{name}."},
+            "noun" => %{"words" => [word]},
+            "item" => %{}
+          },
+          more
+        )
+
+      ref = push(chan, "place", %{"composition" => composition})
+      assert_reply(ref, :ok, %{eid: eid})
+      {eid, word}
+    end
+
+    defp open(chan, word, eid) do
+      ref = push(chan, "command", %{"text" => "edit #{word}"})
+      assert_reply(ref, :ok, _)
+      assert_push("compose", %{eid: ^eid})
+      flush_pushes()
+    end
+
+    test "the composer stores and destroys the thing it has open (#284)", %{ada: ada} do
+      :ok = MuaWorld.set_component(@world, ada.account, "builder", %{"max_placed" => 100})
+      a = join_as(ada)
+      {kettle, word} = place_own(a, "Kettle")
+      open(a, word, kettle)
+
+      ref = push(a, "store", %{"eid" => kettle, "ref" => "s1"})
+      assert_reply(ref, :ok, %{ref: "s1", eid: ^kettle, placed: placed, max_placed: 100})
+      assert_push("output", %{lines: ["You put away the kettle."]})
+      assert MuaWorld.component(@world, kettle, "location")["in"] == MuaWorld.places(@world).limbo
+      assert MuaWorld.editing(@world, ada.account, ada.character) == {:ok, nil}
+
+      {box, word} = place_own(a, "Box", %{"container" => %{"capacity" => 3}})
+      {cup, _} = place_own(a, "Cup")
+      room = MuaWorld.component(@world, ada.character, "location")
+      open(a, word, box)
+
+      # a container that holds something stays, and stays open
+      :ok = MuaWorld.set_component(@world, cup, "location", %{"in" => box})
+      ref = push(a, "destroy", %{"eid" => box, "ref" => "d1"})
+      assert_reply(ref, :error, %{ref: "d1", reason: "The box holds things: empty it first."})
+      assert {:ok, %{eid: ^box}} = MuaWorld.editing(@world, ada.account, ada.character)
+
+      :ok = MuaWorld.set_component(@world, cup, "location", room)
+      ref = push(a, "destroy", %{"eid" => box, "ref" => "d2"})
+      assert_reply(ref, :ok, %{ref: "d2", eid: ^box, placed: after_destroy})
+      assert after_destroy == placed + 1
+      assert_push("output", %{lines: ["You unmake the box."]})
+      assert MuaWorld.component(@world, box, "described") == nil
+    end
+
+    test "a thing the World stores or destroys closes in the composer that has it open (#284)",
+         %{ada: ada} do
+      :ok = MuaWorld.set_component(@world, ada.account, "builder", %{"max_placed" => 100})
+      a = join_as(ada)
+      {kettle, word} = place_own(a, "Kettle")
+      open(a, word, kettle)
+
+      # by the Verb, as another builder's would
+      ref = push(a, "command", %{"text" => "destroy #{word}"})
+      assert_reply(ref, :ok, _)
+      assert_push("closed", %{eid: ^kettle})
+      assert MuaWorld.editing(@world, ada.account, ada.character) == {:ok, nil}
+    end
+
+    test "a store without an eid is refused without reaching the World", %{ada: ada} do
+      a = join_as(ada)
+      ref = push(a, "store", %{"eid" => "kettle"})
+      assert_reply(ref, :error, %{reason: "it needs the eid of the thing"})
+    end
+
     test "an edit without an eid and a patch is refused without reaching the World",
          %{ada: ada} do
       a = join_as(ada)
