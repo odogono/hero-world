@@ -36,6 +36,8 @@ Joining brings the Character into play, or resumes control of it, and takes over
 | `store`        | `{eid, ref?}`: the thing the `edit` Verb opened                              | `ok {ref, eid, placed, max_placed}` once it is stored; `error {ref?, reason}`        |
 | `destroy`      | `{eid, ref?}`: the thing the `edit` Verb opened                              | `ok {ref, eid, placed, max_placed}` once it is destroyed; `error {ref?, reason}`     |
 
+A message whose form is wrong, such as a `place` without a composition, is refused with `error {reason}` before the World sees it. The cases in [`spec/mua/protocol`](../../../spec/mua/protocol/README.md) pin each reason, and a Local World's Worker gives the same ones.
+
 A `command` reply of `error {reason: "replaced"}` means another Connection controls the Character.
 
 A `command` reply of `error {reason: "busy"}` means the World is too far behind to take it (#139). The command did nothing, and the client shows it as not sent; it may be sent again.

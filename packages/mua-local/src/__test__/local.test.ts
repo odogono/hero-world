@@ -103,7 +103,7 @@ describe('a Local World', () => {
     await local.receive({ ref: 'b', text: 'x'.repeat(501), type: 'command' });
     expect(events(sent, 'reply')).toEqual([
       { event: 'reply', ok: false, reason: 'not_joined', ref: 'a' },
-      { event: 'reply', ok: false, reason: 'too_long', ref: 'b' }
+      { event: 'reply', ok: false, reason: 'command too long', ref: 'b' }
     ]);
   });
 

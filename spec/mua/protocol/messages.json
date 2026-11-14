@@ -1,0 +1,280 @@
+{
+  "cases": [
+    {
+      "name": "a command is accepted",
+      "send": "command",
+      "payload": {
+        "text": "look",
+        "ref": "c1"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a command's ref may be a whole number",
+      "send": "command",
+      "payload": {
+        "text": "look",
+        "ref": 7
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a command is trimmed before its length is checked",
+      "send": "command",
+      "payload": {
+        "text": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+        "ref": "c2"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a blank command is refused",
+      "send": "command",
+      "payload": {
+        "text": "   "
+      },
+      "reply": {
+        "error": "empty command"
+      }
+    },
+    {
+      "name": "a command over 500 characters is refused",
+      "send": "command",
+      "payload": {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "reply": {
+        "error": "command too long"
+      }
+    },
+    {
+      "name": "a command without text is refused",
+      "send": "command",
+      "payload": {},
+      "reply": {
+        "error": "a command needs text"
+      }
+    },
+    {
+      "name": "a command whose text isn't text is refused",
+      "send": "command",
+      "payload": {
+        "text": 5
+      },
+      "reply": {
+        "error": "a command needs text"
+      }
+    },
+    {
+      "name": "a command's ref must be text or a number",
+      "send": "command",
+      "payload": {
+        "text": "look",
+        "ref": {}
+      },
+      "reply": {
+        "error": "ref must be text or a number"
+      }
+    },
+    {
+      "name": "a command's ref must be a whole number",
+      "send": "command",
+      "payload": {
+        "text": "look",
+        "ref": 1.5
+      },
+      "reply": {
+        "error": "ref must be text or a number"
+      }
+    },
+    {
+      "name": "a place is accepted, whatever the World says to it",
+      "send": "place",
+      "payload": {
+        "composition": {
+          "described": {
+            "name": "Rock"
+          }
+        },
+        "ref": "p1"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a place without a composition is refused",
+      "send": "place",
+      "payload": {
+        "ref": "p2"
+      },
+      "reply": {
+        "error": "a place needs a composition"
+      }
+    },
+    {
+      "name": "a place's composition must be a map",
+      "send": "place",
+      "payload": {
+        "composition": ["described"]
+      },
+      "reply": {
+        "error": "a place needs a composition"
+      }
+    },
+    {
+      "name": "a place's ref must be text or a number",
+      "send": "place",
+      "payload": {
+        "composition": {},
+        "ref": []
+      },
+      "reply": {
+        "error": "ref must be text or a number"
+      }
+    },
+    {
+      "name": "an edit is accepted, whatever the World says to it",
+      "send": "edit",
+      "payload": {
+        "eid": 999999,
+        "patch": {},
+        "ref": "e1"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "an edit without an eid is refused",
+      "send": "edit",
+      "payload": {
+        "patch": {}
+      },
+      "reply": {
+        "error": "an edit needs an eid and a patch"
+      }
+    },
+    {
+      "name": "an edit's eid must be a whole number",
+      "send": "edit",
+      "payload": {
+        "eid": "1",
+        "patch": {}
+      },
+      "reply": {
+        "error": "an edit needs an eid and a patch"
+      }
+    },
+    {
+      "name": "an edit without a patch is refused",
+      "send": "edit",
+      "payload": {
+        "eid": 1,
+        "ref": "e2"
+      },
+      "reply": {
+        "error": "an edit needs an eid and a patch"
+      }
+    },
+    {
+      "name": "an edit's patch must be a map",
+      "send": "edit",
+      "payload": {
+        "eid": 1,
+        "patch": []
+      },
+      "reply": {
+        "error": "an edit needs an eid and a patch"
+      }
+    },
+    {
+      "name": "an edit's ref must be text or a number",
+      "send": "edit",
+      "payload": {
+        "eid": 1,
+        "patch": {},
+        "ref": true
+      },
+      "reply": {
+        "error": "ref must be text or a number"
+      }
+    },
+    {
+      "name": "a store is accepted, whatever the World says to it",
+      "send": "store",
+      "payload": {
+        "eid": 999999,
+        "ref": "s1"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a store without an eid is refused",
+      "send": "store",
+      "payload": {},
+      "reply": {
+        "error": "it needs the eid of the thing"
+      }
+    },
+    {
+      "name": "a store's eid must be a whole number",
+      "send": "store",
+      "payload": {
+        "eid": 1.5
+      },
+      "reply": {
+        "error": "it needs the eid of the thing"
+      }
+    },
+    {
+      "name": "a store's ref may be null",
+      "send": "store",
+      "payload": {
+        "eid": 1,
+        "ref": null
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a destroy is accepted, whatever the World says to it",
+      "send": "destroy",
+      "payload": {
+        "eid": 999999,
+        "ref": "d1"
+      },
+      "reply": "accepted"
+    },
+    {
+      "name": "a destroy without an eid is refused",
+      "send": "destroy",
+      "payload": {
+        "ref": "d2"
+      },
+      "reply": {
+        "error": "it needs the eid of the thing"
+      }
+    },
+    {
+      "name": "a destroy's ref must be text or a number",
+      "send": "destroy",
+      "payload": {
+        "eid": 1,
+        "ref": {}
+      },
+      "reply": {
+        "error": "ref must be text or a number"
+      }
+    },
+    {
+      "name": "closing the Composer is accepted with nothing open",
+      "send": "stop_editing",
+      "payload": {},
+      "reply": "accepted"
+    },
+    {
+      "name": "closing the Composer ignores a bad ref",
+      "send": "stop_editing",
+      "payload": {
+        "ref": {}
+      },
+      "reply": "accepted"
+    }
+  ]
+}
