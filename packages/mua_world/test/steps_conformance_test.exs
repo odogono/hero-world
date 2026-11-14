@@ -23,13 +23,27 @@ defmodule MuaWorld.StepsConformanceTest do
     end
   end
 
+  # What a step does, by the key that names it. Each of the Composer's
+  # (`place`, `save`, `store`, `destroy`, `close`) comes with an `as`
+  @kinds ["type", "advance", "mirror", "where", "place", "save", "store", "destroy", "close"]
+
+  # A `join` entry: a name, or `{name, builder}` for a Character whose
+  # Account builds with those permissions and limits
+  defp join_as(world, %{"name" => name} = j) do
+    eid = join(world, name)
+    :ok = MuaWorld.set_component(world, account(eid), "builder", j["builder"] || %{})
+    {name, eid}
+  end
+
+  defp join_as(world, name), do: {name, join(world, name)}
+
   defp record?, do: System.get_env("MUA_STEPS_RECORD") == "1"
 
   defp run_case(spec, c, dir) do
     world =
       start(Path.join(@spec_dir, spec["edl"]), dir, starting_room: spec["starting_room"])
 
-    characters = for name <- c["join"], into: %{}, do: {name, join(world, name)}
+    characters = for j <- c["join"], into: %{}, do: join_as(world, j)
     # what joining told everyone is not the case's
     for {_, eid} <- characters, do: received(eid)
 
@@ -42,7 +56,7 @@ defmodule MuaWorld.StepsConformanceTest do
 
       if record?() do
         IO.puts(
-          JSON.encode!(Map.merge(Map.take(step, ["as", "type", "advance", "mirror"]), actual))
+          JSON.encode!(Map.merge(Map.take(step, ["as" | @kinds] ++ ["patch", "label"]), actual))
         )
       else
         check(step, actual)
@@ -54,6 +68,38 @@ defmodule MuaWorld.StepsConformanceTest do
     {:ok, told} = MuaWorld.command(world, account(characters[name]), characters[name], text)
     told = Enum.map(told, &as_spec/1)
     %{"told" => told, "heard" => heard(characters, {name, told})}
+  end
+
+  # The Composer's requests: what the actor was sent, its refusal if any,
+  # and the Account's count of placed things when the reply gives one
+  defp run_step(world, characters, %{"as" => name, "place" => composition} = step) do
+    who = characters[name]
+    result = MuaWorld.place(world, account(who), who, composition)
+
+    with {:ok, %{eid: thing}} <- result,
+         label when is_binary(label) <- step["label"],
+         do: Process.put(:labels, Map.put(Process.get(:labels, %{}), label, thing))
+
+    composed(characters, name, result)
+  end
+
+  defp run_step(world, characters, %{"as" => name, "save" => thing, "patch" => patch}) do
+    who = characters[name]
+    thing = eid(world, characters, thing)
+    composed(characters, name, MuaWorld.edit(world, account(who), who, thing, patch))
+  end
+
+  defp run_step(world, characters, %{"as" => name} = step)
+       when is_map_key(step, "store") or is_map_key(step, "destroy") do
+    who = characters[name]
+    verb = if Map.has_key?(step, "store"), do: "store", else: "destroy"
+    thing = eid(world, characters, step[verb])
+    composed(characters, name, MuaWorld.put_away(world, account(who), who, thing, verb))
+  end
+
+  defp run_step(world, characters, %{"as" => name, "close" => true}) do
+    who = characters[name]
+    composed(characters, name, MuaWorld.stop_editing(world, account(who), who))
   end
 
   defp run_step(world, characters, %{"advance" => seconds}) do
@@ -80,6 +126,18 @@ defmodule MuaWorld.StepsConformanceTest do
     }
   end
 
+  defp composed(characters, name, result) do
+    told = Enum.map(received(characters[name]), &as_spec/1)
+    actual = %{"told" => told, "heard" => heard(characters, nil)}
+
+    case result do
+      {:ok, %{placed: placed, max_placed: max}} -> Map.put(actual, "placed", [placed, max])
+      {:ok, _} -> actual
+      :ok -> actual
+      {:error, why} when is_binary(why) -> Map.put(actual, "refused", why)
+    end
+  end
+
   # Every Character's lines since the last step, for those given any. The
   # typer's subscription also hears what it was told, which `told` has, so
   # those lines are left out of its own
@@ -97,8 +155,9 @@ defmodule MuaWorld.StepsConformanceTest do
   end
 
   # A line as the cases write it: a Picture by its `src`, whose URL
-  # changes with the file
+  # changes with the file, and a line that offers Suggestions with them
   defp as_spec(%{picture: %{src: src}}), do: %{"picture" => src}
+  defp as_spec(%{text: text, suggestions: s}), do: %{"text" => text, "suggestions" => s}
   defp as_spec(line), do: line
 
   defp check(%{"where" => where}, actual), do: assert(actual["where"] == where)
@@ -107,11 +166,23 @@ defmodule MuaWorld.StepsConformanceTest do
     do: assert(actual == Map.take(step, ["place", "sees"]), "#{name}: mirror")
 
   defp check(step, actual) do
-    if Map.has_key?(step, "told"),
-      do: assert(actual["told"] == step["told"], "#{step["type"]}: told")
+    what = what(step)
 
-    assert actual["heard"] == Map.get(step, "heard", %{}),
-           "#{step["type"] || "advance"}: heard"
+    if Map.has_key?(step, "told"),
+      do: assert(actual["told"] == step["told"], "#{what}: told")
+
+    assert actual["refused"] == step["refused"], "#{what}: refused"
+
+    if Map.has_key?(step, "placed"),
+      do: assert(actual["placed"] == step["placed"], "#{what}: placed")
+
+    assert actual["heard"] == Map.get(step, "heard", %{}), "#{what}: heard"
+  end
+
+  # A step as its failures name it: its kind and what it names
+  defp what(step) do
+    kind = Enum.find(@kinds, &Map.has_key?(step, &1))
+    "#{step["as"]} #{kind} #{inspect(step[kind])}"
   end
 
   # A mirror snapshot as `%{"place" => label, "sees" => %{label => rows}}`:
@@ -158,14 +229,18 @@ defmodule MuaWorld.StepsConformanceTest do
   defp mirror_ref("portal", "door", value, label) when value != nil, do: label.(value)
   defp mirror_ref(_, _, value, _), do: value
 
-  # A Character by its join name, or anything else by its Definition name
+  # A Character by its join name, a placed thing by the `label` its `place`
+  # step gave it, or anything else by its Definition name
   defp eid(world, characters, name),
-    do: characters[name] || MuaWorld.named(world, name) || flunk("No entity #{name}")
+    do:
+      characters[name] || Process.get(:labels, %{})[name] || MuaWorld.named(world, name) ||
+        flunk("No entity #{name}")
 
   # A Character's join name, or anything else's Definition name, looked up
   # among the names the case uses
   defp label(world, characters, eid) do
     Enum.find_value(characters, fn {name, e} -> e == eid && name end) ||
+      Enum.find_value(Process.get(:labels, %{}), fn {name, e} -> e == eid && name end) ||
       Process.get(:names, [])
       |> Enum.find(&(MuaWorld.named(world, &1) == eid))
   end
