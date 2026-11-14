@@ -54,30 +54,23 @@ defmodule MuaWorld.RequestTest do
   end
 
   # Asks the probe `message` about the thing in one Step, reading text as
-  # accepted, and returns what `ask/3` did and every mark in the World
+  # accepted, and returns what `ask/2` did and every mark in the World
   # after the Step's commit
   defp ask(message, setup \\ fn _ -> :ok end) do
     {engine, thing} = engine()
 
     {{:ok, %{result: result}}, engine} =
       OdgnEcsEngine.step(engine, fn step ->
-        Request.ask(
-          step,
-          fn ->
-            with :ok <- setup.(step) do
-              {:ok,
-               %Delivery{
-                 to: {:service, "probe"},
-                 message: message,
-                 args: [OdgnEcsTalk.handle(step.talk, thing)]
-               }}
-            end
-          end,
-          fn
-            text when is_binary(text) -> {:ok, text}
-            _ -> :error
+        Request.ask(step, fn ->
+          with :ok <- setup.(step) do
+            {:ok,
+             %Delivery{
+               to: {:service, "probe"},
+               message: message,
+               args: [OdgnEcsTalk.handle(step.talk, thing)]
+             }, &read/1}
           end
-        )
+        end)
       end)
 
     marks =
@@ -87,7 +80,10 @@ defmodule MuaWorld.RequestTest do
     {result, marks}
   end
 
-  describe "ask/3" do
+  defp read(text) when is_binary(text), do: {:ok, text}
+  defp read(_), do: :error
+
+  describe "ask/2" do
     test "an accepted reply keeps what the Script did" do
       assert ask("accept") == {{:ok, "Done."}, [%{"n" => 1}]}
     end

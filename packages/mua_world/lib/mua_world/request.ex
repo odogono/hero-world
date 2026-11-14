@@ -6,7 +6,7 @@ defmodule MuaWorld.Request do
   never replies says no too. What any other reply means is for whoever
   asked to read.
 
-  `ask/3` asks within a Step, all or nothing. Dispatch asks its own way
+  `ask/2` asks within a Step, all or nothing. Dispatch asks its own way
   (`OdgnEcsEngine.ask/4`), since a command's Run may answer in a later
   Step, and reads the reply with `reply/1`.
   """
@@ -21,9 +21,13 @@ defmodule MuaWorld.Request do
   was accepted.
 
   `setup` runs first, inside the same savepoint, and returns `{:ok,
-  delivery}` or anything else to give up. `read` gets an accepted reply's
+  delivery, read}`, or anything else to give up. Made there, `read` can
+  see what setup made, such as a new entity. It gets an accepted reply's
   value and returns `{:ok, result}`, or anything else for a reply it
-  can't read. A Run still waiting is abandoned.
+  can't read. A Run still waiting is abandoned: nothing waits for its
+  reply, but the Run carries on, so what it changes once it wakes is
+  kept (#321). A caller that can replace the Script, as the admin line
+  does, ends the Run with it.
 
   Returns `{:ok, result}`, `{:refused, text}`, or `{:failed, why}`, where
   `why` is what setup returned, the Run's outcome (`:waiting` or `{:failed,
@@ -31,11 +35,14 @@ defmodule MuaWorld.Request do
   failure and a malformed reply are logged; the caller words what the
   player is told.
   """
-  def ask(%Step{world: world} = step, setup, read) do
+  def ask(%Step{world: world} = step, setup) do
     OdgnEcs.in_savepoint(world, "mua_request", fn ->
       case setup.() do
-        {:ok, %Delivery{} = delivery} -> request(step, %{delivery | asks: :request}, read)
-        other -> {:failed, other}
+        {:ok, %Delivery{} = delivery, read} when is_function(read, 1) ->
+          request(step, %{delivery | asks: :request}, read)
+
+        other ->
+          {:failed, other}
       end
     end)
   end
