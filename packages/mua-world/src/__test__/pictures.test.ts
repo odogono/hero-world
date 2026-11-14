@@ -1,7 +1,7 @@
 // A place's Picture (ADR 0027), as mua_world's test/gameplay/pictures_test.exs
 // has it: shown just before its description, and checked against the
 // Pictures the World's files were bundled with
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
@@ -20,20 +20,13 @@ const REPO = join(import.meta.dir, '../../../..');
 const SCRIPTS = join(REPO, 'packages/mua-scripts');
 const MAIN = join(REPO, 'packages/mua_world/priv/edl/main.edl');
 
-const PICTURES: PictureUrls = {
-  'pictures/boatyard.png': pictureUrl(
-    'pictures/boatyard.png',
-    'bbbbbbbbbbbbbbbb'
-  ),
-  'pictures/harbour_steps.png': pictureUrl(
-    'pictures/harbour_steps.png',
-    'aaaaaaaaaaaaaaaa'
-  ),
-  'pictures/headland.png': pictureUrl(
-    'pictures/headland.png',
-    'cccccccccccccccc'
-  )
-};
+// Every Picture beside the main World's EDL, each with a made-up hash
+const PICTURES: PictureUrls = Object.fromEntries(
+  readdirSync(join(MAIN, '../pictures')).map(file => [
+    `pictures/${file}`,
+    pictureUrl(`pictures/${file}`, 'aaaaaaaaaaaaaaaa')
+  ])
+);
 
 const start = async (pictures?: PictureUrls) => {
   const world = await createWorld(components, { type: DatabaseType.BUN });

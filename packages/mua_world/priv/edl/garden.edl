@@ -25,6 +25,7 @@ entity garden_path: garden_room fragrant {
     name: "Garden Path"
     description: "A gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end."
   }
+  picture { src: "pictures/garden_path.png" }
   scent { air: "The air is thick with the scent of roses." }
   # The way back south to Hill Lane comes from its `north`
   exits {
@@ -38,6 +39,7 @@ entity orchard: garden_room {
     name: "Orchard"
     description: "Old apple trees lean together over long grass. Windfalls lie where they dropped."
   }
+  picture { src: "pictures/orchard.png" }
   exits { north: $well }
 }
 
@@ -46,6 +48,7 @@ entity well: garden_room {
     name: "Old Well"
     description: "A mossy stone well sits in a clearing, a rope and bucket hanging from its winch."
   }
+  picture { src: "pictures/well.png" }
 }
 
 entity shed: garden_room {
@@ -53,6 +56,7 @@ entity shed: garden_room {
     name: "Garden Shed"
     description: "Shelves of pots and tools line the walls. It smells of earth and creosote."
   }
+  picture { src: "pictures/shed.png" }
 }
 
 

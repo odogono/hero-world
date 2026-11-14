@@ -20,6 +20,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/square.png"
+            },
             "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
           ],
           "heard": {
@@ -32,6 +35,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/chandlers.png"
+            },
             "Chandler's Shop\nRope, tar, brass fittings and oilskins crowd every shelf. Nobody minds the shop, but there's an honesty box on the counter.\n\nYou see: the matches, the rope\nThere is: the honesty box\nExits: west"
           ]
         },
@@ -46,6 +52,9 @@
           "as": "ada",
           "type": "west",
           "told": [
+            {
+              "picture": "pictures/square.png"
+            },
             "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
           ]
         },
@@ -53,6 +62,9 @@
           "as": "ada",
           "type": "west",
           "told": [
+            {
+              "picture": "pictures/ship_bar.png"
+            },
             "The Ship\nA low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north.\n\nThere is: the counter\nAlso here: Jory\nExits: north, east"
           ],
           "heard": {
@@ -72,6 +84,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/back_room.png"
+            },
             "Back Room\nA cramped room stacked with barrels. Coats nobody came back for hang on a row of pegs.\n\nThere is: the lost property box\nExits: south"
           ]
         },
@@ -100,6 +115,9 @@
           "as": "ada",
           "type": "south",
           "told": [
+            {
+              "picture": "pictures/ship_bar.png"
+            },
             "The Ship\nA low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north.\n\nThere is: the counter\nAlso here: Jory\nExits: north, east"
           ],
           "heard": {
@@ -124,6 +142,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/square.png"
+            },
             "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
           ]
         },
@@ -131,6 +152,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/hill_lane.png"
+            },
             "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
           ]
         },
@@ -138,6 +162,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/garden_path.png"
+            },
             "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east (closed), south"
           ]
         },
@@ -145,6 +172,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/orchard.png"
+            },
             "Orchard\nOld apple trees lean together over long grass. Windfalls lie where they dropped.\n\nAlso here: Hollis\nExits: north, south"
           ],
           "heard": {
@@ -169,6 +199,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/well.png"
+            },
             "Old Well\nA mossy stone well sits in a clearing, a rope and bucket hanging from its winch.\n\nThere is: the bucket\nExits: south"
           ]
         },
@@ -183,6 +216,9 @@
           "as": "ada",
           "type": "south",
           "told": [
+            {
+              "picture": "pictures/orchard.png"
+            },
             "Orchard\nOld apple trees lean together over long grass. Windfalls lie where they dropped.\n\nAlso here: Hollis\nExits: north, south"
           ],
           "heard": {
@@ -195,6 +231,9 @@
           "as": "ada",
           "type": "south",
           "told": [
+            {
+              "picture": "pictures/garden_path.png"
+            },
             "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east (closed), south"
           ]
         },
@@ -216,6 +255,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/shed.png"
+            },
             "Garden Shed\nShelves of pots and tools line the walls. It smells of earth and creosote.\n\nYou see: the seed catalogue, the watering can, the trowel, the brass key\nExits: west"
           ]
         },
@@ -230,6 +272,9 @@
           "as": "ada",
           "type": "west",
           "told": [
+            {
+              "picture": "pictures/garden_path.png"
+            },
             "Garden Path\nA gravel path runs between high brick walls behind the keeper's cottage. Rose bushes crowd the borders, and a wooden shed stands at the far end.\n\nYou see: the roses\nExits: north, east, south"
           ]
         },
@@ -237,6 +282,9 @@
           "as": "ada",
           "type": "south",
           "told": [
+            {
+              "picture": "pictures/hill_lane.png"
+            },
             "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
           ]
         },
@@ -254,6 +302,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/lighthouse.png"
+            },
             "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west"
           ]
         },
@@ -282,6 +333,9 @@
           "as": "ada",
           "type": "up",
           "told": [
+            {
+              "picture": "pictures/lamp_room.png"
+            },
             "Lamp Room\nA round room of glass at the top of the tower, the great lamp at its centre. Through the salt-crusted panes you can see the whole harbour.\n\nYou see: the lamp, the logbook\nExits: down"
           ]
         },
@@ -341,6 +395,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/square.png"
+            },
             "The Square\nA cobbled square around a granite cross. The Ship stands on the west side and a chandler's shop on the east; a lane climbs north out of town, and the harbour lies south.\n\nYou see: the cross\nExits: north, east, west, south"
           ]
         },
@@ -348,6 +405,9 @@
           "as": "ada",
           "type": "north",
           "told": [
+            {
+              "picture": "pictures/hill_lane.png"
+            },
             "Hill Lane\nA steep lane between granite walls. North, a gate opens into a walled garden behind a cottage; east, the lane runs out onto the headland.\n\nExits: north, east, south"
           ]
         },
@@ -365,6 +425,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/lighthouse.png"
+            },
             "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west"
           ]
         },
@@ -387,6 +450,9 @@
           "as": "ada",
           "type": "look",
           "told": [
+            {
+              "picture": "pictures/lighthouse.png"
+            },
             "Lighthouse\nThe whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark.\n\nExits: up (closed), west\n\nThrough the door, the sea covers the causeway back to the headland."
           ]
         },
