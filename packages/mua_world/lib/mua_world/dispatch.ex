@@ -22,7 +22,7 @@ defmodule MuaWorld.Dispatch do
 
   require Logger
 
-  alias MuaWorld.{Exits, Talk, Tables}
+  alias MuaWorld.{Exits, Request, Talk, Tables}
   alias MuaWorld.Commands.Scope
   alias OdgnEcsEngine.{Delivery, Step}
 
@@ -144,31 +144,35 @@ defmodule MuaWorld.Dispatch do
   # What a question's outcome means to Dispatch: a Decision's veto is its
   # answer, as a reply is a Request's. A Script that fails refuses the
   # command with "Something went wrong."
-  # A Request says no by replying `{refused: text}`; any other map is a
-  # mistake, so fails rather than counting as having acted.
-  defp reply(%{asks: :offer} = q, {:replied, %NorthTalk.Map{} = value}) do
-    case NorthTalk.Map.get(value, "refused") do
-      text when is_binary(text) ->
-        {:refused, text}
+  # Dispatch reads a Request's reply as text or nothing; any map other
+  # than a refusal is a mistake, so fails rather than counting as having
+  # acted.
+  defp reply(_, :passed), do: :passed
 
-      _ ->
-        Logger.error(
-          "#{q.message} to #{inspect(q.to)} replied #{MuaWorld.Admin.show(value)}: " <>
-            "a Request replies text, nothing, or {refused: text}",
-          event: :malformed_reply
-        )
-
-        {:refused, @failed}
+  defp reply(%{asks: :offer} = q, outcome) do
+    case Request.reply(outcome) do
+      {:refused, text} -> {:refused, text}
+      {:malformed, value} -> malformed(q, value)
+      {:replied, %NorthTalk.Map{} = value} -> malformed(q, value)
+      {:replied, value} -> {:replied, if(is_binary(value), do: value)}
+      {:failed, _} -> {:refused, @failed}
     end
   end
-
-  defp reply(%{asks: :offer}, {:replied, value}), do: {:replied, if(is_binary(value), do: value)}
 
   defp reply(%{asks: :decide}, {:vetoed, reason}),
     do: {:replied, if(is_binary(reason), do: reason)}
 
-  defp reply(_, :passed), do: :passed
   defp reply(_, _), do: {:refused, @failed}
+
+  defp malformed(q, value) do
+    Logger.error(
+      "#{q.message} to #{inspect(q.to)} replied #{MuaWorld.Admin.show(value)}: " <>
+        "a Request replies text, nothing, or {refused: text}",
+      event: :malformed_reply
+    )
+
+    {:refused, @failed}
+  end
 
   # Tells the actor. Everyone else who saw it, and the Scripts that notice
   # it, were told by the Service Script.
