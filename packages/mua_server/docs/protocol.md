@@ -30,6 +30,7 @@ Joining brings the Character into play, or resumes control of it, and takes over
 | `command`      | `{text, ref?}`: up to 500 characters; `ref` is text or a number, echoed back | `ok {ref}` once the command's Step has committed; `error {ref?, reason}`             |
 | `place`        | `{composition, ref?}`: a map of component names to their data                | `ok {ref, eid, placed, max_placed}` once the thing is placed; `error {ref?, reason}` |
 | `logout`       | `{}`                                                                         | `ok`; the Character goes to Limbo at once and the Channel closes                     |
+| `mirror`       | `{}`                                                                         | `ok` with a fresh `mirror`'s payload; `error {reason}`, `not_in_play` in Limbo       |
 | `edit`         | `{eid, patch, ref?}`: the thing the `edit` Verb opened, and what to change   | `ok {ref, eid}` once the edit is saved; `error {ref?, reason}`                       |
 | `stop_editing` | `{}`                                                                         | `ok`; the thing the `edit` Verb opened is closed without saving                      |
 | `store`        | `{eid, ref?}`: the thing the `edit` Verb opened                              | `ok {ref, eid, placed, max_placed}` once it is stored; `error {ref?, reason}`        |
@@ -113,7 +114,7 @@ A `command` whose text starts with `;` is a line of NorthTalk for an admin, one 
 | `compose` | `{eid, composition}`                                                     | After the `edit` Verb opens a placed thing, and again on rejoining while it is open: its buildable components as they stand, for the composer.                                                                                                              |
 | `closed`  | `{eid}`                                                                  | When the World closes the thing the Character had open to edit without the Character asking, as when someone stores or destroys it (#284).                                                                                                                  |
 | `mirror`  | `{character, place, components: {name: [row]}}`                          | On joining. Only what the Character perceives: its place, the Elements there it can see, and what it carries, as rows in the shared layout (ADR 0019), each with its `eid`.                                                                                 |
-| `changes` | `{place, gone, put, remove}`                                             | After each Step that changed what the Character perceives. `gone`: eids to drop entirely; `put`: rows to add or replace; `remove`: `{name: [eid]}` components to drop. A client that missed one rejoins for a fresh `mirror`; nothing is replayed.          |
+| `changes` | `{place, gone, put, remove}`                                             | After each Step that changed what the Character perceives. `gone`: eids to drop entirely; `put`: rows to add or replace; `remove`: `{name: [eid]}` components to drop. A client that missed one asks for a fresh `mirror`; nothing is replayed.             |
 
 ## Connections and recovery
 

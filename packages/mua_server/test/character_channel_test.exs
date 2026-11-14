@@ -125,6 +125,35 @@ defmodule MuaServer.CharacterChannelTest do
       assert_push("changes", %{put: %{"container" => [%{"is_closed" => false}]}})
     end
 
+    test "a client asks for a fresh mirror, and changes follow from it (#314)", %{ada: ada} do
+      a = join_as(ada)
+      flush_pushes()
+
+      ref = push(a, "mirror", %{})
+      assert_reply(ref, :ok, %{character: character, components: %{"described" => described}})
+      assert character == ada.character
+      assert Enum.any?(described, &(&1["name"] == "Harbour Steps"))
+
+      # the World is shared between tests: close the crate first, so opening
+      # it changes something, and leave it closed as joining expects
+      for {text, ref} <- [{"close crate", "c1"}, {"open crate", "c2"}] do
+        ref = push(a, "command", %{"text" => text, "ref" => ref})
+        assert_reply(ref, :ok, _)
+      end
+
+      assert_push("changes", %{put: %{"container" => [%{"is_closed" => false}]}})
+      ref = push(a, "command", %{"text" => "close crate", "ref" => "c3"})
+      assert_reply(ref, :ok, %{ref: "c3"})
+    end
+
+    test "a fresh mirror is refused while the Character is in Limbo (#314)", %{ada: ada} do
+      a = join_as(ada)
+      :ok = MuaWorld.leave(@world, ada.account, ada.character)
+
+      ref = push(a, "mirror", %{})
+      assert_reply(ref, :error, %{reason: "not_in_play"})
+    end
+
     test "an invalid command is refused without reaching the World", %{ada: ada} do
       a = join_as(ada)
       ref = push(a, "command", %{"text" => "   "})

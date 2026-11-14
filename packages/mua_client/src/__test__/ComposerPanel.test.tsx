@@ -249,9 +249,7 @@ describe('Try it', () => {
         place={() => Promise.resolve({ eid: 99, ok: true })}
         snapshot={() =>
           Promise.reject(
-            new Error(
-              "Try it couldn't read where you stand: the Worker stopped. Reconnect to try again."
-            )
+            new Error("Try it couldn't read where you stand: not_in_play")
           )
         }
       />
