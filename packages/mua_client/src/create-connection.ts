@@ -74,14 +74,20 @@ export const createConnection = (
 ) => {
   let joinedBefore = false;
 
-  // a request's answer, or none once the timeout has passed
+  // a request's answer or failure, or none once the timeout has passed
   const within = <T>(answer: Promise<T>, none: T) =>
-    new Promise<T>(resolve => {
+    new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => resolve(none), timeout);
-      void answer.then(value => {
-        clearTimeout(timer);
-        resolve(value);
-      });
+      answer.then(
+        value => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
     });
 
   const ask = (type: Parameters<Adapter['request']>[0], payload = {}) =>

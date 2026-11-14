@@ -78,8 +78,8 @@ export type Adapter = {
   /** Saves the World as a file, where the World can be saved */
   save?: () => void;
   /**
-   * A mirror of what the Character perceives, for Try it (#259), or
-   * undefined while there is none
+   * A Snapshot of what the Character perceives, for Try it (#259), or
+   * undefined while there is none. Rejects when one can't be read (#310).
    */
   snapshot: () => Promise<MirrorSnapshot | undefined>;
 };

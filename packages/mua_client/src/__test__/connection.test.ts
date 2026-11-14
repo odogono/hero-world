@@ -312,6 +312,17 @@ describe('a Connection whatever its World', () => {
     });
   });
 
+  test("passes on a mirror's failure to give Try it a snapshot (#310)", async () => {
+    const fake = fakeAdapter(never);
+    fake.adapter.snapshot = () =>
+      Promise.reject(new Error("Try it couldn't read where you stand: gone"));
+    const connection = createConnection(fake.adapter, { timeout: 5 });
+    fake.tell({ builder: null, event: 'joined' });
+    await expect(connection.snapshot()).rejects.toThrow(
+      "Try it couldn't read where you stand: gone"
+    );
+  });
+
   test("passes on the World's reason for an error reply", async () => {
     const fake = fakeAdapter(() =>
       Promise.resolve({ ok: false, reason: 'too_heavy' })

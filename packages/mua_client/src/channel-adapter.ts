@@ -6,11 +6,12 @@
  * Worker, for Try it.
  */
 import type {
-  FromMirror,
   MirrorChangeSet,
+  MirrorReplies,
   MirrorSnapshot,
   ToMirror
 } from 'mua-local';
+import { connect as connectWorker, type Endpoint } from 'mua-local/endpoint';
 import { Socket, type Channel } from 'phoenix';
 
 import type { Adapter, Reply, WorldEvent } from './adapter';
@@ -22,22 +23,38 @@ const PUSH_TIMEOUT_MS = 30_000;
 
 type Payload = Record<string, unknown>;
 
+const errorOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
+// a mirror that failed to take a snapshot or change set says so when Try
+// it next asks for it
+const warn = (what: string) => (error: unknown) =>
+  // for whoever is debugging: the player hears of it from Try it
+  // eslint-disable-next-line no-console
+  console.warn(`The mirror couldn't ${what}: ${errorOf(error)}`);
+
 /** Plays one Character over its Channel, signed in with `token` */
 export const channelAdapter = (token: string, character: number) => {
   let socket: Socket | undefined;
   let channel: Channel | undefined;
-  let mirror: Worker | undefined;
-  // replies to `snapshot`, in the order they were asked for
-  const snapshots: ((snapshot: MirrorSnapshot | undefined) => void)[] = [];
+  // once its Worker dies it stays closed, and Try it can't read it, until
+  // the server sends the next `mirror` (#314)
+  let mirror: Endpoint<ToMirror, MirrorReplies> | undefined;
 
-  const toMirror = (message: ToMirror) => {
-    if (!mirror) {
-      mirror = new Worker('/local/mirror.js', { type: 'module' });
-      mirror.addEventListener('message', ({ data }: MessageEvent<FromMirror>) =>
-        snapshots.shift()?.(data.snapshot)
+  // only a fresh snapshot starts a Worker: a change set needs one to apply to
+  const loadMirror = (snapshot: MirrorSnapshot) => {
+    if (!mirror || mirror.closed()) {
+      mirror = connectWorker(
+        new Worker('/local/mirror.js', { type: 'module' })
       );
     }
-    mirror.postMessage(message);
+    mirror.request({ snapshot, type: 'load' }).catch(warn('load'));
+  };
+
+  const applyToMirror = (changes: MirrorChangeSet) => {
+    if (mirror && !mirror.closed()) {
+      mirror.request({ changes, type: 'apply' }).catch(warn('apply a Step'));
+    }
   };
 
   const push = (type: string, payload: Payload) =>
@@ -94,12 +111,8 @@ export const channelAdapter = (token: string, character: number) => {
     });
     // the server's World as the Character perceives it: fresh on every
     // join, then kept current Step by Step
-    channel.on('mirror', (snapshot: MirrorSnapshot) =>
-      toMirror({ snapshot, type: 'load' })
-    );
-    channel.on('changes', (changes: MirrorChangeSet) =>
-      toMirror({ changes, type: 'apply' })
-    );
+    channel.on('mirror', loadMirror);
+    channel.on('changes', applyToMirror);
     channel.onError(dropped);
     channel
       .join()
@@ -120,7 +133,7 @@ export const channelAdapter = (token: string, character: number) => {
       socket = undefined;
       channel = undefined;
       // nothing of the World stays in the browser once the Character has left
-      mirror?.terminate();
+      mirror?.close();
       mirror = undefined;
     },
     join,
@@ -128,15 +141,20 @@ export const channelAdapter = (token: string, character: number) => {
       await push('logout', {});
     },
     request: push,
-    snapshot: () =>
-      new Promise<MirrorSnapshot | undefined>(resolve => {
-        if (!mirror) {
-          resolve(undefined);
-          return;
-        }
-        snapshots.push(resolve);
-        toMirror({ type: 'snapshot' });
-      })
+    // rejects if the mirror is out of step with the server's World, or its
+    // Worker died
+    snapshot: async () => {
+      if (!mirror) {
+        return undefined;
+      }
+      try {
+        return await mirror.request({ type: 'snapshot' });
+      } catch (error) {
+        throw new Error(
+          `Try it couldn't read where you stand: ${errorOf(error)}. Reconnect to try again.`
+        );
+      }
+    }
   };
 
   return { adapter, socket: () => socket };
