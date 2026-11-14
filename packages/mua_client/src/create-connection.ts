@@ -4,6 +4,8 @@
  * World the same way whichever adapter reaches it, writing what the World
  * says into the store, and answering what Play and the Composer ask.
  */
+import type { MirrorSnapshot } from 'mua-local';
+
 import type { Adapter, Reply, WorldEvent } from './adapter';
 import {
   actions,
@@ -25,6 +27,9 @@ import {
 
 /** How long a request waits for the World before giving up on it */
 export const REQUEST_TIMEOUT_MS = 10_000;
+
+// a Snapshot the World didn't give in time
+const NO_ANSWER = Symbol('no answer');
 
 /** What a place came to: the thing's id, or the World's reason for refusing */
 export type Placed = { eid: number; ok: true } | { ok: false; reason: string };
@@ -287,10 +292,22 @@ export const createConnection = (
     },
 
     /**
-     * The mirror of what the Character perceives, as it is now, for Try it
-     * (#259), or undefined while there is none
+     * A Snapshot of what the Character perceives, as it is now, for Try it
+     * (#259), or undefined while there is none. Rejects when one can't be
+     * read, or the World doesn't answer in time (#313).
      */
-    snapshot: () => within(adapter.snapshot(), undefined),
+    snapshot: async () => {
+      const taken = await within<MirrorSnapshot | undefined | typeof NO_ANSWER>(
+        adapter.snapshot(),
+        NO_ANSWER
+      );
+      if (taken === NO_ANSWER) {
+        throw new Error(
+          "Try it couldn't read where you stand: No answer from the World yet."
+        );
+      }
+      return taken;
+    },
 
     /** Saves the World as a file, where it can be */
     save: () => adapter.save?.(),

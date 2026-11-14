@@ -351,17 +351,30 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     }
   };
 
-  // A mirror of what the Character perceives, for Try it (#259, #291)
-  const snapshot = async () => {
-    let mirror;
-    if (account !== undefined && character !== undefined) {
-      try {
-        mirror = await mua.mirror(account, character);
-      } catch (error) {
-        fail(error);
-      }
+  // A Snapshot of what the Character perceives, for Try it (#259, #291). It
+  // only reads, so a failure is Try it's to report, not the World's (#313)
+  const snapshot = async (ref: unknown) => {
+    const safeRef = isRef(ref) ? ref : undefined;
+    if (account === undefined || character === undefined) {
+      send({ event: 'reply', ok: false, reason: 'not_joined', ref: safeRef });
+      return;
     }
-    send({ event: 'snapshot', snapshot: mirror });
+    try {
+      const taken = await mua.mirror(account, character);
+      send({ event: 'reply', ok: true, ref: safeRef, snapshot: taken });
+    } catch (error) {
+      send({
+        event: 'reply',
+        ok: false,
+        reason:
+          error instanceof MuaWorldError
+            ? error.code
+            : error instanceof Error
+              ? error.message
+              : String(error),
+        ref: safeRef
+      });
+    }
   };
 
   const logout = async () => {
@@ -395,7 +408,7 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
         case 'stop_editing':
           return stopEditing(message.ref);
         case 'snapshot':
-          return snapshot();
+          return snapshot(message.ref);
       }
     },
     /** Closes the World's database */

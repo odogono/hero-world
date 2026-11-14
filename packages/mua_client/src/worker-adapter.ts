@@ -4,7 +4,6 @@
  */
 import type { FromWorld } from 'mua-local';
 
-import { ignore, type WorldEvent } from './adapter';
 import { localAdapter } from './local-adapter';
 
 // Offers a save to the browser to keep, as a file
@@ -35,15 +34,10 @@ export const workerAdapter = (name: string) => {
   worker.addEventListener('message', ({ data }: MessageEvent<FromWorld>) =>
     receive(data)
   );
-  let listen: (event: WorldEvent) => void = ignore;
+  // a Worker that died stops the World as one that reported an error does,
+  // giving up on whatever it was asked (#313)
   worker.addEventListener('error', event =>
-    listen({ event: 'stopped', message: event.message })
+    receive({ event: 'error', message: event.message })
   );
-  return {
-    ...adapter,
-    join: (listener: (event: WorldEvent) => void) => {
-      listen = listener;
-      adapter.join(listener);
-    }
-  };
+  return adapter;
 };

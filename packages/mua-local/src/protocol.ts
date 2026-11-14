@@ -26,8 +26,11 @@ export type ToWorld =
   | { eid: number; ref?: Ref; type: 'destroy' | 'store' }
   /** Closes the thing the `edit` Verb opened without saving */
   | { ref?: Ref; type: 'stop_editing' }
-  /** Asks for a mirror of what the Character perceives, for Try it (#259) */
-  | { type: 'snapshot' };
+  /**
+   * Asks for a Snapshot of what the Character perceives, for Try it (#259):
+   * replied to with `reply`, refused while no Character has joined (#313)
+   */
+  | { ref?: Ref; type: 'snapshot' };
 
 /** An Account's building limits and count, as the Channel's join replies */
 export type Builder = {
@@ -49,6 +52,8 @@ export type FromWorld =
   | { builder: Builder | null; character: number; event: 'joined' }
   /** The reply to a `command` or `stop_editing`, once its Step has committed */
   | { event: 'reply'; ok: true; ref?: Ref }
+  /** The reply to a `snapshot` */
+  | { event: 'reply'; ok: true; ref?: Ref; snapshot: MirrorSnapshot }
   /** The reply to an `edit`, once it is saved */
   | { eid: number; event: 'reply'; ok: true; ref?: Ref }
   /** The reply to a `place`, `store` or `destroy`: the Account's count after it */
@@ -65,8 +70,6 @@ export type FromWorld =
   | ({ event: 'compose' } & Editing)
   /** The World closed the thing the Character had open, as when it was stored */
   | { eid: number; event: 'closed' }
-  /** The reply to `snapshot`: undefined while the Character isn't in play */
-  | { event: 'snapshot'; snapshot: MirrorSnapshot | undefined }
   /** The World as an SQLite file, to download */
   | { bytes: Uint8Array; event: 'saved' }
   /** A loaded World plays from now on: `join` again to play it */

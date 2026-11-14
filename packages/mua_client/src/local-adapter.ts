@@ -33,10 +33,25 @@ export const localAdapter = ({
   let listen: (event: WorldEvent) => void = ignore;
   let refs = 0;
   const pending = new Map<string, (reply: Reply) => void>();
-  // replies to `snapshot` and `logout`, in the order they were asked for
-  const snapshots: ((snapshot: MirrorSnapshot | undefined) => void)[] = [];
+  // replies to `logout`, in the order they were asked for
   const logouts: (() => void)[] = [];
   let open = true;
+
+  // a request the World answers with `reply` and its `ref`
+  const send = (type: ToWorld['type'], payload: Record<string, unknown>) =>
+    new Promise<Reply>(resolve => {
+      const ref = `r${++refs}`;
+      pending.set(ref, resolve);
+      post({ ...payload, ref, type } as ToWorld);
+    });
+
+  // a World that stopped, or was replaced by a save, answers nothing more
+  const settle = (reason: string) => {
+    for (const answer of pending.values()) {
+      answer({ ok: false, reason });
+    }
+    pending.clear();
+  };
 
   const receive = (message: FromWorld) => {
     switch (message.event) {
@@ -55,9 +70,6 @@ export const localAdapter = ({
         }
         return;
       }
-      case 'snapshot':
-        snapshots.shift()?.(message.snapshot);
-        return;
       case 'joined':
         // a Local World's Builder always has its limits (#292)
         listen({ builder: message.builder as Builder | null, event: 'joined' });
@@ -79,11 +91,13 @@ export const localAdapter = ({
         listen({ event: 'saved' });
         return;
       case 'loaded':
+        settle('a saved World was loaded in its place');
         listen({ event: 'loaded' });
         // the saved World plays from here on, with its own Character
         post({ name, type: 'join' });
         return;
       case 'error':
+        settle(message.message);
         listen({ event: 'stopped', message: message.message });
         return;
       default:
@@ -95,6 +109,7 @@ export const localAdapter = ({
     canSend: () => open,
     close: () => {
       open = false;
+      settle('the World was closed');
       close();
     },
     join: listener => {
@@ -107,18 +122,19 @@ export const localAdapter = ({
         logouts.push(resolve);
         post({ type: 'logout' });
       }),
-    request: (type, payload) =>
-      new Promise<Reply>(resolve => {
-        const ref = `r${++refs}`;
-        pending.set(ref, resolve);
-        post({ ...payload, ref, type } as ToWorld);
-      }),
+    request: send,
     save: () => post({ type: 'save' }),
-    snapshot: () =>
-      new Promise<MirrorSnapshot | undefined>(resolve => {
-        snapshots.push(resolve);
-        post({ type: 'snapshot' });
-      })
+    // matched by `ref` like any request, so a late reply settles only its
+    // own (#313)
+    snapshot: async () => {
+      const reply = await send('snapshot', {});
+      if (!reply.ok) {
+        throw new Error(
+          `Try it couldn't read where you stand: ${'reason' in reply ? reply.reason : 'No answer from the World yet.'}`
+        );
+      }
+      return reply.payload.snapshot as MirrorSnapshot;
+    }
   };
 
   return { adapter, receive };
