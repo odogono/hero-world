@@ -42,6 +42,20 @@ defmodule MuaWorld.AdminTest do
     assert location(world, MuaWorld.named(world, "lamp")) == ada
   end
 
+  test "a line that refuses leaves no change", %{world: world, ada: ada} do
+    lamp = MuaWorld.named(world, "lamp")
+    before = location(world, lamp)
+
+    assert line(
+             world,
+             ada,
+             ~s(ask world to named "lamp"\nmoveTo it, actor\nreturn {refused: "Not now."})
+           ) ==
+             "!! refused: Not now."
+
+    assert location(world, lamp) == before
+  end
+
   test "a `;` command is a line", %{world: world, ada: ada} do
     assert send_command(world, ada, ";return 40 + 2") == "=> 42"
   end

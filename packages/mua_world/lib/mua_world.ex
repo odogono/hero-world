@@ -50,6 +50,7 @@ defmodule MuaWorld do
     Lifecycle,
     Lock,
     Places,
+    Request,
     Tables,
     Talk
   }
@@ -1078,40 +1079,40 @@ defmodule MuaWorld do
     Lifecycle.rearm(state.world, timer, instant_us(state.world_ms))
   end
 
-  # What a reset does is the lifecycle Service's to decide (ADR 0024); the
-  # place's own Scripts hear of it after
+  # What a reset does is the lifecycle Service's to decide (ADR 0024), all
+  # or nothing; the place's own Scripts hear of it after, if it worked.
+  # Returns how many things it moved.
   defp reset_place(state, place) do
     talk = state.talk
-    handle = OdgnEcsTalk.handle(talk, place)
 
-    {:ok, pending} =
-      OdgnEcsEngine.deliver(state.step, %Delivery{
-        to: {:service, "lifecycle"},
-        message: "reset",
-        args: [handle],
-        asks: :request
-      })
+    asked =
+      Request.ask(state.step, fn ->
+        delivery = %Delivery{
+          to: {:service, "lifecycle"},
+          message: "reset",
+          args: [OdgnEcsTalk.handle(talk, place)]
+        }
 
-    :ok = OdgnEcsEngine.pump(state.step)
+        {:ok, delivery, &moved/1}
+      end)
 
-    moved =
-      case OdgnEcsTalk.outcome(pending) do
-        {:replied, n} when is_number(n) ->
-          trunc(n)
+    case asked do
+      {:ok, moved} ->
+        if OdgnEcsTalk.scripted?(talk, place) do
+          system = OdgnEcsTalk.handle(talk, state.places.system)
+          {:ok, _} = OdgnEcsTalk.deliver(talk, place, "reset", [system])
+        end
 
-        other ->
-          if other == :waiting, do: OdgnEcsTalk.abandon(pending)
-          Logger.error("reset of #{place} failed: #{inspect(other)}", event: :reset_failed)
-          0
-      end
+        moved
 
-    if OdgnEcsTalk.scripted?(state.talk, place) do
-      system = OdgnEcsTalk.handle(state.talk, state.places.system)
-      {:ok, _} = OdgnEcsTalk.deliver(state.talk, place, "reset", [system])
+      other ->
+        Logger.error("reset of #{place} failed: #{inspect(other)}", event: :reset_failed)
+        0
     end
-
-    moved
   end
+
+  defp moved(n) when is_number(n), do: {:ok, trunc(n)}
+  defp moved(_), do: :malformed
 
   # The NPC commands queued so far, each a Step of its own. Any they queue
   # wait for the next run, so an NPC answering itself can't loop.
@@ -1175,114 +1176,97 @@ defmodule MuaWorld do
     state
   end
 
-  # An admin's line runs in a savepoint, released only if its Run
-  # completes, so a line that fails or is still waiting leaves no change,
-  # its output included. What the admin is told comes after.
+  # An admin's line runs as a Request, kept only if its Run replies, so a
+  # line that fails, refuses or is still waiting leaves no change, its
+  # output included. What the admin is told comes after.
   defp run_admin_line(state, actor, line) do
-    world = state.world
     talk = state.talk
     service = "admin:#{actor}"
-    :ok = OdgnEcs.savepoint(world, "mua_admin_line")
 
-    {outcome, state} =
-      with :ok <- OdgnEcsTalk.put_service_script(talk, service, MuaWorld.Admin.source(line)),
-           {:ok, pending} <-
-             OdgnEcsEngine.deliver(state.step, %Delivery{
-               to: {:service, service},
-               message: "line",
-               args: [
-                 OdgnEcsTalk.handle(talk, actor),
-                 OdgnEcsTalk.handle(talk, location(state, actor))
-               ],
-               asks: :request
-             }) do
-        :ok = OdgnEcsEngine.pump(state.step)
-        outcome = OdgnEcsTalk.outcome(pending)
-        if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
-        {outcome, state}
-      else
-        error -> {error, state}
-      end
+    asked =
+      Request.ask(state.step, fn ->
+        with :ok <- OdgnEcsTalk.put_service_script(talk, service, MuaWorld.Admin.source(line)) do
+          delivery = %Delivery{
+            to: {:service, service},
+            message: "line",
+            args: [
+              OdgnEcsTalk.handle(talk, actor),
+              OdgnEcsTalk.handle(talk, location(state, actor))
+            ]
+          }
 
-    case outcome do
-      {:replied, value} ->
-        :ok = OdgnEcs.release(world, "mua_admin_line")
+          {:ok, delivery, &{:ok, &1}}
+        end
+      end)
+
+    case asked do
+      {:ok, value} ->
         tell(state, actor, "=> " <> MuaWorld.Admin.show(value))
 
-      other ->
-        :ok = OdgnEcs.rollback_to(world, "mua_admin_line")
+      {:refused, reason} ->
+        tell(state, actor, "!! refused: " <> reason)
+
+      {:failed, why} ->
         # A Run still waiting is discarded with the line's code, so it can't
         # carry on in a later Step
-        if other == :waiting, do: OdgnEcsTalk.put_service_script(talk, service, "")
-        tell(state, actor, "!! " <> MuaWorld.Admin.failure(other, line))
+        if why == :waiting, do: OdgnEcsTalk.put_service_script(talk, service, "")
+        tell(state, actor, "!! " <> MuaWorld.Admin.failure(why, line))
     end
   end
 
   # A builder's thing: an empty entity the `build` Service fills in and
-  # places, in a savepoint released only if it did. A refusal, or a Script
-  # that fails, leaves no change, the entity included.
+  # places, kept only if it did. A refusal, or a Script that fails, leaves
+  # no change, the entity included.
   defp place_thing(state, actor, composition) do
     world = state.world
     talk = state.talk
-    :ok = OdgnEcs.savepoint(world, "mua_place")
-    {:ok, thing} = OdgnEcs.create(world)
-    handle = OdgnEcsTalk.handle(talk, thing)
 
-    {:ok, pending} =
-      OdgnEcsEngine.deliver(state.step, %Delivery{
-        to: {:service, "build"},
-        message: "place",
-        args: [handle, OdgnEcsTalk.Values.to_value(composition), OdgnEcsTalk.handle(talk, actor)],
-        asks: :request
-      })
+    asked =
+      Request.ask(state.step, fn ->
+        # A rolled-back entity's id comes back for the next one made, so
+        # its Handle is kept: NorthTalk won't make another with the same
+        # id, and an entity made at play has no Lineage, so the Handle fits
+        {:ok, thing} = OdgnEcs.create(world)
 
-    :ok = OdgnEcsEngine.pump(state.step)
-    outcome = OdgnEcsTalk.outcome(pending)
-    if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
+        delivery = %Delivery{
+          to: {:service, "build"},
+          message: "place",
+          args: [
+            OdgnEcsTalk.handle(talk, thing),
+            OdgnEcsTalk.Values.to_value(composition),
+            OdgnEcsTalk.handle(talk, actor)
+          ]
+        }
 
-    case placed_reply(outcome) do
-      {:ok, message, suggestions, reply} ->
-        :ok = OdgnEcs.release(world, "mua_place")
+        {:ok, delivery, &placed_reply(thing, &1)}
+      end)
+
+    case asked do
+      {:ok, {message, suggestions, reply}} ->
         tell(state, actor, message, suggestions)
-        {:ok, Map.put(reply, :eid, thing)}
+        {:ok, reply}
 
-      {:error, reason} ->
-        # The id comes back for the next entity made, so its Handle is
-        # kept: NorthTalk won't make another with the same id, and an
-        # entity made at play has no Lineage, so the Handle fits it
-        :ok = OdgnEcs.rollback_to(world, "mua_place")
-        {:error, reason}
+      other ->
+        not_built(other)
     end
   end
 
-  # What the `build` Service's reply means: `{message, placed, max_placed}`
-  # when it placed the thing, with any `suggestions` the message offers
-  # (#275), and `{refused: text}` when it said no
-  defp placed_reply({:replied, %NorthTalk.Map{} = value}) do
-    value = OdgnEcsTalk.Values.from_value(value)
-
-    case value do
-      %{"refused" => reason} when is_binary(reason) ->
-        {:error, reason}
-
-      %{"message" => message, "placed" => placed, "max_placed" => max}
+  # What the `build` Service's reply means when it placed the thing:
+  # `{message, placed, max_placed}`, with any `suggestions` the message
+  # offers (#275)
+  defp placed_reply(thing, %NorthTalk.Map{} = value) do
+    case OdgnEcsTalk.Values.from_value(value) do
+      %{"message" => message, "placed" => placed, "max_placed" => max} = value
       when is_binary(message) and is_integer(placed) and is_integer(max) ->
         suggestions = Enum.filter(List.wrap(value["suggestions"]), &is_binary/1)
-        {:ok, message, suggestions, %{placed: placed, max_placed: max}}
+        {:ok, {message, suggestions, %{eid: thing, placed: placed, max_placed: max}}}
 
       _ ->
-        Logger.error("build replied #{inspect(value)}", event: :malformed_reply)
-        {:error, "Something went wrong."}
+        :malformed
     end
   end
 
-  # A write the composition doesn't fit, such as text for a number, fails
-  # the Script: that is the builder's to fix, so it says why
-  defp placed_reply(other) do
-    why = MuaWorld.Admin.failure(other)
-    Logger.warning("build failed: #{why}", event: :build_failed)
-    {:error, "That can't be built: #{why}"}
-  end
+  defp placed_reply(_thing, _value), do: :malformed
 
   # Only the thing the `edit` Verb opened can be saved, and only while it
   # is still within reach, as the Verb found it
@@ -1322,55 +1306,44 @@ defmodule MuaWorld do
     with {:ok, _} <- build(state, actor, "save", args), do: {:ok, %{eid: thing}}
   end
 
-  # Sends `message args…, actor` to the `build` Service, in a savepoint
-  # released only if it replied text, which the actor is told, as
-  # `place_thing/3` does. A refusal, or a Script that fails, writes nothing.
+  # Sends `message args…, actor` to the `build` Service as a Request,
+  # keeping what it did only if it replied text, which the actor is told.
+  # A refusal, or a Script that fails, writes nothing.
   defp build(state, actor, message, args) do
-    world = state.world
-    :ok = OdgnEcs.savepoint(world, "mua_build")
+    talk = state.talk
 
-    {:ok, pending} =
-      OdgnEcsEngine.deliver(state.step, %Delivery{
-        to: {:service, "build"},
-        message: message,
-        args: args ++ [OdgnEcsTalk.handle(state.talk, actor)],
-        asks: :request
-      })
+    asked =
+      Request.ask(state.step, fn ->
+        delivery = %Delivery{
+          to: {:service, "build"},
+          message: message,
+          args: args ++ [OdgnEcsTalk.handle(talk, actor)]
+        }
 
-    :ok = OdgnEcsEngine.pump(state.step)
-    outcome = OdgnEcsTalk.outcome(pending)
-    if outcome == :waiting, do: OdgnEcsTalk.abandon(pending)
+        {:ok, delivery, &built_text/1}
+      end)
 
-    case edited_reply(outcome) do
+    case asked do
       {:ok, text} ->
-        :ok = OdgnEcs.release(world, "mua_build")
         tell(state, actor, text)
         {:ok, text}
 
-      {:error, reason} ->
-        :ok = OdgnEcs.rollback_to(world, "mua_build")
-        {:error, reason}
+      other ->
+        not_built(other)
     end
   end
 
-  defp edited_reply({:replied, message}) when is_binary(message), do: {:ok, message}
+  defp built_text(text) when is_binary(text), do: {:ok, text}
+  defp built_text(_), do: :malformed
 
-  defp edited_reply({:replied, %NorthTalk.Map{} = value}) do
-    case OdgnEcsTalk.Values.from_value(value) do
-      %{"refused" => reason} when is_binary(reason) ->
-        {:error, reason}
+  # What a builder is told when the `build` Service didn't do what they
+  # asked. A write the composition doesn't fit, such as text for a number,
+  # fails the Script: that is the builder's to fix, so it says why.
+  defp not_built({:refused, reason}), do: {:error, reason}
+  defp not_built({:failed, {:malformed, _}}), do: {:error, "Something went wrong."}
 
-      value ->
-        Logger.error("build replied #{inspect(value)}", event: :malformed_reply)
-        {:error, "Something went wrong."}
-    end
-  end
-
-  defp edited_reply(other) do
-    why = MuaWorld.Admin.failure(other)
-    Logger.warning("edit failed: #{why}", event: :build_failed)
-    {:error, "That can't be built: #{why}"}
-  end
+  defp not_built({:failed, why}),
+    do: {:error, "That can't be built: #{MuaWorld.Admin.failure(why)}"}
 
   # How many things an Account has placed
   defp placed(world, account),

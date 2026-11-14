@@ -212,6 +212,14 @@ _Avoid_: inheritance chain, delegation
 One message handed to an entity's Message Path from outside Scripts, such as a command's question, a due timer or a lifecycle message, together with the Script work it causes. A Step holds one or more Deliveries.
 _Avoid_: dispatch, event
 
+**Request**:
+A question put to a Script that it answers with a reply. Replying `{refused: text}` says no; what any other reply means is for whoever asked.
+_Avoid_: query, call
+
+**Run**:
+One Script's handling of one Delivery. It may wait past the Step it began in.
+_Avoid_: invocation, execution
+
 **Host**:
 A program that runs a World and its Scripts: the server in Elixir, or a Local World's Worker in TypeScript. Every Host plays a World the same way.
 _Avoid_: runtime, backend

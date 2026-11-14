@@ -42,6 +42,32 @@ defmodule MuaWorld.LifecycleTest do
     assert "Dust settles over the shrine." in received(bob)
   end
 
+  test "a reset whose Script fails moves nothing, and isn't told to the place's Scripts", %{
+    world: world,
+    bob: bob,
+    shrine: shrine,
+    tmp_dir: dir
+  } do
+    alice = join(world, "alice")
+    send_command(world, bob, "take lamp")
+    send_command(world, bob, "take idol")
+    send_command(world, bob, "east")
+    send_command(world, bob, "drop lamp")
+    send_command(world, bob, "drop idol")
+
+    # Started again with too little fuel for the lifecycle Service to put
+    # both back, but enough for the shrine's own Script
+    GenServer.stop(world)
+    world = start("lifecycle.edl", dir, limits: [fuel_per_run: 300])
+    :ok = MuaWorld.subscribe(world, alice)
+    received(alice)
+
+    ExUnit.CaptureLog.capture_log(fn -> assert MuaWorld.reset(world, shrine) == 0 end)
+    refute location(world, MuaWorld.named(world, "lamp")) == shrine
+    refute location(world, MuaWorld.named(world, "idol")) == shrine
+    refute "Dust settles over the shrine." in received(alice)
+  end
+
   test "tells Scripts the World has started", %{world: world} do
     assert MuaWorld.component(world, MuaWorld.named(world, "idol"), "item")["weight"] == 7.0
   end
