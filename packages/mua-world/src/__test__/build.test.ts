@@ -125,6 +125,19 @@ describe('placing a composed thing (#258)', () => {
     expect((await mua.builder(ada.account))?.placed).toBe(1);
   });
 
+  test('a refused placing leaves no entity behind', async () => {
+    const { ada, mua } = await setup();
+    const entities = () =>
+      (
+        mua.store.db.query('SELECT count(*) AS n FROM entities') as {
+          n: number;
+        }[]
+      )[0]!.n;
+    const before = entities();
+    expect(await refusal(place(mua, ada))).toBe("You can't build.");
+    expect(entities()).toBe(before);
+  });
+
   test('an invalid composition is refused, and nothing is written', async () => {
     const { ada, mua } = await setup();
     grant(mua, ada);
