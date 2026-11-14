@@ -58,7 +58,6 @@ const reply = () => ({
     { eid: 2, label: 'Ada' },
     { eid: 3, label: 'Satchel' }
   ],
-  event: 'opened' as const,
   origins: [
     [1, { eid: 10, kind: 'perceived' }],
     [2, { eid: 11, kind: 'stand-in' }],
@@ -84,15 +83,13 @@ const fakeClient = () => {
               ]
             : [],
         entities: reply().entities,
-        event: 'result',
         lines: [text === 'go north' ? 'You go north.' : 'Taken.'],
         ok: true,
         outside:
-          text === 'go north' ? [{ eid: 9, label: 'Beyond the north' }] : [],
-        ref: sent.length
+          text === 'go north' ? [{ eid: 9, label: 'Beyond the north' }] : []
       });
     },
-    entity: eid => Promise.resolve({ components: {}, eid, event: 'entity' }),
+    entity: eid => Promise.resolve({ components: {}, eid }),
     migrate: () => Promise.reject(new Error('not here')),
     open: source => {
       opened.push(source!);
@@ -242,6 +239,28 @@ const tryIt = async () => {
 };
 
 describe('Try it', () => {
+  // #310: a mirror that can't be read used to leave Try it waiting forever
+  test("says why when it can't read where you stand", async () => {
+    render(
+      <ComposerPanel
+        client={fakeClient().client}
+        limits={limits}
+        onClose={() => {}}
+        place={() => Promise.resolve({ eid: 99, ok: true })}
+        snapshot={() =>
+          Promise.reject(
+            new Error(
+              "Try it couldn't read where you stand: the Worker stopped. Reconnect to try again."
+            )
+          )
+        }
+      />
+    );
+    expect(
+      await screen.findByText(/couldn't read where you stand/)
+    ).toBeTruthy();
+  });
+
   test('builds a copy of where you stand with the composition, from the mirror', async () => {
     const { opened } = await tryIt();
     expect(opened.at(-1)).toEqual({

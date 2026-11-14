@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
 import { get, query } from 'odgn-ecs/store';
 
-import { openMirror, type MirrorSnapshot } from '../mirror';
+import { mirrorHandler, openMirror, type MirrorSnapshot } from '../mirror';
 
 const ROOM = 1;
 const ADA = 2;
@@ -116,5 +116,47 @@ describe('a snapshot of the mirror', () => {
       type: DatabaseType.BUN
     });
     expect(mirror.snapshot()).toBeUndefined();
+  });
+});
+
+const handler = () =>
+  mirrorHandler(openMirror({ path: ':memory:', type: DatabaseType.BUN }));
+
+// The Worker's handler (#310): what Try it hears when it asks for a snapshot
+describe("the mirror's Worker", () => {
+  // a snapshot the mirror can't read
+  const broken = { ...snapshot, components: null } as unknown as MirrorSnapshot;
+
+  test('has no snapshot before the first load, and passes over change sets', async () => {
+    const handle = handler();
+    await handle({
+      changes: { gone: [LAMP], place: ROOM, put: {}, remove: {} },
+      type: 'apply'
+    });
+    expect(await handle({ type: 'snapshot' })).toBeUndefined();
+    await handle({ snapshot, type: 'load' });
+    expect((await handle({ type: 'snapshot' }))?.place).toBe(ROOM);
+  });
+
+  test('a snapshot after a failed load throws, until the next load', async () => {
+    const handle = handler();
+    await handle({ snapshot, type: 'load' });
+    await expect(handle({ snapshot: broken, type: 'load' })).rejects.toThrow();
+    await expect(handle({ type: 'snapshot' })).rejects.toThrow('out of step');
+    await handle({ snapshot, type: 'load' });
+    expect((await handle({ type: 'snapshot' }))?.character).toBe(ADA);
+  });
+
+  test('a snapshot after a failed change set throws', async () => {
+    const handle = handler();
+    await handle({ snapshot, type: 'load' });
+    await expect(
+      handle({
+        // a change set the mirror can't read
+        changes: { gone: null, place: ROOM, put: {}, remove: {} } as never,
+        type: 'apply'
+      })
+    ).rejects.toThrow();
+    await expect(handle({ type: 'snapshot' })).rejects.toThrow('out of step');
   });
 });

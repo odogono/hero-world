@@ -6,19 +6,20 @@ export {
 } from './local';
 export type { FromWorld, ToWorld } from './protocol';
 export type {
-  FromMirror,
   MirrorChangeSet,
+  MirrorReplies,
   MirrorRow,
   MirrorSnapshot,
   ToMirror
 } from './mirror';
 export {
   openPreviewWorld,
-  type FromPreview,
   type PreviewDefinition,
   type PreviewEntity,
   type PreviewMigration,
+  type PreviewOpened,
   type PreviewOptions,
+  type PreviewReplies,
   type PreviewResult,
   type PreviewSource,
   type PreviewWorld,

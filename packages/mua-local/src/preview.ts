@@ -73,7 +73,7 @@ export type PreviewOptions = {
 export type ToPreview =
   /** Loads a Preview World, from the main World's EDL if no source is given */
   | { source?: PreviewSource; type: 'open' }
-  | { ref: number; text: string; type: 'command' }
+  | { text: string; type: 'command' }
   /** Migrates the World to edited EDL, keeping its play state (ADR 0005) */
   | { edl: string; type: 'migrate' }
   | { type: 'reset' }
@@ -82,34 +82,31 @@ export type ToPreview =
 /** An entity, with a name to show it by */
 export type PreviewEntity = { eid: Eid; label: string };
 
-/** From a Preview World's Worker */
-export type FromPreview =
-  /** The reply to `open` and `reset` */
-  | {
-      definitions: PreviewDefinition[];
-      /** The EDL it was built from, for an editor to start from */
-      edl?: string;
-      entities: PreviewEntity[];
-      event: 'opened';
-      /** In a Try it World, where each entity came from */
-      origins?: [Eid, TryItOrigin][];
-      runs: boolean;
-    }
-  /** The reply to `migrate`, with the entities after it */
-  | ({
-      definitions: PreviewDefinition[];
-      entities: PreviewEntity[];
-      event: 'migrated';
-    } & PreviewMigration)
-  /** The reply to a `command`, with the entities after it */
-  | ({
-      entities: PreviewEntity[];
-      event: 'result';
-      ref: number;
-    } & PreviewResult)
-  /** The reply to `entity`: every component it has, by name */
-  | { components: Record<string, Data>; eid: Eid; event: 'entity' }
-  | { event: 'error'; message: string };
+/** A Preview World as it opened, or as a reset left it */
+export type PreviewOpened = {
+  definitions: PreviewDefinition[];
+  /** The EDL it was built from, for an editor to start from */
+  edl?: string;
+  entities: PreviewEntity[];
+  /** In a Try it World, where each entity came from */
+  origins?: [Eid, TryItOrigin][];
+  runs: boolean;
+};
+
+/** A Preview World's Worker's reply to each request (`endpoint.ts`) */
+export type PreviewReplies = {
+  /** What the command did, with the entities after it */
+  command: PreviewResult & { entities: PreviewEntity[] };
+  /** Every component the entity has, by name */
+  entity: { components: Record<string, Data>; eid: Eid };
+  /** What the Migration did, with the entities after it */
+  migrate: PreviewMigration & {
+    definitions: PreviewDefinition[];
+    entities: PreviewEntity[];
+  };
+  open: PreviewOpened;
+  reset: PreviewOpened;
+};
 
 /** What one command did */
 export type PreviewResult = {

@@ -97,14 +97,11 @@ const fakeClient = () => {
       return Promise.resolve({
         changes: [[2, 'container', 'changed', { is_closed: false }]],
         entities,
-        event: 'result',
         lines: ['Opened.'],
-        ok: true,
-        ref: sent.length
+        ok: true
       });
     },
-    entity: eid =>
-      Promise.resolve({ components: world[eid]!, eid, event: 'entity' }),
+    entity: eid => Promise.resolve({ components: world[eid]!, eid }),
     migrate: edl => {
       migrated.push(edl);
       return Promise.resolve(
@@ -112,7 +109,6 @@ const fakeClient = () => {
           ? {
               definitions,
               entities,
-              event: 'migrated',
               ok: false,
               reason: 'Unexpected token'
             }
@@ -120,7 +116,6 @@ const fakeClient = () => {
               changes: [[2, 'described', 'changed', { name: 'Mailbox' }]],
               definitions,
               entities,
-              event: 'migrated',
               ok: true,
               plan
             }
@@ -133,7 +128,6 @@ const fakeClient = () => {
         definitions,
         edl,
         entities,
-        event: 'opened',
         runs: true
       });
     },
@@ -142,7 +136,6 @@ const fakeClient = () => {
       return Promise.resolve({
         definitions,
         entities,
-        event: 'opened',
         runs: true
       });
     }

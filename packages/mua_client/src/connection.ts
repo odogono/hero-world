@@ -1,10 +1,11 @@
 import type {
-  FromMirror,
   FromWorld,
   MirrorChangeSet,
+  MirrorReplies,
   MirrorSnapshot,
   ToMirror
 } from 'mua-local';
+import { connect as connectWorker, type Endpoint } from 'mua-local/endpoint';
 import { Socket, type Channel } from 'phoenix';
 
 import {
@@ -35,37 +36,56 @@ let socket: Socket | undefined;
 let channel: Channel | undefined;
 /** A Local World's Worker, while playing offline (ADR 0023) */
 let worker: Worker | undefined;
-/** The mirror of the server's World, while playing online (#164) */
-let mirror: Worker | undefined;
+/**
+ * The mirror of the server's World, while playing online (#164). Once its
+ * Worker dies it stays closed, and Try it can't read it, until the server
+ * sends the next `mirror` (#314).
+ */
+let mirror: Endpoint<ToMirror, MirrorReplies> | undefined;
 /** The local Character's name, to join again after loading a save */
 let localName = '';
 
-/** Replies to `snapshot`, in the order they were asked for */
-const snapshots: ((snapshot: MirrorSnapshot | undefined) => void)[] = [];
+const errorOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
-const toMirror = (message: ToMirror) => {
-  if (!mirror) {
-    mirror = new Worker('/local/mirror.js', { type: 'module' });
-    mirror.addEventListener('message', ({ data }: MessageEvent<FromMirror>) =>
-      snapshots.shift()?.(data.snapshot)
-    );
+// a mirror that failed to take a snapshot or change set says so when Try
+// it next asks for it
+const warn = (what: string) => (error: unknown) =>
+  // for whoever is debugging: the player hears of it from Try it
+  // eslint-disable-next-line no-console
+  console.warn(`The mirror couldn't ${what}: ${errorOf(error)}`);
+
+// only a fresh snapshot starts a Worker: a change set needs one to apply to
+const loadMirror = (snapshot: MirrorSnapshot) => {
+  if (!mirror || mirror.closed()) {
+    mirror = connectWorker(new Worker('/local/mirror.js', { type: 'module' }));
   }
-  mirror.postMessage(message);
+  mirror.request({ snapshot, type: 'load' }).catch(warn('load'));
+};
+
+const applyToMirror = (changes: MirrorChangeSet) => {
+  if (mirror && !mirror.closed()) {
+    mirror.request({ changes, type: 'apply' }).catch(warn('apply a Step'));
+  }
 };
 
 /**
  * The mirror of what the Character perceives, as it is now, for Try it
- * (#259), or undefined while there is none
+ * (#259), or undefined while there is none. Rejects if the mirror is out of
+ * step with the server's World, or its Worker died.
  */
-export const mirrorSnapshot = () =>
-  new Promise<MirrorSnapshot | undefined>(resolve => {
-    if (!mirror) {
-      resolve(undefined);
-      return;
-    }
-    snapshots.push(resolve);
-    toMirror({ type: 'snapshot' });
-  });
+export const mirrorSnapshot = async () => {
+  if (!mirror) {
+    return undefined;
+  }
+  try {
+    return await mirror.request({ type: 'snapshot' });
+  } catch (error) {
+    throw new Error(
+      `Try it couldn't read where you stand: ${errorOf(error)}. Reconnect to try again.`
+    );
+  }
+};
 
 const add = (line: Parameters<typeof append>[1]) => {
   lines.value = append(lines.value, line);
@@ -120,12 +140,8 @@ export const connect = (token: string, character: number) => {
   });
   // the server's World as the Character perceives it: fresh on every join,
   // then kept current Step by Step
-  channel.on('mirror', (snapshot: MirrorSnapshot) =>
-    toMirror({ snapshot, type: 'load' })
-  );
-  channel.on('changes', (changes: MirrorChangeSet) =>
-    toMirror({ changes, type: 'apply' })
-  );
+  channel.on('mirror', loadMirror);
+  channel.on('changes', applyToMirror);
   channel.on('prompt', ({ options, text }: Prompt) =>
     add({ kind: 'prompt', options, text })
   );
@@ -443,7 +459,7 @@ const logoutRemote = () =>
     channel = undefined;
     // nothing of the World stays in the browser once the Character has left
     editing.value = null;
-    mirror?.terminate();
+    mirror?.close();
     mirror = undefined;
   });
 
