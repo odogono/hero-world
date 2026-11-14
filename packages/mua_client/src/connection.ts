@@ -26,6 +26,7 @@ import {
 } from './transcript';
 
 type Output = { lines: string[]; suggestions?: string[] };
+type Picture = { alt: string; name: string; url: string };
 type Prompt = { options: string[]; text: string };
 type State = { actions?: string[] };
 type Status = { status: 'connected' | 'limbo' | 'replaced' };
@@ -100,6 +101,10 @@ export const connect = (token: string, character: number) => {
       )
     );
   });
+  // a place's Picture, just before its description (ADR 0027)
+  channel.on('picture', ({ alt, name, url }: Picture) =>
+    add({ alt, kind: 'picture', name, url })
+  );
   // a placed thing the `edit` Verb opened, for the Composer (#275)
   channel.on('compose', (opened: Editing) => {
     editing.value = opened;
@@ -166,6 +171,9 @@ export const connectLocal = (name: string) => {
         for (const text of data.lines) {
           add({ kind: 'output', text });
         }
+        break;
+      case 'picture':
+        add({ alt: data.alt, kind: 'picture', name: data.name, url: data.url });
         break;
       case 'state':
         actions.value = data.state.actions;

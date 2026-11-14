@@ -4,6 +4,8 @@ import {
   append,
   confirmed,
   connectionLost,
+  pictureOpened,
+  pictureShown,
   rejoined,
   restored,
   sent,
@@ -59,5 +61,24 @@ describe('a transcript restored after a reload', () => {
     const saved: Line[] = [{ id: 10_000, kind: 'output', text: 'Hall' }];
     const next = append(restored(saved), { kind: 'output', text: 'Yard' });
     expect(next.at(-1)!.id).toBeGreaterThan(10_000);
+  });
+
+  test('forgets which Pictures the reader showed or folded, so only the newest shows (ADR 0027)', () => {
+    const picture = { alt: 'A hall.', name: 'Hall', url: '/pictures/hall.png' };
+    let saved = append([], { ...picture, kind: 'picture' });
+    saved = append(saved, { ...picture, kind: 'picture' });
+    const [older, newest] = saved;
+    saved = pictureOpened(saved, older!.id, true);
+    saved = pictureOpened(saved, newest!.id, false);
+
+    const pictures = restored(saved).filter(line => line.kind === 'picture');
+    expect(
+      pictures.map(line => pictureShown(line, line.id === newest!.id, 'shown'))
+    ).toEqual([false, true]);
+    expect(
+      pictures.map(line =>
+        pictureShown(line, line.id === newest!.id, 'collapsed')
+      )
+    ).toEqual([false, false]);
   });
 });

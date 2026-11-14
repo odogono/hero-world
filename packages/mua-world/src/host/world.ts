@@ -104,14 +104,14 @@ export type MuaWorldOptions = {
   clock?: () => number;
   /** Limits for every Script */
   limits?: Partial<Limits>;
+  /** Called with each committed Step's change set, as a Preview World reports them */
+  onChanges?: (changes: ChangeSetEntry[]) => void;
   /**
    * Each place's Picture `src` and the URL it is served at, worked out when
    * the World's files were bundled, to check every Picture against; with
    * none, each is served at its path unchecked (ADR 0027)
    */
   pictures?: PictureUrls;
-  /** Called with each committed Step's change set, as a Preview World reports them */
-  onChanges?: (changes: ChangeSetEntry[]) => void;
   /** Reads a Script's source, by its path */
   readFile: (path: string) => string;
   /** Where `packages/mua-scripts` is, for mua's Libraries and Services */

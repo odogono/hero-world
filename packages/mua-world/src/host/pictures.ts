@@ -15,8 +15,7 @@ import type { Picture } from './tables';
 export type PictureUrls = Readonly<Record<string, string>>;
 
 // where Pictures live, beside the EDL, and the files they may be
-const SRC =
-  /^pictures\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.(png|webp|jpe?g|gif)$/;
+const SRC = /^pictures\/[\w-]+(\/[\w-]+)*\.(png|webp|jpe?g|gif)$/;
 
 type Described = { description?: string; name?: string };
 

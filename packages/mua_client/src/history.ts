@@ -51,6 +51,29 @@ export const loadCommands = (character: number) =>
 export const saveCommands = (character: number, commands: string[]) =>
   write(key('commands', character), commands.slice(-COMMAND_LIMIT));
 
+// Settings are this browser's, for every Character, so outlive `clearHistory`
+const PICTURES_KEY = 'mua-settings:pictures';
+
+/** Whether places' Pictures are shown, folded to their names, or left out */
+export type PictureMode = 'collapsed' | 'off' | 'shown';
+
+export const loadPictureMode = (): PictureMode => {
+  try {
+    const saved = localStorage.getItem(PICTURES_KEY);
+    return saved === 'collapsed' || saved === 'off' ? saved : 'shown';
+  } catch {
+    return 'shown';
+  }
+};
+
+export const savePictureMode = (mode: PictureMode) => {
+  try {
+    localStorage.setItem(PICTURES_KEY, mode);
+  } catch {
+    // storage blocked: the choice lasts until the page closes
+  }
+};
+
 /** Forgets what was saved for any other Character, such as a deleted one */
 export const keepOnly = (character: number) => {
   for (const name of ours()) {

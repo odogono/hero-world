@@ -82,7 +82,7 @@ describe("a place's Picture", () => {
   test("stops a World starting when it isn't among the bundled Pictures", async () => {
     const { 'pictures/headland.png': _, ...missing } = PICTURES;
     await expect(start(missing)).rejects.toThrow(
-      /Headland \(\d+\)'s picture pictures\/headland\.png has no file/
+      /Headland \(\d+\)'s(?: picture){2}s\/headland\.png has no file/
     );
   });
 

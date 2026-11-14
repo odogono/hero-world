@@ -90,7 +90,7 @@ describe('a Local World', () => {
       event: 'picture',
       name: 'Harbour Steps',
       url: expect.stringMatching(
-        /^\/pictures\/harbour_steps\.png\?vsn=[0-9a-f]{12}$/
+        /^\/pictures\/harbour_steps\.png\?vsn=[\da-f]{12}$/
       ) as never
     });
     expect(told[1]).toMatchObject({ event: 'output' });
