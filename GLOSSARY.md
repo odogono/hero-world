@@ -78,6 +78,10 @@ _Avoid_: test, dry run
 A client's copy of what its Character perceives of the server's World, kept current while playing online. It is never authoritative.
 _Avoid_: replica, cache, shadow world
 
+**Snapshot**:
+What a Character perceives, as it is at one moment, which Try it is built from. Any World can give one; a server's World gives it from the Mirror.
+_Avoid_: dump, export
+
 **Entity**:
 A thing that exists in a World and carries components. It is nothing but its id.
 _Avoid_: object, instance
