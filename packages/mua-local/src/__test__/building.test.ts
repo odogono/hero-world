@@ -185,15 +185,20 @@ describe('building in a Local World (#292)', () => {
 
   test('gives a snapshot of what the Character perceives, for Try it', async () => {
     const { local, sent } = await open();
-    await local.receive({ type: 'snapshot' });
-    expect(events(sent, 'snapshot')).toEqual([
-      { event: 'snapshot', snapshot: undefined }
-    ]);
+    await local.receive({ ref: 1, type: 'snapshot' });
+    expect(lastReply(sent)).toEqual({
+      event: 'reply',
+      ok: false,
+      reason: 'not_joined',
+      ref: 1
+    });
 
     await local.receive({ name: 'Ada', type: 'join' });
     const { character } = events(sent, 'joined')[0]!;
-    await local.receive({ type: 'snapshot' });
-    const snapshot = events(sent, 'snapshot').at(-1)?.snapshot;
+    await local.receive({ ref: 2, type: 'snapshot' });
+    const reply = lastReply(sent);
+    expect(reply).toMatchObject({ ok: true, ref: 2 });
+    const snapshot = reply && 'snapshot' in reply ? reply.snapshot : undefined;
     expect(snapshot?.character).toBe(character);
     expect(
       snapshot?.components.described?.map(r => r.name as string)

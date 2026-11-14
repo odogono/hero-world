@@ -74,6 +74,13 @@ const playLocal = (path?: string) => {
   };
 };
 
+// a Snapshot as a Local World would reply with it
+const snapshotOf = (character: number) => ({
+  character,
+  components: {},
+  place: 1
+});
+
 const joinedLocal = async (path?: string) => {
   const played = playLocal(path);
   await played.settled();
@@ -201,6 +208,69 @@ describe('a Connection to a Local World', () => {
     });
   });
 
+  test('says why Try it has no snapshot before the Character has joined (#313)', async () => {
+    const local = localAdapter({
+      close: ignore,
+      keep: ignore,
+      name: 'Ada',
+      post: ignore
+    });
+    const asked = local.adapter.snapshot();
+    local.receive({
+      event: 'reply',
+      ok: false,
+      reason: 'not_joined',
+      ref: 'r1'
+    });
+    await expect(asked).rejects.toThrow(
+      "Try it couldn't read where you stand: not_joined"
+    );
+  });
+
+  test('settles each snapshot by its own reply, however late (#313)', async () => {
+    const posted: ToWorld[] = [];
+    const local = localAdapter({
+      close: ignore,
+      keep: ignore,
+      name: 'Ada',
+      post: message => posted.push(message)
+    });
+    const first = local.adapter.snapshot();
+    const second = local.adapter.snapshot();
+    const [one, two] = posted.map(message =>
+      'ref' in message ? message.ref : undefined
+    );
+    // the second is answered first: the first is still waiting for its own
+    local.receive({
+      event: 'reply',
+      ok: true,
+      ref: two,
+      snapshot: snapshotOf(2)
+    });
+    expect((await second)?.character).toBe(2);
+    local.receive({
+      event: 'reply',
+      ok: true,
+      ref: one,
+      snapshot: snapshotOf(1)
+    });
+    expect((await first)?.character).toBe(1);
+  });
+
+  test('gives up on a snapshot when a saved World is loaded in its place (#313)', async () => {
+    const local = localAdapter({
+      close: ignore,
+      keep: ignore,
+      name: 'Ada',
+      post: ignore
+    });
+    const asked = local.adapter.snapshot();
+    local.receive({ event: 'loaded' });
+    await expect(asked).rejects.toThrow(
+      "Try it couldn't read where you stand: a saved World was loaded in its place"
+    );
+  });
+
   test('saves the World, and loads it back in place of this one', async () => {
     const { connection, kept, settled } = await joinedLocal(
       join(mkdtempSync(join(tmpdir(), 'mua-client-')), 'world.db')
@@ -300,7 +370,9 @@ describe('a Connection whatever its World', () => {
       ok: false,
       reason: 'No answer from the World yet: it may have been done.'
     });
-    expect(await connection.snapshot()).toBeUndefined();
+    await expect(connection.snapshot()).rejects.toThrow(
+      "Try it couldn't read where you stand: No answer from the World yet."
+    );
     // the count stays as the World last said
     expect(builder.value?.placed).toBe(0);
 

@@ -163,7 +163,9 @@ export const ComposerPanel = ({
     async (from: Composition, replaces?: number) => {
       const mirror = await snapshot();
       if (!mirror) {
-        throw new Error("There's nowhere to try it yet: wait to be connected.");
+        throw new Error(
+          "Try it couldn't read where you stand: You aren't connected."
+        );
       }
       return client.open({
         tryIt: {
