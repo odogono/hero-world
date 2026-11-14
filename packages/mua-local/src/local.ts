@@ -3,6 +3,7 @@ import {
   components,
   startMuaWorld,
   type MuaWorld,
+  type Patch,
   type PictureUrls,
   type Told
 } from 'mua-world';
@@ -16,10 +17,16 @@ import { get, put, type Eid } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import { EDL_PATH, SCRIPTS_DIR, reader, type WorldFiles } from './files';
-import type { Builder, FromWorld, ToWorld } from './protocol';
-
-/** Commands are at most this long, as on the server */
-const MAX_COMMAND = 500;
+import {
+  checkCommand,
+  checkEdit,
+  checkPlace,
+  checkThing,
+  type Builder,
+  type FromWorld,
+  type Refused,
+  type ToWorld
+} from './protocol';
 
 export type LocalWorldOptions = {
   /** Milliseconds of wall time; `performance.now` by default */
@@ -49,14 +56,11 @@ export type LocalWorldOptions = {
 const LOCAL_SCHEMA =
   'CREATE TABLE IF NOT EXISTS mua_local (key TEXT PRIMARY KEY, value INTEGER NOT NULL)';
 
-type Ref = number | string;
+type Ref = number | string | null;
 
-// A message's `ref`, as the Channel takes it: text, a number or none
+// `stop_editing` and `snapshot` take any `ref`, as the Channel ignores theirs
 const isRef = (ref: unknown): ref is Ref | undefined =>
-  ref === undefined || typeof ref === 'string' || typeof ref === 'number';
-
-const isMap = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
+  ref == null || typeof ref === 'string' || typeof ref === 'number';
 
 // The World's reason for refusing; anything else is the Worker's to report
 const fail = (error: unknown) => {
@@ -242,13 +246,9 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     await refresh();
   };
 
-  const command = async (ref: number | string, text: string) => {
+  const command = async (ref: Ref | undefined, text: string) => {
     if (account === undefined || character === undefined) {
       send({ event: 'reply', ok: false, reason: 'not_joined', ref });
-      return;
-    }
-    if (text.length > MAX_COMMAND) {
-      send({ event: 'reply', ok: false, reason: 'too_long', ref });
       return;
     }
     try {
@@ -264,17 +264,9 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   // Runs one of the Channel's building messages for the local Character,
   // replying with `done`'s payload or the World's reason for refusing
   const building = async (
-    ref: unknown,
+    ref: Ref | undefined,
     run: (account: Eid, character: Eid) => Promise<Record<string, unknown>>
   ) => {
-    if (!isRef(ref)) {
-      send({
-        event: 'reply',
-        ok: false,
-        reason: 'ref must be text or a number'
-      });
-      return;
-    }
     if (account === undefined || character === undefined) {
       send({ event: 'reply', ok: false, reason: 'not_joined', ref });
       return;
@@ -289,49 +281,44 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   };
 
   // A builder's composed thing, placed in the Character's room (#258)
-  const place = (ref: unknown, composition: unknown) => {
-    if (!isMap(composition)) {
-      send({
-        event: 'reply',
-        ok: false,
-        reason: 'a place needs a composition'
-      });
-      return;
-    }
-    return building(ref, async (a, c) => {
+  const place = (ref: Ref | undefined, composition: Record<string, unknown>) =>
+    building(ref, async (a, c) => {
       const { eid, maxPlaced, placed } = await mua.place(a, c, composition);
       return { eid, max_placed: maxPlaced, placed };
     });
-  };
 
   // Saving an edit to the placed thing the `edit` Verb opened (#274)
-  const edit = (ref: unknown, eid: unknown, patch: unknown) => {
-    if (!Number.isInteger(eid) || !isMap(patch)) {
-      send({
-        event: 'reply',
-        ok: false,
-        reason: 'an edit needs an eid and a patch'
-      });
-      return;
-    }
-    return building(ref, (a, c) => mua.edit(a, c, eid as Eid, patch));
-  };
+  const edit = (ref: Ref | undefined, eid: Eid, patch: Patch) =>
+    building(ref, (a, c) => mua.edit(a, c, eid, patch));
 
   // Storing or destroying the placed thing the `edit` Verb opened, from
   // the Composer, as the `store` and `destroy` Verbs do (#284)
-  const putAway = (ref: unknown, eid: unknown, verb: 'destroy' | 'store') => {
-    if (!Number.isInteger(eid)) {
+  const putAway = (ref: Ref | undefined, eid: Eid, verb: 'destroy' | 'store') =>
+    building(ref, async (a, c) => {
+      const done = await mua.putAway(a, c, eid, verb);
+      return { eid: done.eid, max_placed: done.maxPlaced, placed: done.placed };
+    });
+
+  // A message whose form its check refuses gets the Channel's reason and
+  // never reaches the World; any other goes on to `run`. The reply carries
+  // the message's `ref` if it has a usable one, as the client matches
+  // replies by it, where a Channel's reply has its own.
+  const checked = <T extends object>(
+    fields: Record<string, unknown>,
+    form: Refused | T,
+    run: (message: T) => Promise<void> | undefined
+  ) => {
+    if ('refused' in form) {
+      const { ref } = fields;
       send({
         event: 'reply',
         ok: false,
-        reason: 'it needs the eid of the thing'
+        reason: form.refused,
+        ...(typeof ref === 'string' || typeof ref === 'number' ? { ref } : {})
       });
       return;
     }
-    return building(ref, async (a, c) => {
-      const done = await mua.putAway(a, c, eid as Eid, verb);
-      return { eid: done.eid, max_placed: done.maxPlaced, placed: done.placed };
-    });
+    return run(form);
   };
 
   // Closing the Composer without saving: the client asked, so no `closed`
@@ -391,20 +378,32 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   return {
     /** Handles one message from the UI */
     receive: (message: ToWorld) => {
+      // what arrives is checked as the Channel checks it, whatever its type
+      const fields = message as unknown as Record<string, unknown>;
       switch (message.type) {
         case 'join':
           return join(message.name);
         case 'command':
-          return command(message.ref, message.text);
+          return checked(fields, checkCommand(fields), m =>
+            command(m.ref, m.text)
+          );
         case 'logout':
           return logout();
         case 'place':
-          return place(message.ref, message.composition);
+          return checked(fields, checkPlace(fields), m =>
+            place(m.ref, m.composition)
+          );
         case 'edit':
-          return edit(message.ref, message.eid, message.patch);
+          return checked(fields, checkEdit(fields), m =>
+            edit(m.ref, m.eid, m.patch)
+          );
         case 'store':
-        case 'destroy':
-          return putAway(message.ref, message.eid, message.type);
+        case 'destroy': {
+          const verb = message.type;
+          return checked(fields, checkThing(fields), m =>
+            putAway(m.ref, m.eid, verb)
+          );
+        }
         case 'stop_editing':
           return stopEditing(message.ref);
         case 'snapshot':

@@ -128,14 +128,14 @@ describe('a Connection to a Local World', () => {
     expect(texts().join('\n')).toContain('The Square');
   });
 
-  test("shows the World's reason for refusing a command", async () => {
+  test('shows why a command was refused', async () => {
     const { connection, settled } = await joinedLocal();
     connection.sendCommand('x'.repeat(501));
     await settled();
     expect(lines.value.find(line => line.kind === 'command')).toMatchObject({
       state: 'unconfirmed'
     });
-    expect(texts()).toContain('Not sent: too_long');
+    expect(texts()).toContain('Not sent: command too long');
   });
 
   test('places, edits, stores and destroys a satchel, keeping the count', async () => {

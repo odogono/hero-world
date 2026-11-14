@@ -3,10 +3,16 @@
  * Channel's (packages/mua_server/docs/protocol.md), so `mua_client` can't
  * tell a Local World from a server's (ADR 0023). A Channel message's reply
  * comes back as `reply`, with the same `ref` and payload.
+ *
+ * A message's form is checked here, as `MuaServer.Protocol` checks it,
+ * function for function and with the same reasons, which the shared cases
+ * in `spec/mua/protocol` pin. The one reason only a Local World gives is
+ * `not_joined`, for a message before `join`: a Channel can't receive one.
  */
 import type { Editing, MirrorSnapshot, Patch, View } from 'mua-world';
 
-type Ref = number | string;
+/** A message's `ref`: text or a whole number, or null as on the Channel */
+type Ref = number | string | null;
 
 /** From the UI */
 export type ToWorld =
@@ -78,3 +84,71 @@ export type FromWorld =
   | { event: 'loadFailed'; message: string }
   /** The World couldn't start or carry on */
   | { event: 'error'; message: string };
+
+/** Commands are at most this many characters once trimmed, as on the server */
+const MAX_TEXT = 500;
+
+const REF = 'ref must be text or a number';
+
+/** Why a message's form was refused, before the World saw it */
+export type Refused = { refused: string };
+
+const isRef = (ref: unknown): ref is Ref | undefined =>
+  ref == null || typeof ref === 'string' || Number.isInteger(ref);
+
+const isMap = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// Characters as Elixir's `String.length` counts them: graphemes
+const length = (text: string) => [...new Intl.Segmenter().segment(text)].length;
+
+/** A `command`, as `MuaServer.Protocol.command/1` checks it */
+export const checkCommand = (
+  m: Record<string, unknown>
+): Refused | { ref: Ref | undefined; text: string } => {
+  if (typeof m.text !== 'string') {
+    return { refused: 'a command needs text' };
+  }
+  const text = m.text.trim();
+  if (text === '') {
+    return { refused: 'empty command' };
+  }
+  if (length(text) > MAX_TEXT) {
+    return { refused: 'command too long' };
+  }
+  return isRef(m.ref) ? { ref: m.ref, text } : { refused: REF };
+};
+
+/** A `place`, as `MuaServer.Protocol.place/1` checks it */
+export const checkPlace = (
+  m: Record<string, unknown>
+): Refused | { composition: Record<string, unknown>; ref: Ref | undefined } => {
+  if (!isMap(m.composition)) {
+    return { refused: 'a place needs a composition' };
+  }
+  return isRef(m.ref)
+    ? { composition: m.composition, ref: m.ref }
+    : { refused: REF };
+};
+
+/** An `edit`, as `MuaServer.Protocol.edit/1` checks it */
+export const checkEdit = (
+  m: Record<string, unknown>
+): Refused | { eid: number; patch: Patch; ref: Ref | undefined } => {
+  if (!Number.isInteger(m.eid) || !isMap(m.patch)) {
+    return { refused: 'an edit needs an eid and a patch' };
+  }
+  return isRef(m.ref)
+    ? { eid: m.eid as number, patch: m.patch as Patch, ref: m.ref }
+    : { refused: REF };
+};
+
+/** A `store` or `destroy`, as `MuaServer.Protocol.thing/1` checks it */
+export const checkThing = (
+  m: Record<string, unknown>
+): Refused | { eid: number; ref: Ref | undefined } => {
+  if (!Number.isInteger(m.eid)) {
+    return { refused: 'it needs the eid of the thing' };
+  }
+  return isRef(m.ref) ? { eid: m.eid as number, ref: m.ref } : { refused: REF };
+};
