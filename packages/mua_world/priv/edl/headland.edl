@@ -32,6 +32,7 @@ entity headland: headland_room causeway_end tidal {
     name: "Headland"
     description: "Short turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island."
   }
+  picture { src: "pictures/headland.png" }
   shore {
     high: "The tide is in, and the sea pours over the causeway."
     low: "The tide is out, and the causeway is clear to cross."

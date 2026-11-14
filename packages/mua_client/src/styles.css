@@ -1149,3 +1149,37 @@ button.compose-toggle[aria-pressed='true'] {
     border-left: 0;
   }
 }
+
+/* A place's Picture, just before its description (ADR 0027): pixel art
+   drawn at 480×192, scaled up with its pixels kept square. Folded, it is
+   its place's name, which shows it again. */
+.line.picture {
+  margin-top: 0.9rem;
+  white-space: normal;
+}
+
+.picture-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.picture-name:hover {
+  color: var(--accent);
+}
+
+.picture-image {
+  display: block;
+  width: 100%;
+  max-width: 960px;
+  height: auto;
+  margin-top: 0.35rem;
+  aspect-ratio: 5 / 2;
+  border-radius: 2px;
+  background: var(--rule);
+  image-rendering: pixelated;
+}

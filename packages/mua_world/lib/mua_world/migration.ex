@@ -47,7 +47,7 @@ defmodule MuaWorld.Migration do
       end
 
     finish = fn world, plan ->
-      with {:ok, report} <- finish(world, plan, starting_room) do
+      with {:ok, report} <- finish(world, plan, starting_room, opts[:path]) do
         Process.put(report_key, report)
         :ok
       end
@@ -70,7 +70,7 @@ defmodule MuaWorld.Migration do
     end
   end
 
-  defp finish(world, plan, starting_room) do
+  defp finish(world, plan, starting_room, path) do
     starting = OdgnEdl.entity_named(world, starting_room)
     pruned = if plan.pruned, do: Enum.map(plan.gone, & &1.eid), else: []
 
@@ -89,13 +89,28 @@ defmodule MuaWorld.Migration do
     Exits.expand(world)
     Lifecycle.record_homes(world)
 
+    with {:ok, _} <- starting(world, starting_room),
+         :ok <- pictures(world, path) do
+      {:ok, %{exits_remade: rooms, timers_cancelled: cancelled}}
+    end
+  end
+
+  defp starting(world, starting_room) do
     case Places.ensure(world, starting_room) do
-      {:ok, _} ->
-        {:ok, %{exits_remade: rooms, timers_cancelled: cancelled}}
+      {:ok, places} ->
+        {:ok, places}
 
       {:error, reason} ->
         {:error, "the Migration would leave the World without a Starting room: #{reason}"}
     end
+  end
+
+  # Every place's Picture has a file beside the EDL (ADR 0027); with no
+  # `.edl` file to look beside, there is nothing to check against
+  defp pictures(_world, nil), do: :ok
+
+  defp pictures(world, path) do
+    with {:ok, _urls} <- MuaWorld.Pictures.load(world, path), do: :ok
   end
 
   # Entities the Migration changed a component of

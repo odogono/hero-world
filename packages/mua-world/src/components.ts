@@ -161,6 +161,15 @@ const described = defineComponent({
   schema: { description: s.string().optional(), name: s.string().optional() }
 });
 
+/**
+ * A place's Picture, shown with its description (ADR 0027): a file under
+ * the World Definition's `pictures/`. Builders can't set one.
+ */
+const picture = defineComponent({
+  id: 'picture',
+  schema: { src: s.string().optional() }
+});
+
 const account = defineComponent({
   id: 'account',
   playState: true,
@@ -236,6 +245,7 @@ export const components = [
   messages,
   script,
   described,
+  picture,
   account,
   builder,
   editing,

@@ -40,6 +40,8 @@ export type Builder = {
 export type FromWorld =
   /** `suggestions` are Commands the last line offers, to send in one click */
   | { event: 'output'; lines: string[]; suggestions?: string[] }
+  /** A place's Picture, just before its description (ADR 0027) */
+  | { alt: string; event: 'picture'; name: string; url: string }
   | { event: 'prompt'; options: string[]; text: string }
   | { event: 'state'; state: View }
   | { event: 'status'; status: 'connected' | 'limbo' }

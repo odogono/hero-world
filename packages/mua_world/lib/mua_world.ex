@@ -388,39 +388,54 @@ defmodule MuaWorld do
     Exits.expand(world)
     abandoned = Tables.abandon_waiting(world)
 
-    case Places.ensure(world, opts[:starting_room]) do
-      {:ok, places} ->
-        Lifecycle.record_homes(world)
-        :ok = OdgnEcs.commit(world)
-        state = %{state | vocabulary: Verbs.from_world(world), places: places}
+    with {:ok, places} <- Places.ensure(world, opts[:starting_room]),
+         {:ok, pictures} <- pictures(world, opts[:edl]) do
+      Lifecycle.record_homes(world)
+      :ok = OdgnEcs.commit(world)
+      state = %{state | vocabulary: Verbs.from_world(world), places: places}
 
-        case start_talk(state, Keyword.get(opts, :limits, [])) do
-          {:ok, state} ->
-            state = start_world(start_engine(state))
-            # a test's `fault` is for the Steps that follow start-up
-            state = put_in(state.engine.fault, opts[:fault])
-            if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
-            started(path, how, state.world_ms, abandoned)
-            {:ok, state}
+      case start_talk(state, Keyword.get(opts, :limits, []), pictures) do
+        {:ok, state} ->
+          state = start_world(start_engine(state))
+          # a test's `fault` is for the Steps that follow start-up
+          state = put_in(state.engine.fault, opts[:fault])
+          if is_integer(state.tick), do: Process.send_after(self(), :tick, state.tick)
+          started(path, how, state.world_ms, abandoned)
+          {:ok, state}
 
-          {:error, {script, reason}} ->
-            diagnostics = diagnostics(reason)
+        {:error, {script, reason}} ->
+          diagnostics = diagnostics(reason)
 
-            for d <- diagnostics do
-              at = Enum.join(Enum.reject([script, d["line"], d["col"]], &is_nil/1), ":")
-              Logger.error("#{at} #{d["message"]}", event: :script_load_failed)
-            end
+          for d <- diagnostics do
+            at = Enum.join(Enum.reject([script, d["line"], d["col"]], &is_nil/1), ":")
+            Logger.error("#{at} #{d["message"]}", event: :script_load_failed)
+          end
 
-            OdgnEcs.close(world)
-            Lock.release(path)
-            {:stop, {:script_load_failed, script, diagnostics}}
-        end
+          OdgnEcs.close(world)
+          Lock.release(path)
+          {:stop, {:script_load_failed, script, diagnostics}}
+      end
+    else
+      {:error, {:pictures, message}} ->
+        Logger.error("World at #{path} can't start: #{message}", event: :world_not_started)
+        :ok = OdgnEcs.rollback(world)
+        OdgnEcs.close(world)
+        Lock.release(path)
+        {:stop, {:pictures, message}}
 
       {:error, reason} ->
         :ok = OdgnEcs.rollback(world)
         OdgnEcs.close(world)
         Lock.release(path)
         {:stop, {:invalid_starting_room, reason}}
+    end
+  end
+
+  # Every place's Picture, checked against the files beside the EDL
+  defp pictures(world, edl_path) do
+    case MuaWorld.Pictures.load(world, edl_path) do
+      {:ok, urls} -> {:ok, urls}
+      {:error, message} -> {:error, {:pictures, message}}
     end
   end
 
@@ -451,8 +466,9 @@ defmodule MuaWorld do
 
   defp ok!({:ok, value}), do: value
 
-  defp start_talk(state, limits) do
+  defp start_talk(state, limits, pictures) do
     table = Talk.table()
+    Talk.put_pictures(table, pictures)
 
     with {:ok, talk} <- Talk.start(state.world, table, limits),
          do: {:ok, %{state | talk: talk, table: table}}

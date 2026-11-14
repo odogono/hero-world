@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
-import type { Status } from './store';
+import { savePictureMode, type PictureMode } from './history';
+import { pictureMode, type Status } from './store';
+
+// Each click of Pictures moves to the next way of showing them
+const NEXT_MODE: Record<PictureMode, PictureMode> = {
+  collapsed: 'off',
+  off: 'shown',
+  shown: 'collapsed'
+};
+
+const MODE_TEXT: Record<PictureMode, string> = {
+  collapsed: 'folded',
+  off: 'off',
+  shown: 'shown'
+};
 
 /**
  * The profile badge: the Character's initial, which opens a menu with who
@@ -68,6 +82,25 @@ export const Profile = ({
             {admin && <span class="pill">Admin</span>}
           </div>
           <div class={`status ${status}`}>{statusText}</div>
+          {/* places' Pictures (ADR 0027): shown, folded to their names, or
+              left out of the transcript */}
+          <button
+            class="profile-item"
+            onClick={() => {
+              const next = NEXT_MODE[pictureMode.value];
+              pictureMode.value = next;
+              savePictureMode(next);
+            }}
+            role="menuitem"
+            title="Show places' Pictures, fold them to their names, or leave them out"
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 16 16">
+              <rect height="9" rx="1" width="13" x="1.5" y="3.5" />
+              <path d="m1.5 11 4-3.5 3 2.5 2-1.5 4 3" />
+            </svg>
+            Pictures: {MODE_TEXT[pictureMode.value]}
+          </button>
           <button
             aria-disabled="true"
             class="profile-item"

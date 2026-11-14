@@ -217,7 +217,10 @@ const load = async (options: PreviewOptions) => {
     const changes: ChangeSetEntry[] = [];
     collect = changes;
     try {
-      const lines = await mua.command(account, author, text);
+      // a Preview shows what the author was told as text, without Pictures
+      const lines = (await mua.command(account, author, text)).filter(
+        (told): told is string => typeof told === 'string'
+      );
       return tried
         ? {
             changes,

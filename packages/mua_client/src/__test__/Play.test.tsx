@@ -45,6 +45,7 @@ const {
   commands: sentCommands,
   editing,
   lines,
+  pictureMode,
   status
 } = await import('../store');
 
@@ -56,6 +57,7 @@ afterEach(() => {
   editing.value = null;
   stopped = 0;
   lines.value = [];
+  pictureMode.value = 'shown';
   sentCommands.value = [];
   status.value = 'connecting';
 });
@@ -63,6 +65,70 @@ afterEach(() => {
 const input = () => screen.getByLabelText('Command') as HTMLTextAreaElement;
 
 const badge = () => screen.getByRole('button', { name: /profile menu/ });
+
+// Two places' Pictures, each before its description (ADR 0027)
+const twoPictures = () => {
+  let next = append([], {
+    alt: 'Worn granite steps.',
+    kind: 'picture',
+    name: 'Harbour Steps',
+    url: '/pictures/harbour_steps.png?vsn=a'
+  });
+  next = append(next, { kind: 'output', text: 'Harbour Steps' });
+  next = append(next, {
+    alt: 'A yard of cradles.',
+    kind: 'picture',
+    name: 'Boatyard',
+    url: '/pictures/boatyard.png?vsn=b'
+  });
+  return append(next, { kind: 'output', text: 'Boatyard' });
+};
+
+const fold = (name: string) =>
+  screen.getByRole('button', { name: new RegExp(name) });
+
+describe("places' Pictures", () => {
+  test('show the newest, and fold older ones to their names', () => {
+    lines.value = twoPictures();
+    render(<Play name="Ada" onLeft={() => {}} />);
+
+    const images = screen.getAllByRole('img');
+    expect(images.map(i => i.getAttribute('alt'))).toEqual([
+      'A yard of cradles.'
+    ]);
+    expect(fold('Boatyard').getAttribute('aria-expanded')).toBe('true');
+    expect(fold('Harbour Steps').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  test('a folded Picture shows when its name is clicked, and folds again', () => {
+    lines.value = twoPictures();
+    render(<Play name="Ada" onLeft={() => {}} />);
+
+    fireEvent.click(fold('Harbour Steps'));
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+    fireEvent.click(fold('Boatyard'));
+    expect(screen.getAllByRole('img').map(i => i.getAttribute('alt'))).toEqual([
+      'Worn granite steps.'
+    ]);
+  });
+
+  test('arrive folded, or are left out, as the reader sets in the profile menu', () => {
+    lines.value = twoPictures();
+    render(<Play name="Ada" onLeft={() => {}} />);
+
+    fireEvent.click(badge());
+    fireEvent.click(screen.getByRole('menuitem', { name: /Pictures: shown/ }));
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+    expect(fold('Boatyard').getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /Pictures: folded/ }));
+    expect(screen.queryByRole('button', { name: /Boatyard/ })).toBeNull();
+    expect(localStorage.getItem('mua-settings:pictures')).toBe('off');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /Pictures: off/ }));
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+  });
+});
 
 describe('the play screen', () => {
   test('takes commands only while joined', () => {

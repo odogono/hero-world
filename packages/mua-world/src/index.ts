@@ -17,6 +17,8 @@ export {
   type Patch
 } from './host/world';
 export type { View } from './host/view';
+export type { Picture, Told } from './host/tables';
+export { loadPictures, pictureUrl, type PictureUrls } from './host/pictures';
 export {
   mirrorComponents,
   type MirrorRow,

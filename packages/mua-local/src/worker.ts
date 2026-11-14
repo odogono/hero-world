@@ -6,7 +6,10 @@
  * World time advances only while the Worker runs.
  */
 // a macro: the World's files are read and inlined when the Worker is bundled
-import { worldFiles } from '../scripts/files' with { type: 'macro' };
+import {
+  worldFiles,
+  worldPictures
+} from '../scripts/files' with { type: 'macro' };
 import { createLocalHost } from './local';
 import type { FromWorld, ToWorld } from './protocol';
 
@@ -30,6 +33,7 @@ const report = (error: unknown) =>
 const host = createLocalHost({
   database: { opfs: true, path: `/${DATABASE}`, type: 'wasm' },
   files: worldFiles(),
+  pictures: worldPictures(),
   send
 });
 

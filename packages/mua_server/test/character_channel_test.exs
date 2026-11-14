@@ -88,6 +88,20 @@ defmodule MuaServer.CharacterChannelTest do
       refute in_limbo?(ada)
     end
 
+    test "a place's Picture arrives just before its description", %{ada: ada} do
+      a = join_as(ada)
+
+      ref = push(a, "command", %{"text" => "look", "ref" => "p1"})
+      assert_reply(ref, :ok, %{ref: "p1"})
+
+      assert_push("picture", %{
+        url: "/pictures/harbour_steps.png?vsn=" <> _,
+        name: "Harbour Steps"
+      })
+
+      assert_push("output", %{lines: ["Harbour Steps\n" <> _]})
+    end
+
     test "a command's output arrives after its reply, and then the view", %{ada: ada, bob: bob} do
       a = join_as(ada)
       _b = join_as(bob)

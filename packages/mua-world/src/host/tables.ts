@@ -8,7 +8,7 @@ import { get, type Eid, type Store } from 'odgn-ecs/store';
  * NPC queue. Sign-in identities are the server's, so a Local World has none.
  */
 const SCHEMA = [
-  'CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT)',
+  'CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT, picture TEXT)',
   'CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS mua_identities (sub TEXT PRIMARY KEY, email TEXT, account INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL)'
@@ -32,6 +32,15 @@ export const ensureMuaTables = (store: Store) => {
   if (!hasSuggestions) {
     store.db.exec('ALTER TABLE mua_outbox ADD COLUMN suggestions TEXT');
   }
+  // a World made before places had Pictures (ADR 0027)
+  const hasPicture =
+    rows(
+      store,
+      "SELECT 1 FROM pragma_table_info('mua_outbox') WHERE name = 'picture'"
+    ).length > 0;
+  if (!hasPicture) {
+    store.db.exec('ALTER TABLE mua_outbox ADD COLUMN picture TEXT');
+  }
 };
 
 /** The Characters (entities with `player`) whose Location is `place` */
@@ -39,10 +48,20 @@ export const charactersAt = (store: Store, place: Eid): Eid[] =>
   elements(store, place, { with: ['player'] });
 
 /**
+ * A place's Picture (ADR 0027): its `src` beside the EDL, the URL it is
+ * served at, and the place's name and description, which stand in for it
+ * where it isn't shown
+ */
+export type Picture = { alt: string; name: string; src: string; url: string };
+
+/** What a Character is told: a line of text, or a place's Picture */
+export type Told = string | { picture: Picture };
+
+/**
  * A line a Character is told, and the Commands it offers to send with one
  * click (#275), as `MuaWorld.Tables` keeps them
  */
-export type Line = [character: Eid, text: string, suggestions?: string[]];
+export type Line = [character: Eid, told: Told, suggestions?: string[]];
 
 /**
  * Queues a line for a Character, once the Step commits. `suggestions` are
@@ -65,6 +84,16 @@ export const output = (
       );
 
 /**
+ * Queues a place's Picture for a Character, once the Step commits. Its
+ * `text` is the place's name, for anything that reads lines as text.
+ */
+export const outputPicture = (store: Store, character: Eid, picture: Picture) =>
+  store.db.exec(
+    'INSERT INTO mua_outbox (character, text, picture) VALUES (?1, ?2, ?3)',
+    [character, picture.name, JSON.stringify(picture)]
+  );
+
+/**
  * Tells an entity something: a Character hears it; any other entity (a
  * room, a box) passes it to the Characters inside it, but for `except`.
  */
@@ -82,20 +111,28 @@ export const tell = (store: Store, to: Eid, text: string, except?: Eid) => {
 
 /**
  * Takes the Step's output, inside the Step's transaction: each line with
- * its Suggestions, when it offers any
+ * its Suggestions, when it offers any, or a place's Picture
  */
 export const takeOutbox = (store: Store): Line[] => {
   const out = rows<{
     character: Eid;
+    picture: string | null;
     suggestions: string | null;
     text: string;
-  }>(store, 'SELECT character, text, suggestions FROM mua_outbox ORDER BY id');
-  store.db.exec('DELETE FROM mua_outbox');
-  return out.map(({ character, suggestions, text }) =>
-    suggestions === null
-      ? [character, text]
-      : [character, text, JSON.parse(suggestions) as string[]]
+  }>(
+    store,
+    'SELECT character, text, suggestions, picture FROM mua_outbox ORDER BY id'
   );
+  store.db.exec('DELETE FROM mua_outbox');
+  return out.map(({ character, picture, suggestions, text }): Line => {
+    if (picture !== null) {
+      const { alt, name, src, url } = JSON.parse(picture) as Picture;
+      return [character, { picture: { alt, name, src, url } }];
+    }
+    return suggestions === null
+      ? [character, text]
+      : [character, text, JSON.parse(suggestions) as string[]];
+  });
 };
 
 /**

@@ -38,6 +38,19 @@ defmodule MuaServer.AuthTest do
     assert conn.status in [200, 404]
   end
 
+  # beside the World's EDL, cached for good when the URL carries its hash
+  # (ADR 0027)
+  test "serves a place's Picture" do
+    conn = get(build_conn(), "/pictures/harbour_steps.png?vsn=abc")
+    assert conn.status == 200
+    assert get_resp_header(conn, "content-type") == ["image/png"]
+    assert [cache] = get_resp_header(conn, "cache-control")
+    assert cache =~ "immutable"
+
+    assert get(build_conn(), "/pictures/nowhere.png").status == 404
+    assert_error_sent(400, fn -> get(build_conn(), "/pictures/../main.edl") end)
+  end
+
   # so a Local World's Worker can use sqlite-wasm in OPFS (ADR 0023)
   test "isolates every page from other origins" do
     for path <- ["/", "/api/session", "/health"] do

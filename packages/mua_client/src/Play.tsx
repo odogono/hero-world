@@ -19,10 +19,11 @@ import {
   commands,
   editing,
   lines,
+  pictureMode,
   status,
   type Status
 } from './store';
-import type { Line } from './transcript';
+import { pictureOpened, pictureShown, type Line } from './transcript';
 
 const STATUS_TEXT: Record<Status, string> = {
   connecting: 'Connecting…',
@@ -41,13 +42,46 @@ const STATUS_TEXT: Record<Status, string> = {
 const TranscriptLine = ({
   answerable,
   joined,
-  line
+  line,
+  newestPicture
 }: {
   answerable: boolean;
   joined: boolean;
   line: Line;
+  /** whether the line is the newest Picture, which shows unless folded */
+  newestPicture: boolean;
 }) => {
   switch (line.kind) {
+    case 'picture': {
+      // a place's Picture (ADR 0027): only the newest shows, unless the
+      // reader shows or folds one, or Pictures arrive folded
+      const mode = pictureMode.value === 'collapsed' ? 'collapsed' : 'shown';
+      const shown = pictureShown(line, newestPicture, mode);
+      return (
+        <li class={shown ? 'line picture' : 'line picture folded'}>
+          <button
+            aria-expanded={shown}
+            class="picture-name"
+            onClick={() => {
+              lines.value = pictureOpened(lines.value, line.id, !shown);
+            }}
+            type="button"
+          >
+            <span aria-hidden="true">{shown ? '▾' : '▸'}</span> {line.name}
+          </button>
+          {shown && (
+            <img
+              alt={line.alt}
+              class="picture-image"
+              decoding="async"
+              height={192}
+              src={line.url}
+              width={480}
+            />
+          )}
+        </li>
+      );
+    }
     case 'command':
       return (
         <li class={`line command ${line.state}`}>
@@ -327,6 +361,14 @@ export const Play = ({
   const composing = (building || opened !== null) && limits !== null && joined;
   const count = lines.value.length;
   const lastPrompt = lines.value.findLast(line => line.kind === 'prompt')?.id;
+  const newestPicture = lines.value.findLast(
+    line => line.kind === 'picture'
+  )?.id;
+  // with Pictures off, the transcript leaves them out
+  const shown =
+    pictureMode.value === 'off'
+      ? lines.value.filter(line => line.kind !== 'picture')
+      : lines.value;
 
   useEffect(() => {
     // reading back up stops the transcript following new lines, until the
@@ -394,12 +436,13 @@ export const Play = ({
               : 'no';
         }}
       >
-        {lines.value.map(line => (
+        {shown.map(line => (
           <TranscriptLine
             answerable={joined && line.id === lastPrompt}
             joined={joined}
             key={line.id}
             line={line}
+            newestPicture={line.id === newestPicture}
           />
         ))}
         <li aria-hidden="true" ref={end} />

@@ -59,7 +59,10 @@ defmodule MuaWorld.AccountsTest do
                MuaWorld.enter(world, account, bob)
 
       assert location(world, bob) == MuaWorld.named(world, "harbour_steps")
-      assert {:ok, [look]} = MuaWorld.command(world, account, bob, "look")
+
+      assert {:ok, [%{picture: %{src: "pictures/harbour_steps.png"}}, look]} =
+               MuaWorld.command(world, account, bob, "look")
+
       assert look =~ "Harbour Steps"
     end
 
