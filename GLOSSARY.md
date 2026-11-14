@@ -241,7 +241,7 @@ NorthTalk code attached to an atom or entity that decides how it behaves.
 _Avoid_: behaviour (for the code), handler
 
 **Service Script**:
-A Script that belongs to no entity and carries out an Action for every World.
+A named Script that belongs to no entity, declared by the World, and carries out Actions for the whole World. Which Service Scripts a World has is World data, never Host code.
 _Avoid_: built-in, system script
 
 ## Commands
@@ -251,11 +251,11 @@ One thing a Character or NPC asks to do, a Verb with its bound entities and text
 _Avoid_: action, input, order
 
 **Verb**:
-A named kind of Command, with the forms it can be typed in and the Reach of each noun. Verbs are World data, never Host code.
+A named kind of Command, with the forms it can be typed in, the Action each form asks for, and the Reach of each noun. Verbs are World data, never Host code.
 _Avoid_: command (for the kind)
 
 **Action**:
-The change a Command makes to the World once nothing has Vetoed it, carried out by a Service Script.
+A named change a Command makes to the World once nothing has Vetoed it. Each Action names the Service Script that carries it out and what that Script is given; several forms, of one Verb or many, may ask for the same Action.
 _Avoid_: built-in, effect
 
 **Reach**:
