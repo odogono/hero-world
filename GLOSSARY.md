@@ -70,6 +70,14 @@ _Avoid_: offline world, save game
 A private, disposable World for trying something out, which is never saved and never reaches another World.
 _Avoid_: sandbox, test world, scratch world
 
+**Try it**:
+A Preview World built from where the Character stands, for trying a composition before it is placed or changed.
+_Avoid_: test, dry run
+
+**Mirror**:
+A client's copy of what its Character perceives of the server's World, kept current while playing online. It is never authoritative.
+_Avoid_: replica, cache, shadow world
+
 **Entity**:
 A thing that exists in a World and carries components. It is nothing but its id.
 _Avoid_: object, instance
