@@ -44,7 +44,7 @@ export type Builder = {
   placed: number;
 };
 
-/** `null` for an Account that doesn't build, or playing offline */
+/** `null` for an Account that doesn't build */
 export const builder = signal<Builder | null>(null);
 
 /**
@@ -59,3 +59,6 @@ export type Editing = {
 
 /** `null` while nothing is open to edit */
 export const editing = signal<Editing | null>(null);
+
+/** Whether the World played now can be saved as a file and loaded from one */
+export const saving = signal(false);

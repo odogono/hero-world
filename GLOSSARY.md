@@ -17,8 +17,8 @@ An Entity a person plays through, owned by an Account and known in the World by 
 _Avoid_: account, login
 
 **Connection**:
-A browser's link through which a Player controls their Character. A Character has at most one controlling Connection; a new one takes over from the old.
-_Avoid_: session, socket
+A browser's link to a World, a server's or a Local World, through which a Player controls their Character. A Character has at most one controlling Connection; a new one takes over from the old.
+_Avoid_: session, socket, channel, transport
 
 **Allowlist**:
 The Google identities admitted to the game while it is invite-only. Signing in proves who someone is; the Allowlist decides whether they may enter.
