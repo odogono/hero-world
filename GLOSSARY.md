@@ -114,6 +114,10 @@ _Avoid_: starting room, origin
 What a Character can currently know about the World: its place, the Elements there that it can see, and what it carries. Nothing outside it reaches that Character's Player.
 _Avoid_: view, visibility, scope
 
+**Picture**:
+An illustration of a place, part of its World Definition, shown to a Player alongside the place's description. A place has at most one, and only places have them.
+_Avoid_: graphic, image (for the concept), art
+
 **Starting room**:
 Where a Character enters the World when it has nowhere valid to return to.
 _Avoid_: home, spawn
