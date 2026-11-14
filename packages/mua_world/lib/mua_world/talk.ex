@@ -15,6 +15,9 @@ defmodule MuaWorld.Talk do
   - `editors thing`: the Characters who have `thing` open in the composer.
   - `placed account`: how many things the Account has placed, by their
     `made_by`, for a builder's quota (#258).
+  - `picture place, actor`: shows `place`'s Picture to `actor`, if it is a
+    Character and the place has one (ADR 0027). The `rooms` Library's
+    `describe` sends it, so it arrives just before the description.
   - `notice place, message, who, text`: sends `message who` (or
     `message who, text` when `text` is given) to the Scripts of the things
     in a place but `who`, once the Run's Pump ends.
@@ -43,6 +46,16 @@ defmodule MuaWorld.Talk do
 
   @doc "A table for queued notices, shared with callbacks."
   def table, do: :ets.new(:mua_talk, [:set, :public])
+
+  @doc "Keeps the World's Pictures (`MuaWorld.Pictures.load/2`) for callbacks."
+  def put_pictures(table, urls), do: :ets.insert(table, {:pictures, urls})
+
+  defp pictures(table) do
+    case :ets.lookup(table, :pictures) do
+      [{:pictures, urls}] -> urls
+      [] -> %{}
+    end
+  end
 
   @doc "The notices Scripts asked for since the last call, oldest first."
   def take_notices(table) do
@@ -175,6 +188,18 @@ defmodule MuaWorld.Talk do
              [] -> {:ok, nil}
              characters -> {:ok, handle(Enum.min(characters))}
            end
+         end},
+      "picture" =>
+        {[args: [entity, entity], cost: 1, mode: :fire_and_forget, command: true],
+         fn [place, actor], _ ->
+           place = Values.from_value(place)
+           actor = Values.from_value(actor)
+
+           with true <- OdgnEcs.get(world, actor, "player") != nil,
+                %{} = line <- MuaWorld.Pictures.line(world, place, pictures(table)),
+                do: MuaWorld.Tables.picture(world, actor, line)
+
+           :noreply
          end},
       "notice" =>
         {[

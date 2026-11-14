@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
 
-import { worldFiles } from '../../scripts/files';
+import { worldFiles, worldPictures } from '../../scripts/files';
 import { EDL_PATH } from '../files';
 import { openLocalWorld } from '../local';
 import type { FromWorld } from '../protocol';
@@ -20,6 +20,7 @@ const open = async (path = ':memory:', files = FILES) => {
     clock: () => 0,
     database: { path, type: DatabaseType.BUN },
     files,
+    pictures: worldPictures(),
     send: message => sent.push(message)
   });
   return { local, sent };
@@ -74,6 +75,25 @@ describe('a Local World', () => {
     expect(events(sent, 'state')[0]).toMatchObject({
       state: { room: { name: 'The Square' } }
     });
+  });
+
+  test("shows a place's Picture just before its description (ADR 0027)", async () => {
+    const { local, sent } = await open();
+    await local.receive({ name: 'Ada', type: 'join' });
+    sent.length = 0;
+    await local.receive({ ref: 1, text: 'look', type: 'command' });
+    const told = sent.filter(
+      m => m.event === 'picture' || m.event === 'output'
+    );
+    expect(told[0]).toEqual({
+      alt: expect.stringMatching(/^Worn granite steps/) as never,
+      event: 'picture',
+      name: 'Harbour Steps',
+      url: expect.stringMatching(
+        /^\/pictures\/harbour_steps\.png\?vsn=[0-9a-f]{12}$/
+      ) as never
+    });
+    expect(told[1]).toMatchObject({ event: 'output' });
   });
 
   test('refuses a command too long, or before joining', async () => {

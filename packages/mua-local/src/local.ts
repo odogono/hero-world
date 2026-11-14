@@ -2,7 +2,9 @@ import {
   MuaWorldError,
   components,
   startMuaWorld,
-  type MuaWorld
+  type MuaWorld,
+  type PictureUrls,
+  type Told
 } from 'mua-world';
 import {
   isSqliteFile,
@@ -26,6 +28,11 @@ export type LocalWorldOptions = {
   database: CreateDatabaseOptions;
   /** The World's files, from `scripts/files.ts` */
   files: WorldFiles;
+  /**
+   * Each place's Picture and the URL it is served at, from
+   * `scripts/files.ts`, to check the World's Pictures against (ADR 0027)
+   */
+  pictures?: PictureUrls;
   /**
    * Refuse a database that isn't a built World, as when loading a save,
    * rather than build one into it
@@ -92,6 +99,7 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
 
   const mua: MuaWorld = await startMuaWorld(world, {
     clock: options.clock,
+    pictures: options.pictures,
     readFile,
     scriptsDir: SCRIPTS_DIR,
     startingRoom: options.startingRoom ?? 'harbour_steps'
@@ -174,6 +182,19 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
   };
 
   // The Account's building limits and count, as the Channel's join replies
+  // What the Character is told, as the Channel sends it: a line, with any
+  // Suggestions, or a place's Picture
+  const tell = (told: Told, suggestions?: string[]) => {
+    if (typeof told !== 'string') {
+      const { alt, name, url } = told.picture;
+      send({ alt, event: 'picture', name, url });
+    } else if (suggestions) {
+      send({ event: 'output', lines: [told], suggestions });
+    } else {
+      send({ event: 'output', lines: [told] });
+    }
+  };
+
   const builderOf = async (of: Eid): Promise<Builder | null> => {
     const b = await mua.builder(of);
     return b
@@ -202,19 +223,14 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
     const lines = await mua.enter(account, character);
     send({ builder: await builderOf(account), character, event: 'joined' });
     send({ event: 'status', status: 'connected' });
-    if (lines.length > 0) {
-      send({ event: 'output', lines });
+    for (const told of lines) {
+      tell(told);
     }
     // subscribed after the entry's own lines, so none arrives twice
     unsubscribe?.();
     unsubscribe = await mua.subscribe(
       character,
-      (line, suggestions) =>
-        send(
-          suggestions
-            ? { event: 'output', lines: [line], suggestions }
-            : { event: 'output', lines: [line] }
-        ),
+      (told, suggestions) => tell(told, suggestions),
       {
         onEditing: () => {
           editingChanged = true;

@@ -63,6 +63,9 @@ defmodule MuaWorld.Components do
       c("messages", false, [col("msg", :json), col("omsg", :json)]),
       c("script", false, [col("src", :string)]),
       b("described", false, [col("description", :string), col("name", :string)]),
+      # A place's Picture, shown with its description (ADR 0027): a file
+      # under the World Definition's `pictures/`. Builders can't set one.
+      c("picture", false, [col("src", :string)]),
       # A person's game identity (ADR 0016). Phoenix maps a Google identity
       # to its id; nothing in the World points at a person directly.
       # `admin` lets the Account run NorthTalk at the prompt (#91); sign-in

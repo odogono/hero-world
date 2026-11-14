@@ -244,6 +244,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/headland.png"
+            },
             "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
           ]
         },
@@ -320,6 +323,9 @@
           "as": "bob",
           "type": "look",
           "told": [
+            {
+              "picture": "pictures/harbour_steps.png"
+            },
             "Harbour Steps\nWorn granite steps climb from the ferry landing to the quay. Gulls squabble on the bollards, and the town rises behind you in terraces of slate and whitewash.\n\nYou see: the sea, the noticeboard\nThere is: the crate\nAlso here: Morwenna\nExits: north, south, east, west\n\nThe tide is out. Boats lean on their keels in the harbour mud, and past the headland the causeway to the lighthouse stands clear of the water. The lighthouse beam sweeps across the harbour."
           ]
         }
@@ -349,6 +355,9 @@
           "as": "ada",
           "type": "east",
           "told": [
+            {
+              "picture": "pictures/headland.png"
+            },
             "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
           ]
         },
@@ -393,6 +402,9 @@
           "as": "ada",
           "type": "west",
           "told": [
+            {
+              "picture": "pictures/headland.png"
+            },
             "Headland\nShort turf and sea pinks run out to a rocky point. East, a causeway of weed-slick stones crosses to the lighthouse on its island.\n\nExits: east, west"
           ]
         },
@@ -413,6 +425,9 @@
           "as": "ada",
           "type": "look",
           "told": [
+            {
+              "picture": "pictures/harbour_steps.png"
+            },
             "Harbour Steps\nWorn granite steps climb from the ferry landing to the quay. Gulls squabble on the bollards, and the town rises behind you in terraces of slate and whitewash.\n\nYou see: the sea, the noticeboard\nThere is: the crate\nAlso here: Morwenna\nExits: north, south, east, west\n\nThe tide is out. Boats lean on their keels in the harbour mud, and past the headland the causeway to the lighthouse stands clear of the water."
           ]
         },

@@ -1,5 +1,5 @@
 import { elements, fromScript, type EcsTalk } from 'ecs-talk';
-import { query, type Eid, type Store } from 'odgn-ecs/store';
+import { get, query, type Eid, type Store } from 'odgn-ecs/store';
 
 import {
   defineCapability,
@@ -14,13 +14,20 @@ import {
 } from '@northtalk/ts';
 
 import type { Arg, Context } from './dispatch';
+import { pictureOf, type PictureUrls } from './pictures';
 import { limbo } from './places';
-import { charactersAt, output, queueAct, type Act } from './tables';
+import {
+  charactersAt,
+  output,
+  outputPicture,
+  queueAct,
+  type Act
+} from './tables';
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `buildable`, `command`, `editors`, `homed`, `limbo`, `notice`, `placed`,
- * `signature` and `verbs`. The command a Run handles is
+ * `buildable`, `command`, `editors`, `homed`, `limbo`, `notice`, `picture`,
+ * `placed`, `signature` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -71,7 +78,8 @@ export const between =
 
 /** The `mua` Capability, for `createEcsTalk`'s `capabilities` */
 export const muaCapability =
-  (store: Store, notices: Notices) => (talk: EcsTalk) => {
+  (store: Store, notices: Notices, pictures: PictureUrls = {}) =>
+  (talk: EcsTalk) => {
     const entity = shape.object(talk.entityKind);
     const handle = (eid: Eid | null) =>
       eid === null ? nothing : talk.handle(eid).value;
@@ -181,6 +189,24 @@ export const muaCapability =
             message,
             place: place.native.eid
           });
+        },
+        mode: 'fire-and-forget'
+      },
+      // shows a place's Picture to a Character, just before `describe`'s
+      // description (ADR 0027)
+      picture: {
+        args: [entity, entity],
+        command: true,
+        cost: { fuel: 1 },
+        fire: (_call, place, actor) => {
+          const character: Eid = actor.native.eid;
+          if (!get(store, character, 'player')) {
+            return;
+          }
+          const picture = pictureOf(store, place.native.eid, pictures);
+          if (picture) {
+            outputPicture(store, character, picture);
+          }
         },
         mode: 'fire-and-forget'
       },

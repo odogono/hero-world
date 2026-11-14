@@ -154,7 +154,7 @@ defmodule MuaServer.CharacterChannel do
   @impl true
   def handle_info({:after_join, lines}, socket) do
     push(socket, "status", Protocol.status(:connected))
-    if lines != [], do: push(socket, "output", Protocol.output(lines))
+    push_lines(socket, lines)
     # subscribed after the entry's own lines, so none arrives twice
     :ok = MuaWorld.subscribe(@world, socket.assigns.character)
     # after subscribing, so no Step falls between the mirror and its changes
@@ -164,6 +164,14 @@ defmodule MuaServer.CharacterChannel do
     end
 
     {:noreply, refresh(socket)}
+  end
+
+  def handle_info(
+        {:mua, character, %{picture: picture}},
+        %{assigns: %{character: character}} = socket
+      ) do
+    push(socket, "picture", Protocol.picture(picture))
+    {:noreply, socket}
   end
 
   def handle_info(
@@ -255,6 +263,25 @@ defmodule MuaServer.CharacterChannel do
       _ ->
         :ok
     end
+  end
+
+  # Lines in order: a run of text as one `output`, and each Picture, or
+  # line with Suggestions, as its own message
+  defp push_lines(socket, lines) do
+    lines
+    |> Enum.chunk_by(&is_binary/1)
+    |> Enum.each(fn
+      [text | _] = run when is_binary(text) ->
+        push(socket, "output", Protocol.output(run))
+
+      others ->
+        for line <- others do
+          case line do
+            %{picture: picture} -> push(socket, "picture", Protocol.picture(picture))
+            %{text: text, suggestions: s} -> push(socket, "output", Protocol.output([text], s))
+          end
+        end
+    end)
   end
 
   defp command_reply({:ok, _lines}, ref), do: {:ok, %{ref: ref}}

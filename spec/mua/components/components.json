@@ -481,6 +481,22 @@
       }
     ]
   },
+  "picture": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "src",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "string",
+        "unique": false
+      }
+    ]
+  },
   "player": {
     "buildable": false,
     "play_state": false,

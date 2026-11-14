@@ -107,6 +107,13 @@ defmodule MuaServer.Protocol do
   def output(lines, []), do: %{lines: List.wrap(lines)}
   def output(lines, suggestions), do: %{lines: List.wrap(lines), suggestions: suggestions}
 
+  @doc """
+  A place's Picture, shown just before its description (ADR 0027): the
+  URL it is served at, and the place's name and description, which stand
+  in for it where it isn't shown.
+  """
+  def picture(%{url: url, name: name, alt: alt}), do: %{url: url, name: name, alt: alt}
+
   @doc "A question the Character must answer, such as \"which do you mean?\"."
   def prompt(text, options), do: %{text: text, options: options}
 

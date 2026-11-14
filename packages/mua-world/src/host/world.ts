@@ -50,6 +50,7 @@ import {
 import { TIMERS_SCRIPT, armLifecycle, rearm, recordHomes } from './lifecycle';
 import { mirrorSnapshot } from './mirror';
 import { perceptionOf } from './perception';
+import { loadPictures, type PictureUrls } from './pictures';
 import { destination, ensurePlaces } from './places';
 import {
   abandonWaiting,
@@ -61,7 +62,8 @@ import {
   takeOutbox,
   tell,
   type Act,
-  type Line
+  type Line,
+  type Told
 } from './tables';
 import { argValue, between, muaCapability, type Notices } from './talk';
 import { viewFor } from './view';
@@ -85,8 +87,11 @@ export type Patch = {
   remove?: string[];
 };
 
-/** Hears a line a Character is told, and any Commands it offers (#275) */
-export type Hear = (text: string, suggestions?: string[]) => void;
+/**
+ * Hears a line a Character is told, or a place's Picture, and any Commands
+ * it offers (#275)
+ */
+export type Hear = (told: Told, suggestions?: string[]) => void;
 
 /** How to hear a Character, from `subscribe` */
 export type Listener = {
@@ -99,6 +104,12 @@ export type MuaWorldOptions = {
   clock?: () => number;
   /** Limits for every Script */
   limits?: Partial<Limits>;
+  /**
+   * Each place's Picture `src` and the URL it is served at, worked out when
+   * the World's files were bundled, to check every Picture against; with
+   * none, each is served at its path unchecked (ADR 0027)
+   */
+  pictures?: PictureUrls;
   /** Called with each committed Step's change set, as a Preview World reports them */
   onChanges?: (changes: ChangeSetEntry[]) => void;
   /** Reads a Script's source, by its path */
@@ -307,12 +318,14 @@ export const startMuaWorld = async (
 
   store.db.exec('BEGIN IMMEDIATE');
   let places;
+  let pictures: PictureUrls;
   try {
     ensureMuaTables(store);
     expand(store);
     abandonWaiting(store);
     places = ensurePlaces(store, options.startingRoom, named);
     recordHomes(store);
+    pictures = loadPictures(store, options.pictures);
     store.db.exec('COMMIT');
   } catch (error) {
     store.db.exec('ROLLBACK');
@@ -322,7 +335,10 @@ export const startMuaWorld = async (
   const vocabulary = fromWorld(store);
 
   const talk = createEcsTalk(world, {
-    capabilities: [timerCapability(store), muaCapability(store, notices)],
+    capabilities: [
+      timerCapability(store),
+      muaCapability(store, notices, pictures)
+    ],
     limits: options.limits,
     onShow: (eid, line) => tell(store, eid, line)
   });
