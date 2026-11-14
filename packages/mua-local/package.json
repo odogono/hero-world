@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bundle": "./scripts/bundle.ts",
+    "./endpoint": "./src/endpoint.ts",
     "./worker": "./src/worker.ts"
   },
   "scripts": {

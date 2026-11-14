@@ -28,9 +28,13 @@ export type ToMirror =
   /** Asks for the mirror as it is now, for Try it (#259) */
   | { type: 'snapshot' };
 
-/** From the mirror's Worker: the reply to `snapshot`, or nothing yet */
-export type FromMirror = {
-  event: 'snapshot';
+/**
+ * The mirror's Worker's reply to each request (`endpoint.ts`): to
+ * `snapshot`, the mirror as it is now, or nothing before the first `load`
+ */
+export type MirrorReplies = {
+  apply: void;
+  load: void;
   snapshot: MirrorSnapshot | undefined;
 };
 
@@ -149,3 +153,39 @@ export const openMirror = async (database: CreateDatabaseOptions) => {
 };
 
 export type Mirror = Awaited<ReturnType<typeof openMirror>>;
+
+/**
+ * Answers the mirror's Worker's requests (#310). Until the first `load` a
+ * change set has nothing to apply to, and the snapshot that follows holds
+ * it already. Once a `load` or `apply` fails, the mirror is out of step
+ * with the server's World: `snapshot` throws, and change sets are passed
+ * over, until the next `load`.
+ */
+export const mirrorHandler = (opening: Promise<Mirror>) => {
+  let state: 'waiting' | 'loaded' | 'out-of-step' = 'waiting';
+
+  return async (
+    request: ToMirror
+  ): Promise<MirrorReplies[ToMirror['type']]> => {
+    const mirror = await opening;
+    switch (request.type) {
+      case 'load':
+        state = 'out-of-step';
+        mirror.load(request.snapshot);
+        state = 'loaded';
+        return;
+      case 'apply':
+        if (state === 'loaded') {
+          state = 'out-of-step';
+          mirror.apply(request.changes);
+          state = 'loaded';
+        }
+        return;
+      case 'snapshot':
+        if (state === 'out-of-step') {
+          throw new Error("the mirror is out of step with the server's World");
+        }
+        return mirror.snapshot();
+    }
+  };
+};

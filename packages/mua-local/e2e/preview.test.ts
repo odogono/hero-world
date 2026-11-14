@@ -37,28 +37,39 @@ afterAll(async () => {
   server?.stop(true);
 });
 
-type Message = { event: string } & Record<string, unknown>;
+type Message = Record<string, unknown>;
+// what the page hears: a reply to a request (src/endpoint.ts), or an error
+// from the Worker itself
+type Heard = {
+  event?: 'error';
+  id?: number;
+  message?: string;
+  ok?: boolean;
+  reply?: Message;
+};
 
 const heard = (page: Page) =>
-  page.evaluate(() => (globalThis as unknown as { heard: Message[] }).heard);
+  page.evaluate(() => (globalThis as unknown as { heard: Heard[] }).heard);
 
-const post = (page: Page, message: unknown) =>
+let sent = 0;
+/** Sends a request, as `connect` in src/endpoint.ts does */
+const post = (page: Page, request: unknown) =>
   page.evaluate(
     m => (globalThis as unknown as { post: (m: unknown) => void }).post(m),
-    message
+    { id: ++sent, request }
   );
 
-/** Waits for the `n`th message the page hears, counting from 1 */
+/** Waits for the reply to the `n`th request on the page, counting from 1 */
 const nth = async (page: Page, n: number) => {
   const deadline = Date.now() + 30_000;
   for (;;) {
     const messages = await heard(page);
-    const error = messages.find(m => m.event === 'error');
-    if (error) {
-      throw new Error(`the Worker failed: ${String(error.message)}`);
+    const failed = messages.find(m => m.event === 'error' || m.ok === false);
+    if (failed) {
+      throw new Error(`the Worker failed: ${String(failed.message)}`);
     }
     if (messages.length >= n) {
-      return messages[n - 1]!;
+      return messages[n - 1]!.reply!;
     }
     if (Date.now() > deadline) {
       throw new Error(`timed out; heard ${JSON.stringify(messages)}`);
@@ -69,6 +80,7 @@ const nth = async (page: Page, n: number) => {
 
 const open = async () => {
   const page = await browser.newPage();
+  sent = 0;
   await page.goto(`http://localhost:${server.port}/?worker=preview.js`);
   return page;
 };
@@ -81,13 +93,12 @@ test('runs commands in a Preview World, reports their changes, and resets', asyn
   const page = await open();
   await post(page, { type: 'open' });
   const opened = await nth(page, 1);
-  expect(opened.event).toBe('opened');
   expect(opened.runs).toBe(true);
   const crate = eidOf(opened, 'crate');
 
-  await post(page, { ref: 1, text: 'open crate', type: 'command' });
+  await post(page, { text: 'open crate', type: 'command' });
   const result = await nth(page, 2);
-  expect(result).toMatchObject({ event: 'result', ok: true, ref: 1 });
+  expect(result).toMatchObject({ ok: true });
   expect(result.changes).toContainEqual([
     crate,
     'container',
@@ -96,7 +107,7 @@ test('runs commands in a Preview World, reports their changes, and resets', asyn
   ]);
 
   await post(page, { type: 'reset' });
-  expect((await nth(page, 3)).event).toBe('opened');
+  expect((await nth(page, 3)).runs).toBe(true);
   await post(page, { eid: crate, type: 'entity' });
   const entity = await nth(page, 4);
   expect(
@@ -148,7 +159,7 @@ entity buoy : item {
     type: 'migrate'
   });
   const migrated = await nth(page, 2);
-  expect(migrated).toMatchObject({ event: 'migrated', ok: true });
+  expect(migrated).toMatchObject({ ok: true });
   expect(migrated.changes).toContainEqual([
     expect.any(Number),
     'described',
