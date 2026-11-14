@@ -1,5 +1,7 @@
 // The Host's own calls, which spec/mua/steps doesn't reach, adapted from
 // packages/mua_world/test/gameplay/accounts_test.exs and lifecycle_test.exs.
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'bun:test';
 import { createEntity, exists, get, put, query } from 'odgn-ecs/store';
 
@@ -104,6 +106,33 @@ describe('lifecycle', () => {
     expect(await mua.reset(shrine)).toBe(1);
     expect(where(mua, lamp)).toBe(shrine);
     expect(bob.heard).toContain('Dust settles over the shrine.');
+  });
+
+  test("a reset whose Script fails moves nothing, and isn't told to the place's Scripts", async () => {
+    // A lifecycle Service that puts things back, then fails
+    const failing = `on reset place
+  ask mua to homed place into homed
+  repeat for each thing in homed
+    moveTo thing, place
+  end repeat
+  return 1 / 0
+end reset`;
+    const mua = await start('lifecycle.edl', 'west_of_house', {
+      readFile: file =>
+        file.endsWith('services/lifecycle.talk')
+          ? failing
+          : readFileSync(file, 'utf8')
+    });
+    const bob = await join_(mua, 'bob');
+    const shrine = (await mua.named('west_of_house'))!;
+    const lamp = (await mua.named('lamp'))!;
+    for (const line of ['take lamp', 'east', 'drop lamp', 'west']) {
+      await mua.command(bob.account, bob.eid, line);
+    }
+    bob.heard.length = 0;
+    expect(await mua.reset(shrine)).toBe(0);
+    expect(where(mua, lamp)).not.toBe(shrine);
+    expect(bob.heard).not.toContain('Dust settles over the shrine.');
   });
 
   test('leaves what a Character carries when a place resets', async () => {

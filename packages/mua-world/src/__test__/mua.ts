@@ -15,7 +15,8 @@ const FIXTURES = join(REPO, 'packages/mua_world/test/fixtures');
 
 export const start = async (
   fixture: string,
-  startingRoom = 'west_of_house'
+  startingRoom = 'west_of_house',
+  options: Partial<Parameters<typeof startMuaWorld>[1]> = {}
 ) => {
   const path = join(FIXTURES, fixture);
   const world = await createWorld(components, { type: DatabaseType.BUN });
@@ -28,7 +29,8 @@ export const start = async (
     clock: () => 0,
     readFile: file => readFileSync(file, 'utf8'),
     scriptsDir: SCRIPTS,
-    startingRoom
+    startingRoom,
+    ...options
   });
 };
 

@@ -6,15 +6,7 @@ import {
   type Step,
   type Timer
 } from 'ecs-engine';
-import {
-  abandon,
-  createEcsTalk,
-  fromScript,
-  outcome,
-  toValue,
-  type Outcome,
-  type Pending
-} from 'ecs-talk';
+import { createEcsTalk, fromScript, toValue, type Outcome } from 'ecs-talk';
 import {
   armSystems,
   exists,
@@ -52,6 +44,11 @@ import { mirrorSnapshot } from './mirror';
 import { perceptionOf } from './perception';
 import { loadPictures, type PictureUrls } from './pictures';
 import { destination, ensurePlaces } from './places';
+import {
+  ask as askRequest,
+  replyOf as requestReply,
+  type Asked
+} from './request';
 import {
   abandonWaiting,
   deleteAct,
@@ -168,24 +165,30 @@ const refused = (message: string): Result => ({ kind: 'refused', message });
 
 /**
  * A question's outcome as Dispatch reads it: a Decision's veto is its
- * answer, as a reply is a Request's. A Request says no by replying
- * `{refused: text}`; any other map is a mistake, so fails.
+ * answer, as a reply is a Request's. Dispatch reads a Request's reply as
+ * text or nothing; any map other than a refusal is a mistake, so fails.
  */
 const replyOf = (q: Question, o: Outcome): Reply => {
-  if (q.asks === 'offer' && o.kind === 'replied') {
-    const v = o.value;
-    if (v.kind === 'map') {
-      const text = v.hasKey('refused') ? v.get('refused').asText() : undefined;
-      return text === undefined
-        ? { kind: 'failed' }
-        : { kind: 'refused', message: text };
-    }
-    return { kind: 'replied', message: v.asText() ?? null };
-  }
   if (q.asks === 'decide' && o.kind === 'vetoed') {
     return { kind: 'replied', message: o.reason?.asText() ?? null };
   }
-  return o.kind === 'passed' ? { kind: 'passed' } : { kind: 'failed' };
+  if (o.kind === 'passed') {
+    return { kind: 'passed' };
+  }
+  if (q.asks !== 'offer') {
+    return { kind: 'failed' };
+  }
+  const reply = requestReply(o);
+  switch (reply.kind) {
+    case 'refused':
+      return { kind: 'refused', message: reply.message };
+    case 'replied':
+      return reply.value.kind === 'map'
+        ? { kind: 'failed' }
+        : { kind: 'replied', message: reply.value.asText() ?? null };
+    default:
+      return { kind: 'failed' };
+  }
 };
 
 /**
@@ -225,40 +228,33 @@ const failure = (o: Outcome) => {
 /** The `build` Service's refusal, or why a Script failed */
 type Refused = { error: string };
 
-/** A write the composition doesn't fit fails the Script: the builder's to fix */
-const cantBuild = (o: Outcome) => `That can't be built: ${failure(o)}`;
-
-/** What the `build` Service replied, if it refused: `{refused: text}` */
-const refusalOf = (value: unknown) =>
-  value !== null &&
-  typeof value === 'object' &&
-  typeof (value as { refused?: unknown }).refused === 'string'
-    ? (value as { refused: string }).refused
-    : undefined;
+/**
+ * What a builder is told when the `build` Service didn't do what they
+ * asked. A write the composition doesn't fit, such as text for a number,
+ * fails the Script: that is the builder's to fix, so it says why.
+ */
+const notBuilt = (asked: Exclude<Asked<unknown>, { kind: 'ok' }>): Refused => {
+  if (asked.kind === 'refused') {
+    return { error: asked.message };
+  }
+  const { why } = asked;
+  switch (why.kind) {
+    case 'malformed':
+      return { error: 'Something went wrong.' };
+    case 'setup':
+      return { error: `That can't be built: ${String(why.error)}` };
+    default:
+      return { error: `That can't be built: ${failure(why)}` };
+  }
+};
 
 /**
- * What placing came to, from the `build` Service's reply: `{message,
- * placed, max_placed}` when it placed the thing, with any `suggestions` the
- * message offers (#275), and `{refused: text}` when it said no
+ * What the `build` Service's reply means when it placed the thing:
+ * `{message, placed, max_placed}`, with any `suggestions` the message
+ * offers (#275)
  */
-const placedReply = (
-  o: Outcome
-):
-  | Refused
-  | {
-      maxPlaced: number;
-      message: string;
-      placed: number;
-      suggestions: string[];
-    } => {
-  if (o.kind !== 'replied') {
-    return { error: cantBuild(o) };
-  }
-  const value = fromScript(o.value) as Record<string, unknown> | null;
-  const refusal = refusalOf(value);
-  if (refusal !== undefined) {
-    return { error: refusal };
-  }
+const placedReply = (reply: Value) => {
+  const value = fromScript(reply) as Record<string, unknown> | null;
   if (
     typeof value?.message === 'string' &&
     typeof value.placed === 'number' &&
@@ -274,19 +270,7 @@ const placedReply = (
       suggestions: offered.filter(o => typeof o === 'string')
     };
   }
-  return { error: 'Something went wrong.' };
-};
-
-/** What an edit, a store or a destroy came to: the actor's line, or why not */
-const editedReply = (o: Outcome): Refused | { message: string } => {
-  if (o.kind !== 'replied') {
-    return { error: cantBuild(o) };
-  }
-  const text = o.value.asText();
-  if (text !== undefined) {
-    return { message: text };
-  }
-  return { error: refusalOf(fromScript(o.value)) ?? 'Something went wrong.' };
+  return undefined;
 };
 
 /**
@@ -374,22 +358,28 @@ export const startMuaWorld = async (
 
   // -- Timers and resets ----------------------------------------------------
 
-  // What a reset does is the lifecycle Service's to decide (ADR 0024); the
-  // place's own Scripts hear of it after
+  // What a reset does is the lifecycle Service's to decide (ADR 0024), all
+  // or nothing; the place's own Scripts hear of it after, if it worked.
+  // Returns how many things it moved.
   const resetPlace = async (s: Step, place: Eid) => {
-    const pending = s.deliver({
-      args: [talk.handle(place).value],
-      asks: 'request',
-      message: 'reset',
-      to: { service: 'lifecycle' }
-    }) as Pending;
-    s.pump();
-    const o = await outcome(pending);
-    const moved = o.kind === 'replied' ? Number(o.value.toString()) || 0 : 0;
+    const asked = await askRequest(s, () => ({
+      delivery: {
+        args: [talk.handle(place).value],
+        message: 'reset',
+        to: { service: 'lifecycle' }
+      },
+      read: (reply: Value) => {
+        const moved = fromScript(reply);
+        return typeof moved === 'number' ? Math.trunc(moved) : undefined;
+      }
+    }));
+    if (asked.kind !== 'ok') {
+      return 0;
+    }
     if (talk.isScripted(place)) {
       talk.deliver(place, 'reset', [systemValue()]);
     }
-    return Math.trunc(moved);
+    return asked.result;
   };
 
   // mua's own `timers`: `reset` resets the place; any other message goes
@@ -637,37 +627,6 @@ export const startMuaWorld = async (
 
   // -- Building -------------------------------------------------------------
 
-  // Sends `message args…, actor` to the `build` Service as a Request, and
-  // reads its reply with `read`, in a savepoint released only if it did
-  // what was asked. A refusal, or a Script that fails, writes nothing, and
-  // comes back as `{error}` for the Step to commit as it is.
-  const askBuild = async <T extends object>(
-    s: Step,
-    actor: Eid,
-    message: string,
-    args: Value[],
-    read: (o: Outcome) => Refused | T
-  ): Promise<Refused | T> => {
-    store.db.exec('SAVEPOINT mua_build');
-    const pending = s.deliver({
-      args: [...args, talk.handle(actor).value],
-      asks: 'request',
-      message,
-      to: { service: 'build' }
-    }) as Pending;
-    s.pump();
-    const o = await outcome(pending);
-    if (o.kind === 'waiting') {
-      abandon(pending);
-    }
-    const reply = read(o);
-    if ('error' in reply) {
-      store.db.exec('ROLLBACK TO mua_build');
-    }
-    store.db.exec('RELEASE mua_build');
-    return reply;
-  };
-
   // How many things an Account has placed
   const placedBy = (account: Eid) =>
     query(store, { where: [['made_by', 'account', account]] }).length;
@@ -702,41 +661,60 @@ export const startMuaWorld = async (
   };
 
   // A builder's thing: an empty entity the `build` Service fills in and
-  // places. If it refuses, the entity goes with the rest.
+  // places, kept only if it did. A refusal, or a Script that fails, leaves
+  // no change, the entity included.
   const placeThing = async (
     s: Step,
     actor: Eid,
     composition: unknown
   ): Promise<Refused | { eid: Eid; maxPlaced: number; placed: number }> => {
-    const thing = store.db.addEntity();
-    const handle = talk.handle(thing).value;
-    const reply = await askBuild(
-      s,
-      actor,
-      'place',
-      [handle, toValue(composition)],
-      placedReply
-    );
-    if ('error' in reply) {
-      return reply;
+    const asked = await askRequest(s, () => {
+      const thing = store.db.addEntity();
+      return {
+        delivery: {
+          args: [
+            talk.handle(thing).value,
+            toValue(composition),
+            talk.handle(actor).value
+          ],
+          message: 'place',
+          to: { service: 'build' }
+        },
+        read: (reply: Value) => {
+          const placed = placedReply(reply);
+          return placed && { ...placed, eid: thing };
+        }
+      };
+    });
+    if (asked.kind !== 'ok') {
+      return notBuilt(asked);
     }
-    output(store, actor, reply.message, reply.suggestions);
-    return { eid: thing, maxPlaced: reply.maxPlaced, placed: reply.placed };
+    const { eid, maxPlaced, message, placed, suggestions } = asked.result;
+    output(store, actor, message, suggestions);
+    return { eid, maxPlaced, placed };
   };
 
-  // An edit, store or destroy, which the `build` Service checks and
-  // writes, then tells the actor
+  // Sends `message args…, actor` to the `build` Service as a Request,
+  // keeping what it did only if it replied text, which the actor is told.
+  // A refusal, or a Script that fails, writes nothing.
   const buildEdit = async (
     s: Step,
     actor: Eid,
     message: string,
     args: Value[]
   ) => {
-    const reply = await askBuild(s, actor, message, args, editedReply);
-    if ('error' in reply) {
-      return reply;
+    const asked = await askRequest(s, () => ({
+      delivery: {
+        args: [...args, talk.handle(actor).value],
+        message,
+        to: { service: 'build' }
+      },
+      read: (reply: Value) => reply.asText()
+    }));
+    if (asked.kind !== 'ok') {
+      return notBuilt(asked);
     }
-    output(store, actor, reply.message);
+    output(store, actor, asked.result);
     return { ok: true } as const;
   };
 
