@@ -2,6 +2,7 @@ import { elements, fromScript, type EcsTalk } from 'ecs-talk';
 import { get, query, type Eid, type Store } from 'odgn-ecs/store';
 
 import {
+  bool,
   defineCapability,
   list,
   map,
@@ -13,6 +14,7 @@ import {
   type Value
 } from '@northtalk/ts';
 
+import { inReach } from '../commands/scope';
 import type { Arg, Context } from './dispatch';
 import { pictureOf, type PictureUrls } from './pictures';
 import { limbo } from './places';
@@ -27,7 +29,7 @@ import {
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
  * `buildable`, `command`, `editors`, `homed`, `limbo`, `notice`, `picture`,
- * `placed`, `signature` and `verbs`. The command a Run handles is
+ * `placed`, `reaches`, `signature` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -44,6 +46,13 @@ export const argValue = (talk: EcsTalk, arg: Arg): Value => {
   }
   return typeof arg === 'string' ? text(arg) : talk.handle(arg.entity).value;
 };
+
+/**
+ * How many things an Account has placed, by their `made_by`: the count a
+ * builder's quota is held to, for the `placed` Capability and the Host alike
+ */
+export const placedBy = (store: Store, account: Eid) =>
+  query(store, { where: [['made_by', 'account', account]] }).length;
 
 const context = (talk: EcsTalk, call: Call<unknown>) =>
   talk.delivery(call)?.host as Context | undefined;
@@ -213,14 +222,23 @@ export const muaCapability =
       placed: {
         args: [entity],
         cost: { fuel: 1 },
-        do: (_call, account) =>
-          num(
-            query(store, {
-              where: [['made_by', 'account', account.native.eid]]
-            }).length
-          ),
+        do: (_call, account) => num(placedBy(store, account.native.eid)),
         mode: 'immediate',
         result: shape.number
+      },
+      // whether a thing is within a Character's Reach, as a noun the Verbs
+      // bind `here` could name, for the Composer's requests (ADR 0028)
+      reaches: {
+        args: [entity, entity],
+        cost: { fuel: 1 },
+        do: (_call, actor, thing) =>
+          bool(
+            inReach(store, actor.native.eid, 'here').some(
+              c => c.id === thing.native.eid
+            )
+          ),
+        mode: 'immediate',
+        result: shape.bool
       },
       // an Account's Signature: the Character that speaks for it wherever
       // it is shown as a Maker, its first while it has one (#276)

@@ -22,6 +22,13 @@
 -- and properties to change. Both reply text, or `{refused: text}`. mua
 -- keeps nothing of a refused save.
 --
+-- A save, and the Composer's own store and destroy, come from the
+-- Composer, not a typed Command, so no Veto sees them (ADR 0028). Each
+-- needs the thing open in the actor's Composer and within their Reach,
+-- which this Script checks: the Composer's store and destroy send
+-- `putAway thing, verb, actor`, `verb` being "store" or "destroy", and
+-- reply `{message, placed, max_placed}` as `place` does.
+--
 -- Destroying a placed thing (#283): the `destroy` Verb sends
 -- `destroy target, actor`, which takes away every component the thing
 -- has, `made_by` included, so its place in its Maker's quota is free. It
@@ -237,8 +244,27 @@ on edit thing, actor
   return `You open ${theName(thing)} to edit it.`
 end edit
 
+-- why the actor can't change `thing` from the Composer, or Nothing: it
+-- must be the thing the `edit` Verb opened, and still within Reach, as the
+-- Verb found it
+function composerRefusal thing, actor
+  put the optional editing of actor into editing
+  if editing is nothing or the optional thing of editing is not thing then
+    return "Open it with edit first."
+  end if
+  ask mua to reaches actor, thing into reached
+  if not reached then
+    return "You can't reach that from here."
+  end if
+  return nothing
+end composerRefusal
+
 -- Saving an edit: the thing's components as `patch` changes `current`
 on save thing, patch, current, actor
+  put composerRefusal(thing, actor) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
   put the optional account of the player of actor into account
   put editRefusal(thing, account) into why
   if why is not nothing then
@@ -287,10 +313,11 @@ function closeEditors thing
   end repeat
 end closeEditors
 
--- The `destroy` Verb: takes away every component a placed thing has. It
--- refuses while the thing holds anything, so nothing is lost by accident,
--- and closes it in every composer that has it open.
-on destroy thing, actor
+-- Takes away every component a placed thing has, for the `destroy` Verb.
+-- It refuses while the thing holds anything, so nothing is lost by
+-- accident, and closes it in every composer that has it open. Replies
+-- text, or `{refused: text}`.
+function destroying thing, actor
   if thing is nothing then
     return {refused: "What do you want to destroy?"}
   end if
@@ -309,14 +336,19 @@ on destroy thing, actor
   put messageFor("destroy", "msg", about) otherwise `You unmake ${theName(thing)}.` into message
 
   closeEditors(thing)
-  -- named in full: inside `on destroy`, a bare `destroy` is this handler
   ask world to destroy thing
   tell mua to announce the in of the location of actor, others, actor
   return message
+end destroying
+
+-- The `destroy` Verb
+on destroy thing, actor
+  return destroying(thing, actor)
 end destroy
 
--- The `store` Verb: moves a placed thing to Limbo, with what it holds
-on store thing, actor
+-- Moves a placed thing to Limbo, with what it holds, for the `store`
+-- Verb. Replies text, or `{refused: text}`.
+function storing thing, actor
   if thing is nothing then
     return {refused: "What do you want to store?"}
   end if
@@ -332,7 +364,33 @@ on store thing, actor
   moveTo thing, limbo
   tell mua to announce the in of the location of actor, others, actor
   return messageFor("store", "msg", about) otherwise `You put away ${theName(thing)}.`
+end storing
+
+-- The `store` Verb
+on store thing, actor
+  return storing(thing, actor)
 end store
+
+-- The Composer's store or destroy: as the Verb `verb`, for the thing open
+-- in the actor's Composer. Replies `{message, placed, max_placed}`, the
+-- actor's Account's count after it, or `{refused: text}`.
+on putAway thing, verb, actor
+  put composerRefusal(thing, actor) into why
+  if why is not nothing then
+    return {refused: why}
+  end if
+  if verb is "store" then
+    put storing(thing, actor) into done
+  else
+    put destroying(thing, actor) into done
+  end if
+  if kindOf(done) is "map" then
+    return done
+  end if
+  put the account of the player of actor into account
+  ask mua to placed account into placed
+  return {message: done, placed: placed, max_placed: the max_placed of the builder of account}
+end putAway
 
 -- The stored things in Limbo that the Account may bring back, in the
 -- order they were made

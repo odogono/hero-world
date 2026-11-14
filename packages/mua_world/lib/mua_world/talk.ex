@@ -15,6 +15,9 @@ defmodule MuaWorld.Talk do
   - `editors thing`: the Characters who have `thing` open in the composer.
   - `placed account`: how many things the Account has placed, by their
     `made_by`, for a builder's quota (#258).
+  - `reaches actor, thing`: whether `thing` is within the Character's
+    Reach, as a noun the Verbs bind `here` could name, for the Composer's
+    requests (ADR 0028).
   - `picture place, actor`: shows `place`'s Picture to `actor`, if it is a
     Character and the place has one (ADR 0027). The `rooms` Library's
     `describe` sends it, so it arrives just before the description.
@@ -67,6 +70,13 @@ defmodule MuaWorld.Talk do
   end
 
   # The command a Run handles, or `nil` for a Delivery sent without one
+  @doc """
+  How many things an Account has placed, by their `made_by`: the count a
+  builder's quota is held to, for the `placed` Capability and the Host alike.
+  """
+  def placed(world, account),
+    do: length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))
+
   defp context(talk, call) do
     case OdgnEcsTalk.delivery(talk, call) do
       %{host: context} -> context
@@ -173,9 +183,17 @@ defmodule MuaWorld.Talk do
          end},
       "placed" =>
         {[args: [entity], result: "number", cost: 1],
-         fn [account], _ ->
-           account = Values.from_value(account)
-           {:ok, length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))}
+         fn [account], _ -> {:ok, placed(world, Values.from_value(account))} end},
+      "reaches" =>
+        {[args: [entity, entity], result: "boolean", cost: 1],
+         fn [actor, thing], _ ->
+           thing = Values.from_value(thing)
+
+           {:ok,
+            Enum.any?(
+              MuaWorld.Commands.Scope.in_reach(world, Values.from_value(actor), "here"),
+              &(&1.id == thing)
+            )}
          end},
       # an Account's Signature: the Character that speaks for it wherever
       # it is shown as a Maker, its first while it has one (#276)

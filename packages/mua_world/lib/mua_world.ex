@@ -55,7 +55,7 @@ defmodule MuaWorld do
     Talk
   }
 
-  alias MuaWorld.Commands.{Scope, Verbs}
+  alias MuaWorld.Commands.Verbs
   alias OdgnEcsEngine.Delivery
 
   import OdgnEcsEngine, only: [instant_us: 1]
@@ -187,9 +187,9 @@ defmodule MuaWorld do
   @doc """
   Saves an edit to the placed thing a Character has open, as one Step
   (#274). `patch` is `%{"put" => %{name => properties}, "remove" =>
-  [name]}`. The thing must be the one the `edit` Verb opened, and still
-  within the Character's reach; whether the edit may be made is the
-  `build` Service Script's to decide. A saved edit closes the thing.
+  [name]}`. Whether it may be saved is the `build` Service Script's to
+  decide (ADR 0028): the thing must be the one the `edit` Verb opened, and
+  still within the Character's Reach. A saved edit closes the thing.
 
   Returns `{:ok, %{eid}}`, or `{:error, reason}` with nothing written: the
   refusal as text, or `:not_owner` and `:not_in_play` as `command/4` gives
@@ -201,8 +201,7 @@ defmodule MuaWorld do
   @doc """
   Stores or destroys the placed thing a Character has open to edit, as the
   `store` and `destroy` Verbs do, as one Step (#284). `verb` is `"store"`
-  or `"destroy"`. The thing must be the one the `edit` Verb opened, and
-  still within reach, as for `edit/5`.
+  or `"destroy"`. The `build` Service Script checks it as for `edit/5`.
 
   Returns `{:ok, %{eid, placed, max_placed}}`, the Account's count after
   it, or `{:error, reason}` with nothing written, as `edit/5` does.
@@ -729,8 +728,7 @@ defmodule MuaWorld do
 
   def handle_call({:edit, account, character, eid, patch}, _from, state) do
     with :ok <- owns(state, account, character),
-         :ok <- in_play(state, character),
-         :ok <- editing_this(state, character, eid) do
+         :ok <- in_play(state, character) do
       reply_result(advance_clock(state), &save_edit(&1, character, eid, patch))
     else
       error -> {:reply, error, state}
@@ -739,16 +737,8 @@ defmodule MuaWorld do
 
   def handle_call({:put_away, account, character, eid, verb}, _from, state) do
     with :ok <- owns(state, account, character),
-         :ok <- in_play(state, character),
-         :ok <- editing_this(state, character, eid) do
-      reply_result(advance_clock(state), fn state ->
-        with {:ok, _} <- build(state, character, verb, [OdgnEcsTalk.handle(state.talk, eid)]) do
-          builder = OdgnEcs.get(state.world, account, "builder") || %{}
-
-          {:ok,
-           %{eid: eid, placed: placed(state.world, account), max_placed: builder["max_placed"]}}
-        end
-      end)
+         :ok <- in_play(state, character) do
+      reply_result(advance_clock(state), &put_away_thing(&1, character, eid, verb))
     else
       error -> {:reply, error, state}
     end
@@ -770,7 +760,7 @@ defmodule MuaWorld do
 
         builder ->
           %{
-            placed: placed(state.world, account),
+            placed: MuaWorld.Talk.placed(state.world, account),
             max_placed: builder["max_placed"],
             max_capacity: builder["max_capacity"]
           }
@@ -1241,6 +1231,31 @@ defmodule MuaWorld do
         {:ok, delivery, &placed_reply(thing, &1)}
       end)
 
+    counted(state, actor, asked)
+  end
+
+  # The Composer's store or destroy, which the `build` Service checks and
+  # carries out, replying the count as for a placed thing
+  defp put_away_thing(state, actor, thing, verb) do
+    talk = state.talk
+
+    asked =
+      Request.ask(state.step, fn ->
+        delivery = %Delivery{
+          to: {:service, "build"},
+          message: "putAway",
+          args: [OdgnEcsTalk.handle(talk, thing), verb, OdgnEcsTalk.handle(talk, actor)]
+        }
+
+        {:ok, delivery, &placed_reply(thing, &1)}
+      end)
+
+    counted(state, actor, asked)
+  end
+
+  # A `build` Service reply with the Account's count: the actor is told its
+  # message, with any Suggestions
+  defp counted(state, actor, asked) do
     case asked do
       {:ok, {message, suggestions, reply}} ->
         tell(state, actor, message, suggestions)
@@ -1251,7 +1266,8 @@ defmodule MuaWorld do
     end
   end
 
-  # What the `build` Service's reply means when it placed the thing:
+  # What the `build` Service's reply means when it placed or put away the
+  # thing:
   # `{message, placed, max_placed}`, with any `suggestions` the message
   # offers (#275)
   defp placed_reply(thing, %NorthTalk.Map{} = value) do
@@ -1267,23 +1283,6 @@ defmodule MuaWorld do
   end
 
   defp placed_reply(_thing, _value), do: :malformed
-
-  # Only the thing the `edit` Verb opened can be saved, and only while it
-  # is still within reach, as the Verb found it
-  defp editing_this(state, character, eid) do
-    world = state.world
-
-    cond do
-      OdgnEcs.get(world, character, "editing") != %{"thing" => eid} ->
-        {:error, "Open it with edit first."}
-
-      not Enum.any?(Scope.in_reach(world, character, "here"), &(&1.id == eid)) ->
-        {:error, "You can't reach that from here."}
-
-      true ->
-        :ok
-    end
-  end
 
   # A placed thing's buildable components, as they stand
   defp composition(world, thing) do
@@ -1344,10 +1343,6 @@ defmodule MuaWorld do
 
   defp not_built({:failed, why}),
     do: {:error, "That can't be built: #{MuaWorld.Admin.failure(why)}"}
-
-  # How many things an Account has placed
-  defp placed(world, account),
-    do: length(OdgnEcs.query(world, where: [{"made_by", "account", account}]))
 
   defp tell(state, character, text, suggestions \\ []) do
     Tables.output(state.world, character, text, suggestions)

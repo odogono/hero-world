@@ -26,7 +26,7 @@ import type { World } from 'odgn-ecs/world';
 import type { Limits, Value } from '@northtalk/ts';
 
 import type { BoundCommand } from '../commands/bind';
-import { inReach, location } from '../commands/scope';
+import { location } from '../commands/scope';
 import { fromWorld } from '../commands/verbs';
 import { expand } from '../exits';
 import { read, readNpc } from '../input';
@@ -62,7 +62,13 @@ import {
   type Line,
   type Told
 } from './tables';
-import { argValue, between, muaCapability, type Notices } from './talk';
+import {
+  argValue,
+  between,
+  muaCapability,
+  placedBy,
+  type Notices
+} from './talk';
 import { viewFor } from './view';
 
 /** mua's Libraries, by the name Scripts `use` them from */
@@ -195,7 +201,10 @@ const replyOf = (q: Question, o: Outcome): Reply => {
  * Why a Script failed, as `MuaWorld.Admin.failure/2` says it: an error's
  * code and message, or that it didn't finish
  */
-const failure = (o: Outcome) => {
+const failure = (o: Outcome | { error: unknown; kind: 'setup' }) => {
+  if (o.kind === 'setup') {
+    return String(o.error);
+  }
   if (o.kind === 'waiting') {
     return "the line didn't finish, so nothing changed";
   }
@@ -238,14 +247,9 @@ const notBuilt = (asked: Exclude<Asked<unknown>, { kind: 'ok' }>): Refused => {
     return { error: asked.message };
   }
   const { why } = asked;
-  switch (why.kind) {
-    case 'malformed':
-      return { error: 'Something went wrong.' };
-    case 'setup':
-      return { error: `That can't be built: ${String(why.error)}` };
-    default:
-      return { error: `That can't be built: ${failure(why)}` };
-  }
+  return why.kind === 'malformed'
+    ? { error: 'Something went wrong.' }
+    : { error: `That can't be built: ${failure(why)}` };
 };
 
 /**
@@ -627,10 +631,6 @@ export const startMuaWorld = async (
 
   // -- Building -------------------------------------------------------------
 
-  // How many things an Account has placed
-  const placedBy = (account: Eid) =>
-    query(store, { where: [['made_by', 'account', account]] }).length;
-
   // A placed thing's buildable components, as they stand
   const compositionOf = (thing: Eid) => {
     const composition: Record<string, Data> = {};
@@ -641,17 +641,6 @@ export const startMuaWorld = async (
       }
     }
     return composition;
-  };
-
-  // Only the thing the `edit` Verb opened can be saved, and only while it
-  // is still within reach, as the Verb found it
-  const editingThis = (character: Eid, eid: Eid) => {
-    if (get(store, character, 'editing')?.thing !== eid) {
-      throw new MuaWorldError('Open it with edit first.');
-    }
-    if (!inReach(store, character, 'here').some(c => c.id === eid)) {
-      throw new MuaWorldError("You can't reach that from here.");
-    }
   };
 
   const inPlay = (character: Eid) => {
@@ -686,6 +675,37 @@ export const startMuaWorld = async (
         }
       };
     });
+    if (asked.kind !== 'ok') {
+      return notBuilt(asked);
+    }
+    const { eid, maxPlaced, message, placed, suggestions } = asked.result;
+    output(store, actor, message, suggestions);
+    return { eid, maxPlaced, placed };
+  };
+
+  // The Composer's store or destroy, which the `build` Service checks and
+  // carries out, replying the count as for a placed thing
+  const putAwayThing = async (
+    s: Step,
+    actor: Eid,
+    thing: Eid,
+    verb: 'destroy' | 'store'
+  ): Promise<Refused | { eid: Eid; maxPlaced: number; placed: number }> => {
+    const asked = await askRequest(s, () => ({
+      delivery: {
+        args: [
+          talk.handle(thing).value,
+          toValue(verb),
+          talk.handle(actor).value
+        ],
+        message: 'putAway',
+        to: { service: 'build' }
+      },
+      read: (reply: Value) => {
+        const placed = placedReply(reply);
+        return placed && { ...placed, eid: thing };
+      }
+    }));
     if (asked.kind !== 'ok') {
       return notBuilt(asked);
     }
@@ -832,7 +852,7 @@ export const startMuaWorld = async (
         return {
           maxCapacity: builder.max_capacity as number | undefined,
           maxPlaced: builder.max_placed as number | undefined,
-          placed: placedBy(account)
+          placed: placedBy(store, account)
         };
       }),
 
@@ -909,7 +929,6 @@ export const startMuaWorld = async (
       serial(async () => {
         owns(account, character);
         inPlay(character);
-        editingThis(character, eid);
         await building(s =>
           buildEdit(s, character, 'save', [
             talk.handle(eid).value,
@@ -989,16 +1008,7 @@ export const startMuaWorld = async (
       serial(async () => {
         owns(account, character);
         inPlay(character);
-        editingThis(character, eid);
-        await building(s =>
-          buildEdit(s, character, verb, [talk.handle(eid).value])
-        );
-        return {
-          eid,
-          maxPlaced: get(store, account, 'builder')?.max_placed as
-            number | undefined,
-          placed: placedBy(account)
-        };
+        return building(s => putAwayThing(s, character, eid, verb));
       }),
 
     /**
