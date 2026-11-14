@@ -36,6 +36,18 @@ _Avoid_: creator, author, owner
 The place in the browser where a Builder shapes a thing, either a new one to place or a placed one to change.
 _Avoid_: builder panel, editor, build panel
 
+**Composition**:
+What a Builder writes in the Composer for a thing: the components it has, each with its properties.
+_Avoid_: blueprint, template, recipe
+
+**Place**:
+To put a new thing, made from a Composition, in the Builder's room. The Composer asks for it; it is never typed, so it is not a Command and nothing can Veto it.
+_Avoid_: build, create, spawn
+
+**Save**:
+To change a placed thing to match its Composition as edited in the Composer. Like Place, it is asked by the Composer, not typed, and is not a Command.
+_Avoid_: submit, commit, update
+
 **Maker**:
 The Account that placed a thing. The World keeps it with the thing, and shows it only through its Signature.
 _Avoid_: owner (which is a Script's), creator, author

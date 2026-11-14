@@ -1,6 +1,6 @@
 # mua Step cases
 
-Language-neutral cases for what a Command does, Actions and all (ADR 0024). `packages/mua_world` runs them in `test/steps_conformance_test.exs`, and the TypeScript Host will run the same files (#216). The command cases in [`../commands/`](../commands/README.md) test only the front of a Command. These test the whole Step: what the typer is told, what everyone hears and where things end up.
+Language-neutral cases for what a Command does, Actions and all (ADR 0024). `packages/mua_world` runs them in `test/steps_conformance_test.exs`, and the TypeScript Host runs the same files in `packages/mua-world/src/__test__/steps.test.ts`. The command cases in [`../commands/`](../commands/README.md) test only the front of a Command. These test the whole Step: what the typer is told, what everyone hears and where things end up.
 
 ```json
 {
