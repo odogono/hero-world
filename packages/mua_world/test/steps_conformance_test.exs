@@ -52,6 +52,7 @@ defmodule MuaWorld.StepsConformanceTest do
 
   defp run_step(world, characters, %{"as" => name, "type" => text}) do
     {:ok, told} = MuaWorld.command(world, account(characters[name]), characters[name], text)
+    told = Enum.map(told, &as_spec/1)
     %{"told" => told, "heard" => heard(characters, {name, told})}
   end
 
@@ -84,7 +85,7 @@ defmodule MuaWorld.StepsConformanceTest do
   # those lines are left out of its own
   defp heard(characters, typed) do
     for {name, eid} <- characters,
-        lines = received(eid),
+        lines = Enum.map(received(eid), &as_spec/1),
         lines =
           (case typed do
              {^name, told} -> lines -- told
@@ -94,6 +95,11 @@ defmodule MuaWorld.StepsConformanceTest do
         into: %{},
         do: {name, lines}
   end
+
+  # A line as the cases write it: a Picture by its `src`, whose URL
+  # changes with the file
+  defp as_spec(%{picture: %{src: src}}), do: %{"picture" => src}
+  defp as_spec(line), do: line
 
   defp check(%{"where" => where}, actual), do: assert(actual["where"] == where)
 

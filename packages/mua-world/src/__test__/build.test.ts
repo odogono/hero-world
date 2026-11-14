@@ -72,9 +72,11 @@ describe('placing a composed thing (#258)', () => {
     const { ada, bob, mua } = await setup();
     grant(mua, ada);
     const offered: [string, string[] | undefined][] = [];
-    await mua.subscribe(ada.eid, (text, suggestions) =>
-      offered.push([text, suggestions])
-    );
+    await mua.subscribe(ada.eid, (text, suggestions) => {
+      if (typeof text === 'string') {
+        offered.push([text, suggestions]);
+      }
+    });
 
     const placed = await place(mua, ada);
     expect(placed).toEqual({

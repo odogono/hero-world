@@ -22,6 +22,10 @@ defmodule MuaServer.Endpoint do
   # World's Worker beside it, in `local`
   plug(Plug.Static, at: "/", from: :mua_server, only: ~w(assets local))
 
+  # Places' Pictures, beside the World's EDL (ADR 0027). Each URL carries a
+  # hash of its file as `vsn`, so the browser may keep it for good.
+  plug(Plug.Static, at: "/pictures", from: {__MODULE__, :pictures_dir, []})
+
   plug(Plug.RequestId)
   plug(Plug.Parsers, parsers: [:urlencoded, :json], pass: ["*/*"], json_decoder: Jason)
   plug(Plug.MethodOverride)
@@ -33,5 +37,17 @@ defmodule MuaServer.Endpoint do
     conn
     |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
     |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
+  end
+
+  @doc """
+  Where the World's Pictures are: `pictures/` beside its EDL, which is the
+  main World's unless configured (tests configure none).
+  """
+  def pictures_dir do
+    edl =
+      Application.get_env(:mua_server, :world, [])[:edl] ||
+        Path.join(:code.priv_dir(:mua_world), "edl/main.edl")
+
+    MuaWorld.Pictures.dir(edl)
   end
 end

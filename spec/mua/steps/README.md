@@ -28,7 +28,7 @@ Language-neutral cases for what a Command does, Actions and all (ADR 0024). `pac
 - **`starting_room`**: the Definition name of the room new Characters enter.
 - **`join`**: the Characters, made in order, each with its own Account, then entered. A Character is named by its join name, which is also its label in the case. What joining tells anyone isn't checked.
 - **`steps`**, in order, each one of:
-  - **`{"as": name, "type": line, "told"?: [...], "heard"?: {...}}`**: the Character types a line. `told` is what the Command replies, one entry per message, word for word.
+  - **`{"as": name, "type": line, "told"?: [...], "heard"?: {...}}`**: the Character types a line. `told` is what the Command replies, one entry per message, word for word. A place's Picture is `{"picture": src}`, by the `src` its `picture` gives, since its URL changes with the file (ADR 0027).
   - **`{"advance": seconds, "heard"?: {...}}`**: runs the World on, one tick per second of World time.
   - **`{"where": {thing: place}}`**: what holds each thing. Both are labels: a Character's join name, or anything else's Definition name.
   - **`{"mirror": name, "place": label, "sees": {...}}`**: the Character's mirror snapshot (`MuaWorld.mirror/3`, ADR 0019): its place, and each entity it perceives with the fields of its shown components. Entities and the ids in `location.in` and `portal.door` are labels. An exit with no Definition name is its place's label and its direction, as `"hall north"`.

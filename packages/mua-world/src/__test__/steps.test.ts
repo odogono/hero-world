@@ -13,7 +13,8 @@ import {
   components,
   startMuaWorld,
   type MirrorSnapshot,
-  type MuaWorld
+  type MuaWorld,
+  type Told
 } from '../index';
 
 const REPO = join(import.meta.dir, '../../../..');
@@ -42,12 +43,21 @@ const start = async (spec: Spec) => {
 };
 
 /** Joins a Character with an Account of its own, and hears its output */
+/** A line as the cases write it: a Picture by its `src`, whose URL changes with the file */
+type SpecLine = string | { picture: string };
+
+const asSpec = (told: Told): SpecLine =>
+  typeof told === 'string' ? told : { picture: told.picture.src };
+
+const same = (a: SpecLine, b: SpecLine) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 const join_ = async (mua: MuaWorld, name: string) => {
   const account = await mua.createAccount();
   const eid = await mua.createCharacter(account, name);
   await mua.enter(account, eid);
-  const heard: string[] = [];
-  await mua.subscribe(eid, line => heard.push(line));
+  const heard: SpecLine[] = [];
+  await mua.subscribe(eid, told => heard.push(asSpec(told)));
   return { account, eid, heard };
 };
 
@@ -57,15 +67,15 @@ type Joined = Awaited<ReturnType<typeof join_>>;
 // typer's echo of what it was told is left out of its own
 const heardSince = (
   characters: Map<string, Joined>,
-  typed?: { name: string; told: string[] }
+  typed?: { name: string; told: SpecLine[] }
 ) => {
-  const out: Record<string, string[]> = {};
+  const out: Record<string, SpecLine[]> = {};
   for (const [name, c] of characters) {
     let lines = c.heard.splice(0);
     if (typed?.name === name) {
       const told = [...typed.told];
       lines = lines.filter(line => {
-        const i = told.indexOf(line);
+        const i = told.findIndex(t => same(t, line));
         if (i === -1) {
           return true;
         }
@@ -168,7 +178,9 @@ const runCase = async (spec: Spec, c: Case) => {
     } else {
       const name = step.as as string;
       const who = characters.get(name)!;
-      const told = await mua.command(who.account, who.eid, step.type as string);
+      const told = (
+        await mua.command(who.account, who.eid, step.type as string)
+      ).map(asSpec);
       const label = `${name}: ${String(step.type)}`;
       if ('told' in step) {
         expect([label, told]).toEqual([label, step.told] as never);

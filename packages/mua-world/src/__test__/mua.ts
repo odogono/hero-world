@@ -32,14 +32,22 @@ export const start = async (
   });
 };
 
-/** A Character joined and in play, with every line it hears from now on */
+/**
+ * A Character joined and in play, with every line it hears from now on,
+ * and the `src` of every place's Picture it is shown
+ */
 export const join_ = async (mua: MuaWorld, name: string) => {
   const account = await mua.createAccount();
   const eid = await mua.createCharacter(account, name);
   await mua.enter(account, eid);
   const heard: string[] = [];
-  await mua.subscribe(eid, line => heard.push(line));
-  return { account, eid, heard };
+  const pictures: string[] = [];
+  await mua.subscribe(eid, told =>
+    typeof told === 'string'
+      ? heard.push(told)
+      : pictures.push(told.picture.src)
+  );
+  return { account, eid, heard, pictures };
 };
 
 export const where = (mua: MuaWorld, eid: number) =>

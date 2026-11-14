@@ -5,8 +5,10 @@ import {
   keepOnly,
   loadCommands,
   loadHistory,
+  loadPictureMode,
   saveCommands,
-  saveHistory
+  saveHistory,
+  savePictureMode
 } from '../history';
 
 afterEach(() => localStorage.clear());
@@ -46,5 +48,13 @@ describe('the saved history', () => {
     clearHistory();
     expect(loadHistory(12)).toEqual([]);
     expect(localStorage.getItem('theme')).toBe('dark');
+  });
+
+  test('keeps how Pictures are shown for every Character, past clearing the history', () => {
+    expect(loadPictureMode()).toBe('shown');
+    savePictureMode('off');
+    clearHistory();
+    keepOnly(3);
+    expect(loadPictureMode()).toBe('off');
   });
 });

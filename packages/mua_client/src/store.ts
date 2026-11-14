@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 
+import { loadPictureMode, type PictureMode } from './history';
 import type { Line } from './transcript';
 
 export type Character = { id: number; in_play: boolean; name: string };
@@ -26,6 +27,8 @@ export type Status = 'connecting' | 'joined' | 'limbo' | 'offline' | 'replaced';
 export const session = signal<Session | null | undefined>(undefined);
 export const status = signal<Status>('connecting');
 export const lines = signal<Line[]>([]);
+/** Whether places' Pictures are shown, folded or left out (ADR 0027) */
+export const pictureMode = signal<PictureMode>(loadPictureMode());
 /** Commands this Character has sent, oldest first, for recalling with ↑ */
 export const commands = signal<string[]>([]);
 /** Commands the Character could type next, from the latest `state` */

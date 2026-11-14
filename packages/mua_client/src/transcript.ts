@@ -13,6 +13,18 @@ export type Line =
   | { id: number; kind: 'gap'; reason?: 'drop' | 'reload' }
   /** `suggestions`: Commands the line offers, to send with one click */
   | { id: number; kind: 'output'; suggestions?: string[]; text: string }
+  /**
+   * A place's Picture, just before its description (ADR 0027). `alt` is
+   * the description; `open` is the reader's own choice to show or fold it.
+   */
+  | {
+      alt: string;
+      id: number;
+      kind: 'picture';
+      name: string;
+      open?: boolean;
+      url: string;
+    }
   | { id: number; kind: 'prompt'; options: string[]; text: string }
   | { id: number; kind: 'status'; text: string };
 
@@ -60,6 +72,22 @@ export const connectionLost = (lines: Line[]) =>
 export const rejoined = (lines: Line[]) =>
   lines.length === 0 ? lines : append(lines, { kind: 'gap', reason: 'drop' });
 
+/** The reader showed or folded a Picture */
+export const pictureOpened = (lines: Line[], id: number, open: boolean) =>
+  lines.map(line =>
+    line.kind === 'picture' && line.id === id ? { ...line, open } : line
+  );
+
+/**
+ * Whether a Picture shows, or is folded to its place's name: as the reader
+ * chose, or else only the newest shows, while Pictures are `shown`
+ */
+export const pictureShown = (
+  line: Extract<Line, { kind: 'picture' }>,
+  newest: boolean,
+  mode: 'collapsed' | 'shown'
+) => line.open ?? (mode === 'shown' && newest);
+
 /**
  * A transcript read back after a reload: commands that were waiting may or
  * may not have run, and output may have been missed while the page was gone.
@@ -69,7 +97,14 @@ export const restored = (saved: Line[]): Line[] => {
   for (const line of saved) {
     nextId = Math.max(nextId, line.id + 1);
   }
-  const lines = connectionLost(saved);
+  // Pictures come back folded, but for the newest (ADR 0027)
+  const lines = connectionLost(saved).map(line => {
+    if (line.kind !== 'picture') {
+      return line;
+    }
+    const { open: _open, ...folded } = line;
+    return folded;
+  });
   // reloading again with nothing new since keeps the one marker
   return lines.length === 0 || lines.at(-1)?.kind === 'gap'
     ? lines

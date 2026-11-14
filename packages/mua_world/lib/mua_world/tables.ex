@@ -9,7 +9,7 @@ defmodule MuaWorld.Tables do
   alias OdgnEcs.SQL
 
   @schema """
-  CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT);
+  CREATE TABLE IF NOT EXISTS mua_outbox (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL, suggestions TEXT, picture TEXT);
   CREATE TABLE IF NOT EXISTS mua_notices (id INTEGER PRIMARY KEY, character INTEGER NOT NULL, text TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_identities (sub TEXT PRIMARY KEY, email TEXT, account INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS mua_npc_queue (id INTEGER PRIMARY KEY, actor INTEGER NOT NULL, text TEXT NOT NULL);
@@ -27,6 +27,10 @@ defmodule MuaWorld.Tables do
     # a World made before a line could offer Suggestions (#275)
     if not column?(conn, "mua_outbox", "suggestions"),
       do: SQL.exec!(conn, "ALTER TABLE mua_outbox ADD COLUMN suggestions TEXT")
+
+    # a World made before places had Pictures (ADR 0027)
+    if not column?(conn, "mua_outbox", "picture"),
+      do: SQL.exec!(conn, "ALTER TABLE mua_outbox ADD COLUMN picture TEXT")
 
     # a savepoint, not a transaction: a Migration runs this inside its own
     if table?(conn, "mua_meta") or table?(conn, "mua_waiting") do
@@ -63,8 +67,13 @@ defmodule MuaWorld.Tables do
       SQL.one!(conn, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1", [name]) !=
         nil
 
-  defp line(text, nil), do: text
-  defp line(text, suggestions), do: %{text: text, suggestions: Jason.decode!(suggestions)}
+  defp line(text, nil, nil), do: text
+  defp line(text, suggestions, nil), do: %{text: text, suggestions: Jason.decode!(suggestions)}
+
+  defp line(_text, _, picture) do
+    %{"src" => src, "url" => url, "name" => name, "alt" => alt} = Jason.decode!(picture)
+    %{picture: %{src: src, url: url, name: name, alt: alt}}
+  end
 
   @doc "The Characters (entities with `player`) whose Location is `place`."
   def characters_at(world, place) do
@@ -104,14 +113,31 @@ defmodule MuaWorld.Tables do
       )
 
   @doc """
+  Queues a place's Picture for a Character, once the Step commits:
+  `MuaWorld.Pictures.line/3`'s `%{picture: picture}`. Its `text` is the
+  place's name, for anything that reads lines as text.
+  """
+  def picture(%OdgnEcs{conn: conn}, character, %{picture: picture}),
+    do:
+      SQL.run!(
+        conn,
+        "INSERT INTO mua_outbox (character, text, picture) VALUES (?1, ?2, ?3)",
+        [character, picture.name, Jason.encode!(picture)]
+      )
+
+  @doc """
   Takes the Step's output: read and cleared inside the Step's transaction.
-  Each line is its text, or `%{text, suggestions}` when it offers any.
+  Each line is its text, `%{text, suggestions}` when it offers any, or
+  `%{picture: %{src, url, name, alt}}` for a place's Picture.
   """
   def take_outbox(%OdgnEcs{conn: conn}) do
     rows =
-      for [c, t, s] <-
-            SQL.all!(conn, "SELECT character, text, suggestions FROM mua_outbox ORDER BY id"),
-          do: {c, line(t, s)}
+      for [c, t, s, p] <-
+            SQL.all!(
+              conn,
+              "SELECT character, text, suggestions, picture FROM mua_outbox ORDER BY id"
+            ),
+          do: {c, line(t, s, p)}
 
     SQL.run!(conn, "DELETE FROM mua_outbox")
     rows

@@ -36,11 +36,13 @@ function wayName way
 end wayName
 
 -- a place as the actor sees it: its name and description, then what is
--- there, who else is there and the ways out
+-- there, who else is there and the ways out. Its Picture, if it has one,
+-- is shown to the actor just before (ADR 0027).
 function describe place, actor
   if the described of place is nothing then
     return "You are in darkness."
   end if
+  tell mua to picture place, actor
   ask world to find place, "described"
   put every item of it whose portal is nothing into things
   put every item of things whose container is not nothing into containers

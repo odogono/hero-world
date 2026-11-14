@@ -58,11 +58,17 @@ defmodule MuaWorld.Case do
   @doc "The Account that owns a Character made by `join/2` in this test."
   def account(eid), do: Process.get({:account, eid})
 
-  @doc "Sends a command and returns what its Character was told, one line per message."
+  @doc """
+  Sends a command and returns what its Character was told, one line per
+  message. A place's Picture is left out: `pictures/1` has those.
+  """
   def send_command(world, eid, text) do
     {:ok, lines} = MuaWorld.command(world, account(eid), eid, text)
-    Enum.join(lines, "\n")
+    lines |> Enum.reject(&match?(%{picture: _}, &1)) |> Enum.join("\n")
   end
+
+  @doc "The `src` of each Picture among a Character's lines."
+  def pictures(lines), do: for(%{picture: %{src: src}} <- lines, do: src)
 
   @doc "Runs the World on for `seconds` of World time, a second a tick."
   def run_for(world, seconds) do
