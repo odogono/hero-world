@@ -49,6 +49,7 @@ entity fish_market: quay_room fragrant {
     name: "Fish Market"
     description: "Slate counters under a tin roof, hosed clean after the morning's sale. A few boxes of mackerel sit on melting ice."
   }
+  picture { src: "pictures/fish_market.png" }
   scent { air: "Fish, salt and diesel: the smell of every harbour there is." }
 }
 
@@ -57,6 +58,7 @@ entity slipway: quay_room tidal {
     name: "Slipway"
     description: "A concrete slipway runs down into the harbour, green with weed below the tideline. Lobster pots are stacked against the wall, and a yard opens to the west."
   }
+  picture { src: "pictures/slipway.png" }
   shore {
     high: "The water laps halfway up the slipway."
     low: "The slipway runs on down into wet sand and mud."

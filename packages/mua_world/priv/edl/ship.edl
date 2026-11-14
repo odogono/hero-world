@@ -24,6 +24,7 @@ entity ship_bar: ship_room {
     name: "The Ship"
     description: "A low-beamed bar, its ceiling hung with glass floats and an old ship's wheel. A fire smokes in the grate, and a door at the back leads north."
   }
+  picture { src: "pictures/ship_bar.png" }
   exits { north: $back_room }
 }
 
@@ -32,6 +33,7 @@ entity back_room: ship_room {
     name: "Back Room"
     description: "A cramped room stacked with barrels. Coats nobody came back for hang on a row of pegs."
   }
+  picture { src: "pictures/back_room.png" }
 }
 
 

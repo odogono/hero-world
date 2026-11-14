@@ -45,6 +45,7 @@ entity lighthouse: headland_room causeway_end tidal {
     name: "Lighthouse"
     description: "The whitewashed foot of the lighthouse tower. Coils of rope and a can of paraffin stand by an iron stair that winds up into the dark."
   }
+  picture { src: "pictures/lighthouse.png" }
   shore {
     high: "Through the door, the sea covers the causeway back to the headland."
     low: "Through the door, the causeway back to the headland is clear."
@@ -59,6 +60,7 @@ entity lamp_room: headland_room lamp_room_script {
     name: "Lamp Room"
     description: "A round room of glass at the top of the tower, the great lamp at its centre. Through the salt-crusted panes you can see the whole harbour."
   }
+  picture { src: "pictures/lamp_room.png" }
 }
 
 
