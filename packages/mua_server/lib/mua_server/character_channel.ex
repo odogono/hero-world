@@ -6,7 +6,8 @@ defmodule MuaServer.CharacterChannel do
   Character is told arrives as `output` after the World commits the change
   behind it (ADR 0012); `state` and any `prompt` follow. On joining, the
   client is sent a `mirror` of what the Character perceives, and then a
-  `changes` after each Step that changed it (#164).
+  `changes` after each Step that changed it (#164). A client can ask for a
+  fresh `mirror` at any time (#314).
   """
   use Phoenix.Channel
 
@@ -133,6 +134,18 @@ defmodule MuaServer.CharacterChannel do
 
     case Connection.run(character, self(), run) do
       :ok -> {:reply, :ok, assign(socket, :composing, nil)}
+      {:error, reason} -> {:reply, {:error, %{reason: to_string(reason)}}, socket}
+    end
+  end
+
+  # A fresh mirror, for a client whose own fell out of step (#314). Replied
+  # to in order with the `changes` this process pushes, so every one sent
+  # before the reply is already in it.
+  def handle_in("mirror", _payload, socket) do
+    %{account: account, character: character} = socket.assigns
+
+    case MuaWorld.mirror(@world, account, character) do
+      {:ok, mirror} -> {:reply, {:ok, Protocol.mirror(mirror)}, socket}
       {:error, reason} -> {:reply, {:error, %{reason: to_string(reason)}}, socket}
     end
   end
