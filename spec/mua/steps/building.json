@@ -1,0 +1,625 @@
+{
+  "edl": "house.edl",
+  "starting_room": "hall",
+  "cases": [
+    {
+      "name": "a builder places a thing, and others see it",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {
+            "max_placed": 2
+          }
+        },
+        "bob"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Satchel",
+              "description": "A leather satchel."
+            },
+            "item": {},
+            "container": {
+              "capacity": 5
+            }
+          },
+          "label": "satchel",
+          "told": [
+            {
+              "text": "You make the satchel.",
+              "suggestions": ["edit the satchel"]
+            }
+          ],
+          "placed": [1, 2],
+          "heard": {
+            "bob": ["ada makes the satchel."]
+          }
+        },
+        {
+          "where": {
+            "satchel": "hall"
+          }
+        },
+        {
+          "as": "bob",
+          "type": "take satchel",
+          "told": ["Taken."],
+          "heard": {
+            "ada": ["bob takes the satchel."]
+          }
+        }
+      ]
+    },
+    {
+      "name": "placing is refused without the permission, past the limit, or for a bad composition",
+      "join": [
+        "bob",
+        {
+          "name": "cy",
+          "builder": {
+            "place": false
+          }
+        },
+        {
+          "name": "ada",
+          "builder": {
+            "max_placed": 1,
+            "max_capacity": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "as": "bob",
+          "place": {
+            "described": {
+              "name": "Rock"
+            }
+          },
+          "refused": "You can't build."
+        },
+        {
+          "as": "cy",
+          "place": {
+            "described": {
+              "name": "Rock"
+            }
+          },
+          "refused": "You can't place things."
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "description": "Nameless."
+            }
+          },
+          "refused": "A thing needs a name."
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Rock"
+            },
+            "player": {}
+          },
+          "refused": "You can't build with player: only container, described, item, noun, readable."
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Crate"
+            },
+            "container": {
+              "capacity": 9
+            }
+          },
+          "refused": "A container can hold at most 3."
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Rock"
+            }
+          },
+          "label": "rock",
+          "told": [
+            {
+              "text": "You make the rock.",
+              "suggestions": ["edit the rock"]
+            }
+          ],
+          "placed": [1, 1],
+          "heard": {
+            "bob": ["ada makes the rock."],
+            "cy": ["ada makes the rock."]
+          }
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Stone"
+            }
+          },
+          "refused": "You have placed all 1 things you may."
+        }
+      ]
+    },
+    {
+      "name": "a builder opens a placed thing, saves an edit and closes it",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {}
+        },
+        "bob"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Satchel"
+            },
+            "item": {}
+          },
+          "label": "satchel",
+          "told": [
+            {
+              "text": "You make the satchel.",
+              "suggestions": ["edit the satchel"]
+            }
+          ],
+          "placed": [1, 50],
+          "heard": {
+            "bob": ["ada makes the satchel."]
+          }
+        },
+        {
+          "as": "ada",
+          "save": "satchel",
+          "patch": {
+            "put": {
+              "described": {
+                "name": "Bag"
+              }
+            }
+          },
+          "refused": "Open it with edit first."
+        },
+        {
+          "as": "ada",
+          "type": "edit satchel",
+          "told": ["You open the satchel to edit it."]
+        },
+        {
+          "as": "ada",
+          "save": "satchel",
+          "patch": {
+            "put": {
+              "described": {
+                "name": "Bag"
+              }
+            }
+          },
+          "told": ["You reshape the bag."],
+          "heard": {
+            "bob": ["ada reshapes the bag."]
+          }
+        },
+        {
+          "as": "ada",
+          "save": "satchel",
+          "patch": {
+            "put": {
+              "described": {
+                "name": "Sack"
+              }
+            }
+          },
+          "refused": "Open it with edit first."
+        },
+        {
+          "as": "ada",
+          "type": "edit bag",
+          "told": ["You open the bag to edit it."]
+        },
+        {
+          "as": "ada",
+          "close": true
+        },
+        {
+          "as": "ada",
+          "save": "satchel",
+          "patch": {
+            "put": {
+              "described": {
+                "name": "Sack"
+              }
+            }
+          },
+          "refused": "Open it with edit first."
+        }
+      ]
+    },
+    {
+      "name": "an edit is refused for another's thing, a bad patch, or a thing out of reach",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {
+            "max_capacity": 3
+          }
+        },
+        {
+          "name": "bob",
+          "builder": {}
+        }
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Crate"
+            },
+            "container": {
+              "capacity": 2
+            }
+          },
+          "label": "crate",
+          "told": [
+            {
+              "text": "You make the crate.",
+              "suggestions": ["edit the crate"]
+            }
+          ],
+          "placed": [1, 50],
+          "heard": {
+            "bob": ["ada makes the crate."]
+          }
+        },
+        {
+          "as": "bob",
+          "type": "edit crate",
+          "told": ["You didn't make that."]
+        },
+        {
+          "as": "ada",
+          "type": "edit crate",
+          "told": ["You open the crate to edit it."]
+        },
+        {
+          "as": "ada",
+          "save": "crate",
+          "patch": {
+            "put": {
+              "container": {
+                "capacity": 9
+              }
+            }
+          },
+          "refused": "A container can hold at most 3."
+        },
+        {
+          "as": "ada",
+          "save": "crate",
+          "patch": {
+            "remove": ["described"]
+          },
+          "refused": "A thing needs a described, with its name."
+        },
+        {
+          "as": "ada",
+          "type": "take key",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the brass key."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "unlock door with key",
+          "told": ["You unlock the door with the brass key."],
+          "heard": {
+            "bob": ["ada unlocks the door."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "open door",
+          "told": ["Opened."],
+          "heard": {
+            "bob": ["ada opens the door."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "north",
+          "told": ["Study\nA quiet study.\n\nExits: south"],
+          "heard": {
+            "bob": ["ada goes north."]
+          }
+        },
+        {
+          "as": "ada",
+          "save": "crate",
+          "patch": {
+            "put": {
+              "described": {
+                "name": "Box"
+              }
+            }
+          },
+          "refused": "You can't reach that from here."
+        }
+      ]
+    },
+    {
+      "name": "a builder stores a thing from the composer and brings it back",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {
+            "max_placed": 3
+          }
+        },
+        "bob"
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Satchel"
+            },
+            "item": {}
+          },
+          "label": "satchel",
+          "told": [
+            {
+              "text": "You make the satchel.",
+              "suggestions": ["edit the satchel"]
+            }
+          ],
+          "placed": [1, 3],
+          "heard": {
+            "bob": ["ada makes the satchel."]
+          }
+        },
+        {
+          "as": "ada",
+          "store": "satchel",
+          "refused": "Open it with edit first."
+        },
+        {
+          "as": "ada",
+          "type": "edit satchel",
+          "told": ["You open the satchel to edit it."]
+        },
+        {
+          "as": "ada",
+          "store": "satchel",
+          "told": ["You put away the satchel."],
+          "placed": [1, 3],
+          "heard": {
+            "bob": ["ada puts away the satchel."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "stored",
+          "told": ["You can bring back the satchel."]
+        },
+        {
+          "as": "ada",
+          "type": "unstore lamp",
+          "told": ["You have no lamp stored."]
+        },
+        {
+          "as": "ada",
+          "type": "unstore satchel",
+          "told": ["You bring out the satchel."],
+          "heard": {
+            "bob": ["ada brings out the satchel."]
+          }
+        },
+        {
+          "where": {
+            "satchel": "hall"
+          }
+        }
+      ]
+    },
+    {
+      "name": "storing by typing is refused for another's thing",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {}
+        },
+        "bob",
+        {
+          "name": "cy",
+          "builder": {}
+        }
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Satchel"
+            },
+            "item": {}
+          },
+          "label": "satchel",
+          "told": [
+            {
+              "text": "You make the satchel.",
+              "suggestions": ["edit the satchel"]
+            }
+          ],
+          "placed": [1, 50],
+          "heard": {
+            "bob": ["ada makes the satchel."],
+            "cy": ["ada makes the satchel."]
+          }
+        },
+        {
+          "as": "bob",
+          "type": "store satchel",
+          "told": ["You can't build."]
+        },
+        {
+          "as": "cy",
+          "type": "store satchel",
+          "told": ["You didn't make that."]
+        },
+        {
+          "as": "bob",
+          "type": "stored",
+          "told": ["You can't build."]
+        },
+        {
+          "as": "ada",
+          "type": "store satchel",
+          "told": ["You put away the satchel."],
+          "heard": {
+            "bob": ["ada puts away the satchel."],
+            "cy": ["ada puts away the satchel."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "stored",
+          "told": ["You can bring back the satchel."]
+        }
+      ]
+    },
+    {
+      "name": "a builder destroys a thing from the composer, or by typing",
+      "join": [
+        {
+          "name": "ada",
+          "builder": {
+            "max_placed": 2
+          }
+        },
+        {
+          "name": "bob",
+          "builder": {}
+        },
+        {
+          "name": "cy",
+          "builder": {
+            "destroy": "none"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Crate"
+            },
+            "container": {
+              "capacity": 2
+            }
+          },
+          "label": "crate",
+          "told": [
+            {
+              "text": "You make the crate.",
+              "suggestions": ["edit the crate"]
+            }
+          ],
+          "placed": [1, 2],
+          "heard": {
+            "bob": ["ada makes the crate."],
+            "cy": ["ada makes the crate."]
+          }
+        },
+        {
+          "as": "ada",
+          "destroy": "crate",
+          "refused": "Open it with edit first."
+        },
+        {
+          "as": "bob",
+          "type": "destroy crate",
+          "told": ["You didn't make that."]
+        },
+        {
+          "as": "cy",
+          "type": "destroy crate",
+          "told": ["You can't destroy things."]
+        },
+        {
+          "as": "ada",
+          "type": "destroy lamp",
+          "told": ["Only a thing someone placed can be destroyed."]
+        },
+        {
+          "as": "ada",
+          "type": "edit crate",
+          "told": ["You open the crate to edit it."]
+        },
+        {
+          "as": "ada",
+          "destroy": "crate",
+          "told": ["You unmake the crate."],
+          "placed": [0, 2],
+          "heard": {
+            "bob": ["ada unmakes the crate."],
+            "cy": ["ada unmakes the crate."]
+          }
+        },
+        {
+          "as": "ada",
+          "place": {
+            "described": {
+              "name": "Pail"
+            }
+          },
+          "label": "pail",
+          "told": [
+            {
+              "text": "You make the pail.",
+              "suggestions": ["edit the pail"]
+            }
+          ],
+          "placed": [1, 2],
+          "heard": {
+            "bob": ["ada makes the pail."],
+            "cy": ["ada makes the pail."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "destroy pail",
+          "told": ["You unmake the pail."],
+          "heard": {
+            "bob": ["ada unmakes the pail."],
+            "cy": ["ada unmakes the pail."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "look",
+          "told": [
+            "Hall\nA long hall.\n\nYou see: the lamp, the brass key, the note\nThere is: the box, the chest\nAlso here: bob, cy\nExits: north (closed)"
+          ]
+        }
+      ]
+    }
+  ]
+}

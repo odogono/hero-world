@@ -6,10 +6,11 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 import { DatabaseType } from 'odgn-ecs/db';
-import { get, type Eid } from 'odgn-ecs/store';
+import { get, put, type Eid } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import {
+  MuaWorldError,
   components,
   startMuaWorld,
   type MirrorSnapshot,
@@ -22,7 +23,9 @@ const SPEC_DIR = join(REPO, 'spec/mua/steps');
 const SCRIPTS = join(REPO, 'packages/mua-scripts');
 
 type Step = Record<string, unknown>;
-type Case = { join: string[]; name: string; steps: Step[] };
+/** A name, or `{name, builder}` for a Character whose Account builds */
+type Join = string | { builder?: Record<string, unknown>; name: string };
+type Case = { join: Join[]; name: string; steps: Step[] };
 type Spec = { cases: Case[]; edl: string; starting_room: string };
 
 const start = async (spec: Spec) => {
@@ -42,22 +45,32 @@ const start = async (spec: Spec) => {
   return { definitions: world.getDefinitionNames(), mua };
 };
 
-/** Joins a Character with an Account of its own, and hears its output */
-/** A line as the cases write it: a Picture by its `src`, whose URL changes with the file */
-type SpecLine = string | { picture: string };
+/**
+ * A line as the cases write it: a Picture by its `src`, whose URL changes
+ * with the file, and a line that offers Suggestions with them
+ */
+type SpecLine =
+  string | { picture: string } | { suggestions: string[]; text: string };
 
-const asSpec = (told: Told): SpecLine =>
-  typeof told === 'string' ? told : { picture: told.picture.src };
+const asSpec = (told: Told, suggestions?: string[]): SpecLine => {
+  if (typeof told !== 'string') {
+    return { picture: told.picture.src };
+  }
+  return suggestions?.length ? { suggestions, text: told } : told;
+};
 
 const same = (a: SpecLine, b: SpecLine) =>
   JSON.stringify(a) === JSON.stringify(b);
 
+/** Joins a Character with an Account of its own, and hears its output */
 const join_ = async (mua: MuaWorld, name: string) => {
   const account = await mua.createAccount();
   const eid = await mua.createCharacter(account, name);
   await mua.enter(account, eid);
   const heard: SpecLine[] = [];
-  await mua.subscribe(eid, told => heard.push(asSpec(told)));
+  await mua.subscribe(eid, (told, suggestions) =>
+    heard.push(asSpec(told, suggestions))
+  );
   return { account, eid, heard };
 };
 
@@ -129,17 +142,63 @@ const labelled = (
   return { place: label(snapshot.place), sees };
 };
 
+/**
+ * What one of the Composer's requests gave: what the actor was sent, its
+ * refusal if any, and the Account's count of placed things when the reply
+ * gives one
+ */
+const composed = async (
+  characters: Map<string, Joined>,
+  name: string,
+  call: () => Promise<unknown>
+) => {
+  let refused: string | undefined;
+  let reply: unknown;
+  try {
+    reply = await call();
+  } catch (error) {
+    if (!(error instanceof MuaWorldError)) {
+      throw error;
+    }
+    refused = error.code;
+  }
+  const heard = heardSince(characters);
+  const told = heard[name] ?? [];
+  delete heard[name];
+  const { maxPlaced, placed } = (reply ?? {}) as {
+    maxPlaced?: number;
+    placed?: number;
+  };
+  return {
+    heard,
+    placed: placed === undefined ? undefined : [placed, maxPlaced],
+    refused,
+    told
+  };
+};
+
+/** The Composer's step kinds, each with an `as` */
+const COMPOSER = ['place', 'save', 'store', 'destroy', 'close'] as const;
+
 const runCase = async (spec: Spec, c: Case) => {
   const { definitions, mua } = await start(spec);
   const characters = new Map<string, Joined>();
-  for (const name of c.join) {
-    characters.set(name, await join_(mua, name));
+  for (const j of c.join) {
+    const name = typeof j === 'string' ? j : j.name;
+    const joined = await join_(mua, name);
+    if (typeof j !== 'string') {
+      put(mua.store, joined.account, 'builder', j.builder ?? {});
+    }
+    characters.set(name, joined);
   }
+  // placed things, by the `label` their `place` step gave them
+  const labels = new Map<string, Eid>();
   // what joining told everyone is not the case's
   heardSince(characters);
 
   const eid = async (name: string): Promise<Eid> => {
-    const id = characters.get(name)?.eid ?? (await mua.named(name));
+    const id =
+      characters.get(name)?.eid ?? labels.get(name) ?? (await mua.named(name));
     if (id === undefined) {
       throw new Error(`No entity ${name}`);
     }
@@ -148,6 +207,7 @@ const runCase = async (spec: Spec, c: Case) => {
 
   const named = (id: Eid) =>
     [...characters].find(([, c]) => c.eid === id)?.[0] ??
+    [...labels].find(([, e]) => e === id)?.[0] ??
     [...definitions].find(([, e]) => e === id)?.[0];
 
   for (const step of c.steps) {
@@ -175,12 +235,48 @@ const runCase = async (spec: Spec, c: Case) => {
         'advance',
         step.heard ?? {}
       ] as never);
+    } else if (COMPOSER.some(kind => kind in step)) {
+      const name = step.as as string;
+      const who = characters.get(name)!;
+      const kind = COMPOSER.find(k => k in step)!;
+      const label = `${name}: ${kind} ${JSON.stringify(step[kind])}`;
+      const thing = async () => eid(step[kind] as string);
+      const actual = await composed(characters, name, async () => {
+        switch (kind) {
+          case 'place': {
+            const placed = await mua.place(who.account, who.eid, step.place);
+            if (typeof step.label === 'string') {
+              labels.set(step.label, placed.eid);
+            }
+            return placed;
+          }
+          case 'save':
+            return mua.edit(
+              who.account,
+              who.eid,
+              await thing(),
+              step.patch as never
+            );
+          case 'close':
+            return mua.stopEditing(who.account, who.eid);
+          default:
+            return mua.putAway(who.account, who.eid, await thing(), kind);
+        }
+      });
+      if ('told' in step) {
+        expect([label, actual.told]).toEqual([label, step.told] as never);
+      }
+      expect([label, actual.refused]).toEqual([label, step.refused] as never);
+      if ('placed' in step) {
+        expect([label, actual.placed]).toEqual([label, step.placed] as never);
+      }
+      expect([label, actual.heard]).toEqual([label, step.heard ?? {}] as never);
     } else {
       const name = step.as as string;
       const who = characters.get(name)!;
       const told = (
         await mua.command(who.account, who.eid, step.type as string)
-      ).map(asSpec);
+      ).map(told => asSpec(told));
       const label = `${name}: ${String(step.type)}`;
       if ('told' in step) {
         expect([label, told]).toEqual([label, step.told] as never);
