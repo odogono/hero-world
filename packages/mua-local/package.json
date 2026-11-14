@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./bundle": "./scripts/bundle.ts",
     "./endpoint": "./src/endpoint.ts",
+    "./testing": "./src/testing.ts",
     "./worker": "./src/worker.ts"
   },
   "scripts": {
