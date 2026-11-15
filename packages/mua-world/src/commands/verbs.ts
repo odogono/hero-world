@@ -6,19 +6,25 @@ import { get, query, type Data, type Eid, type Store } from 'odgn-ecs/store';
  * articles. All of it is World data (ADR 0024): the Base Verbs come from
  * `mua-scripts/edl/base.edl`, which a World's EDL includes, and a World adds
  * its own with more `verbs` and `words` components. The parser tries a
- * verb's forms in order, and the first match picks the handler.
+ * verb's forms in order, and the first match picks the Action the Command
+ * asks for.
  *
  * A form's pattern is a space-separated list of slots and literal words:
  * `dir` (a Direction word), `obj` (a noun phrase, the target), `obj2` (a
  * second noun phrase after a preposition, the indirect), `text` (the rest of
  * the input, case preserved), or a literal word matched exactly. An empty
  * pattern matches the verb on its own.
+ *
+ * Each Action is declared in an `actions` component (ADR 0029): the Service
+ * Script that carries it out, if any, and the roles it is sent. Each
+ * Service Script is declared in a `services` component, by name and `src`.
+ * A later declaration of the same name replaces the earlier.
  */
 
 export type Reach = 'carried' | 'here' | 'room';
 
 export type Form = {
-  handler: string;
+  action: string;
   indirectReach: Reach | null;
   pattern: string;
   reach: Reach | null;
@@ -33,16 +39,27 @@ export type Verb = {
   vetoes: Veto[];
 };
 
+/** An Action: the Service that carries it out, if any, and the roles it is sent */
+export type Action = { args: string[]; service: string | null };
+
 export type Vocabulary = {
+  actions: Map<string, Action>;
   aliases: Map<string, string>;
   articles: string[];
   byName: Map<string, Verb>;
   defs: Verb[];
   /** Each Direction with its opposite, in the order a World declares them */
   directions: [string, string | null][];
-  /** Each handler's Vetoes */
+  /** Each Service Script's `src`, by name */
+  services: Map<string, string>;
+  /** Each Action's Vetoes */
   vetoes: Map<string, Veto[]>;
 };
+
+const ARGS = ['target', 'actor'];
+
+/** The Services the Host asks itself, not through an Action */
+const HOST_SERVICES = ['lifecycle', 'build'];
 
 const REACHES: readonly (Reach | null | undefined)[] = [
   undefined,
@@ -88,7 +105,7 @@ const strings = (list: unknown): string[] =>
 const toForm = (form: unknown): Form | null => {
   if (
     !isRecord(form) ||
-    typeof form.handler !== 'string' ||
+    typeof form.action !== 'string' ||
     typeof form.pattern !== 'string'
   ) {
     return null;
@@ -97,7 +114,7 @@ const toForm = (form: unknown): Form | null => {
   const indirect = form.indirect_reach as Reach | null | undefined;
   return REACHES.includes(reach) && REACHES.includes(indirect)
     ? {
-        handler: form.handler,
+        action: form.action,
         indirectReach: indirect ?? null,
         pattern: form.pattern,
         reach: reach ?? null
@@ -175,15 +192,64 @@ const merge = (words: Record<string, unknown>[], key: string) => {
   return out;
 };
 
+const toAction = (def: unknown): Action | null => {
+  if (!isRecord(def)) {
+    return null;
+  }
+  const { service } = def;
+  const args = def.args ?? ARGS;
+  return (service == null || typeof service === 'string') &&
+    Array.isArray(args) &&
+    args.every(a => typeof a === 'string')
+    ? { args: args as string[], service: (service as string | null) ?? null }
+    : null;
+};
+
+const toService = (def: unknown): string | null =>
+  isRecord(def) && typeof def.src === 'string' && def.src !== ''
+    ? def.src
+    : null;
+
+// Each name's declaration in the components' `defs` maps, a later one
+// replacing the earlier; a malformed one is skipped
+const declared = <T>(
+  components: Components[],
+  key: 'actions' | 'services',
+  to: (def: unknown) => T | null
+) => {
+  const out = new Map<string, T>();
+  for (const c of components) {
+    const defs = c[key]?.defs;
+    if (!isRecord(defs)) {
+      continue;
+    }
+    for (const [name, def] of Object.entries(defs)) {
+      const value = to(def);
+      if (value !== null) {
+        out.set(name, value);
+      }
+    }
+  }
+  return out;
+};
+
+type Components = {
+  actions?: Data;
+  services?: Data;
+  verbs?: Data;
+  words?: Data;
+};
+
+const COMPONENTS = ['verbs', 'words', 'actions', 'services'] as const;
+
 /**
- * A vocabulary from `verbs` and `words` components, in order. A verb that
+ * A vocabulary from `verbs`, `words`, `actions` and `services` components,
+ * in order. A verb that
  * shares a name with an earlier one adds its forms, which are tried first: a
  * World can add `look under obj` without replacing `look`. A malformed verb
  * is skipped.
  */
-export const fromComponents = (
-  components: { verbs?: Data; words?: Data }[]
-): Vocabulary => {
+export const fromComponents = (components: Components[]): Vocabulary => {
   const defs: Verb[] = [];
   for (const c of components) {
     if (c.verbs && Array.isArray(c.verbs.defs)) {
@@ -216,43 +282,150 @@ export const fromComponents = (
     }
   }
 
-  // A later Verb declaring Vetoes for a handler replaces the earlier ones
+  // A later Verb declaring Vetoes for an Action replaces the earlier ones
   const vetoes = new Map<string, Veto[]>();
   for (const def of defs) {
     if (def.vetoes.length > 0) {
       for (const form of def.forms) {
-        vetoes.set(form.handler, def.vetoes);
+        vetoes.set(form.action, def.vetoes);
       }
     }
   }
 
   return {
+    actions: declared(components, 'actions', toAction),
     aliases: merge(words, 'aliases'),
     articles: [...new Set(words.flatMap(w => strings(w.articles ?? [])))],
     byName,
     defs,
     directions: directionsOf(words),
+    services: declared(components, 'services', toService),
     vetoes
   };
 };
 
 /**
- * The vocabulary of a World: every entity's `verbs` and `words` components,
- * in entity order, so the Base Verbs a World includes first come first.
+ * The vocabulary of a World: every entity's `verbs`, `words`, `actions` and
+ * `services` components, in entity order, so the Base Verbs a World
+ * includes first come first.
  */
 export const fromWorld = (store: Store): Vocabulary => {
   const eids: Eid[] = [
-    ...new Set([
-      ...query(store, { with: ['verbs'] }),
-      ...query(store, { with: ['words'] })
-    ])
+    ...new Set(COMPONENTS.flatMap(c => query(store, { with: [c] })))
   ].sort((a, b) => a - b);
   return fromComponents(
-    eids.map(eid => ({
-      verbs: get(store, eid, 'verbs'),
-      words: get(store, eid, 'words')
-    }))
+    eids.map(eid =>
+      Object.fromEntries(COMPONENTS.map(c => [c, get(store, eid, c)]))
+    )
   );
+};
+
+/**
+ * The file of a Service's `src`: under a named root when it starts with
+ * `<root>:`, else relative to the World's EDL file. `null` for an unknown
+ * root.
+ */
+export const servicePath = (
+  src: string,
+  roots: Record<string, string>,
+  edlPath: string
+): string | null => {
+  const at = src.indexOf(':');
+  if (at > 1) {
+    const dir = roots[src.slice(0, at)];
+    return dir === undefined ? null : `${dir}/${src.slice(at + 1)}`;
+  }
+  return joinPath(dirname(edlPath), src);
+};
+
+const dirname = (path: string) => {
+  const at = path.lastIndexOf('/');
+  return at === -1 ? '.' : path.slice(0, at) || '/';
+};
+
+// `dir` and `relative` joined, `.` and `..` worked out
+const joinPath = (dir: string, relative: string) => {
+  const parts: string[] = [];
+  for (const part of `${dir}/${relative}`.split('/')) {
+    if (part === '..' && parts.length > 0 && parts.at(-1) !== '..') {
+      parts.pop();
+    } else if (part !== '.' && (part !== '' || parts.length === 0)) {
+      parts.push(part);
+    }
+  }
+  return parts.join('/');
+};
+
+// A map's entries, sorted by key
+const sorted = <T>(map: Map<string, T>) =>
+  [...map.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+/** Each declared Service Script's name and file, sorted by name */
+export const serviceFiles = (
+  vocabulary: Vocabulary,
+  roots: Record<string, string>,
+  edlPath: string
+) =>
+  sorted(vocabulary.services).map(
+    ([name, src]) => [name, servicePath(src, roots, edlPath)] as const
+  );
+
+/**
+ * What is wrong with a vocabulary's Actions and Services, as a list of
+ * messages: a form asking for an undeclared Action, an Action or a Veto
+ * naming an undeclared Service, a Service the Host asks itself missing, or
+ * a Service's `src` under a root that isn't one of `roots`. A World with
+ * any of these won't start.
+ */
+export const problems = (
+  vocabulary: Vocabulary,
+  roots: Record<string, string>
+): string[] => {
+  const { actions, services } = vocabulary;
+  const undeclaredActions = vocabulary.defs.flatMap(def =>
+    def.forms
+      .filter(form => !actions.has(form.action))
+      .map(
+        form =>
+          `${def.names[0]} asks for the Action ${form.action}, which isn't declared`
+      )
+  );
+  const undeclaredServices = sorted(actions)
+    .filter(([, a]) => a.service !== null && !services.has(a.service))
+    .map(
+      ([name, a]) =>
+        `the Action ${name} names the Service ${a.service}, which isn't declared`
+    );
+  const vetoes = vocabulary.defs.flatMap(def =>
+    def.vetoes
+      .filter(
+        v =>
+          v.asks.startsWith('service:') &&
+          !services.has(v.asks.slice('service:'.length))
+      )
+      .map(
+        v =>
+          `${v.event} asks the Service ${v.asks.slice('service:'.length)}, which isn't declared`
+      )
+  );
+  const host = HOST_SERVICES.filter(s => !services.has(s)).map(
+    s => `the Service ${s} isn't declared`
+  );
+  const srcs = sorted(services)
+    .filter(([, src]) => servicePath(src, roots, '.') === null)
+    .map(
+      ([name, src]) =>
+        `the Service ${name}'s src ${src} is under no root mua knows`
+    );
+  return [
+    ...new Set([
+      ...undeclaredActions,
+      ...undeclaredServices,
+      ...vetoes,
+      ...host,
+      ...srcs
+    ])
+  ];
 };
 
 /**

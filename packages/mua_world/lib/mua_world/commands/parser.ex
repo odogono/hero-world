@@ -3,7 +3,7 @@ defmodule MuaWorld.Commands.Parser do
   Parses a player's input against a vocabulary, ported from
   `commands/parser.ts`. A parsed command is a map:
 
-  - `verb`: the handler of the matched form
+  - `verb`: the Action the matched form asks for
   - `target`, `indirect`: noun phrases, articles removed
   - `target_reach`, `indirect_reach`: where to look for them
   - `direction`, `text`: as captured
@@ -62,7 +62,7 @@ defmodule MuaWorld.Commands.Parser do
           captures ->
             command =
               captures
-              |> Map.merge(%{verb: form.handler, raw: raw})
+              |> Map.merge(%{verb: form.action, raw: raw})
               |> then(
                 &if(Map.has_key?(&1, :target),
                   do: Map.put(&1, :target_reach, form.reach || "here"),

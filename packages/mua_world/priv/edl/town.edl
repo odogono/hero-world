@@ -93,20 +93,29 @@ entity town_verbs was garden_verbs {
       {
         names: ["smell" "sniff"]
         forms: [
-          { handler: "smell" pattern: "obj" }
-          { handler: "smell" pattern: "" }
+          { action: "smell" pattern: "obj" }
+          { action: "smell" pattern: "" }
         ]
       }
       {
         names: ["water"]
-        forms: [{ handler: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
+        forms: [{ action: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
         incomplete: "Water what, with what?"
       }
       {
         names: ["light"]
-        forms: [{ handler: "light" pattern: "obj" }]
+        forms: [{ action: "light" pattern: "obj" }]
         incomplete: "What do you want to light?"
       }
     ]
+  }
+
+  # Carried out only by the Receivers
+  actions {
+    defs: {
+      light: {}
+      smell: {}
+      water: {}
+    }
   }
 }

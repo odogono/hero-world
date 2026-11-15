@@ -21,11 +21,21 @@ atom echoing: thing { script { src: "sexton.talk" } }
 entity chapel_verbs {
   verbs {
     defs: [
-      { names: ["pull"] forms: [{ handler: "pull" pattern: "text" }] }
-      { names: ["smash"] forms: [{ handler: "smash" pattern: "text" }] }
-      { names: ["pray"] forms: [{ handler: "pray" pattern: "text" }] }
-      { names: ["ring"] forms: [{ handler: "ring" pattern: "text" }] }
+      { names: ["pull"] forms: [{ action: "pull" pattern: "text" }] }
+      { names: ["smash"] forms: [{ action: "smash" pattern: "text" }] }
+      { names: ["pray"] forms: [{ action: "pray" pattern: "text" }] }
+      { names: ["ring"] forms: [{ action: "ring" pattern: "text" }] }
     ]
+  }
+
+  # Carried out only by the Receivers
+  actions {
+    defs: {
+      pray: {}
+      pull: {}
+      ring: {}
+      smash: {}
+    }
   }
 }
 

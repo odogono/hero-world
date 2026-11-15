@@ -111,13 +111,13 @@ defmodule MuaWorld.Commands.ParserTest do
               "names" => ["pray", "kneel"],
               "incomplete" => "Pray to whom?",
               "forms" => [
-                %{"handler" => "prayTo", "pattern" => "to obj", "reach" => "room"},
-                %{"handler" => "pray", "pattern" => ""}
+                %{"action" => "prayTo", "pattern" => "to obj", "reach" => "room"},
+                %{"action" => "pray", "pattern" => ""}
               ]
             },
             %{
               "names" => ["look"],
-              "forms" => [%{"handler" => "lookUnder", "pattern" => "under obj"}]
+              "forms" => [%{"action" => "lookUnder", "pattern" => "under obj"}]
             }
           ]
         }

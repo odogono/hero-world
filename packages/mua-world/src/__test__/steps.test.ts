@@ -38,6 +38,7 @@ const start = async (spec: Spec) => {
   world.flush();
   const mua = await startMuaWorld(world, {
     clock: () => 0,
+    edlPath: path,
     readFile: file => readFileSync(file, 'utf8'),
     scriptsDir: SCRIPTS,
     startingRoom: spec.starting_room

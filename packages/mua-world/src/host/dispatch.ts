@@ -8,8 +8,8 @@ import { find } from '../exits';
  * What dispatch asks about a command, in turn, as `MuaWorld.Dispatch`
  * (ADR 0024): the receivers (the room, the second object, then the thing
  * acted on), each offered the command; the Verb's veto Decisions; the
- * Action, a Request to a Service Script; and once it has succeeded,
- * `after<Verb>` to the same receivers.
+ * Action, a Request to the Service Script the World names for it (ADR
+ * 0029); and once it has succeeded, `after<Action>` to the same receivers.
  */
 
 /** A command as dispatch sees it: the bound command and who typed what */
@@ -86,14 +86,17 @@ export const planMove = (
       };
 };
 
+// The entities a Command concerns, by role. `exit`, `from` and `to` are
+// there only for a Command with a Direction that leads somewhere.
 const roles = (store: Store, ctx: Context): Record<string, Eid | null> => {
-  const move = ctx.verb === 'move' ? planMove(store, ctx) : null;
+  const move = ctx.direction === null ? null : planMove(store, ctx);
   return {
     ...(move?.kind === 'go'
       ? { exit: move.exit, from: move.from, to: move.to }
       : {}),
     actor: ctx.actor,
     holder: ctx.targetId === null ? null : location(store, ctx.targetId),
+    indirect: ctx.indirectId,
     room: location(store, ctx.actor),
     target: ctx.targetId
   };
@@ -135,104 +138,51 @@ export const questions = (store: Store, ctx: Context) => [
   ...vetoes(store, ctx)
 ];
 
-/** The `after<Verb>` questions, asked of the receivers once the action has succeeded */
+/** The `after<Action>` questions, asked of the receivers once the action has succeeded */
 export const afters = (store: Store, ctx: Context) =>
   receivers(store, ctx).map(q => ({
     ...q,
     message: `after${ctx.verb.charAt(0).toUpperCase()}${ctx.verb.slice(1)}`
   }));
 
-// The Service Script that carries out each Verb's Action
-/** The Verbs whose text, the rest of the line, is a third argument */
-const WITH_TEXT = new Set(['unstore']);
-
-const SERVICES: Record<string, string> = {
-  close: 'open',
-  destroy: 'build',
-  drop: 'thing',
-  edit: 'build',
-  examine: 'thing',
-  help: 'help',
-  inventory: 'thing',
-  lock: 'lock',
-  open: 'open',
-  read: 'thing',
-  store: 'build',
-  stored: 'build',
-  take: 'thing',
-  unlock: 'lock',
-  unstore: 'build'
-};
-
-/** The Service Scripts mua loads, by name */
-export const SERVICE_NAMES = [
-  'room',
-  'exit',
-  'lock',
-  'thing',
-  'open',
-  'speech',
-  'help',
-  'lifecycle',
-  'build'
-];
-
-const target = (ctx: Context): Arg =>
-  ctx.targetId === null ? null : { entity: ctx.targetId };
-
-/** What to send for an action, or why it can't happen */
+/**
+ * What to send for an action, or why it can't happen. The World declares
+ * which Service carries out each Action and the roles it is sent (ADR
+ * 0029); the message is the Action's name, and the rest of the line follows
+ * the roles when the Command has one. An Action with no Service is carried
+ * out only by the Receivers, so reaching here, nothing did it.
+ */
 export const plan = (
   store: Store,
   ctx: Context
 ):
   | { args: Arg[]; kind: 'send'; message: string; to: To }
   | { kind: 'refused'; message: string } => {
-  if (ctx.verb === 'look') {
-    const room = location(store, ctx.actor);
-    return room === null
-      ? { kind: 'refused', message: 'You are nowhere.' }
-      : {
-          args: [{ entity: room }, { entity: ctx.actor }],
-          kind: 'send',
-          message: 'look',
-          to: { service: 'room' }
-        };
+  const action = ctx.vocabulary.actions.get(ctx.verb);
+  if (!action?.service) {
+    return { kind: 'refused', message: CANNOT };
   }
-  if (ctx.verb === 'say' || ctx.verb === 'sayTo') {
-    return {
-      args: [target(ctx), { entity: ctx.actor }, ctx.text],
-      kind: 'send',
-      message: ctx.verb,
-      to: { service: 'speech' }
-    };
+  const r = roles(store, ctx);
+  const args: Arg[] = [];
+  for (const name of action.args) {
+    const eid = role(r, name);
+    if (typeof eid === 'number') {
+      args.push({ entity: eid });
+    } else if (name === 'room') {
+      return { kind: 'refused', message: 'You are nowhere.' };
+    } else if (name === 'exit' || name === 'from' || name === 'to') {
+      const move = planMove(store, ctx);
+      return move.kind === 'refused'
+        ? move
+        : { kind: 'refused', message: CANNOT };
+    } else {
+      args.push(null);
+    }
   }
-  if (ctx.verb === 'move') {
-    const move = planMove(store, ctx);
-    return move.kind === 'refused'
-      ? move
-      : {
-          args: [
-            { entity: move.exit },
-            { entity: ctx.actor },
-            { entity: move.from },
-            { entity: move.to }
-          ],
-          kind: 'send',
-          message: 'traverse',
-          to: { service: 'exit' }
-        };
-  }
-  const service = SERVICES[ctx.verb];
-  return service === undefined
-    ? { kind: 'refused', message: CANNOT }
-    : {
-        args: [
-          target(ctx),
-          { entity: ctx.actor },
-          ...(WITH_TEXT.has(ctx.verb) ? [ctx.text] : [])
-        ],
-        kind: 'send',
-        message: ctx.verb,
-        to: { service }
-      };
+  return {
+    args: ctx.text === null ? args : [...args, ctx.text],
+    kind: 'send',
+    message: ctx.verb,
+    to: { service: action.service }
+  };
 };

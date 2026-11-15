@@ -2,7 +2,7 @@ import { toDirection, type Reach, type Vocabulary } from './verbs';
 
 /**
  * A command parsed from what a Character typed, as
- * `MuaWorld.Commands.Parser` gives it: the handler of the matched form, its
+ * `MuaWorld.Commands.Parser` gives it: the Action of the matched form, its
  * noun phrases with articles removed and where to look for them, and any
  * Direction or text.
  */
@@ -51,7 +51,7 @@ export const parse = (raw: string, vocabulary: Vocabulary): ParseResult => {
     const slots = form.pattern.split(/\s+/).filter(Boolean);
     const captures = match(vocabulary, slots, args, input);
     if (captures) {
-      const command: ParsedCommand = { ...captures, raw, verb: form.handler };
+      const command: ParsedCommand = { ...captures, raw, verb: form.action };
       if (command.target !== undefined) {
         command.targetReach = form.reach ?? 'here';
       }

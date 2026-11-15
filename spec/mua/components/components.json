@@ -15,6 +15,22 @@
       }
     ]
   },
+  "actions": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "defs",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      }
+    ]
+  },
   "builder": {
     "buildable": false,
     "play_state": true,
@@ -683,6 +699,22 @@
         "on_delete": "restrict",
         "optional": true,
         "type": "string",
+        "unique": false
+      }
+    ]
+  },
+  "services": {
+    "buildable": false,
+    "play_state": false,
+    "columns": [
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
+        "name": "defs",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
         "unique": false
       }
     ]

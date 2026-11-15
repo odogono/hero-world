@@ -122,16 +122,24 @@ entity garden_verbs {
       {
         names: ["smell" "sniff"]
         forms: [
-          { handler: "smell" pattern: "obj" }
-          { handler: "smell" pattern: "" }
+          { action: "smell" pattern: "obj" }
+          { action: "smell" pattern: "" }
         ]
       }
       {
         names: ["water"]
-        forms: [{ handler: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
+        forms: [{ action: "water" pattern: "obj with obj2" indirect_reach: "carried" }]
         incomplete: "Water what, with what?"
       }
     ]
+  }
+
+  # Carried out only by the Receivers
+  actions {
+    defs: {
+      smell: {}
+      water: {}
+    }
   }
 }
 

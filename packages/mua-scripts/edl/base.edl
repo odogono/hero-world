@@ -1,21 +1,35 @@
 # The Base Verbs: the Verbs, Directions, Aliases and articles every World
-# starts with (ADR 0024). A World's EDL includes this file:
+# starts with, and the Actions and Service Scripts that carry them out
+# (ADR 0024, ADR 0029). A World's EDL includes this file:
 #
 #   include "mua-scripts:edl/base.edl"
 #
 # A World adds forms to a Verb by declaring a Verb of the same name, whose
 # forms are tried first.
 #
-# Each form names its handler and pattern. A pattern's slots are `dir` (a
-# Direction), `obj` (the thing acted on), `obj2` (a second thing, after a
-# preposition), `text` (the rest of the line) and literal words. `reach` and
-# `indirect_reach` say where `obj` and `obj2` are looked for: `here` (the
-# default), `carried` or `room`.
+# Each form names the Action it asks for and its pattern. A pattern's slots
+# are `dir` (a Direction), `obj` (the thing acted on), `obj2` (a second
+# thing, after a preposition), `text` (the rest of the line) and literal
+# words. `reach` and `indirect_reach` say where `obj` and `obj2` are looked
+# for: `here` (the default), `carried` or `room`.
 #
 # A Verb's `vetoes` are the `before…` Decisions asked before its Action, in
 # order. `asks` is who decides and `about` the entity it concerns, each one
-# of the roles the Host knows: actor, target, holder (what holds the
-# target), room (where the actor is), exit, from, to, or `service:<name>`.
+# of the roles the Host knows: actor, target, indirect, holder (what holds
+# the target), room (where the actor is), exit, from, to, or
+# `service:<name>`.
+#
+# `actions` gives each Action the Service Script that carries it out and
+# the roles it is sent, `["target" "actor"]` unless it says otherwise. The
+# Service gets the Action's name as its message, and the rest of the line
+# after the roles when the form's pattern has `text`. An Action with no
+# `service` is carried out only by the Receivers. A World that declares an
+# Action of the same name replaces it, and every form's Action must be
+# declared.
+#
+# `services` names each Service Script and its `src`: `mua-scripts:` and a
+# path in this package, or a path relative to the World's EDL file. A World
+# that declares a Service of the same name replaces it.
 
 entity base_verbs {
   verbs {
@@ -23,18 +37,18 @@ entity base_verbs {
       {
         names: ["look" "l" "examine" "x"]
         forms: [
-          { handler: "look" pattern: "" }
-          { handler: "look" pattern: "around" }
-          { handler: "examine" pattern: "at obj" }
-          { handler: "examine" pattern: "in obj" }
-          { handler: "examine" pattern: "obj" }
+          { action: "look" pattern: "" }
+          { action: "look" pattern: "around" }
+          { action: "examine" pattern: "at obj" }
+          { action: "examine" pattern: "in obj" }
+          { action: "examine" pattern: "obj" }
         ]
       }
       {
         names: ["move" "go" "walk"]
         forms: [
-          { handler: "move" pattern: "dir" }
-          { handler: "move" pattern: "to dir" }
+          { action: "move" pattern: "dir" }
+          { action: "move" pattern: "to dir" }
         ]
         incomplete: "Where do you want to go?"
         vetoes: [
@@ -46,8 +60,8 @@ entity base_verbs {
       {
         names: ["take" "get" "pick"]
         forms: [
-          { handler: "take" pattern: "up obj" }
-          { handler: "take" pattern: "obj" }
+          { action: "take" pattern: "up obj" }
+          { action: "take" pattern: "obj" }
         ]
         incomplete: "What do you want to take?"
         vetoes: [
@@ -58,7 +72,7 @@ entity base_verbs {
       }
       {
         names: ["drop"]
-        forms: [{ handler: "drop" pattern: "obj" reach: "carried" }]
+        forms: [{ action: "drop" pattern: "obj" reach: "carried" }]
         incomplete: "What do you want to drop?"
         vetoes: [
           { event: "beforeRemove" asks: "holder" about: "target" }
@@ -67,76 +81,114 @@ entity base_verbs {
       }
       {
         names: ["read"]
-        forms: [{ handler: "read" pattern: "obj" }]
+        forms: [{ action: "read" pattern: "obj" }]
         incomplete: "What do you want to read?"
       }
       {
         names: ["help" "commands"]
-        forms: [{ handler: "help" pattern: "" }]
+        forms: [{ action: "help" pattern: "" }]
       }
       {
         names: ["inventory" "inv" "i"]
-        forms: [{ handler: "inventory" pattern: "" }]
+        forms: [{ action: "inventory" pattern: "" }]
       }
       {
         names: ["open"]
-        forms: [{ handler: "open" pattern: "obj" }]
+        forms: [{ action: "open" pattern: "obj" }]
         incomplete: "What do you want to open?"
       }
       {
         names: ["close" "shut"]
-        forms: [{ handler: "close" pattern: "obj" }]
+        forms: [{ action: "close" pattern: "obj" }]
         incomplete: "What do you want to close?"
       }
       {
         names: ["lock"]
         forms: [
-          { handler: "lock" pattern: "obj with obj2" indirect_reach: "carried" }
-          { handler: "lock" pattern: "obj" }
+          { action: "lock" pattern: "obj with obj2" indirect_reach: "carried" }
+          { action: "lock" pattern: "obj" }
         ]
         incomplete: "What do you want to lock?"
       }
       {
         names: ["unlock"]
         forms: [
-          { handler: "unlock" pattern: "obj with obj2" indirect_reach: "carried" }
-          { handler: "unlock" pattern: "obj" }
+          { action: "unlock" pattern: "obj with obj2" indirect_reach: "carried" }
+          { action: "unlock" pattern: "obj" }
         ]
         incomplete: "What do you want to unlock?"
       }
       {
         names: ["say"]
         forms: [
-          { handler: "sayTo" pattern: "to obj text" reach: "room" }
-          { handler: "say" pattern: "text" }
+          { action: "sayTo" pattern: "to obj text" reach: "room" }
+          { action: "say" pattern: "text" }
         ]
         incomplete: "What do you want to say?"
       }
       {
         names: ["edit"]
-        forms: [{ handler: "edit" pattern: "obj" }]
+        forms: [{ action: "edit" pattern: "obj" }]
         incomplete: "What do you want to edit?"
       }
       {
         names: ["destroy"]
-        forms: [{ handler: "destroy" pattern: "obj" }]
+        forms: [{ action: "destroy" pattern: "obj" }]
         incomplete: "What do you want to destroy?"
       }
       {
         names: ["store"]
-        forms: [{ handler: "store" pattern: "obj" }]
+        forms: [{ action: "store" pattern: "obj" }]
         incomplete: "What do you want to store?"
       }
       {
         names: ["stored"]
-        forms: [{ handler: "stored" pattern: "" }]
+        forms: [{ action: "stored" pattern: "" }]
       }
       {
         names: ["unstore"]
-        forms: [{ handler: "unstore" pattern: "text" }]
+        forms: [{ action: "unstore" pattern: "text" }]
         incomplete: "What do you want to bring back?"
       }
     ]
+  }
+
+  actions {
+    defs: {
+      close: { service: "open" }
+      destroy: { service: "build" }
+      drop: { service: "thing" }
+      edit: { service: "build" }
+      examine: { service: "thing" }
+      help: { service: "help" }
+      inventory: { service: "thing" }
+      lock: { service: "lock" }
+      look: { service: "room" args: ["room" "actor"] }
+      move: { service: "exit" args: ["exit" "actor" "from" "to"] }
+      open: { service: "open" }
+      read: { service: "thing" }
+      say: { service: "speech" }
+      sayTo: { service: "speech" }
+      store: { service: "build" }
+      stored: { service: "build" }
+      take: { service: "thing" }
+      unlock: { service: "lock" }
+      unstore: { service: "build" }
+    }
+  }
+
+  services {
+    defs: {
+      build: { src: "mua-scripts:scripts/services/build.talk" }
+      exit: { src: "mua-scripts:scripts/services/exit.talk" }
+      help: { src: "mua-scripts:scripts/services/help.talk" }
+      lifecycle: { src: "mua-scripts:scripts/services/lifecycle.talk" }
+      lock: { src: "mua-scripts:scripts/services/lock.talk" }
+      open: { src: "mua-scripts:scripts/services/open.talk" }
+      room: { src: "mua-scripts:scripts/services/room.talk" }
+      speech: { src: "mua-scripts:scripts/services/speech.talk" }
+      thing: { src: "mua-scripts:scripts/services/thing.talk" }
+    }
   }
 
   # Each Direction with its opposite, in the order a room lists its exits,
