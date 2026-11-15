@@ -17,8 +17,9 @@ import { get, query, type Data, type Eid, type Store } from 'odgn-ecs/store';
  *
  * Each Action is declared in an `actions` component (ADR 0029): the Service
  * Script that carries it out, if any, and the roles it is sent. Each
- * Service Script is declared in a `services` component, by name and `src`.
- * A later declaration of the same name replaces the earlier.
+ * Service Script is declared in a `services` component, by name and `src`,
+ * and each Library the World's Scripts can `use` in a `libraries` component,
+ * the same way. A later declaration of the same name replaces the earlier.
  */
 
 export type Reach = 'carried' | 'here' | 'room';
@@ -50,6 +51,8 @@ export type Vocabulary = {
   defs: Verb[];
   /** Each Direction with its opposite, in the order a World declares them */
   directions: [string, string | null][];
+  /** Each Library's `src`, by the name Scripts `use` it from */
+  libraries: Map<string, string>;
   /** Each Service Script's `src`, by name */
   services: Map<string, string>;
   /** Each Action's Vetoes */
@@ -205,7 +208,8 @@ const toAction = (def: unknown): Action | null => {
     : null;
 };
 
-const toService = (def: unknown): string | null =>
+// A Service Script's or a Library's `src`
+const toSrc = (def: unknown): string | null =>
   isRecord(def) && typeof def.src === 'string' && def.src !== ''
     ? def.src
     : null;
@@ -214,7 +218,7 @@ const toService = (def: unknown): string | null =>
 // replacing the earlier; a malformed one is skipped
 const declared = <T>(
   components: Components[],
-  key: 'actions' | 'services',
+  key: 'actions' | 'libraries' | 'services',
   to: (def: unknown) => T | null
 ) => {
   const out = new Map<string, T>();
@@ -235,16 +239,23 @@ const declared = <T>(
 
 type Components = {
   actions?: Data;
+  libraries?: Data;
   services?: Data;
   verbs?: Data;
   words?: Data;
 };
 
-const COMPONENTS = ['verbs', 'words', 'actions', 'services'] as const;
+const COMPONENTS = [
+  'verbs',
+  'words',
+  'actions',
+  'services',
+  'libraries'
+] as const;
 
 /**
- * A vocabulary from `verbs`, `words`, `actions` and `services` components,
- * in order. A verb that
+ * A vocabulary from `verbs`, `words`, `actions`, `services` and `libraries`
+ * components, in order. A verb that
  * shares a name with an earlier one adds its forms, which are tried first: a
  * World can add `look under obj` without replacing `look`. A malformed verb
  * is skipped.
@@ -299,14 +310,15 @@ export const fromComponents = (components: Components[]): Vocabulary => {
     byName,
     defs,
     directions: directionsOf(words),
-    services: declared(components, 'services', toService),
+    libraries: declared(components, 'libraries', toSrc),
+    services: declared(components, 'services', toSrc),
     vetoes
   };
 };
 
 /**
- * The vocabulary of a World: every entity's `verbs`, `words`, `actions` and
- * `services` components, in entity order, so the Base Verbs a World
+ * The vocabulary of a World: every entity's `verbs`, `words`, `actions`,
+ * `services` and `libraries` components, in entity order, so the Base Verbs a World
  * includes first come first.
  */
 export const fromWorld = (store: Store): Vocabulary => {
@@ -321,11 +333,11 @@ export const fromWorld = (store: Store): Vocabulary => {
 };
 
 /**
- * The file of a Service's `src`: under a named root when it starts with
+ * The file of a Service Script's or a Library's `src`: under a named root when it starts with
  * `<root>:`, else relative to the World's EDL file. `null` for an unknown
  * root.
  */
-export const servicePath = (
+export const scriptPath = (
   src: string,
   roots: Record<string, string>,
   edlPath: string
@@ -360,6 +372,16 @@ const joinPath = (dir: string, relative: string) => {
 const sorted = <T>(map: Map<string, T>) =>
   [...map.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
+/** Each declared Library's name and file, sorted by name */
+export const libraryFiles = (
+  vocabulary: Vocabulary,
+  roots: Record<string, string>,
+  edlPath: string
+) =>
+  sorted(vocabulary.libraries).map(
+    ([name, src]) => [name, scriptPath(src, roots, edlPath)] as const
+  );
+
 /** Each declared Service Script's name and file, sorted by name */
 export const serviceFiles = (
   vocabulary: Vocabulary,
@@ -367,14 +389,15 @@ export const serviceFiles = (
   edlPath: string
 ) =>
   sorted(vocabulary.services).map(
-    ([name, src]) => [name, servicePath(src, roots, edlPath)] as const
+    ([name, src]) => [name, scriptPath(src, roots, edlPath)] as const
   );
 
 /**
- * What is wrong with a vocabulary's Actions and Services, as a list of
- * messages: a form asking for an undeclared Action, an Action or a Veto
- * naming an undeclared Service, a Service the Host asks itself missing, or
- * a Service's `src` under a root that isn't one of `roots`. A World with
+ * What is wrong with a vocabulary's Actions, Services and Libraries, as a
+ * list of messages: a form asking for an undeclared Action, an Action or a
+ * Veto naming an undeclared Service, a Service the Host asks itself
+ * missing, or a Service's or a Library's `src` under a root that isn't one
+ * of `roots`. A World with
  * any of these won't start.
  */
 export const problems = (
@@ -412,10 +435,16 @@ export const problems = (
     s => `the Service ${s} isn't declared`
   );
   const srcs = sorted(services)
-    .filter(([, src]) => servicePath(src, roots, '.') === null)
+    .filter(([, src]) => scriptPath(src, roots, '.') === null)
     .map(
       ([name, src]) =>
         `the Service ${name}'s src ${src} is under no root mua knows`
+    );
+  const librarySrcs = sorted(vocabulary.libraries)
+    .filter(([, src]) => scriptPath(src, roots, '.') === null)
+    .map(
+      ([name, src]) =>
+        `the Library ${name}'s src ${src} is under no root mua knows`
     );
   return [
     ...new Set([
@@ -423,7 +452,8 @@ export const problems = (
       ...undeclaredServices,
       ...vetoes,
       ...host,
-      ...srcs
+      ...srcs,
+      ...librarySrcs
     ])
   ];
 };

@@ -1,4 +1,4 @@
-// The Actions and Service Scripts a World declares (ADR 0029), as mua_world's
+// The Actions, Service Scripts and Libraries a World declares (ADR 0029), as mua_world's
 // test/gameplay/actions_test.exs has it: a World whose Verbs ask for what it
 // hasn't declared won't start. What a declared Action reaches is pinned by
 // the Step cases in spec/mua/steps/actions.json.
@@ -79,6 +79,16 @@ describe('a World', () => {
       }`)
     ).rejects.toThrow(
       "the Service thing's src elsewhere:thing.talk is under no root mua knows"
+    );
+  });
+
+  test("won't start when a Library's src is under an unknown root", async () => {
+    await expect(
+      start(`entity more_libraries {
+        libraries { defs: { manners: { src: "elsewhere:manners.talk" } } }
+      }`)
+    ).rejects.toThrow(
+      "the Library manners's src elsewhere:manners.talk is under no root mua knows"
     );
   });
 

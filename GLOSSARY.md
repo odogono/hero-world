@@ -244,6 +244,10 @@ _Avoid_: behaviour (for the code), handler
 A named Script that belongs to no entity, declared by the World, and carries out Actions for the whole World. Which Service Scripts a World has is World data, never Host code.
 _Avoid_: built-in, system script
 
+**Library**:
+NorthTalk functions that Scripts `use` by the Library's name, such as `rooms` or `messages`. Which Libraries a World has is World data, declared by name and `src` as Service Scripts are, never Host code.
+_Avoid_: helpers, module
+
 ## Commands
 
 **Command**:

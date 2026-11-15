@@ -25,8 +25,10 @@ defmodule MuaWorld.Commands.Verbs do
 
   Each Action is declared in an `actions` component (ADR 0029): the Service
   Script that carries it out, if any, and the roles it is sent. Each
-  Service Script is declared in a `services` component, by name and `src`.
-  A later declaration of the same name replaces the earlier.
+  Service Script is declared in a `services` component, by name and `src`,
+  and each Library the World's Scripts can `use` in a `libraries`
+  component, the same way. A later declaration of the same name replaces
+  the earlier.
   """
 
   @type form :: %{
@@ -47,6 +49,7 @@ defmodule MuaWorld.Commands.Verbs do
           by_name: %{String.t() => verb()},
           actions: %{String.t() => action()},
           services: %{String.t() => String.t()},
+          libraries: %{String.t() => String.t()},
           defs: [verb()],
           vetoes: %{String.t() => [veto()]},
           directions: [{String.t(), String.t() | nil}],
@@ -60,7 +63,7 @@ defmodule MuaWorld.Commands.Verbs do
   # The Services the Host asks itself, not through an Action
   @host_services ~w(lifecycle build)
 
-  @components ~w(verbs words actions services)
+  @components ~w(verbs words actions services libraries)
 
   @doc "The words that repeat the last command. The Host reads these itself."
   def again_words, do: ~w(again g)
@@ -85,8 +88,8 @@ defmodule MuaWorld.Commands.Verbs do
   end
 
   @doc """
-  A vocabulary from `verbs`, `words`, `actions` and `services` components,
-  in order. A verb that
+  A vocabulary from `verbs`, `words`, `actions`, `services` and `libraries`
+  components, in order. A verb that
   shares a name with an earlier one adds its forms, which are tried first: a
   World can add `look under obj` without replacing `look`. A malformed verb
   is skipped.
@@ -117,7 +120,8 @@ defmodule MuaWorld.Commands.Verbs do
     %{
       by_name: by_name,
       actions: declared(components, "actions", &to_action/1),
-      services: declared(components, "services", &to_service/1),
+      services: declared(components, "services", &to_src/1),
+      libraries: declared(components, "libraries", &to_src/1),
       defs: defs,
       vetoes: vetoes(defs),
       directions: directions_of(words),
@@ -127,8 +131,8 @@ defmodule MuaWorld.Commands.Verbs do
   end
 
   @doc """
-  The vocabulary of a World: every entity's `verbs`, `words`, `actions` and
-  `services` components, in entity order, so the Base Verbs a World
+  The vocabulary of a World: every entity's `verbs`, `words`, `actions`,
+  `services` and `libraries` components, in entity order, so the Base Verbs a World
   includes first come first.
   """
   @spec from_world(OdgnEcs.t()) :: vocabulary()
@@ -142,10 +146,11 @@ defmodule MuaWorld.Commands.Verbs do
   end
 
   @doc """
-  What is wrong with a vocabulary's Actions and Services, as a list of
-  messages: a form asking for an undeclared Action, an Action or a Veto
-  naming an undeclared Service, a Service the Host asks itself missing, or
-  a Service's `src` under a root that isn't one of `roots`. A World with
+  What is wrong with a vocabulary's Actions, Services and Libraries, as a
+  list of messages: a form asking for an undeclared Action, an Action or a
+  Veto naming an undeclared Service, a Service the Host asks itself
+  missing, or a Service's or a Library's `src` under a root that isn't one
+  of `roots`. A World with
   any of these won't migrate or start.
   """
   @spec problems(vocabulary(), %{String.t() => String.t()}) :: [String.t()]
@@ -177,27 +182,39 @@ defmodule MuaWorld.Commands.Verbs do
 
     srcs =
       for {name, src} <- Enum.sort(vocabulary.services),
-          service_path(src, roots, ".") == nil,
+          script_path(src, roots, ".") == nil,
           do: "the Service #{name}'s src #{src} is under no root mua knows"
 
-    actions ++ services ++ vetoes ++ host ++ srcs
+    library_srcs =
+      for {name, src} <- Enum.sort(vocabulary.libraries),
+          script_path(src, roots, ".") == nil,
+          do: "the Library #{name}'s src #{src} is under no root mua knows"
+
+    actions ++ services ++ vetoes ++ host ++ srcs ++ library_srcs
   end
 
   @doc """
   Each declared Service Script's name and file, sorted by name, its `src`
-  read as `service_path/3` does.
+  read as `script_path/3` does.
   """
-  def service_files(vocabulary, roots, edl_path) do
-    for {name, src} <- Enum.sort(vocabulary.services),
-        do: {name, service_path(src, roots, edl_path)}
+  def service_files(vocabulary, roots, edl_path), do: files(vocabulary.services, roots, edl_path)
+
+  @doc """
+  Each declared Library's name and file, sorted by name, its `src` read as
+  `script_path/3` does.
+  """
+  def library_files(vocabulary, roots, edl_path), do: files(vocabulary.libraries, roots, edl_path)
+
+  defp files(srcs, roots, edl_path) do
+    for {name, src} <- Enum.sort(srcs), do: {name, script_path(src, roots, edl_path)}
   end
 
   @doc """
-  The file of a Service's `src`: under a named root when it starts with
+  The file of a Service Script's or a Library's `src`: under a named root when it starts with
   `<root>:`, else relative to the World's EDL file. `nil` for an unknown
   root.
   """
-  def service_path(src, roots, edl_path) do
+  def script_path(src, roots, edl_path) do
     case String.split(src, ":", parts: 2) do
       [root, rest] when byte_size(root) > 1 ->
         if dir = roots[root], do: Path.join(dir, rest)
@@ -229,8 +246,8 @@ defmodule MuaWorld.Commands.Verbs do
 
   defp to_action(_), do: nil
 
-  defp to_service(%{"src" => src}) when is_binary(src) and src != "", do: src
-  defp to_service(_), do: nil
+  defp to_src(%{"src" => src}) when is_binary(src) and src != "", do: src
+  defp to_src(_), do: nil
 
   # Each Action's Vetoes. A later Verb declaring Vetoes for an Action
   # replaces the earlier ones.

@@ -2,6 +2,8 @@
 -- 0029). Each reply says what it was sent, so a case shows which Service a
 -- Command reached and with what.
 
+use politely from manners
+
 on wave target, actor
   return "gesture: wave"
 end wave
@@ -17,6 +19,10 @@ end point
 on read target, actor
   return `gesture: read ${the name of the described of target}`
 end read
+
+on nod target, actor
+  return politely("nod")
+end nod
 
 on beforeBow actor, subject, deciding
   veto "gesture: no bowing"

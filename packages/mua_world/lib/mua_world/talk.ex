@@ -251,17 +251,11 @@ defmodule MuaWorld.Talk do
     })
   end
 
-  # mua's Libraries, by the name Scripts `use` them from, and its Service
-  # Scripts: its core actions, which no Message Path reaches.
-  @libraries ~w(things messages rooms)
-
-  defp behaviour(path), do: MuaWorld.Scripts.path(Path.join("scripts", path))
-
   @doc """
   Starts NorthTalk for `world` with mua's Capability, sharing `table` for
-  notices, and loads mua's Libraries, the Service Scripts the World
-  declares (ADR 0029) and the World's Scripts. A Service's `src` that isn't
-  under a named root is beside `edl_path`, the World's EDL file. Returns
+  notices, and loads the Libraries and Service Scripts the World declares
+  (ADR 0029) and the World's Scripts. A `src` that isn't under a named root
+  is beside `edl_path`, the World's EDL file. Returns
   `{:ok, talk}`, or `{:error, {path, reason}}` naming the first Script that
   failed to load.
   """
@@ -276,15 +270,16 @@ defmodule MuaWorld.Talk do
         on_show: &MuaWorld.Tables.tell(world, &1, &2)
       )
 
+    vocabulary = Verbs.from_world(world)
+    roots = MuaWorld.Scripts.roots()
+
     libraries =
-      for name <- @libraries do
-        path = behaviour("lib/#{name}.talk")
+      for {name, path} <- Verbs.library_files(vocabulary, roots, edl_path) do
         {path, fn -> OdgnEcsTalk.add_library(talk, name, File.read!(path), [], ["mua"]) end}
       end
 
     services =
-      for {name, path} <-
-            Verbs.service_files(Verbs.from_world(world), MuaWorld.Scripts.roots(), edl_path) do
+      for {name, path} <- Verbs.service_files(vocabulary, roots, edl_path) do
         {path, fn -> OdgnEcsTalk.load_service_script(talk, name, File.read!(path)) end}
       end
 
