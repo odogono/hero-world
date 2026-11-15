@@ -1,4 +1,4 @@
-# The Actions and Service Scripts a World declares (ADR 0029): a World whose
+# The Actions, Service Scripts and Libraries a World declares (ADR 0029): a World whose
 # Verbs ask for what it hasn't declared won't start. What a declared Action
 # reaches is pinned by the Step cases in spec/mua/steps/actions.json.
 defmodule MuaWorld.ActionsTest do
@@ -84,6 +84,18 @@ defmodule MuaWorld.ActionsTest do
              """)
 
     assert message =~ "the Service thing's src elsewhere:thing.talk is under no root mua knows"
+  end
+
+  test "won't start when a Library's src is under an unknown root", %{tmp_dir: dir} do
+    assert {:error, {:actions, message}} =
+             start(dir, """
+             entity more_libraries {
+               libraries { defs: { manners: { src: "elsewhere:manners.talk" } } }
+             }
+             """)
+
+    assert message =~
+             "the Library manners's src elsewhere:manners.talk is under no root mua knows"
   end
 
   test "starts with a Receivers-only Action declared", %{tmp_dir: dir} do

@@ -1,0 +1,6 @@
+-- manners: a Library the Action cases' World declares itself (ADR 0029),
+-- which its gesture Service uses.
+
+function politely gesture
+  return `gesture: ${gesture}, politely`
+end politely

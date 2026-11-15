@@ -67,6 +67,17 @@
           "told": ["You can't do that."]
         }
       ]
+    },
+    {
+      "name": "a Service Script uses a Library the World declares",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "nod",
+          "told": ["gesture: nod, politely"]
+        }
+      ]
     }
   ]
 }

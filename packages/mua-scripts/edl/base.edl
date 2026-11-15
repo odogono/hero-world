@@ -1,6 +1,6 @@
 # The Base Verbs: the Verbs, Directions, Aliases and articles every World
-# starts with, and the Actions and Service Scripts that carry them out
-# (ADR 0024, ADR 0029). A World's EDL includes this file:
+# starts with, the Actions and Service Scripts that carry them out, and the
+# Libraries Scripts can `use` (ADR 0024, ADR 0029). A World's EDL includes this file:
 #
 #   include "mua-scripts:edl/base.edl"
 #
@@ -30,6 +30,9 @@
 # `services` names each Service Script and its `src`: `mua-scripts:` and a
 # path in this package, or a path relative to the World's EDL file. A World
 # that declares a Service of the same name replaces it.
+#
+# `libraries` names each Library a Script can `use`, and its `src`, the
+# same way.
 
 entity base_verbs {
   verbs {
@@ -188,6 +191,14 @@ entity base_verbs {
       room: { src: "mua-scripts:scripts/services/room.talk" }
       speech: { src: "mua-scripts:scripts/services/speech.talk" }
       thing: { src: "mua-scripts:scripts/services/thing.talk" }
+    }
+  }
+
+  libraries {
+    defs: {
+      messages: { src: "mua-scripts:scripts/lib/messages.talk" }
+      rooms: { src: "mua-scripts:scripts/lib/rooms.talk" }
+      things: { src: "mua-scripts:scripts/lib/things.talk" }
     }
   }
 

@@ -45,9 +45,10 @@ defmodule MuaWorld.Components do
       c("npc", true, [col("active", :boolean, default: true)]),
       c("lockable", true, [col("is_locked", :boolean, default: false), col("lock", :string)]),
       c("key", false, [col("opens", :array)]),
-      # The Actions and the Service Scripts a World declares (ADR 0029)
+      # The Actions, Service Scripts and Libraries a World declares (ADR 0029)
       c("actions", false, [col("defs", :json)]),
       c("services", false, [col("defs", :json)]),
+      c("libraries", false, [col("defs", :json)]),
       c("verbs", false, [col("defs", :json)]),
       c("words", false, [
         col("directions", :json),

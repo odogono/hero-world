@@ -29,6 +29,7 @@ import type { BoundCommand } from '../commands/bind';
 import { location } from '../commands/scope';
 import {
   fromWorld,
+  libraryFiles,
   problems,
   serviceFiles,
   type Vocabulary
@@ -74,9 +75,6 @@ import {
   type Notices
 } from './talk';
 import { viewFor } from './view';
-
-/** mua's Libraries, by the name Scripts `use` them from */
-const LIBRARIES = ['things', 'messages', 'rooms'];
 
 /** An Account's building limits and how many things it has placed */
 export type Builder = {
@@ -308,8 +306,6 @@ export const startMuaWorld = async (
   const subscribers = new Map<Eid, Set<Hear>>();
   const editingListeners = new Map<Eid, Set<() => void>>();
   const named = (name: string) => world.getDefinitionNames().get(name);
-  const mua = (path: string) =>
-    options.readFile(`${options.scriptsDir}/scripts/${path}`);
 
   // -- Start ----------------------------------------------------------------
 
@@ -345,8 +341,12 @@ export const startMuaWorld = async (
     limits: options.limits,
     onShow: (eid, line) => tell(store, eid, line)
   });
-  for (const name of LIBRARIES) {
-    talk.addLibrary(name, mua(`lib/${name}.talk`));
+  for (const [name, path] of libraryFiles(
+    vocabulary,
+    roots,
+    options.edlPath ?? '.'
+  )) {
+    talk.addLibrary(name, options.readFile(path!));
   }
   for (const [name, path] of serviceFiles(
     vocabulary,
