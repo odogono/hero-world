@@ -90,7 +90,8 @@ defmodule MuaWorld.Migration do
     Lifecycle.record_homes(world)
 
     with {:ok, _} <- starting(world, starting_room),
-         :ok <- pictures(world, path) do
+         :ok <- pictures(world, path),
+         :ok <- actions(world) do
       {:ok, %{exits_remade: rooms, timers_cancelled: cancelled}}
     end
   end
@@ -102,6 +103,23 @@ defmodule MuaWorld.Migration do
 
       {:error, reason} ->
         {:error, "the Migration would leave the World without a Starting room: #{reason}"}
+    end
+  end
+
+  # Every form's Action, and every Service an Action or Veto names, is
+  # declared (ADR 0029)
+  defp actions(world) do
+    case MuaWorld.Commands.Verbs.problems(
+           MuaWorld.Commands.Verbs.from_world(world),
+           MuaWorld.Scripts.roots()
+         ) do
+      [] ->
+        :ok
+
+      problems ->
+        {:error,
+         "the Migration would leave Actions that can't be carried out: " <>
+           Enum.join(problems, "; ")}
     end
   end
 

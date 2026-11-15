@@ -4,8 +4,8 @@
 --      door vetoes it;
 --   2. `beforeExit` of the room left and `beforeEnter` of the room entered,
 --      which a world's Scripts may veto (see MuaWorld.Dispatch);
---   3. if nothing vetoed, `traverse way, actor, origin, destination`, which
---      moves the actor and returns what they see.
+--   3. if nothing vetoed, the `move` Action: `move way, actor, origin,
+--      destination`, which moves the actor and returns what they see.
 
 use describe, isClosed from rooms
 use messageFor from messages
@@ -25,7 +25,7 @@ on beforeTraverse actor, way, deciding
   pass beforeTraverse
 end beforeTraverse
 
-on traverse way, actor, origin, destination
+on move way, actor, origin, destination
   moveTo actor, destination
 
   -- the exit's `messages` can replace what is said as the actor passes
@@ -50,4 +50,4 @@ on traverse way, actor, origin, destination
     return seen
   end if
   return line & `\n` & seen
-end traverse
+end move

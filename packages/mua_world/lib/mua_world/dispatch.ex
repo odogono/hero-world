@@ -6,9 +6,9 @@ defmodule MuaWorld.Dispatch do
      thing acted on. Each is offered the command (`on <verb> role, actor`),
      and a reply handles it;
   2. the veto Decisions of the action, any of which may refuse it;
-  3. the Action: a request to one of mua's Service Scripts
-     (`packages/mua-scripts/scripts/services`);
-  4. once it has succeeded, `after<Verb>` (`afterTake`) to the same
+  3. the Action: a request to the Service Script the World names for it
+     (ADR 0029), unless only the Receivers carry it out;
+  4. once it has succeeded, `after<Action>` (`afterTake`) to the same
      receivers, whose replies are added to the action's.
 
   Every question goes to a Message Path or a Service Script: a thing's
@@ -103,7 +103,7 @@ defmodule MuaWorld.Dispatch do
   defp done(message), do: %{kind: :done, message: message}
   defp refused(message), do: %{kind: :refused, message: message}
 
-  # Once an action has succeeded, `after<Verb>` goes to the same receivers,
+  # Once an action has succeeded, `after<Action>` goes to the same receivers,
   # whose replies are added to its message.
   defp after_each(step, _ctx, [], outcome, k), do: k.(step, outcome)
 
@@ -247,11 +247,13 @@ defmodule MuaWorld.Dispatch do
     end
   end
 
+  # The entities a Command concerns, by role. `exit`, `from` and `to` are
+  # there only for a Command with a Direction that leads somewhere.
   defp roles(world, ctx) do
     target = ctx[:target_id]
 
     move =
-      case ctx.verb == "move" && plan_move(world, ctx) do
+      case ctx[:direction] && plan_move(world, ctx) do
         {:go, exit, from, to} -> %{"exit" => exit, "from" => from, "to" => to}
         _ -> %{}
       end
@@ -259,6 +261,7 @@ defmodule MuaWorld.Dispatch do
     Map.merge(move, %{
       "actor" => ctx.actor,
       "target" => target,
+      "indirect" => ctx[:indirect_id],
       "holder" => target && Scope.location(world, target),
       "room" => Scope.location(world, ctx.actor)
     })
@@ -269,70 +272,44 @@ defmodule MuaWorld.Dispatch do
 
   # -- Scripted actions --------------------------------------------------------
 
-  # The Service Script that carries out each Verb's Action, sent
-  # `<verb> target, actor` (`target` may be Nothing), and the Verbs whose
-  # text, the rest of the line, follows as a third argument
-  @services %{
-    "close" => "open",
-    "drop" => "thing",
-    "destroy" => "build",
-    "edit" => "build",
-    "store" => "build",
-    "stored" => "build",
-    "unstore" => "build",
-    "examine" => "thing",
-    "help" => "help",
-    "inventory" => "thing",
-    "lock" => "lock",
-    "open" => "open",
-    "read" => "thing",
-    "take" => "thing",
-    "unlock" => "lock"
-  }
-  @with_text ~w(unstore)
-
-  @doc "The Service Scripts mua loads, by name."
-  def services, do: ~w(room exit lock thing open speech help lifecycle build)
-
   # What to send for an action: `{:send, {:service, name}, message, args}`,
-  # or `{:refused, message}` when it can't happen. The Service replies text
-  # when it acted, or `{refused: text}` when it said no. Ask before the
-  # action runs: once it has, the World has changed.
-  defp plan(world, %{verb: "look"} = ctx) do
-    case Scope.location(world, ctx.actor) do
-      nil -> {:refused, "You are nowhere."}
-      room -> {:send, {:service, "room"}, "look", [{:entity, room}, {:entity, ctx.actor}]}
-    end
-  end
+  # or `{:refused, message}` when it can't happen. The World declares which
+  # Service carries out each Action and the roles it is sent (ADR 0029); the
+  # message is the Action's name, and the rest of the line follows the
+  # roles when the Command has one. An Action with no Service is carried
+  # out only by the Receivers, so reaching here, nothing did it. The
+  # Service replies text when it acted, or `{refused: text}` when it said
+  # no. Ask before the action runs: once it has, the World has changed.
+  defp plan(world, ctx) do
+    case ctx.vocabulary.actions[ctx.verb] do
+      %{service: service, args: names} when is_binary(service) ->
+        with {:ok, args} <- args(world, ctx, names) do
+          text = if ctx[:text] != nil, do: [ctx.text], else: []
+          {:send, {:service, service}, ctx.verb, args ++ text}
+        end
 
-  defp plan(_world, %{verb: verb} = ctx) when verb in ["say", "sayTo"],
-    do: {:send, {:service, "speech"}, verb, [target(ctx), {:entity, ctx.actor}, ctx[:text]]}
-
-  defp plan(world, %{verb: "move"} = ctx) do
-    case plan_move(world, ctx) do
-      {:go, exit, from, to} ->
-        {:send, {:service, "exit"}, "traverse",
-         [{:entity, exit}, {:entity, ctx.actor}, {:entity, from}, {:entity, to}]}
-
-      {:refused, _} = refused ->
-        refused
-    end
-  end
-
-  defp plan(_world, %{verb: verb} = ctx) do
-    case @services[verb] do
-      nil ->
+      _ ->
         {:refused, @cannot}
-
-      service ->
-        text = if verb in @with_text, do: [ctx[:text]], else: []
-        {:send, {:service, service}, verb, [target(ctx), {:entity, ctx.actor} | text]}
     end
   end
 
-  defp target(ctx), do: if(id = ctx[:target_id], do: {:entity, id})
+  # The roles an Action is sent, as arguments. A missing target, indirect
+  # or holder is Nothing; a Command that can't have a room or a way to go
+  # is refused, saying why.
+  defp args(world, ctx, names) do
+    roles = roles(world, ctx)
 
-  # Where a move goes: `{:go, exit, from, to}`, or why it can't happen.
+    Enum.reduce_while(names, {:ok, []}, fn name, {:ok, acc} ->
+      case {name, role(roles, name)} do
+        {_, eid} when is_integer(eid) -> {:cont, {:ok, acc ++ [{:entity, eid}]}}
+        {"room", nil} -> {:halt, {:refused, "You are nowhere."}}
+        {way, nil} when way in ~w(exit from to) -> {:halt, plan_move(world, ctx)}
+        {_, _} -> {:cont, {:ok, acc ++ [nil]}}
+      end
+    end)
+  end
+
+  # Where a Direction goes: `{:go, exit, from, to}`, or why it can't happen.
   # Whether a door lets the actor through is the exit Service's
   # `beforeTraverse` Decision.
   defp plan_move(world, ctx) do

@@ -5,7 +5,7 @@ defmodule MuaWorld.Commands.Verbs do
   the Base Verbs come from `mua-scripts/edl/base.edl`, which a World's EDL
   includes, and a World adds its own with more `verbs` and `words`
   components. The parser tries a verb's forms in order, and the first match
-  picks the handler (an action id).
+  picks the Action the Command asks for.
 
   A form's pattern is a space-separated list of slots and literal words:
 
@@ -22,10 +22,15 @@ defmodule MuaWorld.Commands.Verbs do
   A Verb's `vetoes` are the `before…` Decisions asked before its Action:
   `%{event, asks, about}`, where `asks` and `about` are roles that
   `MuaWorld.Dispatch` resolves.
+
+  Each Action is declared in an `actions` component (ADR 0029): the Service
+  Script that carries it out, if any, and the roles it is sent. Each
+  Service Script is declared in a `services` component, by name and `src`.
+  A later declaration of the same name replaces the earlier.
   """
 
   @type form :: %{
-          handler: String.t(),
+          action: String.t(),
           pattern: String.t(),
           reach: String.t() | nil,
           indirect_reach: String.t() | nil
@@ -37,8 +42,11 @@ defmodule MuaWorld.Commands.Verbs do
           incomplete: String.t() | nil,
           vetoes: [veto()]
         }
+  @type action :: %{service: String.t() | nil, args: [String.t()]}
   @type vocabulary :: %{
           by_name: %{String.t() => verb()},
+          actions: %{String.t() => action()},
+          services: %{String.t() => String.t()},
           defs: [verb()],
           vetoes: %{String.t() => [veto()]},
           directions: [{String.t(), String.t() | nil}],
@@ -47,6 +55,12 @@ defmodule MuaWorld.Commands.Verbs do
         }
 
   @reaches ~w(here carried room)
+  @args ~w(target actor)
+
+  # The Services the Host asks itself, not through an Action
+  @host_services ~w(lifecycle build)
+
+  @components ~w(verbs words actions services)
 
   @doc "The words that repeat the last command. The Host reads these itself."
   def again_words, do: ~w(again g)
@@ -71,7 +85,8 @@ defmodule MuaWorld.Commands.Verbs do
   end
 
   @doc """
-  A vocabulary from `verbs` and `words` components, in order. A verb that
+  A vocabulary from `verbs`, `words`, `actions` and `services` components,
+  in order. A verb that
   shares a name with an earlier one adds its forms, which are tried first: a
   World can add `look under obj` without replacing `look`. A malformed verb
   is skipped.
@@ -101,6 +116,8 @@ defmodule MuaWorld.Commands.Verbs do
 
     %{
       by_name: by_name,
+      actions: declared(components, "actions", &to_action/1),
+      services: declared(components, "services", &to_service/1),
       defs: defs,
       vetoes: vetoes(defs),
       directions: directions_of(words),
@@ -110,25 +127,116 @@ defmodule MuaWorld.Commands.Verbs do
   end
 
   @doc """
-  The vocabulary of a World: every entity's `verbs` and `words` components,
-  in entity order, so the Base Verbs a World includes first come first.
+  The vocabulary of a World: every entity's `verbs`, `words`, `actions` and
+  `services` components, in entity order, so the Base Verbs a World
+  includes first come first.
   """
   @spec from_world(OdgnEcs.t()) :: vocabulary()
   def from_world(world) do
-    (OdgnEcs.query(world, with: ["verbs"]) ++ OdgnEcs.query(world, with: ["words"]))
+    @components
+    |> Enum.flat_map(&OdgnEcs.query(world, with: [&1]))
     |> Enum.uniq()
     |> Enum.sort()
-    |> Enum.map(fn eid ->
-      %{"verbs" => OdgnEcs.get(world, eid, "verbs"), "words" => OdgnEcs.get(world, eid, "words")}
-    end)
+    |> Enum.map(fn eid -> Map.new(@components, &{&1, OdgnEcs.get(world, eid, &1)}) end)
     |> from_components()
   end
 
-  # Each handler's Vetoes. A later Verb declaring Vetoes for a handler
+  @doc """
+  What is wrong with a vocabulary's Actions and Services, as a list of
+  messages: a form asking for an undeclared Action, an Action or a Veto
+  naming an undeclared Service, a Service the Host asks itself missing, or
+  a Service's `src` under a root that isn't one of `roots`. A World with
+  any of these won't migrate or start.
+  """
+  @spec problems(vocabulary(), %{String.t() => String.t()}) :: [String.t()]
+  def problems(vocabulary, roots) do
+    actions =
+      for def <- vocabulary.defs,
+          form <- def.forms,
+          not Map.has_key?(vocabulary.actions, form.action),
+          uniq: true,
+          do: "#{hd(def.names)} asks for the Action #{form.action}, which isn't declared"
+
+    services =
+      for {name, %{service: service}} <- Enum.sort(vocabulary.actions),
+          service != nil,
+          not Map.has_key?(vocabulary.services, service),
+          do: "the Action #{name} names the Service #{service}, which isn't declared"
+
+    vetoes =
+      for def <- vocabulary.defs,
+          %{asks: "service:" <> service, event: event} <- def.vetoes,
+          not Map.has_key?(vocabulary.services, service),
+          uniq: true,
+          do: "#{event} asks the Service #{service}, which isn't declared"
+
+    host =
+      for service <- @host_services,
+          not Map.has_key?(vocabulary.services, service),
+          do: "the Service #{service} isn't declared"
+
+    srcs =
+      for {name, src} <- Enum.sort(vocabulary.services),
+          service_path(src, roots, ".") == nil,
+          do: "the Service #{name}'s src #{src} is under no root mua knows"
+
+    actions ++ services ++ vetoes ++ host ++ srcs
+  end
+
+  @doc """
+  Each declared Service Script's name and file, sorted by name, its `src`
+  read as `service_path/3` does.
+  """
+  def service_files(vocabulary, roots, edl_path) do
+    for {name, src} <- Enum.sort(vocabulary.services),
+        do: {name, service_path(src, roots, edl_path)}
+  end
+
+  @doc """
+  The file of a Service's `src`: under a named root when it starts with
+  `<root>:`, else relative to the World's EDL file. `nil` for an unknown
+  root.
+  """
+  def service_path(src, roots, edl_path) do
+    case String.split(src, ":", parts: 2) do
+      [root, rest] when byte_size(root) > 1 ->
+        if dir = roots[root], do: Path.join(dir, rest)
+
+      _ ->
+        Path.expand(src, Path.dirname(edl_path))
+    end
+  end
+
+  # Each name's declaration in the components' `defs` maps, a later one
+  # replacing the earlier; a malformed one is skipped
+  defp declared(components, key, to) do
+    for %{^key => %{"defs" => %{} = defs}} <- components,
+        {name, def} <- defs,
+        is_binary(name),
+        value = to.(def),
+        reduce: %{} do
+      acc -> Map.put(acc, name, value)
+    end
+  end
+
+  defp to_action(%{} = def) do
+    service = def["service"]
+    args = def["args"] || @args
+
+    if (service == nil or is_binary(service)) and is_list(args) and Enum.all?(args, &is_binary/1),
+      do: %{service: service, args: args}
+  end
+
+  defp to_action(_), do: nil
+
+  defp to_service(%{"src" => src}) when is_binary(src) and src != "", do: src
+  defp to_service(_), do: nil
+
+  # Each Action's Vetoes. A later Verb declaring Vetoes for an Action
   # replaces the earlier ones.
   defp vetoes(defs) do
     for def <- defs, def.vetoes != [], form <- def.forms, reduce: %{} do
-      acc -> Map.put(acc, form.handler, def.vetoes)
+      acc -> Map.put(acc, form.action, def.vetoes)
     end
   end
 
@@ -166,12 +274,12 @@ defmodule MuaWorld.Commands.Verbs do
 
   defp to_verb(_), do: nil
 
-  defp to_form(%{"handler" => h, "pattern" => p} = form) when is_binary(h) and is_binary(p) do
+  defp to_form(%{"action" => a, "pattern" => p} = form) when is_binary(a) and is_binary(p) do
     reach = form["reach"]
     indirect = form["indirect_reach"]
 
     if reach in [nil | @reaches] and indirect in [nil | @reaches],
-      do: %{handler: h, pattern: p, reach: reach, indirect_reach: indirect}
+      do: %{action: a, pattern: p, reach: reach, indirect_reach: indirect}
   end
 
   defp to_form(_), do: nil

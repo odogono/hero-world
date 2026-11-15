@@ -192,6 +192,7 @@ const load = async (options: PreviewOptions) => {
   const start = () =>
     startMuaWorld(world, {
       clock: options.clock,
+      edlPath: EDL_PATH,
       onChanges: changes => collect?.push(...changes),
       readFile,
       scriptsDir: SCRIPTS_DIR,

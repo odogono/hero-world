@@ -1,0 +1,23 @@
+-- The gesture Service, which the Action cases' World declares itself (ADR
+-- 0029). Each reply says what it was sent, so a case shows which Service a
+-- Command reached and with what.
+
+on wave target, actor
+  return "gesture: wave"
+end wave
+
+on sign target, actor, words
+  return `gesture: sign "${words}"`
+end sign
+
+on point room, target, actor
+  return `gesture: point at ${the name of the described of target} in ${the name of the described of room}`
+end point
+
+on read target, actor
+  return `gesture: read ${the name of the described of target}`
+end read
+
+on beforeBow actor, subject, deciding
+  veto "gesture: no bowing"
+end beforeBow

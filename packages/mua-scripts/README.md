@@ -2,8 +2,8 @@
 
 The game rules every mua World shares, as data: no code of either Host lives here (ADR 0024). Both Hosts, the Elixir server and a Local World's TypeScript Worker, load it.
 
-- `edl/base.edl`: the Base Verbs, the default message templates (`base_messages`) and the `responsive` atom. A World's EDL includes it with `include "mua-scripts:edl/base.edl"` (ADR 0025).
-- `scripts/services/`: the Service Scripts, which belong to no entity and carry out an Action for every World. `build.talk` decides whether a Builder may place a thing they composed, and places it (#258).
+- `edl/base.edl`: the Base Verbs, their Actions and the Service Scripts that carry them out, the default message templates (`base_messages`) and the `responsive` atom. A World's EDL includes it with `include "mua-scripts:edl/base.edl"` (ADR 0025).
+- `scripts/services/`: the Service Scripts, which belong to no entity and carry out Actions. `base.edl` declares them (ADR 0029). `build.talk` decides whether a Builder may place a thing they composed, and places it (#258).
 - `scripts/lib/`: the Libraries those Scripts use.
 - `scripts/base/`: the Scripts of the Base EDL's atoms: `responsive.talk` answers a thing's fixed `responses`.
 

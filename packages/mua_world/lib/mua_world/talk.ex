@@ -42,6 +42,7 @@ defmodule MuaWorld.Talk do
   handles is the host term of its Delivery (`OdgnEcsTalk.delivery/2`).
   """
   alias NorthTalk.{Capability, Object}
+  alias MuaWorld.Commands.Verbs
   alias OdgnEcsTalk.Values
 
   # odgn_ecs_talk's default Group, whose Handles are `entity` Objects
@@ -258,11 +259,13 @@ defmodule MuaWorld.Talk do
 
   @doc """
   Starts NorthTalk for `world` with mua's Capability, sharing `table` for
-  notices, and loads mua's Libraries, Service Scripts and the World's
-  Scripts. Returns `{:ok, talk}`, or `{:error, {path, reason}}` naming the
-  first Script that failed to load.
+  notices, and loads mua's Libraries, the Service Scripts the World
+  declares (ADR 0029) and the World's Scripts. A Service's `src` that isn't
+  under a named root is beside `edl_path`, the World's EDL file. Returns
+  `{:ok, talk}`, or `{:error, {path, reason}}` naming the first Script that
+  failed to load.
   """
-  def start(world, table, limits \\ []) do
+  def start(world, table, limits \\ [], edl_path \\ ".") do
     {:ok, owner} = NorthTalk.start_link(drive: :manual)
 
     {:ok, talk} =
@@ -280,8 +283,8 @@ defmodule MuaWorld.Talk do
       end
 
     services =
-      for name <- MuaWorld.Dispatch.services() do
-        path = behaviour("services/#{name}.talk")
+      for {name, path} <-
+            Verbs.service_files(Verbs.from_world(world), MuaWorld.Scripts.roots(), edl_path) do
         {path, fn -> OdgnEcsTalk.load_service_script(talk, name, File.read!(path)) end}
       end
 

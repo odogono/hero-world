@@ -103,6 +103,17 @@ const key = defineComponent({
   schema: { opens: s.array('string').optional() }
 });
 
+// The Actions and the Service Scripts a World declares (ADR 0029)
+const actions = defineComponent({
+  id: 'actions',
+  schema: { defs: s.json().optional() }
+});
+
+const services = defineComponent({
+  id: 'services',
+  schema: { defs: s.json().optional() }
+});
+
 const verbs = defineComponent({
   id: 'verbs',
   schema: { defs: s.json().optional() }
@@ -237,6 +248,8 @@ export const components = [
   lockable,
   key,
   verbs,
+  actions,
+  services,
   words,
   readable,
   home,

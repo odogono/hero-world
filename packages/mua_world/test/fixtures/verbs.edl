@@ -25,16 +25,25 @@ entity world_verbs {
       {
         names: ["pray" "kneel"]
         forms: [
-          { handler: "prayTo" pattern: "to obj" reach: "room" }
-          { handler: "pray" pattern: "" }
+          { action: "prayTo" pattern: "to obj" reach: "room" }
+          { action: "pray" pattern: "" }
         ]
         incomplete: "Pray to whom?"
       }
       {
         names: ["look" "l"]
-        forms: [{ handler: "lookUnder" pattern: "under obj" }]
+        forms: [{ action: "lookUnder" pattern: "under obj" }]
       }
     ]
+  }
+
+  # Carried out only by the Receivers
+  actions {
+    defs: {
+      lookUnder: {}
+      pray: {}
+      prayTo: {}
+    }
   }
 }
 

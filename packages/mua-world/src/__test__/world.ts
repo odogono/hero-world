@@ -17,7 +17,7 @@ entity words {
   }
   verbs {
     defs: [
-      { names: ["take"] forms: [{ handler: "take" pattern: "obj" }] }
+      { names: ["take"] forms: [{ action: "take" pattern: "obj" }] }
     ]
   }
 }

@@ -27,6 +27,7 @@ export const start = async (
   world.flush();
   return startMuaWorld(world, {
     clock: () => 0,
+    edlPath: path,
     readFile: file => readFileSync(file, 'utf8'),
     scriptsDir: SCRIPTS,
     startingRoom,

@@ -150,7 +150,7 @@ defmodule MuaWorld.DispatchRunTest do
     assert location(c.world, gem) == chest
   end
 
-  test "an after<Verb> reply is merged into the action's", c do
+  test "an after<Action> reply is merged into the action's", c do
     rock = named(c.world, "Rock")
 
     assert run(c, [%{verb: "take", target_id: rock}]) == ["Taken.\nDust swirls where it lay."]

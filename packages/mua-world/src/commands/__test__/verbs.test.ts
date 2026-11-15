@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { fromComponents, opposite, toDirection, words } from '../verbs';
 
-const form = (handler: string, pattern: string) => ({ handler, pattern });
+const form = (action: string, pattern: string) => ({ action, pattern });
 const veto = (event: string) => ({ about: 'target', asks: 'target', event });
 
 describe('fromComponents', () => {
@@ -16,7 +16,7 @@ describe('fromComponents', () => {
       }
     ]);
 
-    expect(vocabulary.byName.get('look')?.forms.map(f => f.handler)).toEqual([
+    expect(vocabulary.byName.get('look')?.forms.map(f => f.action)).toEqual([
       'lookUnder',
       'look'
     ]);
@@ -62,7 +62,7 @@ describe('fromComponents', () => {
     expect(opposite(vocabulary, 'north')).toBe('down');
   });
 
-  it("keeps each handler's Vetoes, a later Verb's replacing earlier ones", () => {
+  it("keeps each Action's Vetoes, a later Verb's replacing earlier ones", () => {
     const vocabulary = fromComponents([
       {
         verbs: {

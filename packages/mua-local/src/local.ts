@@ -103,6 +103,7 @@ export const openLocalWorld = async (options: LocalWorldOptions) => {
 
   const mua: MuaWorld = await startMuaWorld(world, {
     clock: options.clock,
+    edlPath: EDL_PATH,
     pictures: options.pictures,
     readFile,
     scriptsDir: SCRIPTS_DIR,

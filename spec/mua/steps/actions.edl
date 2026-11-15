@@ -1,0 +1,58 @@
+# The World the Action cases run in: a hall with a note, and Verbs this
+# World adds whose Actions its own `gesture` Service Script carries out
+# (ADR 0029). It also gives the Base Action `read` to that Service, and
+# declares `hum`, which only the Receivers carry out.
+
+include "mua-scripts:edl/base.edl"
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+entity hall {
+  container { capacity: 100 is_closed: false }
+  described { name: "Hall" description: "A plain hall." }
+}
+
+entity note : item {
+  described { name: "Note" description: "A folded note." }
+  readable { text: "Meet at noon." }
+  location { in: $hall }
+}
+
+entity gesture_verbs {
+  verbs {
+    defs: [
+      { names: ["wave"] forms: [{ action: "wave" pattern: "" }] }
+      {
+        names: ["sign"]
+        forms: [{ action: "sign" pattern: "text" }]
+        incomplete: "Sign what?"
+      }
+      { names: ["point"] forms: [{ action: "point" pattern: "at obj" }] }
+      {
+        names: ["bow"]
+        forms: [{ action: "bow" pattern: "" }]
+        vetoes: [{ event: "beforeBow" asks: "service:gesture" about: "actor" }]
+      }
+      { names: ["hum"] forms: [{ action: "hum" pattern: "" }] }
+    ]
+  }
+
+  actions {
+    defs: {
+      bow: { service: "gesture" }
+      hum: {}
+      point: { service: "gesture" args: ["room" "target" "actor"] }
+      read: { service: "gesture" }
+      sign: { service: "gesture" }
+      wave: { service: "gesture" }
+    }
+  }
+
+  services {
+    defs: {
+      gesture: { src: "scripts/gesture.talk" }
+    }
+  }
+}

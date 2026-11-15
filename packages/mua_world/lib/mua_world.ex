@@ -389,12 +389,13 @@ defmodule MuaWorld do
     abandoned = Tables.abandon_waiting(world)
 
     with {:ok, places} <- Places.ensure(world, opts[:starting_room]),
-         {:ok, pictures} <- pictures(world, opts[:edl]) do
+         {:ok, pictures} <- pictures(world, opts[:edl]),
+         {:ok, vocabulary} <- vocabulary(world) do
       Lifecycle.record_homes(world)
       :ok = OdgnEcs.commit(world)
-      state = %{state | vocabulary: Verbs.from_world(world), places: places}
+      state = %{state | vocabulary: vocabulary, places: places}
 
-      case start_talk(state, Keyword.get(opts, :limits, []), pictures) do
+      case start_talk(state, Keyword.get(opts, :limits, []), pictures, opts[:edl]) do
         {:ok, state} ->
           state = start_world(start_engine(state))
           # a test's `fault` is for the Steps that follow start-up
@@ -416,18 +417,31 @@ defmodule MuaWorld do
           {:stop, {:script_load_failed, script, diagnostics}}
       end
     else
-      {:error, {:pictures, message}} ->
+      {:error, {kind, message}} when kind in [:pictures, :actions] ->
         Logger.error("World at #{path} can't start: #{message}", event: :world_not_started)
         :ok = OdgnEcs.rollback(world)
         OdgnEcs.close(world)
         Lock.release(path)
-        {:stop, {:pictures, message}}
+        {:stop, {kind, message}}
 
       {:error, reason} ->
         :ok = OdgnEcs.rollback(world)
         OdgnEcs.close(world)
         Lock.release(path)
         {:stop, {:invalid_starting_room, reason}}
+    end
+  end
+
+  # The World's Verbs, checked against the Actions and Services it declares
+  defp vocabulary(world) do
+    vocabulary = Verbs.from_world(world)
+
+    case Verbs.problems(vocabulary, MuaWorld.Scripts.roots()) do
+      [] ->
+        {:ok, vocabulary}
+
+      problems ->
+        {:error, {:actions, "Actions can't be carried out: " <> Enum.join(problems, "; ")}}
     end
   end
 
@@ -466,11 +480,11 @@ defmodule MuaWorld do
 
   defp ok!({:ok, value}), do: value
 
-  defp start_talk(state, limits, pictures) do
+  defp start_talk(state, limits, pictures, edl_path) do
     table = Talk.table()
     Talk.put_pictures(table, pictures)
 
-    with {:ok, talk} <- Talk.start(state.world, table, limits),
+    with {:ok, talk} <- Talk.start(state.world, table, limits, edl_path),
          do: {:ok, %{state | talk: talk, table: table}}
   end
 

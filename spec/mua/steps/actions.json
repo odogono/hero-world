@@ -1,0 +1,72 @@
+{
+  "edl": "actions.edl",
+  "starting_room": "hall",
+  "cases": [
+    {
+      "name": "a World's own Verb reaches the Service the World declares",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "wave",
+          "told": ["gesture: wave"]
+        }
+      ]
+    },
+    {
+      "name": "the rest of the line follows when the form has text",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "sign Hello there",
+          "told": ["gesture: sign \"Hello there\""]
+        }
+      ]
+    },
+    {
+      "name": "an Action is sent the roles it declares",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "point at note",
+          "told": ["gesture: point at Note in Hall"]
+        }
+      ]
+    },
+    {
+      "name": "a World that redeclares a Base Action sends it to its own Service",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "read note",
+          "told": ["gesture: read Note"]
+        }
+      ]
+    },
+    {
+      "name": "a Veto can ask the World's own Service",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "bow",
+          "told": ["gesture: no bowing"]
+        }
+      ]
+    },
+    {
+      "name": "an Action no Receiver carries out, with no Service, can't be done",
+      "join": ["ada"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "hum",
+          "told": ["You can't do that."]
+        }
+      ]
+    }
+  ]
+}

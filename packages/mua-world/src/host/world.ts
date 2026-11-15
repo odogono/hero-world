@@ -27,12 +27,16 @@ import type { Limits, Value } from '@northtalk/ts';
 
 import type { BoundCommand } from '../commands/bind';
 import { location } from '../commands/scope';
-import { fromWorld } from '../commands/verbs';
+import {
+  fromWorld,
+  problems,
+  serviceFiles,
+  type Vocabulary
+} from '../commands/verbs';
 import { expand } from '../exits';
 import { read, readNpc } from '../input';
 import {
   CANNOT,
-  SERVICE_NAMES,
   afters,
   plan,
   questions,
@@ -105,6 +109,11 @@ export type Listener = {
 export type MuaWorldOptions = {
   /** Milliseconds of wall time, for World time; `performance.now` by default */
   clock?: () => number;
+  /**
+   * The World's EDL file, which a Service's `src` not under a named root is
+   * beside (ADR 0029); the working directory by default
+   */
+  edlPath?: string;
   /** Limits for every Script */
   limits?: Partial<Limits>;
   /** Called with each committed Step's change set, as a Preview World reports them */
@@ -307,6 +316,8 @@ export const startMuaWorld = async (
   store.db.exec('BEGIN IMMEDIATE');
   let places;
   let pictures: PictureUrls;
+  let vocabulary: Vocabulary;
+  const roots = { 'mua-scripts': options.scriptsDir };
   try {
     ensureMuaTables(store);
     expand(store);
@@ -314,13 +325,17 @@ export const startMuaWorld = async (
     places = ensurePlaces(store, options.startingRoom, named);
     recordHomes(store);
     pictures = loadPictures(store, options.pictures);
+    vocabulary = fromWorld(store);
+    const wrong = problems(vocabulary, roots);
+    if (wrong.length > 0) {
+      throw new Error(`Actions can't be carried out: ${wrong.join('; ')}`);
+    }
     store.db.exec('COMMIT');
   } catch (error) {
     store.db.exec('ROLLBACK');
     throw error;
   }
   const { limbo, system } = places;
-  const vocabulary = fromWorld(store);
 
   const talk = createEcsTalk(world, {
     capabilities: [
@@ -333,8 +348,12 @@ export const startMuaWorld = async (
   for (const name of LIBRARIES) {
     talk.addLibrary(name, mua(`lib/${name}.talk`));
   }
-  for (const name of SERVICE_NAMES) {
-    talk.loadServiceScript(name, mua(`services/${name}.talk`));
+  for (const [name, path] of serviceFiles(
+    vocabulary,
+    roots,
+    options.edlPath ?? '.'
+  )) {
+    talk.loadServiceScript(name, options.readFile(path!));
   }
   talk.loadScripts(options.readFile);
 
@@ -475,7 +494,7 @@ export const startMuaWorld = async (
       (next, o) => k(next, replyOf(q, o))
     );
 
-  // Once an action has succeeded, `after<Verb>` goes to the same receivers,
+  // Once an action has succeeded, `after<Action>` goes to the same receivers,
   // whose replies are added to its message
   const afterEach = (
     s: Step,

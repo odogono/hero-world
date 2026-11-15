@@ -24,7 +24,7 @@ Language-neutral cases for what a Command does, Actions and all (ADR 0024). `pac
 }
 ```
 
-- **`edl`**: the World, relative to this directory. It includes the Base Verbs with `include "mua-scripts:edl/base.edl"`, and its Scripts are relative to it, in `scripts/`.
+- **`edl`**: the World, relative to this directory. It includes the Base Verbs with `include "mua-scripts:edl/base.edl"`, and its Scripts, including any Service Script it declares, are relative to it, in `scripts/`.
 - **`starting_room`**: the Definition name of the room new Characters enter.
 - **`join`**: the Characters, made in order, each with its own Account, then entered. A Character is named by its join name, which is also its label in the case. An entry `{"name": name, "builder": {...}}` makes a Builder, its Account given a `builder` component with those permissions and limits, each left out at its default. What joining tells anyone isn't checked.
 - **`steps`**, in order, each one of:
