@@ -255,7 +255,7 @@ A named kind of Command, with the forms it can be typed in, the Action each form
 _Avoid_: command (for the kind)
 
 **Action**:
-A named change a Command makes to the World once nothing has Vetoed it. Each Action names the Service Script that carries it out and what that Script is given; several forms, of one Verb or many, may ask for the same Action.
+A named change a Command makes to the World once nothing has Vetoed it. Each Action names the Service Script that carries it out and what that Script is given, or no Service when only the Receivers carry it out; several forms, of one Verb or many, may ask for the same Action.
 _Avoid_: built-in, effect
 
 **Reach**:

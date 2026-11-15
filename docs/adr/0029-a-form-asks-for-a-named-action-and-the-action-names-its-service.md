@@ -12,4 +12,7 @@ ADR 0024 made Verbs World data, but which Service Script carries out each Action
 
 - A form's key is `action:`, not `handler:`.
 - `exit.talk` answers `move`, not `traverse`. The `beforeTraverse` Veto keeps its name.
-- The Libraries the Hosts load are still a list in Host code.
+- An Action may name no Service, when only the Receivers carry it out, such as Porthleven's `smell`. It is still declared, so a mistyped Action name stops the build.
+- A Service's `src` is under a named root (`mua-scripts:scripts/services/thing.talk`) or relative to the World's main EDL file, as a Picture's is. Each Host resolves it, so neither EDL library learns about `services`. A bare path in an included file is therefore relative to the main EDL file, not to the included file.
+- A World checks its Actions and Services each time it starts or migrates, as it checks its Pictures.
+- The Libraries the Hosts load are still a list in Host code (#330).
