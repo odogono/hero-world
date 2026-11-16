@@ -28,8 +28,8 @@ import {
 
 /**
  * mua's own Capability for Scripts, as `MuaWorld.Talk`: `act`, `announce`,
- * `buildable`, `command`, `editors`, `homed`, `limbo`, `notice`, `picture`,
- * `placed`, `reaches`, `signature` and `verbs`. The command a Run handles is
+ * `buildable`, `command`, `editors`, `homed`, `inform`, `limbo`, `notice`,
+ * `picture`, `placed`, `reaches`, `signature` and `verbs`. The command a Run handles is
  * the host term of its Delivery (`talk.delivery`). Scripts fill in message
  * templates themselves; the Host formats no text (ADR 0024).
  */
@@ -102,13 +102,17 @@ export const muaCapability =
         mode: 'fire-and-forget'
       },
       announce: {
-        args: [entity, shape.text, shape.optional(entity)],
+        args: [
+          entity,
+          shape.text,
+          shape.optional(shape.oneOf(entity, shape.listOf(entity)))
+        ],
         command: true,
         cost: { fuel: 1 },
         fire: (_call, place, line, except) => {
-          const skip = except?.native.eid;
+          const skip = except == null ? [] : [fromScript(except)].flat();
           for (const c of charactersAt(store, place.native.eid)) {
-            if (c !== skip) {
+            if (!skip.includes(c)) {
               output(store, c, line);
             }
           }
@@ -178,6 +182,19 @@ export const muaCapability =
         result: shape.listOf(entity)
       },
       // where a stored thing waits (#282)
+      // Tells one Character a line, as `announce` tells a place; anyone
+      // else, such as an NPC, is told nothing
+      inform: {
+        args: [entity, shape.text],
+        command: true,
+        cost: { fuel: 1 },
+        fire: (_call, who, line) => {
+          if (get(store, who.native.eid, 'player')) {
+            output(store, who.native.eid, line);
+          }
+        },
+        mode: 'fire-and-forget'
+      },
       limbo: {
         args: [],
         cost: { fuel: 1 },

@@ -1,0 +1,11 @@
+-- The pedlar trades: given the feather, she gives back her ribbon.
+on afterGive role, actor
+  if role is not "indirect" then
+    pass afterGive
+  end if
+  ask mua to command into gift
+  if the name of the described of the target of gift is "Feather" then
+    ask world to named "ribbon" into ribbon
+    tell mua to act the target, {verb: "give", target: ribbon, indirect: actor}
+  end if
+end afterGive

@@ -64,7 +64,7 @@ defmodule MuaWorld.Components do
         col("target", :json),
         col("veto", :json)
       ]),
-      c("messages", false, [col("msg", :json), col("omsg", :json)]),
+      c("messages", false, [col("msg", :json), col("imsg", :json), col("omsg", :json)]),
       c("script", false, [col("src", :string)]),
       b("described", false, [col("description", :string), col("name", :string)]),
       # A place's Picture, shown with its description (ADR 0027): a file

@@ -83,6 +83,23 @@ entity base_verbs {
         ]
       }
       {
+        names: ["give" "hand"]
+        forms: [
+          {
+            action: "give"
+            pattern: "obj to obj2"
+            reach: "carried"
+            indirect_reach: "room"
+          }
+        ]
+        incomplete: "What do you want to give?"
+        vetoes: [
+          { event: "beforeGive" asks: "service:thing" about: "target" }
+          { event: "beforeRemove" asks: "holder" about: "target" }
+          { event: "beforeAdd" asks: "indirect" about: "target" }
+        ]
+      }
+      {
         names: ["read"]
         forms: [{ action: "read" pattern: "obj" }]
         incomplete: "What do you want to read?"
@@ -163,6 +180,7 @@ entity base_verbs {
       drop: { service: "thing" }
       edit: { service: "build" }
       examine: { service: "thing" }
+      give: { service: "thing" args: ["target" "actor" "indirect"] }
       help: { service: "help" }
       inventory: { service: "thing" }
       lock: { service: "lock" }
@@ -229,9 +247,9 @@ entity base_verbs {
   }
 }
 
-# The messages the Actions tell, by who sees them (`msg` the actor, `omsg`
-# everyone else in the room) and Verb. A thing's own `messages`, set on it
-# or inherited, replace these, as in
+# The messages the Actions tell, by who sees them (`msg` the actor, `imsg`
+# the Recipient of a `give`, `omsg` everyone else in the room) and Verb. A
+# thing's own `messages`, set on it or inherited, replace these, as in
 # `messages { omsg: { take: "{actor} heaves {the target} onto a shoulder." } }`.
 # The `messages` Library fills them in (`mua-scripts/scripts/lib/messages.talk`).
 entity base_messages {
@@ -239,15 +257,20 @@ entity base_messages {
     msg: {
       close: "Closed."
       drop: "Dropped."
+      give: "Given."
       lock: "You lock {the target} with {the indirect}."
       open: "Opened."
       take: "Taken."
       unlock: "You unlock {the target} with {the indirect}."
     }
+    imsg: {
+      give: "{actor} gives you {the target}."
+    }
     omsg: {
       arrive: "{actor} arrives."
       close: "{actor} closes {the target}."
       drop: "{actor} drops {the target}."
+      give: "{actor} gives {the target} to {the indirect}."
       lock: "{actor} locks {the target}."
       move: "{actor} goes {dir}."
       open: "{actor} opens {the target}."

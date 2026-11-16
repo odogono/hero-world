@@ -1,5 +1,6 @@
--- messages: the text an Action tells the actor (`msg`) and everyone else
--- in the room (`omsg`), filled in from a template. Templates are World
+-- messages: the text an Action tells the actor (`msg`), the Recipient of a
+-- `give` (`imsg`) and everyone else in the room (`omsg`), filled in from a
+-- template. Templates are World
 -- data: a thing's own `messages`, its own or inherited, else the defaults on
 -- the `base_messages` entity of the Base EDL.
 --
@@ -75,7 +76,7 @@ function templateFor verb, kind, owner
   return the optional (verb) of the optional (kind) of the messages of it
 end templateFor
 
--- the message `kind` ("msg" or "omsg") for a verb, filled in from `about`:
+-- the message `kind` ("msg", "imsg" or "omsg") for a verb, filled in from `about`:
 -- its `actor`, `target`, `indirect` and `dir`, and the `owner` whose
 -- `messages` replace the defaults (the target, unless given). Nothing when
 -- there is no template.

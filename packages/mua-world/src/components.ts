@@ -163,7 +163,11 @@ const responses = defineComponent({
 
 const messages = defineComponent({
   id: 'messages',
-  schema: { msg: s.json().optional(), omsg: s.json().optional() }
+  schema: {
+    imsg: s.json().optional(),
+    msg: s.json().optional(),
+    omsg: s.json().optional()
+  }
 });
 
 const script = defineComponent({

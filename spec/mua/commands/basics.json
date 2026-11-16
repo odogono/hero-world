@@ -263,6 +263,48 @@
       }
     },
     {
+      "name": "give a carried thing to someone here",
+      "input": "give the coin to bob",
+      "expect": {
+        "commands": [{ "verb": "give", "target": "coin", "indirect": "bob" }]
+      }
+    },
+    {
+      "name": "hand is give",
+      "input": "hand coin to bob",
+      "expect": {
+        "commands": [{ "verb": "give", "target": "coin", "indirect": "bob" }]
+      }
+    },
+    {
+      "name": "give reaches only carried things",
+      "input": "give lamp to bob",
+      "expect": {
+        "reply": "You aren't carrying any lamp."
+      }
+    },
+    {
+      "name": "give binds a Recipient who is no person, for the Action to refuse",
+      "input": "give coin to box",
+      "expect": {
+        "commands": [{ "verb": "give", "target": "coin", "indirect": "box" }]
+      }
+    },
+    {
+      "name": "give with no Recipient",
+      "input": "give coin",
+      "expect": {
+        "reply": "What do you want to give?"
+      }
+    },
+    {
+      "name": "give nothing",
+      "input": "give",
+      "expect": {
+        "reply": "What do you want to give?"
+      }
+    },
+    {
       "name": "unlock a door with a key",
       "input": "unlock the door with the iron key",
       "expect": {

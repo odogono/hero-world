@@ -1,0 +1,108 @@
+{
+  "edl": "give.edl",
+  "starting_room": "yard",
+  "cases": [
+    {
+      "name": "gives a thing to another Character, and others see it",
+      "join": ["ada", "bob", "cy"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "take apple",
+          "told": ["Taken."],
+          "heard": {
+            "bob": ["ada takes the apple."],
+            "cy": ["ada takes the apple."]
+          }
+        },
+        {
+          "as": "ada",
+          "type": "give apple to bob",
+          "told": ["Given."],
+          "heard": {
+            "bob": ["ada gives you the apple."],
+            "cy": ["ada gives the apple to bob."]
+          }
+        },
+        { "where": { "apple": "bob" } }
+      ]
+    },
+    {
+      "name": "gives only what it carries, to someone here",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "give apple to bob",
+          "told": ["You aren't carrying any apple."]
+        },
+        {
+          "as": "ada",
+          "type": "take apple",
+          "told": ["Taken."],
+          "heard": { "bob": ["ada takes the apple."] }
+        },
+        {
+          "as": "ada",
+          "type": "give apple to crate",
+          "told": ["You can't give things to that."]
+        },
+        {
+          "as": "ada",
+          "type": "give apple to ada",
+          "told": ["You can't see any ada here."]
+        },
+        {
+          "as": "bob",
+          "type": "east",
+          "told": ["Lane\nA narrow lane.\n\nExits: west"],
+          "heard": { "ada": ["bob goes east."] }
+        },
+        {
+          "as": "ada",
+          "type": "give apple to bob",
+          "told": ["You can't see any bob here."]
+        },
+        { "where": { "apple": "ada" } }
+      ]
+    },
+    {
+      "name": "a Recipient refuses through its responses",
+      "join": ["ada"],
+      "steps": [
+        { "as": "ada", "type": "take apple", "told": ["Taken."] },
+        {
+          "as": "ada",
+          "type": "give apple to miser",
+          "told": ["The miser wants nothing of yours."]
+        },
+        { "where": { "apple": "ada" } }
+      ]
+    },
+    {
+      "name": "an NPC gives something back from afterGive",
+      "join": ["ada", "bob"],
+      "steps": [
+        {
+          "as": "ada",
+          "type": "take feather",
+          "told": ["Taken."],
+          "heard": { "bob": ["ada takes the feather."] }
+        },
+        {
+          "as": "ada",
+          "type": "hand feather to pedlar",
+          "told": ["Given."],
+          "heard": {
+            "ada": ["Pedlar gives you the ribbon."],
+            "bob": [
+              "ada gives the feather to the pedlar.",
+              "Pedlar gives the ribbon to ada."
+            ]
+          }
+        },
+        { "where": { "feather": "pedlar", "ribbon": "ada" } }
+      ]
+    }
+  ]
+}
