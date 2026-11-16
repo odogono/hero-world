@@ -18,9 +18,22 @@ defmodule MuaServer.Connection do
 
   @world MuaServer.World
 
-  @doc "Makes `pid` the controlling Channel of a Character, taking over from any other."
-  def attach(account, character, pid),
-    do: GenServer.call(ensure(account, character), {:attach, pid})
+  @doc """
+  Enters the Character with `enter` and, if it enters (`{:ok, _}`), makes
+  `pid` its controlling Channel, taking over from any other. Returns what
+  `enter` returns. Both happen in the Connection's process, so a grace
+  period can't end between them and take the Character out of play
+  (#336). A Connection whose grace has just ended has stopped; attaching
+  starts a fresh one.
+  """
+  def attach(account, character, pid, enter, tries \\ 5) do
+    GenServer.call(ensure(account, character), {:attach, pid, enter}, 30_000)
+  catch
+    # it stopped before it got the call, so `enter` didn't run
+    :exit, {reason, _} when reason in [:noproc, :normal] and tries > 1 ->
+      Process.sleep(10)
+      attach(account, character, pid, enter, tries - 1)
+  end
 
   @doc "Whether `pid` controls the Character."
   def controls?(character, pid) do
@@ -82,14 +95,24 @@ defmodule MuaServer.Connection do
     do: {:ok, %{account: account, character: character, pid: nil, monitor: nil, timer: nil}}
 
   @impl true
-  def handle_call({:attach, pid}, _from, state) do
-    if state.pid && state.pid != pid do
-      Process.demonitor(state.monitor, [:flush])
-      send(state.pid, {:replaced, state.character})
-    end
+  def handle_call({:attach, pid, enter}, _from, state) do
+    case enter.() do
+      {:ok, _} = entered ->
+        if state.pid && state.pid != pid do
+          Process.demonitor(state.monitor, [:flush])
+          send(state.pid, {:replaced, state.character})
+        end
 
-    state = cancel(state)
-    {:reply, :ok, %{state | pid: pid, monitor: Process.monitor(pid)}}
+        state = cancel(state)
+        {:reply, entered, %{state | pid: pid, monitor: Process.monitor(pid)}}
+
+      refused when state.pid == nil and state.timer == nil ->
+        # nothing to keep this Connection for
+        {:stop, :normal, refused, state}
+
+      refused ->
+        {:reply, refused, state}
+    end
   end
 
   def handle_call({:controls?, pid}, _from, state), do: {:reply, state.pid == pid, state}

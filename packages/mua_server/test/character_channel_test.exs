@@ -426,6 +426,29 @@ defmodule MuaServer.CharacterChannelTest do
       refute in_limbo?(ada)
     end
 
+    test "coming back just as the grace period ends still joins (#336)", %{ada: ada} do
+      a = join_as(ada)
+      Process.unlink(a.channel_pid)
+      ref = Process.monitor(a.channel_pid)
+      Process.exit(a.channel_pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, _, _}
+
+      [{conn, _}] = Registry.lookup(MuaServer.Connections, ada.character)
+      assert %{pid: nil} = :sys.get_state(conn)
+
+      # the grace period ends while the rejoin is under way
+      :sys.suspend(conn)
+      send(conn, :grace_over)
+
+      spawn(fn ->
+        Process.sleep(50)
+        :sys.resume(conn)
+      end)
+
+      _again = join_as(ada)
+      refute in_limbo?(ada)
+    end
+
     test "logging out leaves for Limbo at once", %{ada: ada} do
       a = join_as(ada)
       Process.unlink(a.channel_pid)
