@@ -353,10 +353,29 @@ defmodule MuaWorld do
     end
   end
 
+  @doc """
+  Readies an open World for mua: defines its Components and creates mua's
+  tables and the engine's, upgrading those of an older World. Both a start
+  and a Migration open a World this way; the caller holds the lock, and
+  any transaction (`MuaWorld.Tables.ensure/1` works inside one).
+  """
+  @spec prepare(OdgnEcs.t()) :: OdgnEcs.t()
+  def prepare(%OdgnEcs{} = world) do
+    world = Enum.reduce(Components.all(), world, &define!(&2, &1))
+    :ok = Tables.ensure(world)
+    world
+  end
+
+  defp define!(world, component) do
+    case OdgnEcs.define(world, component) do
+      {:ok, world} -> world
+      {:error, error} -> raise ArgumentError, error.message
+    end
+  end
+
   defp init_world(opts, path, edl_path) do
     {:ok, world} = OdgnEcs.open(path)
-    world = Enum.reduce(Components.all(), world, fn c, w -> ok!(OdgnEcs.define(w, c)) end)
-    Tables.ensure(world)
+    world = prepare(world)
 
     # A World built from another EDL won't start until it is migrated: say so
     # plainly rather than crash
@@ -477,8 +496,6 @@ defmodule MuaWorld do
     if state.path, do: Lock.release(state.path)
     :ok
   end
-
-  defp ok!({:ok, value}), do: value
 
   defp start_talk(state, limits, pictures, edl_path) do
     table = Talk.table()

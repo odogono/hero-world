@@ -19,6 +19,11 @@ defmodule MuaWorld.Tables do
   Creates mua's tables and the engine's, moving World time and Waiting
   inputs out of `mua_meta` and `mua_waiting` in a World made before the
   engine had tables of its own (ADR 0022).
+
+  The move stays in mua, and in Elixir only: those names are mua's, not the
+  engine's, and only a server World, or its backup, from before the move
+  has them. Local Worlds came after it, so the TypeScript Host never meets
+  them (#309).
   """
   def ensure(%OdgnEcs{conn: conn} = world) do
     OdgnEcsEngine.Tables.ensure(world)
