@@ -4,15 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { createEcsTalk, location, toValue } from 'ecs-talk';
 import { defineComponent, s } from 'odgn-ecs/component';
 import { DatabaseType } from 'odgn-ecs/db';
-import {
-  armSystems,
-  component,
-  createEntity,
-  define,
-  deleteEntity,
-  put,
-  query
-} from 'odgn-ecs/store';
+import { armSystems, deleteEntity } from 'odgn-ecs/store';
 import { createWorld } from 'odgn-ecs/world';
 
 import { createEngine, instantUs, type Step } from '../engine';
@@ -148,44 +140,6 @@ describe('timers', () => {
     ]);
     expect(timersOf(store, 'host')).toEqual([]);
     expect(storedWorldTime(store)).toBe(1000);
-  });
-
-  test("moves a World's talk_timer entities into the engine's table (ADR 0022)", async () => {
-    const world = await createWorld([meta], { type: DatabaseType.BUN });
-    const { store } = world;
-    define(
-      store,
-      component('talk_timer', [
-        { name: 'owner', onDelete: 'cascade', optional: false, type: 'eid' },
-        { name: 'script', optional: false, type: 'string' },
-        { name: 'name', optional: false, type: 'string' },
-        { index: true, name: 'at', optional: false, type: 'int' },
-        { name: 'message', optional: false, type: 'string' },
-        { name: 'args', optional: false, type: 'string' }
-      ])
-    );
-    const tower = createEntity(store);
-    for (const [name, at] of [
-      ['late', 9],
-      ['early', 5]
-    ] as const) {
-      put(store, createEntity(store), 'talk_timer', {
-        args: '[]',
-        at,
-        message: 'ring',
-        name,
-        owner: tower,
-        script: 'x'
-      });
-    }
-    ensureTables(store);
-    // and again, as the next start does
-    ensureTables(store);
-    expect(timersOwnedBy(store, tower).map(t => [t.name, t.at])).toEqual([
-      ['early', 5],
-      ['late', 9]
-    ]);
-    expect(query(store, { with: ['talk_timer'] })).toEqual([]);
   });
 });
 

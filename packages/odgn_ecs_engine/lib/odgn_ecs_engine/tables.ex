@@ -31,6 +31,9 @@ defmodule OdgnEcsEngine.Tables do
   entities, into `ecs_engine_timers`. Run it inside the caller's
   transaction, or on start, before anything else writes: running it again
   after a crash part way finishes the move.
+
+  The move is Elixir's only: `ecs-engine` came after the engine kept its
+  own timers, so no World it ever ran has `talk_timer` entities (#309).
   """
   def ensure(%OdgnEcs{conn: conn} = world) do
     SQL.exec!(conn, @schema)

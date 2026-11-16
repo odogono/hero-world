@@ -27,22 +27,14 @@ const rows = <T>(store: Store, sql: string, args: unknown[] = []) =>
   (args.length > 0 ? store.db.query(sql, args) : store.db.query(sql)) as T[];
 
 /**
- * Creates the engine's tables, if they aren't there yet, and moves the
- * timers of a World made before the engine kept them, `talk_timer`
- * entities, into `ecs_engine_timers`.
+ * Creates the engine's tables, if they aren't there yet. Unlike
+ * `OdgnEcsEngine.Tables.ensure/1`, it moves no `talk_timer` entities: this
+ * engine came after the engine kept its own timers, so no World it ran has
+ * them (#309).
  */
 export const ensureTables = (store: Store) => {
   for (const sql of SCHEMA) {
     store.db.exec(sql);
-  }
-  if (store.components.has('talk_timer')) {
-    store.db.exec(
-      'INSERT OR IGNORE INTO ecs_engine_timers (owner, script, name, at, message, args) ' +
-        'SELECT owner, script, name, at, message, args FROM c_talk_timer ORDER BY at, eid'
-    );
-    store.db.exec(
-      'DELETE FROM entities WHERE eid IN (SELECT eid FROM c_talk_timer)'
-    );
   }
 };
 

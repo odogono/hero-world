@@ -206,8 +206,7 @@ defmodule MuaWorld.Migration do
       case OdgnEcs.begin(world) do
         :ok ->
           try do
-            world = Enum.reduce(MuaWorld.Components.all(), world, &define!(&2, &1))
-            MuaWorld.Tables.ensure(world)
+            world = MuaWorld.prepare(world)
 
             case run(world, File.read!(edl_path), Keyword.put(opts, :path, edl_path)) do
               {:ok, _world, report} ->
@@ -232,13 +231,6 @@ defmodule MuaWorld.Migration do
       end
     after
       OdgnEcs.close(world)
-    end
-  end
-
-  defp define!(world, component) do
-    case OdgnEcs.define(world, component) do
-      {:ok, world} -> world
-      {:error, error} -> raise ArgumentError, error.message
     end
   end
 
