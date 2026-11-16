@@ -266,6 +266,10 @@ _Avoid_: built-in, effect
 The part of a Character's Perception that a Verb's noun can name: here, carried, or the room. It never extends past Perception.
 _Avoid_: scope, range
 
+**Recipient**:
+The person, a Character or an NPC, that a thing is given to. It gets the thing without being asked, unless its Scripts refuse.
+_Avoid_: receiver (which is any entity a message is delivered to)
+
 **Suggestion**:
 A Command the World offers a player to send with one click, which they could equally type.
 _Avoid_: action chip, action (for this), shortcut
