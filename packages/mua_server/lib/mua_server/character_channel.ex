@@ -20,8 +20,8 @@ defmodule MuaServer.CharacterChannel do
     account = socket.assigns.account
 
     with {character, ""} <- Integer.parse(id),
-         {:ok, lines} <- MuaWorld.enter(@world, account, character) do
-      :ok = Connection.attach(account, character, self())
+         enter = fn -> MuaWorld.enter(@world, account, character) end,
+         {:ok, lines} <- Connection.attach(account, character, self(), enter) do
       send(self(), {:after_join, lines})
       reply = %{builder: Protocol.builder(MuaWorld.builder(@world, account))}
       {:ok, reply, assign(socket, :character, character)}
