@@ -1,0 +1,64 @@
+# The World the give cases run in: a yard where Ada can give things to other
+# Characters, to a pedlar who trades her ribbon for the feather, and to a
+# miser who takes nothing; a crate that is no one to give to; and a lane
+# east, out of reach.
+
+include "mua-scripts:edl/base.edl"
+
+atom room {
+  container { capacity: 100 is_closed: false }
+}
+
+atom item {
+  item { weight: 1 is_takeable: true }
+}
+
+atom npc {
+  npc { active: true }
+}
+
+atom trades_ribbon {
+  script { src: "scripts/pedlar.talk" }
+}
+
+entity yard : room {
+  described { name: "Yard" description: "A cobbled yard." }
+  exits { east: $lane }
+}
+
+entity lane : room {
+  described { name: "Lane" description: "A narrow lane." }
+  exits { west: $yard }
+}
+
+entity pedlar : npc trades_ribbon {
+  described { name: "Pedlar" description: "A pedlar with a tray of trinkets." }
+  location { in: $yard }
+}
+
+entity ribbon : item {
+  described { name: "Ribbon" description: "A red silk ribbon." }
+  location { in: $pedlar }
+}
+
+entity miser : npc responsive {
+  described { name: "Miser" description: "A thin man clutching his purse." }
+  responses { indirect: { give: "The miser wants nothing of yours." } }
+  location { in: $yard }
+}
+
+entity crate {
+  described { name: "Crate" description: "An open crate." }
+  container { capacity: 10 is_closed: false }
+  location { in: $yard }
+}
+
+entity feather : item {
+  described { name: "Feather" description: "A long feather." }
+  location { in: $yard }
+}
+
+entity apple : item {
+  described { name: "Apple" description: "A red apple." }
+  location { in: $yard }
+}

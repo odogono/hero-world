@@ -1,11 +1,11 @@
--- The thing Service: `examine`, `take`, `drop`, `inventory` and `read`, as
--- a Script. mua sends each `<verb> target, actor`; `target` is Nothing for
--- `inventory`.
+-- The thing Service: `examine`, `take`, `drop`, `give`, `inventory` and
+-- `read`, as a Script. mua sends each `<verb> target, actor`, and `give`
+-- the Recipient after them; `target` is Nothing for `inventory`.
 --
 -- Each returns what the actor sees when it acted, or `{refused: text}`
--- when it said no. Before a `take`, mua asks this Service's `beforeTake`
--- Decision, so a thing that can't be taken is refused before anything else
--- is asked.
+-- when it said no. Before a `take` or a `give`, mua asks this Service's
+-- `beforeTake` or `beforeGive` Decision, so a thing that can't be taken or
+-- given is refused before anything else is asked.
 
 use contents from things
 use messageFor, theName from messages
@@ -30,6 +30,26 @@ end report
 function isPerson thing
   return the player of thing is not nothing or the npc of thing is not nothing
 end isPerson
+
+-- the room someone or something is in, or Nothing
+function roomOf thing
+  if the location of thing is nothing then
+    return nothing
+  end if
+  return the in of the location of thing
+end roomOf
+
+-- whether someone holds a thing, in their hands or in something they carry
+function carries holder, thing
+  put roomOf(thing) into place
+  repeat while place is not nothing
+    if place is holder then
+      return true
+    end if
+    put roomOf(place) into place
+  end repeat
+  return false
+end carries
 
 on examine target, actor
   if target is nothing or (the location of target is nothing and the door of target is nothing) then
@@ -140,6 +160,61 @@ on drop target, actor
   moveTo target, the in of the location of actor
   return report("drop", target, actor)
 end drop
+
+-- why the target can't be given to the Recipient, or Nothing if it can.
+-- A Script's own `give` skips Reach (ADR 0003), so this checks it too.
+function giveRefusal target, actor, recipient
+  if target is nothing then
+    return "Give what?"
+  end if
+  if recipient is nothing then
+    return "Give it to whom?"
+  end if
+  if not carries(actor, target) then
+    return "You aren't carrying that."
+  end if
+  if recipient is actor then
+    return "You already have that."
+  end if
+  if not isPerson(recipient) then
+    return "You can't give things to that."
+  end if
+  if roomOf(recipient) is not roomOf(actor) then
+    return `${theName(recipient)} isn't here.`
+  end if
+  return nothing
+end giveRefusal
+
+-- a Decision is asked about the target alone, so the Recipient comes from
+-- the Command (ADR 0002)
+on beforeGive actor, target, deciding
+  ask mua to command
+  put giveRefusal(target, actor, the optional indirect of it) into refusal
+  if refusal is not nothing then
+    veto refusal
+  end if
+  pass beforeGive
+end beforeGive
+
+-- `msg` for the actor, `imsg` for the Recipient, and `omsg` for everyone
+-- else in the room
+on give target, actor, recipient
+  put giveRefusal(target, actor, recipient) into refusal
+  if refusal is not nothing then
+    return {refused: refusal}
+  end if
+  moveTo target, recipient
+  put {actor: actor, target: target, indirect: recipient} into about
+  put messageFor("give", "imsg", about) into theirs
+  if theirs is not nothing then
+    tell mua to inform recipient, theirs
+  end if
+  put messageFor("give", "omsg", about) into others
+  if others is not nothing then
+    tell mua to announce roomOf(actor), others, [actor, recipient]
+  end if
+  return messageFor("give", "msg", about) otherwise ""
+end give
 
 on read target, actor
   if target is nothing then

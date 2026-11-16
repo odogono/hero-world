@@ -133,12 +133,17 @@ defmodule MuaWorld.Talk do
            :noreply
          end},
       "announce" =>
-        {[args: [entity, "text", optional], cost: 1, mode: :fire_and_forget, command: true],
+        {[
+           args: [entity, "text", %{"optional" => %{"oneOf" => [entity, %{"list" => entity}]}}],
+           cost: 1,
+           mode: :fire_and_forget,
+           command: true
+         ],
          fn [place, text, except], _ ->
-           except = except && Values.from_value(except)
+           except = except |> Values.from_value() |> List.wrap()
 
            for c <- MuaWorld.Tables.characters_at(world, Values.from_value(place)),
-               c != except,
+               c not in except,
                do: MuaWorld.Tables.output(world, c, text)
 
            :noreply
@@ -172,6 +177,15 @@ defmodule MuaWorld.Talk do
          fn [thing], _ ->
            thing = Values.from_value(thing)
            {:ok, Enum.map(OdgnEcs.query(world, where: [{"editing", "thing", thing}]), &handle/1)}
+         end},
+      # Tells one Character a line, as `announce` tells a place; anyone
+      # else, such as an NPC, is told nothing
+      "inform" =>
+        {[args: [entity, "text"], cost: 1, mode: :fire_and_forget, command: true],
+         fn [who, text], _ ->
+           who = Values.from_value(who)
+           if OdgnEcs.get(world, who, "player"), do: MuaWorld.Tables.output(world, who, text)
+           :noreply
          end},
       "limbo" =>
         {[args: [], result: entity, cost: 1],

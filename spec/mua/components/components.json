@@ -447,6 +447,16 @@
         "case_insensitive": false,
         "default": null,
         "index": false,
+        "name": "imsg",
+        "on_delete": "restrict",
+        "optional": true,
+        "type": "json",
+        "unique": false
+      },
+      {
+        "case_insensitive": false,
+        "default": null,
+        "index": false,
         "name": "msg",
         "on_delete": "restrict",
         "optional": true,
